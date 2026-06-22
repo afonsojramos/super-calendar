@@ -12,12 +12,15 @@ export function DefaultEvent<T>({
   event,
   mode,
   isAllDay,
+  ampm = false,
+  showTime = true,
   cellStyle,
   onPress,
   onLongPress,
 }: RenderEventArgs<T>) {
   const theme = useCalendarTheme();
-  const showTime = mode !== 'month' && !isAllDay;
+  const timeFormat = ampm ? 'h:mm a' : 'HH:mm';
+  const shouldShowTime = mode !== 'month' && !isAllDay && showTime;
 
   return (
     <TouchableOpacity
@@ -43,13 +46,13 @@ export function DefaultEvent<T>({
           {event.title}
         </Text>
       ) : null}
-      {showTime ? (
+      {shouldShowTime ? (
         <Text
           style={[styles.time, { color: theme.colors.eventText }]}
           numberOfLines={1}
           allowFontScaling={false}
         >
-          {`${format(event.start, 'HH:mm')} - ${format(event.end, 'HH:mm')}`}
+          {`${format(event.start, timeFormat)} - ${format(event.end, timeFormat)}`}
         </Text>
       ) : null}
     </TouchableOpacity>

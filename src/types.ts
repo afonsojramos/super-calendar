@@ -52,6 +52,10 @@ export type RenderEventArgs<T = unknown> = {
   continuesAfter?: boolean;
   /** True when this event is rendered in the all-day lane (week/day) or is an all-day event in month view. */
   isAllDay?: boolean;
+  /** Format the built-in renderer's time range in 12-hour AM/PM. Default false (24h). */
+  ampm?: boolean;
+  /** Show the time range in the built-in renderer (day/week/schedule). Default true. */
+  showTime?: boolean;
   /** Per-event style resolved from `eventCellStyle`; the built-in renderer merges it onto the box. */
   cellStyle?: StyleProp<ViewStyle>;
   onPress: () => void;

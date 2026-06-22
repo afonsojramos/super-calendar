@@ -81,14 +81,18 @@ export type CalendarProps<T> = {
   swipeEnabled?: boolean;
   /** Show the vertical scroll indicator on the week/day grid. Default true. */
   showVerticalScrollIndicator?: boolean;
+  /** Allow vertical scrolling of the week/day grid. Default true. */
+  verticalScrollEnabled?: boolean;
   /** Element rendered between the day header and the week/day grid. */
   headerComponent?: React.ReactNode;
   /** First hour shown on the week/day grid (0–23). Default 0. */
   minHour?: number;
   /** Last hour shown on the week/day grid, exclusive (1–24). Default 24. */
   maxHour?: number;
-  /** Show hour labels in 12-hour AM/PM form. Default false (24h). */
+  /** Show hour labels (and built-in event times) in 12-hour AM/PM form. Default false (24h). */
   ampm?: boolean;
+  /** Show the time range in the built-in event renderer (day/week/schedule). Default true. */
+  showTime?: boolean;
   /** Initial vertical scroll, in minutes from midnight (week/day). */
   scrollOffsetMinutes?: number;
   /** Show the current-time line on the week/day grid. Default true. */
@@ -154,10 +158,12 @@ export function Calendar<T>({
   showSixWeeks,
   swipeEnabled,
   showVerticalScrollIndicator,
+  verticalScrollEnabled,
   headerComponent,
   minHour,
   maxHour,
   ampm,
+  showTime,
   scrollOffsetMinutes,
   showNowIndicator,
   locale,
@@ -186,17 +192,18 @@ export function Calendar<T>({
     [onLongPressEvent],
   );
 
-  // Inject `eventCellStyle` into the renderer once, so every view gets it for
-  // free without threading the prop through each component.
+  // Inject `eventCellStyle`, `ampm` and `showTime` into the renderer once, so
+  // every view gets them for free without threading the props through each
+  // component. Skip the wrapper entirely when none are set.
   const resolvedRenderEvent = useMemo<RenderEvent<T>>(() => {
-    if (!eventCellStyle) return renderEvent;
+    if (eventCellStyle == null && ampm == null && showTime == null) return renderEvent;
     const Base = renderEvent;
     return function StyledEvent(props: RenderEventArgs<T>) {
       const cellStyle =
         typeof eventCellStyle === 'function' ? eventCellStyle(props.event) : eventCellStyle;
-      return <Base {...props} cellStyle={cellStyle} />;
+      return <Base {...props} cellStyle={cellStyle} ampm={ampm} showTime={showTime} />;
     };
-  }, [renderEvent, eventCellStyle]);
+  }, [renderEvent, eventCellStyle, ampm, showTime]);
 
   return (
     <CalendarThemeProvider value={mergedTheme}>
@@ -254,6 +261,7 @@ export function Calendar<T>({
           showWeekNumber={showWeekNumber}
           weekNumberPrefix={weekNumberPrefix}
           showVerticalScrollIndicator={showVerticalScrollIndicator}
+          verticalScrollEnabled={verticalScrollEnabled}
           headerComponent={headerComponent}
           minHour={minHour}
           maxHour={maxHour}
