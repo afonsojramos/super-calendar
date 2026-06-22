@@ -22,6 +22,8 @@ export type CalendarProps<T> = {
   onPressDay?: (date: Date) => void;
   /** Tap the "+N more" overflow label in a month cell. */
   onPressMore?: (events: CalendarEvent<T>[], date: Date) => void;
+  /** Tap empty space on the week/day grid; receives the date+time pressed. */
+  onPressCell?: (date: Date) => void;
   /** Max events shown per month cell before they collapse into "+N more". */
   maxVisibleEventCount?: number;
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */
@@ -67,6 +69,7 @@ export function Calendar<T>({
   onPressEvent,
   onPressDay,
   onPressMore,
+  onPressCell,
   maxVisibleEventCount = 2,
   weekStartsOn = 0,
   renderEvent = DefaultEvent,
@@ -121,6 +124,7 @@ export function Calendar<T>({
           showNowIndicator={showNowIndicator}
           locale={locale}
           onPressEvent={onPressEvent}
+          onPressCell={onPressCell}
           onChangeDate={onChangeDate}
           renderHeader={renderTimeGridHeader}
         />

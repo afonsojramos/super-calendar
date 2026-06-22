@@ -13,7 +13,14 @@ import {
   startOfWeek,
 } from 'date-fns';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import {
+  type GestureResponderEvent,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   scrollTo,
@@ -209,6 +216,7 @@ type TimetablePageProps<T> = {
   renderEvent: RenderEvent<T>;
   keyExtractor: EventKeyExtractor<T>;
   onPressEvent: (event: CalendarEvent<T>) => void;
+  onPressCell?: (date: Date) => void;
 };
 
 // A single date's grid: the pinch-zoomable, vertically-scrolling time column.
@@ -233,6 +241,7 @@ function TimetablePageInner<T>({
   renderEvent,
   keyExtractor,
   onPressEvent,
+  onPressCell,
 }: TimetablePageProps<T>) {
   const theme = useCalendarTheme();
   const { width } = useWindowDimensions();
@@ -272,6 +281,21 @@ function TimetablePageInner<T>({
     () => days.map((day) => layoutDayEvents(events, day)),
     [days, events],
   );
+
+  // Map a tap on empty grid space back to the date+time it represents. Reads the
+  // live row height on the JS thread to convert the touch Y into minutes.
+  const handleBackgroundPress = (event: GestureResponderEvent) => {
+    if (!onPressCell) return;
+    const { locationX, locationY } = event.nativeEvent;
+    const dayIndex = days.length === 1 ? 0 : Math.floor(locationX / dayWidth);
+    const day = days[dayIndex];
+    if (!day) return;
+    const minutes = Math.round((minHour + locationY / heightSource.value) * MINUTES_PER_HOUR);
+    const pressed = new Date(day);
+    pressed.setHours(0, 0, 0, 0);
+    pressed.setMinutes(minutes);
+    onPressCell(pressed);
+  };
 
   // The hours (rows/labels) visible in the window [minHour, maxHour).
   const hoursRange = useMemo(
@@ -331,6 +355,18 @@ function TimetablePageInner<T>({
           }}
         >
           <Animated.View style={[styles.content, fullHeightStyle]}>
+            {onPressCell ? (
+              // Behind the events, so empty-space taps create while event taps
+              // still hit their box. Hidden from screen readers (a convenience
+              // gesture, not the primary create path).
+              <Pressable
+                style={[styles.cellPressLayer, { left: hourColumnWidth }]}
+                onPress={handleBackgroundPress}
+                importantForAccessibility="no"
+                accessibilityElementsHidden
+              />
+            ) : null}
+
             {days.map((day, dayIndex) =>
               isWeekend(day) ? (
                 <Animated.View
@@ -431,6 +467,7 @@ export type TimeGridProps<T> = {
   showNowIndicator?: boolean;
   locale?: string;
   onPressEvent: (event: CalendarEvent<T>) => void;
+  onPressCell?: (date: Date) => void;
   onChangeDate: (date: Date) => void;
   /** Optional header above the grid (e.g. weekday labels). Rendered full-width. */
   renderHeader?: (days: Date[]) => React.ReactNode;
@@ -453,6 +490,7 @@ function TimeGridInner<T>({
   showNowIndicator = true,
   locale,
   onPressEvent,
+  onPressCell,
   onChangeDate,
   renderHeader,
 }: TimeGridProps<T>) {
@@ -554,6 +592,7 @@ function TimeGridInner<T>({
           renderEvent={renderEvent}
           keyExtractor={keyExtractor}
           onPressEvent={onPressEvent}
+          onPressCell={onPressCell}
         />
       </View>
     ),
@@ -577,6 +616,7 @@ function TimeGridInner<T>({
       renderEvent,
       keyExtractor,
       onPressEvent,
+      onPressCell,
     ],
   );
 
@@ -712,6 +752,12 @@ const styles = StyleSheet.create({
   content: {
     width: '100%',
     position: 'relative',
+  },
+  cellPressLayer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
   },
   weekendColumn: {
     position: 'absolute',
