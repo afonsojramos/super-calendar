@@ -153,15 +153,28 @@ function AnimatedEventBox<T>({
   );
 }
 
+/** Replace the hour-axis label. Receives the hour (0–23) and the `ampm` flag. */
+export type HourRenderer = (hour: number, ampm: boolean) => React.ReactNode;
+
 type HourRowProps = {
   hour: number;
   minHour: number;
   cellHeight: SharedValue<number>;
   hourColumnWidth: number;
   label: string;
+  ampm: boolean;
+  hourComponent?: HourRenderer;
 };
 
-const HourRow = ({ hour, minHour, cellHeight, hourColumnWidth, label }: HourRowProps) => {
+const HourRow = ({
+  hour,
+  minHour,
+  cellHeight,
+  hourColumnWidth,
+  label,
+  ampm,
+  hourComponent,
+}: HourRowProps) => {
   const theme = useCalendarTheme();
   // Position via `top` (a layout prop), not a transform. The per-row layout pass
   // as cellHeight animates keeps the ScrollView's content size in sync while
@@ -173,16 +186,20 @@ const HourRow = ({ hour, minHour, cellHeight, hourColumnWidth, label }: HourRowP
 
   return (
     <Animated.View style={[styles.hourRow, animatedStyle]} pointerEvents="none">
-      <Text
-        style={[
-          theme.text.hourLabel,
-          styles.hourLabel,
-          { width: hourColumnWidth, color: theme.colors.textMuted },
-        ]}
-        allowFontScaling={false}
-      >
-        {label}
-      </Text>
+      {hourComponent ? (
+        <View style={{ width: hourColumnWidth }}>{hourComponent(hour, ampm)}</View>
+      ) : (
+        <Text
+          style={[
+            theme.text.hourLabel,
+            styles.hourLabel,
+            { width: hourColumnWidth, color: theme.colors.textMuted },
+          ]}
+          allowFontScaling={false}
+        >
+          {label}
+        </Text>
+      )}
       <View style={[styles.hourLine, { backgroundColor: theme.colors.gridLine }]} />
     </Animated.View>
   );
@@ -256,6 +273,7 @@ type TimetablePageProps<T> = {
   isRTL: boolean;
   showVerticalScrollIndicator: boolean;
   verticalScrollEnabled: boolean;
+  hourComponent?: HourRenderer;
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
   minHourHeight: number;
   maxHourHeight: number;
@@ -291,6 +309,7 @@ function TimetablePageInner<T>({
   isRTL,
   showVerticalScrollIndicator,
   verticalScrollEnabled,
+  hourComponent,
   calendarCellStyle,
   minHourHeight,
   maxHourHeight,
@@ -500,6 +519,8 @@ function TimetablePageInner<T>({
                 cellHeight={heightSource}
                 hourColumnWidth={hourColumnWidth}
                 label={formatHourLabel(hour, ampm)}
+                ampm={ampm}
+                hourComponent={hourComponent}
               />
             ))}
 
@@ -606,6 +627,8 @@ export type TimeGridProps<T> = {
   verticalScrollEnabled?: boolean;
   /** Prefix for the week-number label (e.g. "W"). Default "W". */
   weekNumberPrefix?: string;
+  /** Replace the hour-axis label. Receives the hour (0–23) and `ampm`. */
+  hourComponent?: HourRenderer;
   /** After an empty-cell press, snap the pager back to the active page. Default false. */
   resetPageOnPressCell?: boolean;
   onPressEvent: (event: CalendarEvent<T>) => void;
@@ -649,6 +672,7 @@ function TimeGridInner<T>({
   showVerticalScrollIndicator = true,
   verticalScrollEnabled = true,
   weekNumberPrefix = 'W',
+  hourComponent,
   resetPageOnPressCell = false,
   onPressEvent,
   onLongPressEvent,
@@ -775,6 +799,7 @@ function TimeGridInner<T>({
           isRTL={isRTL}
           showVerticalScrollIndicator={showVerticalScrollIndicator}
           verticalScrollEnabled={verticalScrollEnabled}
+          hourComponent={hourComponent}
           calendarCellStyle={calendarCellStyle}
           minHourHeight={minHourHeight}
           maxHourHeight={maxHourHeight}
@@ -809,6 +834,7 @@ function TimeGridInner<T>({
       isRTL,
       showVerticalScrollIndicator,
       verticalScrollEnabled,
+      hourComponent,
       calendarCellStyle,
       minHourHeight,
       maxHourHeight,

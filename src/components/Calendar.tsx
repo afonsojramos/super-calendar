@@ -14,7 +14,7 @@ import type {
 import { Agenda } from './Agenda';
 import { DefaultEvent } from './DefaultEvent';
 import { MonthPager } from './MonthPager';
-import { DEFAULT_HOUR_HEIGHT, TimeGrid } from './TimeGrid';
+import { DEFAULT_HOUR_HEIGHT, type HourRenderer, TimeGrid } from './TimeGrid';
 
 export type CalendarProps<T> = {
   events: CalendarEvent<T>[];
@@ -77,6 +77,8 @@ export type CalendarProps<T> = {
   showWeekNumber?: boolean;
   /** Prefix for the week-number label (e.g. "W"). Default "W". */
   weekNumberPrefix?: string;
+  /** Replace the hour-axis label on the week/day grid. Receives the hour (0–23) and `ampm`. */
+  hourComponent?: HourRenderer;
   /** Always render six week rows in month view, for a fixed-height grid. Default false. */
   showSixWeeks?: boolean;
   /** Allow swiping between pages (all modes). Default true. */
@@ -162,6 +164,7 @@ export function Calendar<T>({
   timeslots,
   showWeekNumber,
   weekNumberPrefix,
+  hourComponent,
   showSixWeeks,
   swipeEnabled,
   showVerticalScrollIndicator,
@@ -271,6 +274,7 @@ export function Calendar<T>({
           calendarCellStyle={calendarCellStyle}
           showWeekNumber={showWeekNumber}
           weekNumberPrefix={weekNumberPrefix}
+          hourComponent={hourComponent}
           showVerticalScrollIndicator={showVerticalScrollIndicator}
           verticalScrollEnabled={verticalScrollEnabled}
           headerComponent={headerComponent}
