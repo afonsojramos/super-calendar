@@ -520,6 +520,8 @@ export type TimeGridProps<T> = {
   onLongPressEvent?: (event: CalendarEvent<T>) => void;
   onPressCell?: (date: Date) => void;
   onLongPressCell?: (date: Date) => void;
+  /** Tap a day's column header (default header only). */
+  onPressDateHeader?: (date: Date) => void;
   onChangeDate: (date: Date) => void;
   /** Optional header above the grid (e.g. weekday labels). Rendered full-width. */
   renderHeader?: (days: Date[]) => React.ReactNode;
@@ -549,6 +551,7 @@ function TimeGridInner<T>({
   onLongPressEvent,
   onPressCell,
   onLongPressCell,
+  onPressDateHeader,
   onChangeDate,
   renderHeader,
 }: TimeGridProps<T>) {
@@ -704,6 +707,7 @@ function TimeGridInner<T>({
           width={width}
           hourColumnWidth={hourColumnWidth}
           locale={locale}
+          onPressDateHeader={onPressDateHeader}
         />
       )}
 
@@ -746,16 +750,32 @@ type DefaultHeaderProps = {
   width: number;
   hourColumnWidth: number;
   locale?: Locale;
+  onPressDateHeader?: (date: Date) => void;
 };
 
-const DefaultHeader = ({ days, mode, width, hourColumnWidth, locale }: DefaultHeaderProps) => {
-  const dayWidth = mode === 'week' ? (width - hourColumnWidth) / days.length : width;
+const DefaultHeader = ({
+  days,
+  mode,
+  width,
+  hourColumnWidth,
+  locale,
+  onPressDateHeader,
+}: DefaultHeaderProps) => {
+  // Match the grid below: an hour-column spacer, then one column per day.
+  const dayWidth = (width - hourColumnWidth) / days.length;
 
   return (
     <View style={styles.headerRow}>
-      {mode === 'week' ? <View style={{ width: hourColumnWidth }} /> : null}
+      <View style={{ width: hourColumnWidth }} />
       {days.map((day) => (
-        <DayHeader key={day.toISOString()} day={day} mode={mode} width={dayWidth} locale={locale} />
+        <DayHeader
+          key={day.toISOString()}
+          day={day}
+          mode={mode}
+          width={dayWidth}
+          locale={locale}
+          onPressDateHeader={onPressDateHeader}
+        />
       ))}
     </View>
   );
@@ -766,15 +786,21 @@ type DayHeaderProps = {
   mode: CalendarMode;
   width: number;
   locale?: Locale;
+  onPressDateHeader?: (date: Date) => void;
 };
 
-const DayHeader = ({ day, mode, width, locale }: DayHeaderProps) => {
+const DayHeader = ({ day, mode, width, locale, onPressDateHeader }: DayHeaderProps) => {
   const theme = useCalendarTheme();
   const isToday = getIsToday(day);
   const badgeSize = mode === 'day' ? 44 : 32;
 
   return (
-    <View style={[styles.dayHeader, { width, gap: mode === 'day' ? 4 : 2 }]}>
+    <Pressable
+      style={[styles.dayHeader, { width, gap: mode === 'day' ? 4 : 2 }]}
+      onPress={onPressDateHeader ? () => onPressDateHeader(day) : undefined}
+      disabled={!onPressDateHeader}
+      accessibilityRole={onPressDateHeader ? 'button' : undefined}
+    >
       <View
         style={[
           styles.dayHeaderBadge,
@@ -800,7 +826,7 @@ const DayHeader = ({ day, mode, width, locale }: DayHeaderProps) => {
       <Text style={[theme.text.weekday, { color: theme.colors.text }]} allowFontScaling={false}>
         {format(day, 'EEE', { locale })}
       </Text>
-    </View>
+    </Pressable>
   );
 };
 

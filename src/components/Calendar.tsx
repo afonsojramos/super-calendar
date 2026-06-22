@@ -32,6 +32,8 @@ export type CalendarProps<T> = {
   onPressCell?: (date: Date) => void;
   /** Long-press empty space on the week/day grid; receives the date+time. */
   onLongPressCell?: (date: Date) => void;
+  /** Tap a day's column header on the week/day grid (default header only). */
+  onPressDateHeader?: (date: Date) => void;
   /** Max events shown per month cell before they collapse into "+N more". */
   maxVisibleEventCount?: number;
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */
@@ -90,6 +92,7 @@ export function Calendar<T>({
   onPressMore,
   onPressCell,
   onLongPressCell,
+  onPressDateHeader,
   maxVisibleEventCount = 2,
   weekStartsOn = 0,
   numberOfDays,
@@ -168,6 +171,7 @@ export function Calendar<T>({
           onLongPressEvent={onLongPressEvent}
           onPressCell={onPressCell}
           onLongPressCell={onLongPressCell}
+          onPressDateHeader={onPressDateHeader}
           onChangeDate={onChangeDate}
           renderHeader={renderTimeGridHeader}
         />
