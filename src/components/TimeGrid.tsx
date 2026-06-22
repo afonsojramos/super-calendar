@@ -891,13 +891,9 @@ function TimeGridInner<T>({
         onLayout={(event) => setPageHeight(event.nativeEvent.layout.height)}
       >
         <LegendList
-          // Remount on (a) a measured page-height change, so the list adopts the
-          // corrected item height (avoids the oversized window seed), and (b) a
-          // paging-geometry change (`step`, i.e. a day↔week↔custom switch). A bare
-          // reconcile keeps the old pixel offset against the new `pageDates`, so the
-          // list paints the wrong page for a frame before the realign effect scrolls
-          // it — a fresh mount applies `initialScrollIndex` pre-paint, no flash.
-          key={`${step}-${pageHeight}`}
+          // Remount when the measured page height changes so the list adopts
+          // the corrected item height (avoids keeping the oversized window seed).
+          key={pageHeight}
           ref={listRef}
           style={styles.pagerList}
           data={pageDates}
