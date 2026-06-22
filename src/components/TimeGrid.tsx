@@ -42,6 +42,7 @@ import type {
 } from '../types';
 import { getIsToday, getWeekDays, isWeekend } from '../utils/dates';
 import { layoutDayEvents, type PositionedEvent } from '../utils/layout';
+import { AllDayLane } from './AllDayLane';
 
 const MINUTES_PER_HOUR = 60;
 const HOURS_PER_DAY = 24;
@@ -369,6 +370,17 @@ function TimetablePageInner<T>({
 
   return (
     <View style={styles.container}>
+      <AllDayLane
+        days={days}
+        events={events}
+        mode={mode}
+        hourColumnWidth={hourColumnWidth}
+        dayWidth={dayWidth}
+        renderEvent={renderEvent}
+        keyExtractor={keyExtractor}
+        onPressEvent={onPressEvent}
+        onLongPressEvent={onLongPressEvent}
+      />
       <GestureDetector gesture={zoomGesture}>
         <Animated.ScrollView
           ref={scrollRef}

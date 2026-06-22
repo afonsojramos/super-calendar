@@ -13,7 +13,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useCalendarTheme } from '../theme';
 import type { CalendarEvent, EventKeyExtractor, RenderEvent, WeekStartsOn } from '../types';
 import { getIsToday, isWeekend } from '../utils/dates';
-import { eventDayKeys } from '../utils/layout';
+import { eventDayKeys, isAllDayEvent } from '../utils/layout';
 
 const chunkIntoWeeks = (days: Date[]): Date[][] => {
   const weeks: Date[][] = [];
@@ -123,6 +123,7 @@ function MonthViewInner<T>({
             <RenderEventComponent
               event={event}
               mode="month"
+              isAllDay={isAllDayEvent(event)}
               onPress={() => onPressEvent(event)}
               onLongPress={onLongPressEvent ? () => onLongPressEvent(event) : undefined}
             />

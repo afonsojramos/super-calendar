@@ -24,6 +24,8 @@ function buildEvents(): CalendarEvent<EventMeta>[] {
     { id: '4', kind: 'exam', title: 'Mid-term Exam', start: at(2, 9), end: at(2, 12) },
     // A multi-day event: renders on every day it spans, clipped per day.
     { id: '5', kind: 'lecture', title: 'Residential', start: at(3, 18), end: at(5, 12) },
+    // An all-day event: renders in the lane above the grid, not in the columns.
+    { id: '6', kind: 'lecture', title: 'Reading Week', start: at(0, 0), end: at(1, 0), allDay: true },
   ];
 }
 

@@ -43,6 +43,8 @@ export function layoutDayEvents<T>(
   const nextDayStart = addDays(dayStart, 1);
 
   const segments: Segment<T>[] = events
+    // All-day events live in the lane, not the timed columns.
+    .filter((event) => !isAllDayEvent(event))
     // Overlaps this day if it starts before the day ends and ends after it begins.
     .filter((event) => event.start < nextDayStart && event.end > dayStart)
     .map((event) => {
@@ -97,6 +99,22 @@ export function layoutDayEvents<T>(
   if (cluster.length > 0) flushCluster();
 
   return positioned;
+}
+
+const atMidnight = (date: Date): boolean =>
+  date.getHours() === 0 &&
+  date.getMinutes() === 0 &&
+  date.getSeconds() === 0 &&
+  date.getMilliseconds() === 0;
+
+/**
+ * Whether an event belongs in the all-day lane. An explicit `allDay` flag wins;
+ * otherwise it's inferred when the event spans whole days (both `start` and
+ * `end` land on midnight, e.g. an iCal-style all-day event). Pure.
+ */
+export function isAllDayEvent<T>(event: CalendarEvent<T>): boolean {
+  if (typeof event.allDay === 'boolean') return event.allDay;
+  return event.end > event.start && atMidnight(event.start) && atMidnight(event.end);
 }
 
 /**

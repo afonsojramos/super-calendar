@@ -1,4 +1,4 @@
-import { eventDayKeys, layoutDayEvents } from '../layout';
+import { eventDayKeys, isAllDayEvent, layoutDayEvents } from '../layout';
 import type { CalendarEvent } from '../../types';
 
 const at = (h: number, m = 0) => new Date(2026, 5, 15, h, m); // 15 Jun 2026, local
@@ -18,6 +18,15 @@ describe('layoutDayEvents', () => {
   it('excludes events from other days', () => {
     const other: CalendarEvent = { start: new Date(2026, 5, 16, 10), end: new Date(2026, 5, 16, 11) };
     expect(layoutDayEvents([other], day)).toEqual([]);
+  });
+
+  it('excludes all-day events (they belong in the lane)', () => {
+    const allDayFlag: CalendarEvent = { start: at(9), end: at(10), allDay: true };
+    const midnightSpan: CalendarEvent = { start: at(0), end: new Date(2026, 5, 16, 0) };
+    const timed = ev(10, 11);
+    const result = layoutDayEvents([allDayFlag, midnightSpan, timed], day);
+    expect(result).toHaveLength(1);
+    expect(result[0].startHours).toBe(10);
   });
 
   it('places a single event in column 0 of a single column', () => {
@@ -102,6 +111,25 @@ describe('layoutDayEvents', () => {
       expect(layoutDayEvents([toMidnight], new Date(2026, 5, 16))).toEqual([]);
       expect(layoutDayEvents([toMidnight], new Date(2026, 5, 15))).toHaveLength(1);
     });
+  });
+});
+
+describe('isAllDayEvent', () => {
+  it('honours an explicit allDay flag over the heuristic', () => {
+    expect(isAllDayEvent({ start: new Date(2026, 5, 15, 9), end: new Date(2026, 5, 15, 10), allDay: true })).toBe(true);
+    // midnight-to-midnight but explicitly not all-day
+    expect(isAllDayEvent({ start: new Date(2026, 5, 15), end: new Date(2026, 5, 16), allDay: false })).toBe(false);
+  });
+
+  it('infers all-day from midnight-to-midnight spans', () => {
+    expect(isAllDayEvent({ start: new Date(2026, 5, 15), end: new Date(2026, 5, 16) })).toBe(true);
+    expect(isAllDayEvent({ start: new Date(2026, 5, 15), end: new Date(2026, 5, 18) })).toBe(true);
+  });
+
+  it('is false for timed events', () => {
+    expect(isAllDayEvent({ start: new Date(2026, 5, 15, 9), end: new Date(2026, 5, 15, 10) })).toBe(false);
+    // starts at midnight but ends mid-day -> timed
+    expect(isAllDayEvent({ start: new Date(2026, 5, 15), end: new Date(2026, 5, 15, 12) })).toBe(false);
   });
 });
 

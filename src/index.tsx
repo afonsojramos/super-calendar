@@ -27,4 +27,4 @@ export {
   isSameCalendarDay,
   minutesIntoDay,
 } from './utils/dates';
-export { layoutDayEvents, type PositionedEvent } from './utils/layout';
+export { layoutDayEvents, isAllDayEvent, type PositionedEvent } from './utils/layout';

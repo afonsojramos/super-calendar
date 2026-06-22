@@ -13,6 +13,12 @@ export interface ICalendarEvent {
   start: Date;
   end: Date;
   title?: string;
+  /**
+   * Force this event into the all-day lane (above the time grid) instead of the
+   * timed columns. When omitted, an event is treated as all-day only if it spans
+   * whole days (both `start` and `end` land on midnight).
+   */
+  allDay?: boolean;
 }
 
 /**
@@ -38,6 +44,8 @@ export type RenderEventArgs<T = unknown> = {
    */
   continuesBefore?: boolean;
   continuesAfter?: boolean;
+  /** True when this event is rendered in the all-day lane (week/day) or is an all-day event in month view. */
+  isAllDay?: boolean;
   onPress: () => void;
   /** Wired when the consumer passes `onLongPressEvent`; otherwise undefined. */
   onLongPress?: () => void;

@@ -163,6 +163,10 @@ See `CalendarTheme` for the full set of tokens. Anything you omit falls back to
   under the touch — handy for "create event". (Event taps still go to `onPressEvent`.)
 - **Long-press** mirrors every tap: `onLongPressEvent(event)`, `onLongPressCell(date)`
   (week/day), and `onLongPressDay(date)` (month). All optional.
+- **All-day events** render in a lane above the time grid (and as chips in month
+  cells), excluded from the timed columns. Mark an event `allDay: true`, or it's
+  inferred when it spans whole days (midnight-to-midnight). `renderEvent` receives
+  `isAllDay` so you can style the chip. The lane is hidden when there are none.
 - `freeSwipe` (default `false`) controls paging: by default one day/week/month
   moves per swipe; set it to allow a fling to carry across several pages (still
   snapping to a page boundary). Applies to all modes.
@@ -187,7 +191,8 @@ are also exported for advanced layouts:
   it spans. On the week/day grid each day shows the clipped segment (so a
   23:00→01:00 event renders 23:00–24:00, then 00:00–01:00), and `renderEvent`
   receives `continuesBefore`/`continuesAfter` so you can draw continuation hints.
-  A dedicated all-day lane (and an explicit `allDay` flag) is not yet provided.
+  All-day events (an explicit `allDay` flag or a midnight-to-midnight span) render
+  in a dedicated lane above the time grid.
 - **`weekStartsOn` defaults to `0` (Sunday).** Pass `1` for Monday-first.
 - **Controlled `date`.** The calendar is controlled: echo `onChangeDate` back
   into the `date` prop, or paging and the "today" realign won't track.
