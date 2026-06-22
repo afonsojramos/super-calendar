@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.1](https://github.com/afonsojramos/react-native-bigger-calendar/compare/v0.2.0...v0.2.1) (2026-06-22)
+
+
+### Bug Fixes
+
+* **example:** block the library's node_modules to dedupe React Native in Metro ([f4ceaff](https://github.com/afonsojramos/react-native-bigger-calendar/commit/f4ceaff5acf62d279ed9b3d3e624e6190b4b92ac))
+* **example:** use SafeAreaView from react-native-safe-area-context ([1e7b4e4](https://github.com/afonsojramos/react-native-bigger-calendar/commit/1e7b4e45f86e80a1c726364e9c31d1f6b62c1535))
+* **timegrid:** key multi-day event segments per day to avoid duplicate keys ([c1a1350](https://github.com/afonsojramos/react-native-bigger-calendar/commit/c1a1350f446ec971e405841649cf229c3387a6f6))
+* **timegrid:** reserve the today-badge size to avoid header layout shift ([d784047](https://github.com/afonsojramos/react-native-bigger-calendar/commit/d784047f06148cf90836c57d9658973cc9c968ef))
+
 ## [0.2.0](https://github.com/afonsojramos/react-native-bigger-calendar/compare/v0.1.0...v0.2.0) (2026-06-22)
 
 
