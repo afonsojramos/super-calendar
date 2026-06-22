@@ -16,5 +16,5 @@
     "noEmit": true
   },
   "include": ["src"],
-  "exclude": ["lib", "node_modules"]
+  "exclude": ["dist", "node_modules"]
 }
