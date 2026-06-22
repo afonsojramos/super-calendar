@@ -254,6 +254,7 @@ type TimetablePageProps<T> = {
   ampm: boolean;
   timeslots: number;
   isRTL: boolean;
+  showVerticalScrollIndicator: boolean;
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
   minHourHeight: number;
   maxHourHeight: number;
@@ -287,6 +288,7 @@ function TimetablePageInner<T>({
   ampm,
   timeslots,
   isRTL,
+  showVerticalScrollIndicator,
   calendarCellStyle,
   minHourHeight,
   maxHourHeight,
@@ -418,7 +420,7 @@ function TimetablePageInner<T>({
       <GestureDetector gesture={zoomGesture}>
         <Animated.ScrollView
           ref={scrollRef}
-          showsVerticalScrollIndicator
+          showsVerticalScrollIndicator={showVerticalScrollIndicator}
           onScroll={scrollHandler}
           scrollEventThrottle={16}
           contentContainerStyle={{ paddingTop: HOUR_LABEL_TOP_INSET }}
@@ -593,6 +595,12 @@ export type TimeGridProps<T> = {
   showNowIndicator?: boolean;
   locale?: Locale;
   freeSwipe?: boolean;
+  /** Allow swiping between pages. Default true. */
+  swipeEnabled?: boolean;
+  /** Show the vertical scroll indicator on the time grid. Default true. */
+  showVerticalScrollIndicator?: boolean;
+  /** Prefix for the week-number label (e.g. "W"). Default "W". */
+  weekNumberPrefix?: string;
   onPressEvent: (event: CalendarEvent<T>) => void;
   onLongPressEvent?: (event: CalendarEvent<T>) => void;
   onPressCell?: (date: Date) => void;
@@ -630,6 +638,9 @@ function TimeGridInner<T>({
   showNowIndicator = true,
   locale,
   freeSwipe = false,
+  swipeEnabled = true,
+  showVerticalScrollIndicator = true,
+  weekNumberPrefix = 'W',
   onPressEvent,
   onLongPressEvent,
   onPressCell,
@@ -742,6 +753,7 @@ function TimeGridInner<T>({
           ampm={ampm}
           timeslots={timeslots}
           isRTL={isRTL}
+          showVerticalScrollIndicator={showVerticalScrollIndicator}
           calendarCellStyle={calendarCellStyle}
           minHourHeight={minHourHeight}
           maxHourHeight={maxHourHeight}
@@ -774,6 +786,7 @@ function TimeGridInner<T>({
       ampm,
       timeslots,
       isRTL,
+      showVerticalScrollIndicator,
       calendarCellStyle,
       minHourHeight,
       maxHourHeight,
@@ -798,6 +811,7 @@ function TimeGridInner<T>({
           width={width}
           hourColumnWidth={hourColumnWidth}
           showWeekNumber={showWeekNumber}
+          weekNumberPrefix={weekNumberPrefix}
           locale={locale}
           onPressDateHeader={onPressDateHeader}
         />
@@ -820,6 +834,7 @@ function TimeGridInner<T>({
           recycleItems={false}
           keyExtractor={keyExtractorList}
           getFixedItemSize={getFixedItemSize}
+          scrollEnabled={swipeEnabled}
           // Default: native paging — each page is the viewport width, so a swipe
           // hard-stops at the adjacent page and can't fling past it. With
           // `freeSwipe`, momentum carries across pages and snaps to a boundary.
@@ -844,6 +859,7 @@ type DefaultHeaderProps = {
   width: number;
   hourColumnWidth: number;
   showWeekNumber?: boolean;
+  weekNumberPrefix?: string;
   locale?: Locale;
   onPressDateHeader?: (date: Date) => void;
 };
@@ -854,6 +870,7 @@ const DefaultHeader = ({
   width,
   hourColumnWidth,
   showWeekNumber,
+  weekNumberPrefix = 'W',
   locale,
   onPressDateHeader,
 }: DefaultHeaderProps) => {
@@ -869,7 +886,7 @@ const DefaultHeader = ({
             style={[theme.text.hourLabel, { color: theme.colors.textMuted }]}
             allowFontScaling={false}
           >
-            {`W${getISOWeek(days[0])}`}
+            {`${weekNumberPrefix}${getISOWeek(days[0])}`}
           </Text>
         ) : null}
       </View>

@@ -73,6 +73,14 @@ export type CalendarProps<T> = {
   timeslots?: number;
   /** Show the ISO week number in the week/day header gutter. Default false. */
   showWeekNumber?: boolean;
+  /** Prefix for the week-number label (e.g. "W"). Default "W". */
+  weekNumberPrefix?: string;
+  /** Always render six week rows in month view, for a fixed-height grid. Default false. */
+  showSixWeeks?: boolean;
+  /** Allow swiping between pages (all modes). Default true. */
+  swipeEnabled?: boolean;
+  /** Show the vertical scroll indicator on the week/day grid. Default true. */
+  showVerticalScrollIndicator?: boolean;
   /** Element rendered between the day header and the week/day grid. */
   headerComponent?: React.ReactNode;
   /** First hour shown on the week/day grid (0–23). Default 0. */
@@ -142,6 +150,10 @@ export function Calendar<T>({
   hideHours,
   timeslots,
   showWeekNumber,
+  weekNumberPrefix,
+  showSixWeeks,
+  swipeEnabled,
+  showVerticalScrollIndicator,
   headerComponent,
   minHour,
   maxHour,
@@ -200,6 +212,7 @@ export function Calendar<T>({
           showAdjacentMonths={showAdjacentMonths}
           disableMonthEventCellPress={disableMonthEventCellPress}
           isRTL={isRTL}
+          showSixWeeks={showSixWeeks}
           calendarCellStyle={calendarCellStyle}
           renderEvent={resolvedRenderEvent}
           keyExtractor={keyExtractor}
@@ -210,6 +223,7 @@ export function Calendar<T>({
           onPressMore={onPressMore}
           onChangeDate={onChangeDate}
           freeSwipe={freeSwipe}
+          swipeEnabled={swipeEnabled}
         />
       ) : mode === 'schedule' ? (
         <Agenda
@@ -238,6 +252,8 @@ export function Calendar<T>({
           timeslots={timeslots}
           calendarCellStyle={calendarCellStyle}
           showWeekNumber={showWeekNumber}
+          weekNumberPrefix={weekNumberPrefix}
+          showVerticalScrollIndicator={showVerticalScrollIndicator}
           headerComponent={headerComponent}
           minHour={minHour}
           maxHour={maxHour}
@@ -248,6 +264,7 @@ export function Calendar<T>({
           locale={locale}
           isRTL={isRTL}
           freeSwipe={freeSwipe}
+          swipeEnabled={swipeEnabled}
           onPressEvent={handlePressEvent}
           onLongPressEvent={handleLongPressEvent}
           onPressCell={onPressCell}

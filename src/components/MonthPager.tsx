@@ -40,6 +40,8 @@ export type MonthPagerProps<T> = {
   onPressMore?: (events: CalendarEvent<T>[], date: Date) => void;
   onChangeDate: (date: Date) => void;
   freeSwipe?: boolean;
+  swipeEnabled?: boolean;
+  showSixWeeks?: boolean;
 };
 
 function MonthPagerInner<T>({
@@ -63,6 +65,8 @@ function MonthPagerInner<T>({
   onPressMore,
   onChangeDate,
   freeSwipe = false,
+  swipeEnabled = true,
+  showSixWeeks = false,
 }: MonthPagerProps<T>) {
   const { width, height } = useWindowDimensions();
   const listRef = useRef<LegendListRef>(null);
@@ -126,6 +130,7 @@ function MonthPagerInner<T>({
           showAdjacentMonths={showAdjacentMonths}
           disableMonthEventCellPress={disableMonthEventCellPress}
           isRTL={isRTL}
+          showSixWeeks={showSixWeeks}
           calendarCellStyle={calendarCellStyle}
           renderEvent={renderEvent}
           keyExtractor={keyExtractor}
@@ -149,6 +154,7 @@ function MonthPagerInner<T>({
       showAdjacentMonths,
       disableMonthEventCellPress,
       isRTL,
+      showSixWeeks,
       calendarCellStyle,
       renderEvent,
       keyExtractor,
@@ -174,6 +180,7 @@ function MonthPagerInner<T>({
         recycleItems={false}
         keyExtractor={keyExtractorList}
         getFixedItemSize={getFixedItemSize}
+        scrollEnabled={swipeEnabled}
         // Default: native paging — each page is the viewport width, so a swipe
         // hard-stops at the adjacent month and can't fling past it. With
         // `freeSwipe`, momentum carries across months and snaps to a boundary.

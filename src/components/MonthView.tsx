@@ -1,4 +1,5 @@
 import {
+  addDays,
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
@@ -40,6 +41,8 @@ export type MonthViewProps<T> = {
   disableMonthEventCellPress?: boolean;
   /** Reverse the day order within each week (right-to-left). Default false. */
   isRTL?: boolean;
+  /** Always render six week rows, for a fixed-height grid. Default false. */
+  showSixWeeks?: boolean;
   /** Per-date style merged onto the day cell. */
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
   renderEvent: RenderEvent<T>;
@@ -62,6 +65,7 @@ function MonthViewInner<T>({
   showAdjacentMonths = true,
   disableMonthEventCellPress = false,
   isRTL = false,
+  showSixWeeks = false,
   calendarCellStyle,
   renderEvent,
   keyExtractor,
@@ -76,10 +80,13 @@ function MonthViewInner<T>({
 
   const weeks = useMemo(() => {
     const start = startOfWeek(startOfMonth(date), { weekStartsOn });
-    const end = endOfWeek(endOfMonth(date), { weekStartsOn });
+    const naturalEnd = endOfWeek(endOfMonth(date), { weekStartsOn });
+    // Pad to six rows (42 days) for a fixed-height grid; some months span only
+    // four or five weeks.
+    const end = showSixWeeks ? addDays(start, 41) : naturalEnd;
     const chunked = chunkIntoWeeks(eachDayOfInterval({ start, end }));
     return isRTL ? chunked.map((week) => [...week].reverse()) : chunked;
-  }, [date, weekStartsOn, isRTL]);
+  }, [date, weekStartsOn, isRTL, showSixWeeks]);
 
   // Group events by calendar day once per `events` change, rather than scanning
   // the whole list inside every one of the (up to) 42 day cells on each render.
