@@ -110,6 +110,25 @@ function MyEvent({ event, boxHeight, onPress }: RenderEventArgs<MyEvent>) {
 See `CalendarTheme` for the full set of tokens. Anything you omit falls back to
 `defaultTheme`.
 
+### Week/day grid options
+
+```tsx
+<Calendar
+  mode="week"
+  // ...
+  minHour={7}            // window the grid to 07:00–21:00
+  maxHour={21}
+  ampm                   // 12-hour hour labels ("7 AM")
+  onPressCell={(date) => createEventAt(date)} // tap empty space -> date+time
+/>
+```
+
+- `minHour` / `maxHour` clamp the visible hours (defaults `0` / `24`); events and
+  the now-line outside the window are hidden, and the initial scroll is adjusted.
+- `ampm` switches hour labels to 12-hour AM/PM (default 24h).
+- `onPressCell(date)` fires when empty grid space is tapped, with the date+time
+  under the touch — handy for "create event". (Event taps still go to `onPressEvent`.)
+
 ## Components
 
 `<Calendar>` is the batteries-included entry point. The building blocks it wraps
