@@ -1,5 +1,5 @@
 import type { Locale } from 'date-fns';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useSharedValue } from 'react-native-reanimated';
 import { CalendarThemeProvider, mergeTheme, type PartialCalendarTheme } from '../theme';
 import type {
@@ -129,6 +129,23 @@ export function Calendar<T>({
   const internalCellHeight = useSharedValue(hourHeight);
   const cellHeight = cellHeightProp ?? internalCellHeight;
 
+  // Swallow presses on disabled events once, so every view inherits the guard.
+  const handlePressEvent = useCallback(
+    (event: CalendarEvent<T>) => {
+      if (!event.disabled) onPressEvent(event);
+    },
+    [onPressEvent],
+  );
+  const handleLongPressEvent = useMemo(
+    () =>
+      onLongPressEvent
+        ? (event: CalendarEvent<T>) => {
+            if (!event.disabled) onLongPressEvent(event);
+          }
+        : undefined,
+    [onLongPressEvent],
+  );
+
   return (
     <CalendarThemeProvider value={mergedTheme}>
       {mode === 'month' ? (
@@ -146,8 +163,8 @@ export function Calendar<T>({
           keyExtractor={keyExtractor}
           onPressDay={onPressDay}
           onLongPressDay={onLongPressDay}
-          onPressEvent={onPressEvent}
-          onLongPressEvent={onLongPressEvent}
+          onPressEvent={handlePressEvent}
+          onLongPressEvent={handleLongPressEvent}
           onPressMore={onPressMore}
           onChangeDate={onChangeDate}
           freeSwipe={freeSwipe}
@@ -158,8 +175,8 @@ export function Calendar<T>({
           locale={locale}
           renderEvent={renderEvent}
           keyExtractor={keyExtractor}
-          onPressEvent={onPressEvent}
-          onLongPressEvent={onLongPressEvent}
+          onPressEvent={handlePressEvent}
+          onLongPressEvent={handleLongPressEvent}
           onPressDay={onPressDay}
         />
       ) : (
@@ -183,8 +200,8 @@ export function Calendar<T>({
           showNowIndicator={showNowIndicator}
           locale={locale}
           freeSwipe={freeSwipe}
-          onPressEvent={onPressEvent}
-          onLongPressEvent={onLongPressEvent}
+          onPressEvent={handlePressEvent}
+          onLongPressEvent={handleLongPressEvent}
           onPressCell={onPressCell}
           onLongPressCell={onLongPressCell}
           onPressDateHeader={onPressDateHeader}

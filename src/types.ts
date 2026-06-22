@@ -22,6 +22,8 @@ export interface ICalendarEvent {
    * whole days (both `start` and `end` land on midnight).
    */
   allDay?: boolean;
+  /** Ignore taps/long-presses on this event (the built-in renderer also dims it). */
+  disabled?: boolean;
 }
 
 /**

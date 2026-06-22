@@ -14,7 +14,11 @@ export function DefaultEvent<T>({ event, mode, isAllDay, onPress, onLongPress }:
 
   return (
     <TouchableOpacity
-      style={[styles.box, { backgroundColor: theme.colors.eventBackground }]}
+      style={[
+        styles.box,
+        { backgroundColor: theme.colors.eventBackground },
+        event.disabled && styles.disabled,
+      ]}
       onPress={onPress}
       onLongPress={onLongPress}
       activeOpacity={0.7}
@@ -54,5 +58,8 @@ const styles = StyleSheet.create({
   },
   time: {
     fontSize: 11,
+  },
+  disabled: {
+    opacity: 0.5,
   },
 });
