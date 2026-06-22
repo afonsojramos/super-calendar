@@ -30,6 +30,14 @@ export type MonthViewProps<T> = {
   maxVisibleEventCount: number;
   weekStartsOn: WeekStartsOn;
   locale?: Locale;
+  /** Sort each day's events by start time before slicing. Default true. */
+  sortedMonthView?: boolean;
+  /** Template for the overflow label; `{moreCount}` is replaced. Default "{moreCount} More". */
+  moreLabel?: string;
+  /** Show dimmed days from adjacent months in the grid. Default true. */
+  showAdjacentMonths?: boolean;
+  /** Ignore taps on month-cell events (day-cell taps still fire). Default false. */
+  disableMonthEventCellPress?: boolean;
   renderEvent: RenderEvent<T>;
   keyExtractor: EventKeyExtractor<T>;
   onPressDay?: (date: Date) => void;
@@ -45,6 +53,10 @@ function MonthViewInner<T>({
   maxVisibleEventCount,
   weekStartsOn,
   locale,
+  sortedMonthView = true,
+  moreLabel = '{moreCount} More',
+  showAdjacentMonths = true,
+  disableMonthEventCellPress = false,
   renderEvent,
   keyExtractor,
   onPressDay,
@@ -74,12 +86,30 @@ function MonthViewInner<T>({
         else map.set(key, [event]);
       }
     }
+    if (sortedMonthView) {
+      for (const list of map.values()) list.sort((a, b) => a.start.getTime() - b.start.getTime());
+    }
     return map;
-  }, [events]);
+  }, [events, sortedMonthView]);
 
   const renderDay = (day: Date) => {
-    const dayEvents = eventsByDay.get(startOfDay(day).toISOString()) ?? [];
     const isCurrentMonth = isSameMonth(day, date);
+
+    // Blank out adjacent-month days when they're hidden, keeping the grid shape.
+    if (!isCurrentMonth && !showAdjacentMonths) {
+      return (
+        <View
+          key={day.toISOString()}
+          style={[
+            styles.dayCell,
+            { borderColor: theme.colors.gridLine },
+            isWeekend(day) && { backgroundColor: theme.colors.weekendBackground },
+          ]}
+        />
+      );
+    }
+
+    const dayEvents = eventsByDay.get(startOfDay(day).toISOString()) ?? [];
     const isToday = getIsToday(day);
     const hiddenCount = dayEvents.length - maxVisibleEventCount;
 
@@ -127,8 +157,12 @@ function MonthViewInner<T>({
               event={event}
               mode="month"
               isAllDay={isAllDayEvent(event)}
-              onPress={() => onPressEvent(event)}
-              onLongPress={onLongPressEvent ? () => onLongPressEvent(event) : undefined}
+              onPress={disableMonthEventCellPress ? () => {} : () => onPressEvent(event)}
+              onLongPress={
+                disableMonthEventCellPress || !onLongPressEvent
+                  ? undefined
+                  : () => onLongPressEvent(event)
+              }
             />
           </View>
         ))}
@@ -140,7 +174,7 @@ function MonthViewInner<T>({
             accessibilityLabel={`Show ${hiddenCount} more events`}
             allowFontScaling={false}
           >
-            {`${hiddenCount} More`}
+            {moreLabel.replace('{moreCount}', String(hiddenCount))}
           </Text>
         ) : null}
       </TouchableOpacity>

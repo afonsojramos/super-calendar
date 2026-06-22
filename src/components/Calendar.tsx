@@ -36,6 +36,14 @@ export type CalendarProps<T> = {
   onPressDateHeader?: (date: Date) => void;
   /** Max events shown per month cell before they collapse into "+N more". */
   maxVisibleEventCount?: number;
+  /** Sort each month day's events by start. Default true. */
+  sortedMonthView?: boolean;
+  /** Month overflow label template; `{moreCount}` is replaced. Default "{moreCount} More". */
+  moreLabel?: string;
+  /** Show dimmed adjacent-month days in the month grid. Default true. */
+  showAdjacentMonths?: boolean;
+  /** Ignore taps on month-cell events (day taps still fire). Default false. */
+  disableMonthEventCellPress?: boolean;
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */
   weekStartsOn?: WeekStartsOn;
   /** Number of day columns when `mode="custom"`. Ignored by other modes. Default 1. */
@@ -94,6 +102,10 @@ export function Calendar<T>({
   onLongPressCell,
   onPressDateHeader,
   maxVisibleEventCount = 2,
+  sortedMonthView,
+  moreLabel,
+  showAdjacentMonths,
+  disableMonthEventCellPress,
   weekStartsOn = 0,
   numberOfDays,
   renderEvent = DefaultEvent,
@@ -126,6 +138,10 @@ export function Calendar<T>({
           maxVisibleEventCount={maxVisibleEventCount}
           weekStartsOn={weekStartsOn}
           locale={locale}
+          sortedMonthView={sortedMonthView}
+          moreLabel={moreLabel}
+          showAdjacentMonths={showAdjacentMonths}
+          disableMonthEventCellPress={disableMonthEventCellPress}
           renderEvent={renderEvent}
           keyExtractor={keyExtractor}
           onPressDay={onPressDay}

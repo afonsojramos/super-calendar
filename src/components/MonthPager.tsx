@@ -25,6 +25,10 @@ export type MonthPagerProps<T> = {
   maxVisibleEventCount: number;
   weekStartsOn: WeekStartsOn;
   locale?: Locale;
+  sortedMonthView?: boolean;
+  moreLabel?: string;
+  showAdjacentMonths?: boolean;
+  disableMonthEventCellPress?: boolean;
   renderEvent: RenderEvent<T>;
   keyExtractor: EventKeyExtractor<T>;
   onPressDay?: (date: Date) => void;
@@ -42,6 +46,10 @@ function MonthPagerInner<T>({
   maxVisibleEventCount,
   weekStartsOn,
   locale,
+  sortedMonthView,
+  moreLabel,
+  showAdjacentMonths,
+  disableMonthEventCellPress,
   renderEvent,
   keyExtractor,
   onPressDay,
@@ -109,6 +117,10 @@ function MonthPagerInner<T>({
           maxVisibleEventCount={maxVisibleEventCount}
           weekStartsOn={weekStartsOn}
           locale={locale}
+          sortedMonthView={sortedMonthView}
+          moreLabel={moreLabel}
+          showAdjacentMonths={showAdjacentMonths}
+          disableMonthEventCellPress={disableMonthEventCellPress}
           renderEvent={renderEvent}
           keyExtractor={keyExtractor}
           onPressDay={onPressDay}
@@ -126,6 +138,10 @@ function MonthPagerInner<T>({
       maxVisibleEventCount,
       weekStartsOn,
       locale,
+      sortedMonthView,
+      moreLabel,
+      showAdjacentMonths,
+      disableMonthEventCellPress,
       renderEvent,
       keyExtractor,
       onPressDay,
