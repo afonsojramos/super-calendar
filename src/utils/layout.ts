@@ -1,4 +1,4 @@
-import { differenceInMinutes, isSameDay, startOfDay } from 'date-fns';
+import { addDays, differenceInMinutes, max as maxDate, min as minDate, startOfDay } from 'date-fns';
 import type { CalendarEvent } from '../types';
 
 const MINUTES_PER_HOUR = 60;
@@ -8,69 +8,112 @@ const MIN_DURATION_HOURS = 0.25;
 
 export type PositionedEvent<T> = {
   event: CalendarEvent<T>;
-  /** Hours from midnight to the event start (fractional). */
+  /** Hours from midnight to the event's segment start on this day (fractional). */
   startHours: number;
-  /** Event duration in hours (clamped to a small minimum). */
+  /** Segment duration in hours on this day (clamped to a small minimum). */
   durationHours: number;
   /** Zero-based column index within its overlap cluster. */
   column: number;
   /** Total columns in this event's overlap cluster. */
   columns: number;
+  /** True when the segment is clipped because the event continues before/after this day. */
+  continuesBefore: boolean;
+  continuesAfter: boolean;
+};
+
+type Segment<T> = {
+  event: CalendarEvent<T>;
+  start: number;
+  end: number;
+  continuesBefore: boolean;
+  continuesAfter: boolean;
 };
 
 /**
  * Lay out a single day's events: events that overlap in time are split into
- * side-by-side columns. Pure — safe to call per render, never per gesture frame.
- *
- * Exported so consumers can build custom day/week grids on the same overlap
- * model the package uses internally.
+ * side-by-side columns. Multi-day events are clipped to the portion that falls
+ * on `day` (e.g. a 23:00→01:00 event renders 23:00–24:00 on the start day and
+ * 00:00–01:00 on the next). Pure — safe to call per render, never per frame.
  */
 export function layoutDayEvents<T>(
   events: CalendarEvent<T>[],
   day: Date,
 ): PositionedEvent<T>[] {
   const dayStart = startOfDay(day);
-  const sorted = events
-    .filter((event) => isSameDay(event.start, day))
-    .sort((a, b) => a.start.getTime() - b.start.getTime());
+  const nextDayStart = addDays(dayStart, 1);
+
+  const segments: Segment<T>[] = events
+    // Overlaps this day if it starts before the day ends and ends after it begins.
+    .filter((event) => event.start < nextDayStart && event.end > dayStart)
+    .map((event) => {
+      const segStart = maxDate([event.start, dayStart]);
+      const segEnd = minDate([event.end, nextDayStart]);
+      return {
+        event,
+        start: differenceInMinutes(segStart, dayStart) / MINUTES_PER_HOUR,
+        end: differenceInMinutes(segEnd, dayStart) / MINUTES_PER_HOUR,
+        continuesBefore: event.start < dayStart,
+        continuesAfter: event.end > nextDayStart,
+      };
+    })
+    .sort((a, b) => a.start - b.start);
 
   const positioned: PositionedEvent<T>[] = [];
-  let cluster: { event: CalendarEvent<T>; column: number }[] = [];
+  let cluster: Segment<T>[] = [];
   let clusterEnd = Number.NEGATIVE_INFINITY;
 
   const flushCluster = () => {
     const columnEnds: number[] = [];
-    for (const item of cluster) {
-      let column = columnEnds.findIndex((end) => end <= item.event.start.getTime());
+    const columnOf = new Map<Segment<T>, number>();
+    for (const seg of cluster) {
+      let column = columnEnds.findIndex((end) => end <= seg.start);
       if (column === -1) {
         column = columnEnds.length;
-        columnEnds.push(item.event.end.getTime());
+        columnEnds.push(seg.end);
       } else {
-        columnEnds[column] = item.event.end.getTime();
+        columnEnds[column] = seg.end;
       }
-      item.column = column;
+      columnOf.set(seg, column);
     }
-    for (const item of cluster) {
+    for (const seg of cluster) {
       positioned.push({
-        event: item.event,
-        startHours: differenceInMinutes(item.event.start, dayStart) / MINUTES_PER_HOUR,
-        durationHours: Math.max(
-          differenceInMinutes(item.event.end, item.event.start) / MINUTES_PER_HOUR,
-          MIN_DURATION_HOURS,
-        ),
-        column: item.column,
+        event: seg.event,
+        startHours: seg.start,
+        durationHours: Math.max(seg.end - seg.start, MIN_DURATION_HOURS),
+        column: columnOf.get(seg) ?? 0,
         columns: columnEnds.length,
+        continuesBefore: seg.continuesBefore,
+        continuesAfter: seg.continuesAfter,
       });
     }
     cluster = [];
   };
 
-  for (const event of sorted) {
-    if (cluster.length > 0 && event.start.getTime() >= clusterEnd) flushCluster();
-    cluster.push({ event, column: 0 });
-    clusterEnd = Math.max(clusterEnd, event.end.getTime());
+  for (const seg of segments) {
+    if (cluster.length > 0 && seg.start >= clusterEnd) flushCluster();
+    cluster.push(seg);
+    clusterEnd = Math.max(clusterEnd, seg.end);
   }
   if (cluster.length > 0) flushCluster();
 
   return positioned;
+}
+
+/**
+ * The `startOfDay` ISO keys of every calendar day an event touches (inclusive).
+ * An event ending exactly at midnight does not count the following day. Used to
+ * index events by day for the month grid. Pure.
+ */
+export function eventDayKeys<T>(event: CalendarEvent<T>): string[] {
+  const first = startOfDay(event.start);
+  // The last instant the event occupies; an end of exactly midnight belongs to
+  // the previous day.
+  const lastInstant = event.end > event.start ? new Date(event.end.getTime() - 1) : event.start;
+  const last = startOfDay(lastInstant);
+
+  const keys: string[] = [];
+  for (let cursor = first; cursor <= last; cursor = addDays(cursor, 1)) {
+    keys.push(cursor.toISOString());
+  }
+  return keys;
 }

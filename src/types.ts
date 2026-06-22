@@ -31,6 +31,13 @@ export type RenderEventArgs<T = unknown> = {
    * grows. `undefined` in month mode, where events render at a fixed size.
    */
   boxHeight?: SharedValue<number>;
+  /**
+   * On the week/day grid, true when this is a clipped segment of a multi-day
+   * event that started on an earlier day / continues onto a later day. Lets a
+   * renderer draw "continues" affordances. `undefined` in month mode.
+   */
+  continuesBefore?: boolean;
+  continuesAfter?: boolean;
   onPress: () => void;
 };
 

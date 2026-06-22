@@ -120,6 +120,8 @@ function AnimatedEventBox<T>({
         event={positioned.event}
         mode={mode}
         boxHeight={boxHeight}
+        continuesBefore={positioned.continuesBefore}
+        continuesAfter={positioned.continuesAfter}
         onPress={handlePress}
       />
     </Animated.View>

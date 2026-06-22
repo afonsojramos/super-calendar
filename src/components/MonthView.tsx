@@ -13,6 +13,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useCalendarTheme } from '../theme';
 import type { CalendarEvent, EventKeyExtractor, RenderEvent, WeekStartsOn } from '../types';
 import { getIsToday, isWeekend } from '../utils/dates';
+import { eventDayKeys } from '../utils/layout';
 
 const chunkIntoWeeks = (days: Date[]): Date[][] => {
   const weeks: Date[][] = [];
@@ -56,13 +57,15 @@ function MonthViewInner<T>({
 
   // Group events by calendar day once per `events` change, rather than scanning
   // the whole list inside every one of the (up to) 42 day cells on each render.
+  // Multi-day events are indexed under every day they span.
   const eventsByDay = useMemo(() => {
     const map = new Map<string, CalendarEvent<T>[]>();
     for (const event of events) {
-      const key = startOfDay(event.start).toISOString();
-      const existing = map.get(key);
-      if (existing) existing.push(event);
-      else map.set(key, [event]);
+      for (const key of eventDayKeys(event)) {
+        const existing = map.get(key);
+        if (existing) existing.push(event);
+        else map.set(key, [event]);
+      }
     }
     return map;
   }, [events]);

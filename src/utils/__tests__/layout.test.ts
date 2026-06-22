@@ -1,4 +1,4 @@
-import { layoutDayEvents } from '../layout';
+import { eventDayKeys, layoutDayEvents } from '../layout';
 import type { CalendarEvent } from '../../types';
 
 const at = (h: number, m = 0) => new Date(2026, 5, 15, h, m); // 15 Jun 2026, local
@@ -66,5 +66,60 @@ describe('layoutDayEvents', () => {
   it('orders output by start time regardless of input order', () => {
     const result = layoutDayEvents([ev(14, 15), ev(8, 9), ev(11, 12)], day);
     expect(result.map((p) => p.startHours)).toEqual([8, 11, 14]);
+  });
+
+  describe('multi-day events', () => {
+    // 15 Jun 23:00 -> 16 Jun 02:00
+    const spanning: CalendarEvent = {
+      start: new Date(2026, 5, 15, 23, 0),
+      end: new Date(2026, 5, 16, 2, 0),
+    };
+
+    it('clips to the tail of the start day', () => {
+      const [p] = layoutDayEvents([spanning], new Date(2026, 5, 15));
+      expect(p).toMatchObject({ startHours: 23, durationHours: 1, continuesAfter: true });
+      expect(p.continuesBefore).toBe(false);
+    });
+
+    it('clips to the head of the following day', () => {
+      const [p] = layoutDayEvents([spanning], new Date(2026, 5, 16));
+      expect(p).toMatchObject({ startHours: 0, durationHours: 2, continuesBefore: true });
+      expect(p.continuesAfter).toBe(false);
+    });
+
+    it('fills a fully-covered middle day (0 to 24h)', () => {
+      const threeDay: CalendarEvent = { start: new Date(2026, 5, 15, 8), end: new Date(2026, 5, 17, 9) };
+      const [p] = layoutDayEvents([threeDay], new Date(2026, 5, 16));
+      expect(p.startHours).toBe(0);
+      expect(p.durationHours).toBe(24);
+      expect(p.continuesBefore).toBe(true);
+      expect(p.continuesAfter).toBe(true);
+    });
+
+    it('excludes a day the event only touches at midnight', () => {
+      // ends exactly at 16 Jun 00:00 -> does not appear on 16 Jun
+      const toMidnight: CalendarEvent = { start: new Date(2026, 5, 15, 10), end: new Date(2026, 5, 16, 0) };
+      expect(layoutDayEvents([toMidnight], new Date(2026, 5, 16))).toEqual([]);
+      expect(layoutDayEvents([toMidnight], new Date(2026, 5, 15))).toHaveLength(1);
+    });
+  });
+});
+
+describe('eventDayKeys', () => {
+  const keyOf = (y: number, m: number, d: number) => new Date(y, m, d).toISOString();
+
+  it('returns one key for a single-day event', () => {
+    const e: CalendarEvent = { start: new Date(2026, 5, 15, 9), end: new Date(2026, 5, 15, 10) };
+    expect(eventDayKeys(e)).toEqual([keyOf(2026, 5, 15)]);
+  });
+
+  it('returns every spanned day for a multi-day event', () => {
+    const e: CalendarEvent = { start: new Date(2026, 5, 15, 23), end: new Date(2026, 5, 17, 2) };
+    expect(eventDayKeys(e)).toEqual([keyOf(2026, 5, 15), keyOf(2026, 5, 16), keyOf(2026, 5, 17)]);
+  });
+
+  it('does not count a trailing midnight end as an extra day', () => {
+    const e: CalendarEvent = { start: new Date(2026, 5, 15, 10), end: new Date(2026, 5, 16, 0) };
+    expect(eventDayKeys(e)).toEqual([keyOf(2026, 5, 15)]);
   });
 });
