@@ -70,6 +70,6 @@
     "react-native-gesture-handler": "~2.31.1",
     "react-native-reanimated": "4.3.1",
     "tsdown": "^0.22.3",
-    "typescript": "^5.5.0"
+    "typescript": "^6.0.3"
   }
 }
