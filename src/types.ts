@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import type { StyleProp, ViewStyle } from 'react-native';
 import type { SharedValue } from 'react-native-reanimated';
 
 export type CalendarMode = 'day' | '3days' | 'week' | 'custom' | 'month' | 'schedule';
@@ -51,6 +52,8 @@ export type RenderEventArgs<T = unknown> = {
   continuesAfter?: boolean;
   /** True when this event is rendered in the all-day lane (week/day) or is an all-day event in month view. */
   isAllDay?: boolean;
+  /** Per-event style resolved from `eventCellStyle`; the built-in renderer merges it onto the box. */
+  cellStyle?: StyleProp<ViewStyle>;
   onPress: () => void;
   /** Wired when the consumer passes `onLongPressEvent`; otherwise undefined. */
   onLongPress?: () => void;

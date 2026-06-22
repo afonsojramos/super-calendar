@@ -1,5 +1,6 @@
 import type { Locale } from 'date-fns';
 import { useCallback, useMemo } from 'react';
+import type { StyleProp, ViewStyle } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import { CalendarThemeProvider, mergeTheme, type PartialCalendarTheme } from '../theme';
 import type {
@@ -7,6 +8,7 @@ import type {
   CalendarMode,
   EventKeyExtractor,
   RenderEvent,
+  RenderEventArgs,
   WeekStartsOn,
 } from '../types';
 import { Agenda } from './Agenda';
@@ -50,6 +52,8 @@ export type CalendarProps<T> = {
   numberOfDays?: number;
   /** Replace the built-in event box. Return a `flex: 1` element. */
   renderEvent?: RenderEvent<T>;
+  /** Per-event style merged onto the built-in event box (static or a function of the event). */
+  eventCellStyle?: StyleProp<ViewStyle> | ((event: CalendarEvent<T>) => StyleProp<ViewStyle>);
   /** Stable key per event. Defaults to start-time + index. */
   keyExtractor?: EventKeyExtractor<T>;
   /** Partial theme merged over the defaults. */
@@ -115,6 +119,7 @@ export function Calendar<T>({
   weekStartsOn = 0,
   numberOfDays,
   renderEvent = DefaultEvent,
+  eventCellStyle,
   keyExtractor = defaultKeyExtractor as EventKeyExtractor<T>,
   theme,
   cellHeight: cellHeightProp,
@@ -155,6 +160,18 @@ export function Calendar<T>({
     [onLongPressEvent],
   );
 
+  // Inject `eventCellStyle` into the renderer once, so every view gets it for
+  // free without threading the prop through each component.
+  const resolvedRenderEvent = useMemo<RenderEvent<T>>(() => {
+    if (!eventCellStyle) return renderEvent;
+    const Base = renderEvent;
+    return function StyledEvent(props: RenderEventArgs<T>) {
+      const cellStyle =
+        typeof eventCellStyle === 'function' ? eventCellStyle(props.event) : eventCellStyle;
+      return <Base {...props} cellStyle={cellStyle} />;
+    };
+  }, [renderEvent, eventCellStyle]);
+
   return (
     <CalendarThemeProvider value={mergedTheme}>
       {mode === 'month' ? (
@@ -168,7 +185,7 @@ export function Calendar<T>({
           moreLabel={moreLabel}
           showAdjacentMonths={showAdjacentMonths}
           disableMonthEventCellPress={disableMonthEventCellPress}
-          renderEvent={renderEvent}
+          renderEvent={resolvedRenderEvent}
           keyExtractor={keyExtractor}
           onPressDay={onPressDay}
           onLongPressDay={onLongPressDay}
@@ -182,7 +199,7 @@ export function Calendar<T>({
         <Agenda
           events={events}
           locale={locale}
-          renderEvent={renderEvent}
+          renderEvent={resolvedRenderEvent}
           keyExtractor={keyExtractor}
           onPressEvent={handlePressEvent}
           onLongPressEvent={handleLongPressEvent}
@@ -197,7 +214,7 @@ export function Calendar<T>({
           cellHeight={cellHeight}
           hourHeight={hourHeight}
           weekStartsOn={weekStartsOn}
-          renderEvent={renderEvent}
+          renderEvent={resolvedRenderEvent}
           keyExtractor={keyExtractor}
           scrollOffsetMinutes={scrollOffsetMinutes}
           hourColumnWidth={hourColumnWidth}
