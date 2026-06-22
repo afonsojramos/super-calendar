@@ -63,6 +63,12 @@ export type CalendarProps<T> = {
   weekStartsOn?: WeekStartsOn;
   /** Number of day columns when `mode="custom"`. Ignored by other modes. Default 1. */
   numberOfDays?: number;
+  /**
+   * Last weekday of a `custom` partial-week view (0–6). When set, `custom` shows
+   * `weekStartsOn`…`weekEndsOn` of the visible week and pages by week, taking
+   * precedence over `numberOfDays`. Ignored by other modes.
+   */
+  weekEndsOn?: WeekStartsOn;
   /** Replace the built-in event box. Return a `flex: 1` element. */
   renderEvent?: RenderEvent<T>;
   /** Per-event style merged onto the built-in event box (static or a function of the event). */
@@ -149,6 +155,7 @@ function visibleRange(
   date: Date,
   weekStartsOn: WeekStartsOn,
   numberOfDays: number,
+  weekEndsOn?: WeekStartsOn,
 ): [Date, Date] {
   if (mode === 'month') {
     return [
@@ -156,7 +163,7 @@ function visibleRange(
       endOfWeek(endOfMonth(date), { weekStartsOn }),
     ];
   }
-  const days = getViewDays(mode, date, weekStartsOn, numberOfDays);
+  const days = getViewDays(mode, date, weekStartsOn, numberOfDays, false, weekEndsOn);
   return [startOfDay(days[0]), endOfDay(days[days.length - 1])];
 }
 
@@ -182,6 +189,7 @@ export function Calendar<T>({
   disableMonthEventCellPress,
   weekStartsOn = 0,
   numberOfDays,
+  weekEndsOn,
   renderEvent = DefaultEvent,
   eventCellStyle,
   calendarCellStyle,
@@ -241,9 +249,9 @@ export function Calendar<T>({
   const handleChangeDate = useCallback(
     (next: Date) => {
       onChangeDate(next);
-      onChangeDateRange?.(visibleRange(mode, next, weekStartsOn, numberOfDays ?? 1));
+      onChangeDateRange?.(visibleRange(mode, next, weekStartsOn, numberOfDays ?? 1, weekEndsOn));
     },
-    [onChangeDate, onChangeDateRange, mode, weekStartsOn, numberOfDays],
+    [onChangeDate, onChangeDateRange, mode, weekStartsOn, numberOfDays, weekEndsOn],
   );
 
   // Inject `eventCellStyle`, `ampm` and `showTime` into the renderer once, so
@@ -304,6 +312,7 @@ export function Calendar<T>({
         <TimeGrid
           mode={mode}
           numberOfDays={numberOfDays}
+          weekEndsOn={weekEndsOn}
           date={date}
           events={events}
           cellHeight={cellHeight}

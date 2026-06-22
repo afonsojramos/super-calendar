@@ -265,6 +265,7 @@ type TimetablePageProps<T> = {
   isActive: boolean;
   scrollOffsetMinutes: number;
   weekStartsOn: WeekStartsOn;
+  weekEndsOn?: WeekStartsOn;
   hourColumnWidth: number;
   minHour: number;
   maxHour: number;
@@ -301,6 +302,7 @@ function TimetablePageInner<T>({
   isActive,
   scrollOffsetMinutes,
   weekStartsOn,
+  weekEndsOn,
   hourColumnWidth,
   minHour,
   maxHour,
@@ -348,8 +350,8 @@ function TimetablePageInner<T>({
   );
 
   const days = useMemo(
-    () => getViewDays(mode, date, weekStartsOn, numberOfDays, isRTL),
-    [mode, date, weekStartsOn, numberOfDays, isRTL],
+    () => getViewDays(mode, date, weekStartsOn, numberOfDays, isRTL, weekEndsOn),
+    [mode, date, weekStartsOn, numberOfDays, isRTL, weekEndsOn],
   );
 
   const dayWidth = (width - hourColumnWidth) / days.length;
@@ -586,6 +588,12 @@ export type TimeGridProps<T> = {
   mode: TimeGridMode;
   /** Day columns to show in `custom` mode. Ignored by day/3days/week. Default 1. */
   numberOfDays?: number;
+  /**
+   * Last weekday of a `custom` partial-week view (0–6). When set, `custom` shows
+   * `weekStartsOn`…`weekEndsOn` of `date`'s week and pages by week, taking
+   * precedence over `numberOfDays`. Ignored by other modes.
+   */
+  weekEndsOn?: WeekStartsOn;
   date: Date;
   events: CalendarEvent<T>[];
   cellHeight: SharedValue<number>;
@@ -647,6 +655,7 @@ export type TimeGridProps<T> = {
 function TimeGridInner<T>({
   mode,
   numberOfDays = 1,
+  weekEndsOn,
   date,
   events,
   cellHeight,
@@ -696,8 +705,11 @@ function TimeGridInner<T>({
   // Horizontal list items need an explicit cross-axis height; seed it with the
   // window height (so it renders immediately and in tests) and refine on layout.
   const [pageHeight, setPageHeight] = useState(height);
-  // Days advanced per page = the number of visible columns.
-  const step = viewDayCount(mode, numberOfDays);
+  // Week-anchored modes page by a full week and align pages to the week start:
+  // `week`, and `custom` when a `weekEndsOn` defines a partial-week span.
+  const weekAnchored = mode === 'week' || (mode === 'custom' && weekEndsOn != null);
+  // Days advanced per page: a full week when week-anchored, else the column count.
+  const step = weekAnchored ? 7 : viewDayCount(mode, numberOfDays);
   // Shared vertical scroll offset so every mounted page stays aligned. Seeded
   // from the numeric hourHeight rather than reading cellHeight.value (which
   // would warn about reading a shared value during render).
@@ -714,8 +726,8 @@ function TimeGridInner<T>({
   const [anchorDate] = useState(date);
   const anchor = useMemo(
     () =>
-      mode === 'week' ? startOfWeek(anchorDate, { weekStartsOn }) : startOfDay(anchorDate),
-    [mode, anchorDate, weekStartsOn],
+      weekAnchored ? startOfWeek(anchorDate, { weekStartsOn }) : startOfDay(anchorDate),
+    [weekAnchored, anchorDate, weekStartsOn],
   );
   const pageDates = useMemo(
     () =>
@@ -727,12 +739,12 @@ function TimeGridInner<T>({
   const indexOfDate = useCallback(
     (target: Date) => {
       const aligned =
-        mode === 'week' ? startOfWeek(target, { weekStartsOn }) : startOfDay(target);
+        weekAnchored ? startOfWeek(target, { weekStartsOn }) : startOfDay(target);
       // Floor so an arbitrary date lands on the page whose range contains it
       // (exact for day/week, where dates are already page-aligned).
       return Math.floor(differenceInCalendarDays(aligned, anchor) / step) + PAGE_WINDOW;
     },
-    [anchor, mode, step, weekStartsOn],
+    [anchor, weekAnchored, step, weekStartsOn],
   );
 
   // The committed date's page is the centred/active one. `viewedIndexRef` tracks
@@ -743,8 +755,9 @@ function TimeGridInner<T>({
   // Header days track the active page (page-aligned), so they always match the
   // columns below and a swipe never flashes another day's label.
   const headerDays = useMemo(
-    () => getViewDays(mode, pageDates[activeIndex] ?? date, weekStartsOn, numberOfDays, isRTL),
-    [mode, pageDates, activeIndex, date, weekStartsOn, numberOfDays, isRTL],
+    () =>
+      getViewDays(mode, pageDates[activeIndex] ?? date, weekStartsOn, numberOfDays, isRTL, weekEndsOn),
+    [mode, pageDates, activeIndex, date, weekStartsOn, numberOfDays, isRTL, weekEndsOn],
   );
 
   const handleViewableItemsChanged = useCallback(
@@ -794,6 +807,7 @@ function TimeGridInner<T>({
           isActive={index === activeIndex}
           scrollOffsetMinutes={scrollOffsetMinutes}
           weekStartsOn={weekStartsOn}
+          weekEndsOn={weekEndsOn}
           hourColumnWidth={hourColumnWidth}
           minHour={clampedMinHour}
           maxHour={clampedMaxHour}
@@ -829,6 +843,7 @@ function TimeGridInner<T>({
       activeIndex,
       scrollOffsetMinutes,
       weekStartsOn,
+      weekEndsOn,
       hourColumnWidth,
       clampedMinHour,
       clampedMaxHour,

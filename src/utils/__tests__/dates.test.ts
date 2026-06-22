@@ -7,6 +7,7 @@ import {
   isWeekend,
   minutesIntoDay,
   viewDayCount,
+  weekDaysCount,
 } from '../dates';
 
 describe('getWeekDays', () => {
@@ -79,6 +80,33 @@ describe('getViewDays', () => {
       'Tue',
       'Mon',
     ]);
+  });
+
+  it('spans a custom partial week (weekStartsOn…weekEndsOn) anchored to the date', () => {
+    // Mon-first work week (Mon–Fri) for a Wednesday: the five weekdays of its week.
+    expect(getViewDays('custom', wed, 1, 1, false, 5).map((d) => format(d, 'EEE d'))).toEqual([
+      'Mon 15',
+      'Tue 16',
+      'Wed 17',
+      'Thu 18',
+      'Fri 19',
+    ]);
+  });
+
+  it('custom without weekEndsOn keeps the consecutive-days model', () => {
+    expect(getViewDays('custom', wed, 1, 3).map((d) => format(d, 'd'))).toEqual(['17', '18', '19']);
+  });
+});
+
+describe('weekDaysCount', () => {
+  it('counts an inclusive same-direction span', () => {
+    expect(weekDaysCount(1, 5)).toBe(5); // Mon–Fri
+    expect(weekDaysCount(0, 6)).toBe(7); // Sun–Sat
+    expect(weekDaysCount(3, 3)).toBe(1); // single day
+  });
+
+  it('wraps when the end precedes the start', () => {
+    expect(weekDaysCount(6, 3)).toBe(5); // Sat,Sun,Mon,Tue,Wed
   });
 });
 
