@@ -606,6 +606,8 @@ export type TimeGridProps<T> = {
   verticalScrollEnabled?: boolean;
   /** Prefix for the week-number label (e.g. "W"). Default "W". */
   weekNumberPrefix?: string;
+  /** After an empty-cell press, snap the pager back to the active page. Default false. */
+  resetPageOnPressCell?: boolean;
   onPressEvent: (event: CalendarEvent<T>) => void;
   onLongPressEvent?: (event: CalendarEvent<T>) => void;
   onPressCell?: (date: Date) => void;
@@ -647,6 +649,7 @@ function TimeGridInner<T>({
   showVerticalScrollIndicator = true,
   verticalScrollEnabled = true,
   weekNumberPrefix = 'W',
+  resetPageOnPressCell = false,
   onPressEvent,
   onLongPressEvent,
   onPressCell,
@@ -735,6 +738,17 @@ function TimeGridInner<T>({
     listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
   }, [activeIndex]);
 
+  // Optionally snap the pager back to the active page after an empty-cell press
+  // (so tapping a far-swiped page returns to the committed date).
+  const handlePressCell = useMemo(() => {
+    if (!onPressCell) return undefined;
+    if (!resetPageOnPressCell) return onPressCell;
+    return (cellDate: Date) => {
+      onPressCell(cellDate);
+      listRef.current?.scrollToIndex({ index: activeIndex, animated: true });
+    };
+  }, [onPressCell, resetPageOnPressCell, activeIndex]);
+
   const snapToIndices = useMemo(() => pageDates.map((_, index) => index), [pageDates]);
   const keyExtractorList = useCallback((item: Date) => item.toISOString(), []);
   const getFixedItemSize = useCallback(() => width, [width]);
@@ -769,7 +783,7 @@ function TimeGridInner<T>({
           keyExtractor={keyExtractor}
           onPressEvent={onPressEvent}
           onLongPressEvent={onLongPressEvent}
-          onPressCell={onPressCell}
+          onPressCell={handlePressCell}
           onLongPressCell={onLongPressCell}
         />
       </View>
@@ -803,7 +817,7 @@ function TimeGridInner<T>({
       keyExtractor,
       onPressEvent,
       onLongPressEvent,
-      onPressCell,
+      handlePressCell,
       onLongPressCell,
     ],
   );
