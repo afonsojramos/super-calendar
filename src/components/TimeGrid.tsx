@@ -186,6 +186,29 @@ const HourRow = ({ hour, minHour, cellHeight, hourColumnWidth, label }: HourRowP
   );
 };
 
+type TimeslotLineProps = {
+  hour: number;
+  minHour: number;
+  fraction: number;
+  cellHeight: SharedValue<number>;
+  hourColumnWidth: number;
+};
+
+// A faint divider inside an hour row, marking a sub-hour slot (e.g. half hours).
+const TimeslotLine = ({ hour, minHour, fraction, cellHeight, hourColumnWidth }: TimeslotLineProps) => {
+  const theme = useCalendarTheme();
+  const animatedStyle = useAnimatedStyle(
+    () => ({ top: (hour - minHour + fraction) * cellHeight.value }),
+    [hour, minHour, fraction],
+  );
+  return (
+    <Animated.View
+      style={[styles.timeslotLine, { left: hourColumnWidth, backgroundColor: theme.colors.gridLine }, animatedStyle]}
+      pointerEvents="none"
+    />
+  );
+};
+
 type NowIndicatorProps = {
   cellHeight: SharedValue<number>;
   nowHours: number;
@@ -227,6 +250,7 @@ type TimetablePageProps<T> = {
   minHour: number;
   maxHour: number;
   ampm: boolean;
+  timeslots: number;
   minHourHeight: number;
   maxHourHeight: number;
   showNowIndicator: boolean;
@@ -257,6 +281,7 @@ function TimetablePageInner<T>({
   minHour,
   maxHour,
   ampm,
+  timeslots,
   minHourHeight,
   maxHourHeight,
   showNowIndicator,
@@ -449,6 +474,21 @@ function TimetablePageInner<T>({
               />
             ))}
 
+            {timeslots > 1
+              ? hoursRange.flatMap((hour) =>
+                  Array.from({ length: timeslots - 1 }, (_, i) => (
+                    <TimeslotLine
+                      key={`slot-${hour}-${i}`}
+                      hour={hour}
+                      minHour={minHour}
+                      fraction={(i + 1) / timeslots}
+                      cellHeight={heightSource}
+                      hourColumnWidth={hourColumnWidth}
+                    />
+                  )),
+                )
+              : null}
+
             {dayLayouts.flatMap((layout, dayIndex) =>
               layout
                 // Skip events that fall entirely outside the [minHour, maxHour) window.
@@ -508,6 +548,8 @@ export type TimeGridProps<T> = {
   hourColumnWidth?: number;
   /** Hide the left hour-axis column (lines stay, labels/gutter go). Default false. */
   hideHours?: boolean;
+  /** Sub-hour divider lines per hour (e.g. 2 = half-hours). Default 1 (none). */
+  timeslots?: number;
   /** Show the ISO week number in the header gutter. Default false. */
   showWeekNumber?: boolean;
   /** Element rendered between the day header and the grid. */
@@ -547,6 +589,7 @@ function TimeGridInner<T>({
   scrollOffsetMinutes = 0,
   hourColumnWidth: hourColumnWidthProp = DEFAULT_HOUR_COLUMN_WIDTH,
   hideHours = false,
+  timeslots = 1,
   showWeekNumber = false,
   headerComponent,
   minHour = 0,
@@ -667,6 +710,7 @@ function TimeGridInner<T>({
           minHour={clampedMinHour}
           maxHour={clampedMaxHour}
           ampm={ampm}
+          timeslots={timeslots}
           minHourHeight={minHourHeight}
           maxHourHeight={maxHourHeight}
           showNowIndicator={showNowIndicator}
@@ -696,6 +740,7 @@ function TimeGridInner<T>({
       clampedMinHour,
       clampedMaxHour,
       ampm,
+      timeslots,
       minHourHeight,
       maxHourHeight,
       showNowIndicator,
@@ -916,6 +961,12 @@ const styles = StyleSheet.create({
   hourLine: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
+  },
+  timeslotLine: {
+    position: 'absolute',
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    opacity: 0.5,
   },
   eventBox: {
     position: 'absolute',

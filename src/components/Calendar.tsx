@@ -67,6 +67,8 @@ export type CalendarProps<T> = {
   hourColumnWidth?: number;
   /** Hide the left hour-axis column on the week/day grid. Default false. */
   hideHours?: boolean;
+  /** Sub-hour divider lines per hour on the week/day grid (e.g. 2 = half-hours). Default 1. */
+  timeslots?: number;
   /** Show the ISO week number in the week/day header gutter. Default false. */
   showWeekNumber?: boolean;
   /** Element rendered between the day header and the week/day grid. */
@@ -128,6 +130,7 @@ export function Calendar<T>({
   maxHourHeight,
   hourColumnWidth,
   hideHours,
+  timeslots,
   showWeekNumber,
   headerComponent,
   minHour,
@@ -219,6 +222,7 @@ export function Calendar<T>({
           scrollOffsetMinutes={scrollOffsetMinutes}
           hourColumnWidth={hourColumnWidth}
           hideHours={hideHours}
+          timeslots={timeslots}
           showWeekNumber={showWeekNumber}
           headerComponent={headerComponent}
           minHour={minHour}
