@@ -162,6 +162,21 @@ are also exported for advanced layouts:
 - **Stable props.** Pass stable `renderEvent`/`keyExtractor`/`on*` references
   (module scope or `useCallback`) so the memoized inner views can skip renders.
 
+## Example app
+
+A runnable Expo demo lives in [`example/`](./example) — month/week/day modes, a
+multi-day event, drill-into-day on tap, and one-page paging.
+
+```sh
+cd example
+npm install
+npx expo run:ios   # or: npx expo run:android
+```
+
+It consumes the library straight from `../src` (via the example's
+`metro.config.js`), so edits to the package hot-reload into the demo. A custom
+dev build is required (Reanimated worklets aren't available in Expo Go).
+
 ## License
 
 MIT

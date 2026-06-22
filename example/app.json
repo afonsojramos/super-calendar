@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Bigger Calendar Example",
+    "slug": "react-native-bigger-calendar-example",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "rnbc-example",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.biggercalendar"
+    },
+    "android": {
+      "package": "com.example.biggercalendar"
+    }
+  }
+}
