@@ -255,6 +255,7 @@ type TimetablePageProps<T> = {
   timeslots: number;
   isRTL: boolean;
   showVerticalScrollIndicator: boolean;
+  verticalScrollEnabled: boolean;
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
   minHourHeight: number;
   maxHourHeight: number;
@@ -289,6 +290,7 @@ function TimetablePageInner<T>({
   timeslots,
   isRTL,
   showVerticalScrollIndicator,
+  verticalScrollEnabled,
   calendarCellStyle,
   minHourHeight,
   maxHourHeight,
@@ -421,6 +423,7 @@ function TimetablePageInner<T>({
         <Animated.ScrollView
           ref={scrollRef}
           showsVerticalScrollIndicator={showVerticalScrollIndicator}
+          scrollEnabled={verticalScrollEnabled}
           onScroll={scrollHandler}
           scrollEventThrottle={16}
           contentContainerStyle={{ paddingTop: HOUR_LABEL_TOP_INSET }}
@@ -599,6 +602,8 @@ export type TimeGridProps<T> = {
   swipeEnabled?: boolean;
   /** Show the vertical scroll indicator on the time grid. Default true. */
   showVerticalScrollIndicator?: boolean;
+  /** Allow vertical scrolling of the time grid. Default true. */
+  verticalScrollEnabled?: boolean;
   /** Prefix for the week-number label (e.g. "W"). Default "W". */
   weekNumberPrefix?: string;
   onPressEvent: (event: CalendarEvent<T>) => void;
@@ -640,6 +645,7 @@ function TimeGridInner<T>({
   freeSwipe = false,
   swipeEnabled = true,
   showVerticalScrollIndicator = true,
+  verticalScrollEnabled = true,
   weekNumberPrefix = 'W',
   onPressEvent,
   onLongPressEvent,
@@ -754,6 +760,7 @@ function TimeGridInner<T>({
           timeslots={timeslots}
           isRTL={isRTL}
           showVerticalScrollIndicator={showVerticalScrollIndicator}
+          verticalScrollEnabled={verticalScrollEnabled}
           calendarCellStyle={calendarCellStyle}
           minHourHeight={minHourHeight}
           maxHourHeight={maxHourHeight}
@@ -787,6 +794,7 @@ function TimeGridInner<T>({
       timeslots,
       isRTL,
       showVerticalScrollIndicator,
+      verticalScrollEnabled,
       calendarCellStyle,
       minHourHeight,
       maxHourHeight,
