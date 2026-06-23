@@ -7,6 +7,7 @@ import {
 import { addMonths, differenceInCalendarMonths, format, type Locale, startOfMonth } from "date-fns";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Platform,
   StyleSheet,
   type StyleProp,
   Text,
@@ -17,7 +18,12 @@ import {
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent, WeekStartsOn } from "../types";
 import { getWeekDays } from "../utils/dates";
+import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { MonthView } from "./MonthView";
+
+// Horizontal swipe paging doesn't translate to web; there we disable it and page
+// with the arrow keys instead.
+const isWeb = Platform.OS === "web";
 
 // Months rendered either side of the current page. LegendList virtualises, so
 // only a few mount at once; a wide window (5 years each way) means the user
@@ -127,6 +133,17 @@ function MonthPagerInner<T>({
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
   }, [activeIndex]);
 
+  // Web arrow-key paging (swipe is disabled there); the effect above scrolls to
+  // the new month once `onChangeDate` updates `date`.
+  const goToPage = useCallback(
+    (delta: number) => {
+      const target = monthDates[activeIndex + delta];
+      if (target) onChangeDate(target);
+    },
+    [monthDates, activeIndex, onChangeDate],
+  );
+  useWebPagerKeys(swipeEnabled, goToPage);
+
   // The seven weekday labels for the header above the grid. Weekday names depend
   // only on `weekStartsOn`, so any week works; reuse the anchor. Reversed in RTL
   // to line up with the mirrored day cells.
@@ -213,7 +230,7 @@ function MonthPagerInner<T>({
           recycleItems={false}
           keyExtractor={keyExtractorList}
           getFixedItemSize={getFixedItemSize}
-          scrollEnabled={swipeEnabled}
+          scrollEnabled={swipeEnabled && !isWeb}
           // Default: native paging — each page is the viewport width, so a swipe
           // hard-stops at the adjacent month and can't fling past it. With
           // `freeSwipe`, momentum carries across months and snaps to a boundary.

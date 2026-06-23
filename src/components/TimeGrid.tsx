@@ -18,6 +18,7 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type GestureResponderEvent,
+  Platform,
   Pressable,
   StyleSheet,
   type StyleProp,
@@ -54,7 +55,12 @@ import {
   viewDayCount,
 } from "../utils/dates";
 import { layoutDayEvents, type PositionedEvent } from "../utils/layout";
+import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { AllDayLane } from "./AllDayLane";
+
+// Horizontal swipe paging doesn't translate to web; there we disable it and page
+// with the arrow keys instead.
+const isWeb = Platform.OS === "web";
 
 const MINUTES_PER_HOUR = 60;
 const HOURS_PER_DAY = 24;
@@ -807,6 +813,17 @@ function TimeGridInner<T>({
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
   }, [activeIndex]);
 
+  // Web arrow-key paging (swipe is disabled there); the effect above scrolls to
+  // the new page once `onChangeDate` updates `date`.
+  const goToPage = useCallback(
+    (delta: number) => {
+      const target = pageDates[activeIndex + delta];
+      if (target) onChangeDate(target);
+    },
+    [pageDates, activeIndex, onChangeDate],
+  );
+  useWebPagerKeys(swipeEnabled, goToPage);
+
   // Optionally snap the pager back to the active page after an empty-cell press
   // (so tapping a far-swiped page returns to the committed date).
   const handlePressCell = useMemo(() => {
@@ -934,7 +951,7 @@ function TimeGridInner<T>({
           recycleItems={false}
           keyExtractor={keyExtractorList}
           getFixedItemSize={getFixedItemSize}
-          scrollEnabled={swipeEnabled}
+          scrollEnabled={swipeEnabled && !isWeb}
           // Default: native paging — each page is the viewport width, so a swipe
           // hard-stops at the adjacent page and can't fling past it. With
           // `freeSwipe`, momentum carries across pages and snaps to a boundary.
