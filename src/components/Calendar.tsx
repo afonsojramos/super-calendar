@@ -23,7 +23,12 @@ import { getViewDays } from "../utils/dates";
 import { Agenda } from "./Agenda";
 import { DefaultEvent } from "./DefaultEvent";
 import { MonthPager } from "./MonthPager";
-import { DEFAULT_HOUR_HEIGHT, type HourRenderer, TimeGrid } from "./TimeGrid";
+import {
+  DEFAULT_HOUR_HEIGHT,
+  type EventDragHandler,
+  type HourRenderer,
+  TimeGrid,
+} from "./TimeGrid";
 
 export type CalendarProps<T> = {
   events: CalendarEvent<T>[];
@@ -35,6 +40,15 @@ export type CalendarProps<T> = {
   onPressEvent: (event: CalendarEvent<T>) => void;
   /** Long-press an event (month/week/day). */
   onLongPressEvent?: (event: CalendarEvent<T>) => void;
+  /**
+   * Enable drag-to-move and drag-to-resize on the week/day grid. Called with the
+   * dragged event and its new start/end (snapped to `dragStepMinutes`); update
+   * your own event state in response. Long-press an event to move it; drag its
+   * bottom grip to resize.
+   */
+  onDragEvent?: EventDragHandler<T>;
+  /** Minutes a drag-to-move/resize snaps to. Default 15. */
+  dragStepMinutes?: number;
   /** Tap a day cell (month mode) — e.g. drill into the day view. */
   onPressDay?: (date: Date) => void;
   /** Long-press a day cell (month mode). */
@@ -181,6 +195,8 @@ export function Calendar<T>({
   onChangeDateRange,
   onPressEvent,
   onLongPressEvent,
+  onDragEvent,
+  dragStepMinutes,
   onPressDay,
   onLongPressDay,
   onPressMore,
@@ -360,6 +376,8 @@ export function Calendar<T>({
           swipeEnabled={swipeEnabled}
           onPressEvent={handlePressEvent}
           onLongPressEvent={handleLongPressEvent}
+          onDragEvent={onDragEvent}
+          dragStepMinutes={dragStepMinutes}
           onPressCell={onPressCell}
           resetPageOnPressCell={resetPageOnPressCell}
           onLongPressCell={onLongPressCell}

@@ -155,6 +155,22 @@ function MyEvent({ event, boxHeight, onPress }: RenderEventArgs<MyEvent>) {
 The built-in renderer hard-clips a title that overflows its box. Pass
 `ellipsizeTitle` to `<Calendar>` for a trailing ellipsis (…) instead.
 
+### Drag to move and resize
+
+Pass `onDragEvent` to make events draggable on the week/day grid (iOS & Android).
+**Long-press an event** to pick it up and move it; **drag the grip at its bottom
+edge** to resize. The handler receives the new `start`/`end`, snapped to
+`dragStepMinutes` (default 15) — update your own event state in response:
+
+```tsx
+<Calendar
+  /* ... */
+  onDragEvent={(event, start, end) =>
+    setEvents((prev) => prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)))
+  }
+/>
+```
+
 ### Recurring events
 
 Give an event a `recurrence` rule and expand it into concrete occurrences for the

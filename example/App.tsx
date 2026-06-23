@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -79,7 +79,7 @@ function buildEvents(): CalendarEvent<EventMeta>[] {
 export default function App() {
   const [mode, setMode] = useState<CalendarMode>("week");
   const [date, setDate] = useState(() => new Date());
-  const events = useMemo(buildEvents, []);
+  const [events, setEvents] = useState<CalendarEvent<EventMeta>[]>(buildEvents);
   // DEMO_MODE pins the view when set; otherwise the tab bar drives it.
   const activeMode = DEMO_MODE ?? mode;
 
@@ -105,6 +105,9 @@ export default function App() {
             weekStartsOn={1}
             scrollOffsetMinutes={8 * 60}
             onChangeDate={setDate}
+            onDragEvent={(event, start, end) =>
+              setEvents((prev) => prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)))
+            }
             onPressEvent={(event) => console.log("press event:", event.title)}
             onPressDay={(day) => {
               setDate(day);

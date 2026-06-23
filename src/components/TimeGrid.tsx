@@ -29,6 +29,7 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  runOnJS,
   scrollTo,
   type SharedValue,
   useAnimatedReaction,
@@ -54,6 +55,7 @@ import {
   isWeekend,
   viewDayCount,
 } from "../utils/dates";
+import { shiftMinutes, snapDeltaMinutes } from "../utils/drag";
 import { layoutDayEvents, type PositionedEvent } from "../utils/layout";
 import { useWebGridZoom } from "../utils/useWebGridZoom";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
@@ -82,6 +84,16 @@ const MIN_EVENT_HEIGHT = 32;
 // Inset each event box within its slot so adjacent boxes (and column edges) get a
 // little breathing room instead of butting edge-to-edge.
 const EVENT_GAP = 2;
+// Hold this long before a drag-to-move begins, so a normal scroll/tap isn't
+// hijacked.
+const DRAG_ACTIVATE_MS = 220;
+// Height of the resize grip at the bottom of a draggable event box.
+const RESIZE_HANDLE_HEIGHT = 14;
+// Default minutes a drag snaps to when `dragStepMinutes` isn't set.
+const DEFAULT_DRAG_STEP_MINUTES = 15;
+
+/** Called when an event is dragged (moved or resized) to new start/end times. */
+export type EventDragHandler<T> = (event: CalendarEvent<T>, start: Date, end: Date) => void;
 // Hour labels are nudged up so the number sits centred on its grid line. Pad the
 // scroll content by the same amount so the top-most label is never clipped.
 const HOUR_LABEL_TOP_INSET = 12;
@@ -118,8 +130,10 @@ type AnimatedEventBoxProps<T> = {
   width: number;
   mode: CalendarMode;
   renderEvent: RenderEvent<T>;
+  snapMinutes: number;
   onPress: (event: CalendarEvent<T>) => void;
   onLongPress?: (event: CalendarEvent<T>) => void;
+  onDragEvent?: EventDragHandler<T>;
 };
 
 function AnimatedEventBox<T>({
@@ -130,31 +144,98 @@ function AnimatedEventBox<T>({
   width,
   mode,
   renderEvent,
+  snapMinutes,
   onPress,
   onLongPress,
+  onDragEvent,
 }: AnimatedEventBoxProps<T>) {
   const RenderEventComponent = renderEvent;
+  const theme = useCalendarTheme();
+  // Drag-to-move/resize is a touch interaction; on web the gesture overlay would
+  // sit over the event and intercept taps, so it stays native-only (web has
+  // Ctrl/Cmd + scroll zoom and arrow-key paging instead).
+  const draggable = onDragEvent != null && !positioned.event.disabled && !isWeb;
+  // Only the segment that owns the real end may be resized.
+  const resizable = draggable && !positioned.continuesAfter;
+
+  // Live preview offsets (px), reset to 0 once the committed change re-renders.
+  const moveOffset = useSharedValue(0);
+  const resizeDelta = useSharedValue(0);
+
   // Live pixel height of the box, driven on the UI thread by the shared
-  // cellHeight. Handed to renderEvent so custom renderers can reveal detail
-  // progressively as the grid zooms, without re-rendering. Explicit deps so the
-  // worklet re-captures the event's geometry when its time/duration changes.
+  // cellHeight (plus any in-progress resize). Handed to renderEvent so custom
+  // renderers can reveal detail progressively as the grid zooms, without
+  // re-rendering. Explicit deps so the worklet re-captures the event's geometry.
   const boxHeight = useDerivedValue(
-    () => Math.max(positioned.durationHours * cellHeight.value, MIN_EVENT_HEIGHT),
+    () =>
+      Math.max(positioned.durationHours * cellHeight.value + resizeDelta.value, MIN_EVENT_HEIGHT),
     [positioned.durationHours],
   );
 
   const boxStyle = useAnimatedStyle(
     () => ({
-      top: (positioned.startHours - minHour) * cellHeight.value,
+      top: (positioned.startHours - minHour) * cellHeight.value + moveOffset.value,
       height: boxHeight.value,
     }),
     [positioned.startHours, positioned.durationHours, minHour],
   );
 
-  const handlePress = () => onPress(positioned.event);
-  const handleLongPress = onLongPress ? () => onLongPress(positioned.event) : undefined;
+  // Keep the latest event/handler in a ref so the gestures stay memoized but
+  // never call into a stale closure.
+  const latest = useRef({ event: positioned.event, onDragEvent });
+  latest.current = { event: positioned.event, onDragEvent };
 
-  return (
+  const commitDrag = useCallback(
+    (deltaStartMin: number, deltaEndMin: number) => {
+      const { event, onDragEvent: handler } = latest.current;
+      if (!handler) return;
+      const start = shiftMinutes(event.start, deltaStartMin);
+      const end = shiftMinutes(event.end, deltaEndMin);
+      // Never let a resize collapse the event below one step.
+      if (end.getTime() - start.getTime() < snapMinutes * 60_000) return;
+      handler(event, start, end);
+    },
+    [snapMinutes],
+  );
+
+  const moveGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(draggable)
+        .activateAfterLongPress(DRAG_ACTIVATE_MS)
+        .onUpdate((event) => {
+          moveOffset.value = event.translationY;
+        })
+        .onEnd((event) => {
+          const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
+          moveOffset.value = 0;
+          if (delta !== 0) runOnJS(commitDrag)(delta, delta);
+        }),
+    [draggable, snapMinutes, cellHeight, moveOffset, commitDrag],
+  );
+
+  const resizeGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(resizable)
+        .onUpdate((event) => {
+          resizeDelta.value = event.translationY;
+        })
+        .onEnd((event) => {
+          const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
+          resizeDelta.value = 0;
+          if (delta !== 0) runOnJS(commitDrag)(0, delta);
+        }),
+    [resizable, snapMinutes, cellHeight, resizeDelta, commitDrag],
+  );
+
+  const handlePress = () => onPress(positioned.event);
+  // When draggable, a long press grabs the event to move it, so don't also fire
+  // the consumer's long-press handler.
+  const handleLongPress =
+    !draggable && onLongPress ? () => onLongPress(positioned.event) : undefined;
+
+  const box = (
     <Animated.View style={[styles.eventBox, { left, width }, boxStyle]}>
       <RenderEventComponent
         event={positioned.event}
@@ -165,8 +246,18 @@ function AnimatedEventBox<T>({
         onPress={handlePress}
         onLongPress={handleLongPress}
       />
+      {resizable ? (
+        <GestureDetector gesture={resizeGesture}>
+          <Animated.View style={styles.resizeHandle}>
+            <View style={[styles.resizeGrip, { backgroundColor: theme.colors.eventText }]} />
+          </Animated.View>
+        </GestureDetector>
+      ) : null}
     </Animated.View>
   );
+
+  if (!draggable) return box;
+  return <GestureDetector gesture={moveGesture}>{box}</GestureDetector>;
 }
 
 /** Replace the hour-axis label. Receives the hour (0–23) and the `ampm` flag. */
@@ -312,8 +403,10 @@ type TimetablePageProps<T> = {
   showNowIndicator: boolean;
   renderEvent: RenderEvent<T>;
   keyExtractor: EventKeyExtractor<T>;
+  snapMinutes: number;
   onPressEvent: (event: CalendarEvent<T>) => void;
   onLongPressEvent?: (event: CalendarEvent<T>) => void;
+  onDragEvent?: EventDragHandler<T>;
   onPressCell?: (date: Date) => void;
   onLongPressCell?: (date: Date) => void;
 };
@@ -349,8 +442,10 @@ function TimetablePageInner<T>({
   showNowIndicator,
   renderEvent,
   keyExtractor,
+  snapMinutes,
   onPressEvent,
   onLongPressEvent,
+  onDragEvent,
   onPressCell,
   onLongPressCell,
 }: TimetablePageProps<T>) {
@@ -588,8 +683,10 @@ function TimetablePageInner<T>({
                       width={columnWidth}
                       mode={mode}
                       renderEvent={renderEvent}
+                      snapMinutes={snapMinutes}
                       onPress={onPressEvent}
                       onLongPress={onLongPressEvent}
+                      onDragEvent={onDragEvent}
                     />
                   );
                 }),
@@ -671,8 +768,15 @@ export type TimeGridProps<T> = {
   activeDate?: Date;
   /** After an empty-cell press, snap the pager back to the active page. Default false. */
   resetPageOnPressCell?: boolean;
+  /** Minutes a drag-to-move/resize snaps to. Default 15. */
+  dragStepMinutes?: number;
   onPressEvent: (event: CalendarEvent<T>) => void;
   onLongPressEvent?: (event: CalendarEvent<T>) => void;
+  /**
+   * Enable drag-to-move and drag-to-resize on the week/day grid. Called with the
+   * event's new start/end (snapped to `dragStepMinutes`); update your own state.
+   */
+  onDragEvent?: EventDragHandler<T>;
   onPressCell?: (date: Date) => void;
   onLongPressCell?: (date: Date) => void;
   /** Tap a day's column header (default header only). */
@@ -716,8 +820,10 @@ function TimeGridInner<T>({
   hourComponent,
   activeDate,
   resetPageOnPressCell = false,
+  dragStepMinutes = DEFAULT_DRAG_STEP_MINUTES,
   onPressEvent,
   onLongPressEvent,
+  onDragEvent,
   onPressCell,
   onLongPressCell,
   onPressDateHeader,
@@ -888,8 +994,10 @@ function TimeGridInner<T>({
           showNowIndicator={showNowIndicator}
           renderEvent={renderEvent}
           keyExtractor={keyExtractor}
+          snapMinutes={Math.max(1, dragStepMinutes)}
           onPressEvent={onPressEvent}
           onLongPressEvent={onLongPressEvent}
+          onDragEvent={onDragEvent}
           onPressCell={handlePressCell}
           onLongPressCell={onLongPressCell}
         />
@@ -924,8 +1032,10 @@ function TimeGridInner<T>({
       showNowIndicator,
       renderEvent,
       keyExtractor,
+      dragStepMinutes,
       onPressEvent,
       onLongPressEvent,
+      onDragEvent,
       handlePressCell,
       onLongPressCell,
     ],
@@ -1164,6 +1274,21 @@ const styles = StyleSheet.create({
     right: 0,
     height: StyleSheet.hairlineWidth,
     opacity: 0.5,
+  },
+  resizeHandle: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: RESIZE_HANDLE_HEIGHT,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  resizeGrip: {
+    width: 24,
+    height: 3,
+    borderRadius: 2,
+    opacity: 0.4,
   },
   eventBox: {
     position: "absolute",
