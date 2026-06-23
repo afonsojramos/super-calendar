@@ -125,9 +125,13 @@ export function MyCalendar() {
 
 The built-in renderer draws a simple titled box. Pass `renderEvent` — **a React
 component**, not a callback — to take full control. Because it's rendered as a
-component, it may use hooks. On the week/day grid you also receive `boxHeight`, a
-Reanimated shared value tracking the live pixel height of the box (driven by
-pinch-zoom), so you can reveal detail progressively without re-rendering:
+component, it may use hooks. The same renderer is used in **every** mode — month
+chips, the all-day lane, the timed grid and the schedule list — and always
+receives `isAllDay` (plus `continuesBefore`/`continuesAfter` for clipped
+multi-day segments on the grid), so one component covers them all. On the
+week/day grid you also receive `boxHeight`, a Reanimated shared value tracking
+the live pixel height of the box (driven by pinch-zoom), so you can reveal
+detail progressively without re-rendering:
 
 ```tsx
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
