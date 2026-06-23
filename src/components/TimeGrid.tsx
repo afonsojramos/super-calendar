@@ -55,6 +55,7 @@ import {
   viewDayCount,
 } from "../utils/dates";
 import { layoutDayEvents, type PositionedEvent } from "../utils/layout";
+import { useWebGridZoom } from "../utils/useWebGridZoom";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { AllDayLane } from "./AllDayLane";
 
@@ -727,6 +728,9 @@ function TimeGridInner<T>({
 
   const { width, height } = useWindowDimensions();
   const listRef = useRef<LegendListRef>(null);
+  // The grid's outer view; on web its ref resolves to the DOM node we attach the
+  // Ctrl/Cmd + scroll zoom listener to.
+  const containerRef = useRef<View>(null);
   // Horizontal list items need an explicit cross-axis height; seed it with the
   // window height (so it renders immediately and in tests) and refine on layout.
   const [pageHeight, setPageHeight] = useState(height);
@@ -750,6 +754,17 @@ function TimeGridInner<T>({
   // this so they don't re-run their worklets every frame while the visible page
   // zooms.
   const committedCellHeight = useSharedValue(hourHeight);
+
+  // Web stand-in for pinch: Ctrl/Cmd + scroll zooms the grid via the same shared
+  // values the pinch gesture drives.
+  useWebGridZoom(
+    isWeb,
+    containerRef,
+    cellHeight,
+    committedCellHeight,
+    minHourHeight,
+    maxHourHeight,
+  );
 
   // A fixed window of page dates, anchored once and aligned to the page boundary
   // (day or week start). The array never shifts as the date changes.
@@ -913,7 +928,7 @@ function TimeGridInner<T>({
   );
 
   return (
-    <View style={styles.container}>
+    <View ref={containerRef} style={styles.container}>
       {renderHeader ? (
         renderHeader(headerDays)
       ) : (
