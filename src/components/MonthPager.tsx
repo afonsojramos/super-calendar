@@ -124,7 +124,7 @@ function MonthPagerInner<T>({
   useEffect(() => {
     if (activeIndex === viewedIndexRef.current) return;
     viewedIndexRef.current = activeIndex;
-    listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
+    void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
   }, [activeIndex]);
 
   // The seven weekday labels for the header above the grid. Weekday names depend

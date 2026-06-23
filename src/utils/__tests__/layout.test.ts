@@ -57,7 +57,7 @@ describe("layoutDayEvents", () => {
   it("splits two overlapping events into side-by-side columns", () => {
     const result = layoutDayEvents([ev(10, 11), ev(10, 11)], day);
     expect(result.every((p) => p.columns === 2)).toBe(true);
-    expect(result.map((p) => p.column).sort()).toEqual([0, 1]);
+    expect(result.map((p) => p.column).sort((a, b) => a - b)).toEqual([0, 1]);
   });
 
   it("reuses a freed column when an event starts as another ends", () => {

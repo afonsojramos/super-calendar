@@ -799,7 +799,7 @@ function TimeGridInner<T>({
   useEffect(() => {
     if (activeIndex === viewedIndexRef.current) return;
     viewedIndexRef.current = activeIndex;
-    listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
+    void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
   }, [activeIndex]);
 
   // Optionally snap the pager back to the active page after an empty-cell press
@@ -809,7 +809,7 @@ function TimeGridInner<T>({
     if (!resetPageOnPressCell) return onPressCell;
     return (cellDate: Date) => {
       onPressCell(cellDate);
-      listRef.current?.scrollToIndex({ index: activeIndex, animated: true });
+      void listRef.current?.scrollToIndex({ index: activeIndex, animated: true });
     };
   }, [onPressCell, resetPageOnPressCell, activeIndex]);
 
