@@ -224,18 +224,24 @@ function MonthPagerInner<T>({
           // initial (window-height) seed and clip the last week row.
           key={pageHeight}
           ref={listRef}
-          style={styles.pagerList}
+          style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
           data={monthDates}
           horizontal
           recycleItems={false}
           keyExtractor={keyExtractorList}
           getFixedItemSize={getFixedItemSize}
-          scrollEnabled={swipeEnabled && !isWeb}
-          // Default: native paging — each page is the viewport width, so a swipe
-          // hard-stops at the adjacent month and can't fling past it. With
-          // `freeSwipe`, momentum carries across months and snaps to a boundary.
-          pagingEnabled={!freeSwipe}
-          snapToIndices={freeSwipe ? snapToIndices : undefined}
+          // On web LegendList ignores these RN scroll props (it leaks them to the
+          // DOM as unknown attributes), so omit them there and disable horizontal
+          // scroll via `webNoScroll`; paging is driven by the arrow keys instead.
+          // Native: paging makes each swipe hard-stop at the adjacent month, while
+          // `freeSwipe` lets momentum carry across months and snap to a boundary.
+          {...(isWeb
+            ? null
+            : {
+                scrollEnabled: swipeEnabled,
+                pagingEnabled: !freeSwipe,
+                snapToIndices: freeSwipe ? snapToIndices : undefined,
+              })}
           initialScrollIndex={activeIndex}
           showsHorizontalScrollIndicator={false}
           viewabilityConfig={PAGE_VIEWABILITY}
@@ -282,6 +288,10 @@ const styles = StyleSheet.create({
   },
   pagerList: {
     flex: 1,
+  },
+  // Disable user-driven horizontal scroll on web; programmatic paging still works.
+  webNoScroll: {
+    overflow: "hidden",
   },
   weekdayHeader: {
     flexDirection: "row",

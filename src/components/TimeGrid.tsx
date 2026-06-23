@@ -201,7 +201,7 @@ const HourRow = ({
   );
 
   return (
-    <Animated.View style={[styles.hourRow, animatedStyle]} pointerEvents="none">
+    <Animated.View style={[styles.hourRow, styles.nonInteractive, animatedStyle]}>
       {hourComponent ? (
         <View style={{ width: hourColumnWidth }}>{hourComponent(hour, ampm)}</View>
       ) : (
@@ -246,10 +246,10 @@ const TimeslotLine = ({
     <Animated.View
       style={[
         styles.timeslotLine,
+        styles.nonInteractive,
         { left: hourColumnWidth, backgroundColor: theme.colors.gridLine },
         animatedStyle,
       ]}
-      pointerEvents="none"
     />
   );
 };
@@ -271,8 +271,12 @@ const NowIndicator = ({ cellHeight, nowHours, minHour, left, width, color }: Now
 
   return (
     <Animated.View
-      style={[styles.nowIndicator, { left, width, backgroundColor: color }, animatedStyle]}
-      pointerEvents="none"
+      style={[
+        styles.nowIndicator,
+        styles.nonInteractive,
+        { left, width, backgroundColor: color },
+        animatedStyle,
+      ]}
     />
   );
 };
@@ -497,11 +501,11 @@ function TimetablePageInner<T>({
                   key={`weekend-${day.toISOString()}`}
                   style={[
                     styles.weekendColumn,
+                    styles.nonInteractive,
                     { backgroundColor: theme.colors.weekendBackground },
                     { left: dayLeft(dayIndex), width: dayWidth },
                     fullHeightStyle,
                   ]}
-                  pointerEvents="none"
                 />
               ) : null,
             )}
@@ -514,11 +518,11 @@ function TimetablePageInner<T>({
                       key={`cell-${day.toISOString()}`}
                       style={[
                         styles.weekendColumn,
+                        styles.nonInteractive,
                         { left: dayLeft(dayIndex), width: dayWidth },
                         cellStyle,
                         fullHeightStyle,
                       ]}
-                      pointerEvents="none"
                     />
                   ) : null;
                 })
@@ -529,11 +533,11 @@ function TimetablePageInner<T>({
                 key={`separator-${day.toISOString()}`}
                 style={[
                   styles.daySeparator,
+                  styles.nonInteractive,
                   { backgroundColor: theme.colors.gridLine },
                   { left: dayLeft(dayIndex) },
                   fullHeightStyle,
                 ]}
-                pointerEvents="none"
               />
             ))}
 
@@ -960,18 +964,24 @@ function TimeGridInner<T>({
           // items in place instead of remounting and blanking the page.
           key={measured ? "grid" : "grid-seed"}
           ref={listRef}
-          style={styles.pagerList}
+          style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
           data={pageDates}
           horizontal
           recycleItems={false}
           keyExtractor={keyExtractorList}
           getFixedItemSize={getFixedItemSize}
-          scrollEnabled={swipeEnabled && !isWeb}
-          // Default: native paging — each page is the viewport width, so a swipe
-          // hard-stops at the adjacent page and can't fling past it. With
-          // `freeSwipe`, momentum carries across pages and snaps to a boundary.
-          pagingEnabled={!freeSwipe}
-          snapToIndices={freeSwipe ? snapToIndices : undefined}
+          // On web LegendList ignores these RN scroll props (it leaks them to the
+          // DOM as unknown attributes), so omit them there and disable horizontal
+          // scroll via `webNoScroll`; paging is driven by the arrow keys instead.
+          // Native: paging makes each swipe hard-stop at the adjacent page, while
+          // `freeSwipe` lets momentum carry across pages and snap to a boundary.
+          {...(isWeb
+            ? null
+            : {
+                scrollEnabled: swipeEnabled,
+                pagingEnabled: !freeSwipe,
+                snapToIndices: freeSwipe ? snapToIndices : undefined,
+              })}
           initialScrollIndex={activeIndex}
           showsHorizontalScrollIndicator={false}
           viewabilityConfig={PAGE_VIEWABILITY}
@@ -1165,5 +1175,13 @@ const styles = StyleSheet.create({
   nowIndicator: {
     position: "absolute",
     height: 2,
+  },
+  // `pointerEvents` as a style (not a prop) — the prop form is deprecated on web.
+  nonInteractive: {
+    pointerEvents: "none",
+  },
+  // Disable user-driven horizontal scroll on web; programmatic paging still works.
+  webNoScroll: {
+    overflow: "hidden",
   },
 });
