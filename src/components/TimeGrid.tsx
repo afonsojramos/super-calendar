@@ -249,10 +249,11 @@ type NowIndicatorProps = {
   nowHours: number;
   minHour: number;
   left: number;
+  width: number;
   color: string;
 };
 
-const NowIndicator = ({ cellHeight, nowHours, minHour, left, color }: NowIndicatorProps) => {
+const NowIndicator = ({ cellHeight, nowHours, minHour, left, width, color }: NowIndicatorProps) => {
   const animatedStyle = useAnimatedStyle(
     () => ({ top: (nowHours - minHour) * cellHeight.value }),
     [nowHours, minHour],
@@ -260,7 +261,7 @@ const NowIndicator = ({ cellHeight, nowHours, minHour, left, color }: NowIndicat
 
   return (
     <Animated.View
-      style={[styles.nowIndicator, { left, backgroundColor: color }, animatedStyle]}
+      style={[styles.nowIndicator, { left, width, backgroundColor: color }, animatedStyle]}
       pointerEvents="none"
     />
   );
@@ -586,6 +587,7 @@ function TimetablePageInner<T>({
                 nowHours={nowHours}
                 minHour={minHour}
                 left={dayLeft(nowDayIndex)}
+                width={dayWidth}
                 color={theme.colors.nowIndicator}
               />
             ) : null}
@@ -1124,7 +1126,6 @@ const styles = StyleSheet.create({
   },
   nowIndicator: {
     position: "absolute",
-    right: 0,
     height: 2,
   },
 });
