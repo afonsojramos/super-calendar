@@ -175,6 +175,21 @@ edge** to resize. The handler receives the new `start`/`end`, snapped to
 />
 ```
 
+**Haptics on grab.** `onDragStart` fires the instant an event is picked up for a
+move or resize, before anything is committed. The library stays expo-free, so
+bring your own haptics, e.g. [`expo-haptics`](https://docs.expo.dev/versions/latest/sdk/haptics/):
+
+```tsx
+import * as Haptics from "expo-haptics";
+
+<Calendar
+  /* ... */
+  onDragStart={() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }}
+/>;
+```
+
 ### Recurring events
 
 Give an event a `recurrence` rule and expand it into concrete occurrences for the
