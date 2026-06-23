@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.0](https://github.com/afonsojramos/react-native-bigger-calendar/compare/v0.2.2...v0.3.0) (2026-06-23)
+
+
+### Features
+
+* auto-fit month event chips to the cell height ([a455d71](https://github.com/afonsojramos/react-native-bigger-calendar/commit/a455d71930726e9b59448862e9182a75a6f92cba))
+* improve built-in event rendering (month titles, clip/wrap, fitted times) ([f2dcefd](https://github.com/afonsojramos/react-native-bigger-calendar/commit/f2dcefdfe166d41ea011f3dbe93c615c9449addf))
+* inset time-grid event boxes for a small gap between them ([4b40bba](https://github.com/afonsojramos/react-native-bigger-calendar/commit/4b40bba1d94878d27cbf903f4902e94fa55d27da))
+
+
+### Bug Fixes
+
+* confine the week/day current-time line to today's column ([e122754](https://github.com/afonsojramos/react-native-bigger-calendar/commit/e12275490d2ef090a298d80b8f310b0abc40a9ab))
+* scope type-aware lint to src so CI does not resolve example tsconfig ([7328dee](https://github.com/afonsojramos/react-native-bigger-calendar/commit/7328dee71da08defba274788fedb66306b5b70b1))
+
 ## [0.2.2](https://github.com/afonsojramos/react-native-bigger-calendar/compare/v0.2.1...v0.2.2) (2026-06-22)
 
 
