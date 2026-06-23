@@ -10,8 +10,9 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import {
+  type LayoutChangeEvent,
   StyleSheet,
   type StyleProp,
   Text,
@@ -22,7 +23,20 @@ import {
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent, WeekStartsOn } from "../types";
 import { getIsToday, isSameCalendarDay, isWeekend } from "../utils/dates";
+import { monthEventCapacity, monthVisibleCount } from "../utils/eventDisplay";
 import { eventDayKeys, isAllDayEvent } from "../utils/layout";
+
+// Day-cell metrics, mirrored from the styles below, used to estimate how many
+// event chips fit when auto-fitting `maxVisibleEventCount`.
+const DAY_CELL_PADDING_TOP = 4;
+const DATE_BADGE_HEIGHT = 24;
+const CELL_ROW_GAP = 2;
+const CHIP_PADDING_V = 2;
+// Pre-measure fallback so the first paint isn't empty or overflowing.
+const FALLBACK_VISIBLE_COUNT = 3;
+
+const numericStyle = (value: number | string | undefined, fallback: number) =>
+  typeof value === "number" ? value : fallback;
 
 const chunkIntoWeeks = (days: Date[]): Date[][] => {
   const weeks: Date[][] = [];
@@ -35,7 +49,13 @@ const chunkIntoWeeks = (days: Date[]): Date[][] => {
 export type MonthViewProps<T> = {
   date: Date;
   events: CalendarEvent<T>[];
-  maxVisibleEventCount: number;
+  /**
+   * Max event chips per day cell. Omit to auto-fit as many as the cell height
+   * allows (the default); set a number for a fixed cap. Extra events collapse
+   * into a "+N more" label. Auto-fit assumes the built-in chip size — pass an
+   * explicit value when using a custom `renderEvent`.
+   */
+  maxVisibleEventCount?: number;
   weekStartsOn: WeekStartsOn;
   locale?: Locale;
   /** Sort each day's events by start time before slicing. Default true. */
@@ -87,6 +107,8 @@ function MonthViewInner<T>({
 }: MonthViewProps<T>) {
   const theme = useCalendarTheme();
   const RenderEventComponent = renderEvent;
+  // Measured grid height, used to auto-fit the event chips per cell.
+  const [gridHeight, setGridHeight] = useState(0);
 
   const weeks = useMemo(() => {
     const start = startOfWeek(startOfMonth(date), { weekStartsOn });
@@ -97,6 +119,25 @@ function MonthViewInner<T>({
     const chunked = chunkIntoWeeks(eachDayOfInterval({ start, end }));
     return isRTL ? chunked.map((week) => [...week].reverse()) : chunked;
   }, [date, weekStartsOn, isRTL, showSixWeeks]);
+
+  // How many chips fit per cell: a fixed cap when `maxVisibleEventCount` is set,
+  // else derived from the measured cell height and the (default) chip metrics.
+  const capacity = useMemo(() => {
+    if (maxVisibleEventCount != null) {
+      return { full: maxVisibleEventCount, withMore: maxVisibleEventCount };
+    }
+    if (gridHeight <= 0 || weeks.length === 0) {
+      return { full: FALLBACK_VISIBLE_COUNT, withMore: FALLBACK_VISIBLE_COUNT };
+    }
+    const rowHeight = gridHeight / weeks.length;
+    const fontSize = numericStyle(theme.text.eventTitle.fontSize, 12);
+    const lineHeight = numericStyle(theme.text.eventTitle.lineHeight, Math.ceil(fontSize * 1.3));
+    const chipRowHeight = lineHeight + CHIP_PADDING_V * 2 + CELL_ROW_GAP;
+    const moreFontSize = numericStyle(theme.text.more.fontSize, 11);
+    const moreRowHeight = Math.ceil(moreFontSize * 1.3) + CELL_ROW_GAP;
+    const available = rowHeight - DAY_CELL_PADDING_TOP - DATE_BADGE_HEIGHT;
+    return monthEventCapacity(available, chipRowHeight, moreRowHeight);
+  }, [maxVisibleEventCount, gridHeight, weeks.length, theme]);
 
   // Group events by calendar day once per `events` change, rather than scanning
   // the whole list inside every one of the (up to) 42 day cells on each render.
@@ -137,7 +178,8 @@ function MonthViewInner<T>({
     const isToday = getIsToday(day);
     // Highlight the chosen `activeDate` when supplied, else the real today.
     const isHighlighted = activeDate ? isSameCalendarDay(day, activeDate) : isToday;
-    const hiddenCount = dayEvents.length - maxVisibleEventCount;
+    const visibleCount = monthVisibleCount(dayEvents.length, capacity);
+    const hiddenCount = dayEvents.length - visibleCount;
 
     const dateColor = isHighlighted
       ? theme.colors.todayText
@@ -178,7 +220,7 @@ function MonthViewInner<T>({
             {format(day, "d")}
           </Text>
         </View>
-        {dayEvents.slice(0, maxVisibleEventCount).map((event, index) => (
+        {dayEvents.slice(0, visibleCount).map((event, index) => (
           <View key={keyExtractor(event, index)} style={styles.monthEvent}>
             <RenderEventComponent
               event={event}
@@ -208,8 +250,13 @@ function MonthViewInner<T>({
     );
   };
 
+  const handleLayout = (event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout.height;
+    setGridHeight((prev) => (prev === next ? prev : next));
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={styles.container} onLayout={handleLayout}>
       {weeks.map((week) => (
         <View style={styles.weekRow} key={week[0].toISOString()}>
           {week.map((day) => renderDay(day))}

@@ -49,7 +49,11 @@ export type CalendarProps<T> = {
   onLongPressCell?: (date: Date) => void;
   /** Tap a day's column header on the week/day grid (default header only). */
   onPressDateHeader?: (date: Date) => void;
-  /** Max events shown per month cell before they collapse into "+N more". */
+  /**
+   * Max event chips per month cell before they collapse into "+N more". Omit to
+   * auto-fit as many as the cell height allows (default); set a number for a
+   * fixed cap. Pass an explicit value when using a custom `renderEvent`.
+   */
   maxVisibleEventCount?: number;
   /** Sort each month day's events by start. Default true. */
   sortedMonthView?: boolean;
@@ -184,7 +188,7 @@ export function Calendar<T>({
   resetPageOnPressCell,
   onLongPressCell,
   onPressDateHeader,
-  maxVisibleEventCount = 2,
+  maxVisibleEventCount,
   sortedMonthView,
   moreLabel,
   showAdjacentMonths,

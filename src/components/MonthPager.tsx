@@ -31,7 +31,7 @@ const PAGE_VIEWABILITY = { itemVisiblePercentThreshold: 90 };
 export type MonthPagerProps<T> = {
   date: Date;
   events: CalendarEvent<T>[];
-  maxVisibleEventCount: number;
+  maxVisibleEventCount?: number;
   weekStartsOn: WeekStartsOn;
   locale?: Locale;
   sortedMonthView?: boolean;

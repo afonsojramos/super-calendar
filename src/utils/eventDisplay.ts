@@ -43,3 +43,37 @@ export function isTimeVisibleAtHeight(
   if (boxHeightPx == null || mode === "day") return true;
   return boxHeightPx >= MIN_BOX_HEIGHT_FOR_TIME;
 }
+
+/** How many month-cell chips fit in the available height. */
+export type MonthEventCapacity = {
+  /** Count when every event fits, with no overflow label. */
+  full: number;
+  /** Count that leaves room for the "+N more" label. */
+  withMore: number;
+};
+
+/**
+ * Derive how many event chips fit in a month cell from the measured space.
+ * `chipRowHeightPx` is one chip plus its gap; `moreRowHeightPx` is the overflow
+ * label plus its gap. Both counts are clamped to >= 0.
+ */
+export function monthEventCapacity(
+  availableHeightPx: number,
+  chipRowHeightPx: number,
+  moreRowHeightPx: number,
+): MonthEventCapacity {
+  if (chipRowHeightPx <= 0) return { full: 0, withMore: 0 };
+  return {
+    full: Math.max(0, Math.floor(availableHeightPx / chipRowHeightPx)),
+    withMore: Math.max(0, Math.floor((availableHeightPx - moreRowHeightPx) / chipRowHeightPx)),
+  };
+}
+
+/**
+ * Chips to show for a day: all of them when they fit, otherwise `withMore` (at
+ * least one) so the rest collapse into a "+N more" label.
+ */
+export function monthVisibleCount(total: number, capacity: MonthEventCapacity): number {
+  if (total <= capacity.full) return total;
+  return Math.max(1, capacity.withMore);
+}
