@@ -38,8 +38,9 @@ export function DefaultEvent<T>({
   // on the UI thread, so it reveals as you pinch-zoom in). The single wide `day`
   // column and schedule (no live box height) always show it.
   const timeStyle = useAnimatedStyle(() => {
-    if (!boxHeight || mode === "day") return {};
-    return { display: boxHeight.value >= MIN_BOX_HEIGHT_FOR_TIME ? "flex" : "none" };
+    // Always return the same key so Reanimated has a prior value to diff against.
+    const visible = !boxHeight || mode === "day" || boxHeight.value >= MIN_BOX_HEIGHT_FOR_TIME;
+    return { display: visible ? "flex" : "none" };
   }, [boxHeight, mode]);
 
   return (
