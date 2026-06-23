@@ -4,6 +4,17 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { Calendar, type CalendarEvent, type CalendarMode } from "react-native-bigger-calendar";
 
+// Freeze the clock so the demo always renders the same scene: the events, the
+// "today" highlight and the current-time line all anchor to this instant (Tue
+// 23 June 2026, 10:01). Handy for screenshots and docs. Delete this block to
+// follow the real device clock.
+const MOCK_NOW = new Date(2026, 5, 23, 10, 1, 0).getTime();
+globalThis.Date = new Proxy(Date, {
+  construct: (target, args) => Reflect.construct(target, args.length === 0 ? [MOCK_NOW] : args),
+  get: (target, prop, receiver) =>
+    prop === "now" ? () => MOCK_NOW : Reflect.get(target, prop, receiver),
+}) as DateConstructor;
+
 type EventMeta = {
   id: string;
   kind: "work" | "music" | "health" | "exam" | "social" | "travel";
