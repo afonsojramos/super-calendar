@@ -204,7 +204,10 @@ function MonthViewInner<T>({
         onPress={onPressDay ? () => onPressDay(day) : undefined}
         onLongPress={onLongPressDay ? () => onLongPressDay(day) : undefined}
         disabled={!onPressDay && !onLongPressDay}
-        accessibilityRole={onPressDay ? "button" : undefined}
+        // A cell, not a button — it contains the event-chip buttons, and a nested
+        // <button> is invalid HTML on web. `cell` is also closer to the correct
+        // semantics for a calendar day than `button`.
+        role="cell"
         accessibilityLabel={accessibilityLabel}
       >
         <View
