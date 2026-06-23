@@ -72,6 +72,9 @@ const DEFAULT_HOUR_COLUMN_WIDTH = 50;
 // Short events would otherwise render only a few pixels tall and clip their
 // content; keep them tall enough to stay legible and tappable.
 const MIN_EVENT_HEIGHT = 32;
+// Inset each event box within its slot so adjacent boxes (and column edges) get a
+// little breathing room instead of butting edge-to-edge.
+const EVENT_GAP = 2;
 // Hour labels are nudged up so the number sits centred on its grid line. Pad the
 // scroll content by the same amount so the top-most label is never clipped.
 const HOUR_LABEL_TOP_INSET = 12;
@@ -1123,6 +1126,9 @@ const styles = StyleSheet.create({
   eventBox: {
     position: "absolute",
     overflow: "hidden",
+    // Border-box padding insets the visible box (the flex child) on all sides,
+    // giving a small gap without touching the slot geometry above.
+    padding: EVENT_GAP,
   },
   nowIndicator: {
     position: "absolute",
