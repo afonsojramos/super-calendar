@@ -14,7 +14,7 @@
 </p>
 
 - 📆 Month grid plus day / 3-day / week / custom-N time-grids
-- 🤏 Pinch-to-zoom on the week/day grid (UI thread, no re-renders)
+- 🤏 Zoomable week/day grid: pinch on iOS & Android, Ctrl/Cmd + scroll on web (UI thread, no re-renders)
 - ♾️ Virtualized, snap-paging months/weeks/days via [`@legendapp/list`](https://legendapp.com/open-source/list/)
 - 🧩 Bring-your-own event type (`CalendarEvent<T>`) and a `renderEvent` escape hatch
 - 🎨 Fully themeable, with sensible defaults (no styling library required)
@@ -251,10 +251,10 @@ support web. Add the web peers to your app:
 npx expo install react-dom react-native-web @expo/metro-runtime
 ```
 
-All modes render and navigate. Horizontal swipe paging doesn't translate to web,
-so it's disabled there and replaced with **←** / **→** arrow-key paging
-(previous / next page). The runnable [`example/`](./example) builds with `expo
-start --web`.
+All modes render and navigate. Two touch gestures are remapped for web:
+horizontal swipe paging becomes **←** / **→** arrow-key paging (previous / next
+page), and pinch-to-zoom on the week/day grid becomes **Ctrl/Cmd + scroll**. The
+runnable [`example/`](./example) builds with `expo start --web`.
 
 ## Components
 
