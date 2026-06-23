@@ -38,6 +38,8 @@ function buildEvents(): CalendarEvent<EventMeta>[] {
     return d;
   };
   return [
+    // A packed "today" (seven events) so the month cell overflows into "+N more".
+    { id: "11", kind: "social", title: "☕ Coffee with Alex", start: at(0, 8), end: at(0, 8, 30) },
     { id: "1", kind: "work", title: "👥 Team standup", start: at(0, 9), end: at(0, 9, 30) },
     { id: "2", kind: "health", title: "🦷 Dentist", start: at(0, 11), end: at(0, 11, 45) },
     {
@@ -59,6 +61,7 @@ function buildEvents(): CalendarEvent<EventMeta>[] {
     { id: "6", kind: "health", title: "🩺 GP appointment", start: at(1, 15), end: at(1, 15, 30) },
     { id: "7", kind: "health", title: "💪 Physio", start: at(2, 10), end: at(2, 10, 45) },
     { id: "8", kind: "work", title: "📊 Project review", start: at(2, 14), end: at(2, 15) },
+    { id: "12", kind: "health", title: "🏋️ Gym", start: at(0, 16), end: at(0, 17) },
     // A multi-day event: renders on every day it spans, clipped per day.
     { id: "9", kind: "travel", title: "✈️ Lisbon trip", start: at(3, 17), end: at(5, 21) },
     // An all-day event: renders in the lane above the grid, not in the columns.
