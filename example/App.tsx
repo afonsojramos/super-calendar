@@ -3,7 +3,13 @@ import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { Calendar, type CalendarEvent, type CalendarMode } from "react-native-super-calendar";
+import {
+  Calendar,
+  type CalendarEvent,
+  type CalendarMode,
+  type DateRange,
+  useDateRange,
+} from "react-native-super-calendar";
 import { EventContextMenu } from "./components/EventContextMenu";
 import { EventMenuProvider, type EventMenuActions } from "./components/EventMenu";
 
@@ -24,6 +30,18 @@ type EventMeta = {
 };
 
 const MODES: CalendarMode[] = ["month", "week", "3days", "day", "schedule"];
+
+// The mode tabs plus a "picker" tab that demos range selection via useDateRange.
+type DemoTab = CalendarMode | "picker";
+const TABS: DemoTab[] = [...MODES, "picker"];
+
+// Human-readable summary of the current range-selection state for the banner.
+function rangeLabel(range: DateRange | null): string {
+  if (!range) return "Tap a start date";
+  const start = range.start.toLocaleDateString();
+  if (!range.end) return `${start} → tap an end date`;
+  return `${start} → ${range.end.toLocaleDateString()}`;
+}
 
 // Shift a date by some minutes (used by the right-click menu actions).
 function shiftedDate(date: Date, minutes: number): Date {
@@ -87,11 +105,13 @@ function buildEvents(): CalendarEvent<EventMeta>[] {
 }
 
 export default function App() {
-  const [mode, setMode] = useState<CalendarMode>("week");
+  const [mode, setMode] = useState<DemoTab>("week");
   const [date, setDate] = useState(() => new Date());
   const [events, setEvents] = useState<CalendarEvent<EventMeta>[]>(buildEvents);
+  // Range selection for the "picker" tab; onPressDate wires to month-cell taps.
+  const { range, onPressDate, reset } = useDateRange();
   // DEMO_MODE pins the view when set; otherwise the tab bar drives it.
-  const activeMode = DEMO_MODE ?? mode;
+  const activeMode: DemoTab = DEMO_MODE ?? mode;
 
   // Actions the (web) right-click menu performs; matched back to events by id.
   const menuActions = useMemo<EventMenuActions>(
@@ -115,7 +135,7 @@ export default function App() {
       <SafeAreaProvider>
         <SafeAreaView style={styles.root}>
           <View style={styles.tabs}>
-            {MODES.map((m) => (
+            {TABS.map((m) => (
               <Pressable
                 key={m}
                 style={[styles.tab, activeMode === m && styles.tabActive]}
@@ -125,48 +145,72 @@ export default function App() {
               </Pressable>
             ))}
           </View>
-          <EventMenuProvider value={menuActions}>
-            <Calendar
-              mode={activeMode}
-              date={date}
-              events={events}
-              weekStartsOn={1}
-              scrollOffsetMinutes={8 * 60}
-              businessHours={(date) => {
-                const weekday = date.getDay();
-                if (weekday === 0 || weekday === 6) return null; // weekends closed
-                return { start: 9, end: 17 };
-              }}
-              renderEvent={EventContextMenu}
-              onChangeDate={setDate}
-              onDragEvent={(event, start, end) => {
-                // Demo: exams are locked — returning false rejects the drop and
-                // snaps the event back to where it started.
-                if ((event as CalendarEvent<EventMeta>).kind === "exam") return false;
-                setEvents((prev) =>
-                  prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)),
-                );
-              }}
-              onDragStart={() => {
-                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              }}
-              onCreateEvent={(start, end) =>
-                setEvents((prev) => {
-                  const nextId = String(Math.max(0, ...prev.map((e) => Number(e.id) || 0)) + 1);
-                  return [...prev, { id: nextId, kind: "work", title: "✨ New event", start, end }];
-                })
-              }
-              onPressEvent={(event) => console.log("press event:", event.title)}
-              onPressDay={(day) => {
-                setDate(day);
-                setMode("day");
-              }}
-              onPressMore={(dayEvents, day) =>
-                console.log("more:", day.toDateString(), dayEvents.length)
-              }
-              onPressCell={(at) => console.log("create at:", at.toISOString())}
-            />
-          </EventMenuProvider>
+          {activeMode === "picker" ? (
+            <View style={styles.root}>
+              <View style={styles.pickerBar}>
+                <Text style={styles.pickerLabel}>{rangeLabel(range)}</Text>
+                <Pressable style={styles.clearButton} onPress={reset}>
+                  <Text style={styles.clearText}>Clear</Text>
+                </Pressable>
+              </View>
+              <Calendar
+                mode="month"
+                date={date}
+                events={[]}
+                weekStartsOn={1}
+                selectedRange={range ?? undefined}
+                onChangeDate={setDate}
+                onPressEvent={() => {}}
+                onPressDay={onPressDate}
+              />
+            </View>
+          ) : (
+            <EventMenuProvider value={menuActions}>
+              <Calendar
+                mode={activeMode}
+                date={date}
+                events={events}
+                weekStartsOn={1}
+                scrollOffsetMinutes={8 * 60}
+                businessHours={(date) => {
+                  const weekday = date.getDay();
+                  if (weekday === 0 || weekday === 6) return null; // weekends closed
+                  return { start: 9, end: 17 };
+                }}
+                renderEvent={EventContextMenu}
+                onChangeDate={setDate}
+                onDragEvent={(event, start, end) => {
+                  // Demo: exams are locked — returning false rejects the drop and
+                  // snaps the event back to where it started.
+                  if ((event as CalendarEvent<EventMeta>).kind === "exam") return false;
+                  setEvents((prev) =>
+                    prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)),
+                  );
+                }}
+                onDragStart={() => {
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                }}
+                onCreateEvent={(start, end) =>
+                  setEvents((prev) => {
+                    const nextId = String(Math.max(0, ...prev.map((e) => Number(e.id) || 0)) + 1);
+                    return [
+                      ...prev,
+                      { id: nextId, kind: "work", title: "✨ New event", start, end },
+                    ];
+                  })
+                }
+                onPressEvent={(event) => console.log("press event:", event.title)}
+                onPressDay={(day) => {
+                  setDate(day);
+                  setMode("day");
+                }}
+                onPressMore={(dayEvents, day) =>
+                  console.log("more:", day.toDateString(), dayEvents.length)
+                }
+                onPressCell={(at) => console.log("create at:", at.toISOString())}
+              />
+            </EventMenuProvider>
+          )}
         </SafeAreaView>
       </SafeAreaProvider>
     </GestureHandlerRootView>
@@ -186,4 +230,19 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: "#1F6FEB" },
   tabText: { fontWeight: "600", color: "#1A1B1E", textTransform: "capitalize" },
   tabTextActive: { color: "#fff" },
+  pickerBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  pickerLabel: { fontSize: 15, fontWeight: "600", color: "#1A1B1E" },
+  clearButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: "#eef0f3",
+  },
+  clearText: { fontWeight: "600", color: "#1F6FEB" },
 });
