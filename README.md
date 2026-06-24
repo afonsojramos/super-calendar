@@ -216,10 +216,11 @@ import * as Haptics from "expo-haptics";
 ```
 
 **Drag to create.** Pass `onCreateEvent` to sweep out a new event on empty grid
-space (iOS & Android): **long-press empty space and drag** to size the range. The
-handler receives the snapped `start`/`end` on release (a stationary press yields
-a one-step range) — create your own event in response. It supersedes
-`onLongPressCell` on empty space; tap-to-create via `onPressCell` still works.
+space: **long-press and drag** on native, **click-drag** on web. The handler
+receives the snapped `start`/`end` on release (a stationary press yields a
+one-step range) — create your own event in response. On native it supersedes
+`onLongPressCell` on empty space; on web, dragging empty space creates instead of
+scrolling (use the wheel to scroll), matching desktop calendars.
 
 ```tsx
 <Calendar
