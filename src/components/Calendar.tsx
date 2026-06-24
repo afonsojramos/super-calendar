@@ -174,6 +174,12 @@ export type CalendarProps<T> = {
   selectedDates?: Date[];
   /** Month mode only: a selected span; pair with the `useDateRange` hook for range picking. */
   selectedRange?: DateRange;
+  /** Month mode only: earliest selectable day (inclusive); earlier days render disabled. */
+  minDate?: Date;
+  /** Month mode only: latest selectable day (inclusive); later days render disabled. */
+  maxDate?: Date;
+  /** Month mode only: return true to render a day disabled (dimmed, taps ignored). */
+  isDateDisabled?: (date: Date) => boolean;
   /**
    * Lay the day columns out right-to-left (month, week/day grid and all-day lane).
    * Cosmetic only: the hour gutter stays on the left and paging still advances
@@ -279,6 +285,9 @@ export function Calendar<T>({
   selectedDate,
   selectedDates,
   selectedRange,
+  minDate,
+  maxDate,
+  isDateDisabled,
   isRTL,
   freeSwipe,
   renderTimeGridHeader,
@@ -362,6 +371,9 @@ export function Calendar<T>({
           activeDate={activeDate}
           selectedDates={monthSelectedDates}
           selectedRange={selectedRange}
+          minDate={minDate}
+          maxDate={maxDate}
+          isDateDisabled={isDateDisabled}
           renderHeaderForMonthView={renderHeaderForMonthView}
           calendarCellStyle={calendarCellStyle}
           renderEvent={resolvedRenderEvent}

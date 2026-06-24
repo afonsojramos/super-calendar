@@ -24,6 +24,7 @@ import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent, WeekStartsOn } from "../types";
 import {
   type DateRange,
+  isDateSelectable,
   isRangeEndpoint,
   isWithinDateRange,
   useCalendarSelection,
@@ -82,6 +83,12 @@ export type MonthViewProps<T> = {
   selectedDates?: Date[];
   /** A selected span: endpoints get the selected badge, interior days a `rangeBackground` band. */
   selectedRange?: DateRange;
+  /** Earliest selectable day (inclusive); earlier days render disabled. */
+  minDate?: Date;
+  /** Latest selectable day (inclusive); later days render disabled. */
+  maxDate?: Date;
+  /** Return true to render a specific day disabled (dimmed, taps ignored). */
+  isDateDisabled?: (date: Date) => boolean;
   /** Per-date style merged onto the day cell. */
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
   renderEvent: RenderEvent<T>;
@@ -108,6 +115,9 @@ function MonthViewInner<T>({
   activeDate,
   selectedDates: selectedDatesProp,
   selectedRange: selectedRangeProp,
+  minDate: minDateProp,
+  maxDate: maxDateProp,
+  isDateDisabled: isDateDisabledProp,
   calendarCellStyle,
   renderEvent,
   keyExtractor,
@@ -123,6 +133,9 @@ function MonthViewInner<T>({
   const selection = useCalendarSelection();
   const selectedDates = selectedDatesProp ?? selection.selectedDates;
   const selectedRange = selectedRangeProp ?? selection.selectedRange;
+  const minDate = minDateProp ?? selection.minDate;
+  const maxDate = maxDateProp ?? selection.maxDate;
+  const isDateDisabled = isDateDisabledProp ?? selection.isDateDisabled;
   const RenderEventComponent = renderEvent;
   // Measured grid height, used to auto-fit the event chips per cell.
   const [gridHeight, setGridHeight] = useState(0);
@@ -197,25 +210,36 @@ function MonthViewInner<T>({
     const isHighlighted = activeDate ? isSameCalendarDay(day, activeDate) : isToday;
     // Selection (single/multiple dates or a range endpoint) wins over the today
     // badge; interior range days get a band behind the cell instead of a badge.
+    const isDisabled =
+      (minDate != null || maxDate != null || isDateDisabled != null) &&
+      !isDateSelectable(day, { minDate, maxDate, isDateDisabled });
     const isSelected =
-      (selectedDates?.some((selected) => isSameCalendarDay(selected, day)) ?? false) ||
-      isRangeEndpoint(day, selectedRange ?? null);
-    const isInRange = isWithinDateRange(day, selectedRange ?? null);
+      !isDisabled &&
+      ((selectedDates?.some((selected) => isSameCalendarDay(selected, day)) ?? false) ||
+        isRangeEndpoint(day, selectedRange ?? null));
+    const isInRange = !isDisabled && isWithinDateRange(day, selectedRange ?? null);
     const visibleCount = monthVisibleCount(dayEvents.length, capacity);
     const hiddenCount = dayEvents.length - visibleCount;
 
-    const dateColor = isSelected
-      ? theme.colors.selectedText
-      : isHighlighted
-        ? theme.colors.todayText
-        : isCurrentMonth
-          ? theme.colors.text
-          : theme.colors.textDisabled;
+    const dateColor = isDisabled
+      ? theme.colors.textDisabled
+      : isSelected
+        ? theme.colors.selectedText
+        : isHighlighted
+          ? theme.colors.todayText
+          : isCurrentMonth
+            ? theme.colors.text
+            : theme.colors.textDisabled;
+
+    // Disabled days ignore taps; pass the guards through so a press never fires.
+    const handlePressDay = isDisabled || !onPressDay ? undefined : () => onPressDay(day);
+    const handleLongPressDay =
+      isDisabled || !onLongPressDay ? undefined : () => onLongPressDay(day);
 
     // Summarise the cell for screen readers: full date, today marker, and how
     // many events it holds (the chips inside are grouped under this cell).
     const eventCount = dayEvents.length;
-    const accessibilityLabel = `${format(day, "EEEE, d LLLL yyyy", { locale })}${isToday ? ", today" : ""}${isSelected ? ", selected" : ""}, ${eventCount} ${eventCount === 1 ? "event" : "events"}`;
+    const accessibilityLabel = `${format(day, "EEEE, d LLLL yyyy", { locale })}${isToday ? ", today" : ""}${isSelected ? ", selected" : ""}${isDisabled ? ", unavailable" : ""}, ${eventCount} ${eventCount === 1 ? "event" : "events"}`;
 
     return (
       <TouchableOpacity
@@ -228,9 +252,9 @@ function MonthViewInner<T>({
           isInRange && { backgroundColor: theme.colors.rangeBackground },
           calendarCellStyle?.(day),
         ]}
-        onPress={onPressDay ? () => onPressDay(day) : undefined}
-        onLongPress={onLongPressDay ? () => onLongPressDay(day) : undefined}
-        disabled={!onPressDay && !onLongPressDay}
+        onPress={handlePressDay}
+        onLongPress={handleLongPressDay}
+        disabled={isDisabled || (!onPressDay && !onLongPressDay)}
         // A cell, not a button — it contains the event-chip buttons, and a nested
         // <button> is invalid HTML on web. `cell` is also closer to the correct
         // semantics for a calendar day than `button`.

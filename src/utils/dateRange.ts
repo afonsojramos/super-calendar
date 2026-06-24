@@ -64,8 +64,12 @@ export function isWithinDateRange(date: Date, range: DateRange | null): boolean 
   return day >= Math.min(a, b) && day <= Math.max(a, b);
 }
 
-/** The current month-view selection, shared with day cells via context. */
-export interface CalendarSelection {
+/**
+ * Per-day state shared with the month grid via context: the current selection
+ * plus the selectability constraints. Threaded through context (not props) so
+ * cached/virtualized day cells still repaint when any of it changes.
+ */
+export interface CalendarSelection extends DateSelectionConstraints {
   selectedDates?: Date[];
   selectedRange?: DateRange;
 }

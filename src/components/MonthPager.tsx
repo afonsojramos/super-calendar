@@ -65,6 +65,9 @@ export type MonthPagerProps<T> = {
   activeDate?: Date;
   selectedDates?: Date[];
   selectedRange?: DateRange;
+  minDate?: Date;
+  maxDate?: Date;
+  isDateDisabled?: (date: Date) => boolean;
   /** Replace the weekday-label header above the month grid. Receives the week's days. */
   renderHeaderForMonthView?: (weekDays: Date[]) => React.ReactNode;
 };
@@ -95,6 +98,9 @@ function MonthPagerInner<T>({
   activeDate,
   selectedDates,
   selectedRange,
+  minDate,
+  maxDate,
+  isDateDisabled,
   renderHeaderForMonthView,
 }: MonthPagerProps<T>) {
   const { width, height } = useWindowDimensions();
@@ -165,8 +171,8 @@ function MonthPagerInner<T>({
   // (LegendList keeps mounted pages with recycleItems={false}) still repaints
   // when the selection changes. Memoised so consumers only re-render on change.
   const selection = useMemo<CalendarSelection>(
-    () => ({ selectedDates, selectedRange }),
-    [selectedDates, selectedRange],
+    () => ({ selectedDates, selectedRange, minDate, maxDate, isDateDisabled }),
+    [selectedDates, selectedRange, minDate, maxDate, isDateDisabled],
   );
 
   const snapToIndices = useMemo(() => monthDates.map((_, index) => index), [monthDates]);

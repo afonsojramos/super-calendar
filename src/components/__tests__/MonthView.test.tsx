@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 import { StyleSheet, type ViewStyle } from "react-native";
 import { defaultTheme } from "../../theme";
 import type { CalendarEvent } from "../../types";
@@ -44,5 +44,42 @@ describe("MonthView selection", () => {
     );
     const other = getByLabelText(/20 June 2026, 0 events/);
     expect(backgroundColorOf(other)).not.toBe(defaultTheme.colors.rangeBackground);
+  });
+});
+
+describe("MonthView disabled days", () => {
+  it("marks days outside the min/max range as unavailable", () => {
+    const { getByLabelText } = render(
+      <MonthView {...baseProps} minDate={new Date(2026, 5, 10)} maxDate={new Date(2026, 5, 20)} />,
+    );
+    expect(getByLabelText(/, 9 June 2026, unavailable/)).toBeTruthy();
+    expect(getByLabelText(/, 21 June 2026, unavailable/)).toBeTruthy();
+    // Inside the window stays available.
+    expect(() => getByLabelText(/, 15 June 2026, unavailable/)).toThrow();
+  });
+
+  it("honours an isDateDisabled predicate", () => {
+    const onPressDay = jest.fn();
+    const { getByLabelText } = render(
+      <MonthView
+        {...baseProps}
+        isDateDisabled={(d) => d.getDate() === 12}
+        onPressDay={onPressDay}
+      />,
+    );
+    const disabled = getByLabelText(/, 12 June 2026, unavailable/);
+    fireEvent.press(disabled);
+    expect(onPressDay).not.toHaveBeenCalled();
+  });
+
+  it("does not select a disabled day even if passed in selectedDates", () => {
+    const { getByLabelText } = render(
+      <MonthView
+        {...baseProps}
+        selectedDates={[new Date(2026, 5, 12)]}
+        isDateDisabled={(d) => d.getDate() === 12}
+      />,
+    );
+    expect(() => getByLabelText(/, 12 June 2026, selected/)).toThrow();
   });
 });
