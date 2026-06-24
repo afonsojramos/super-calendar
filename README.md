@@ -201,6 +201,17 @@ fires, so drag coexists with both:
 />
 ```
 
+**Reject a drop.** Return `false` from `onDragEvent` to refuse the new placement
+— the event snaps back to where it started. Use it to forbid overlaps,
+out-of-bounds slots, or locked events:
+
+```tsx
+onDragEvent={(event, start, end) => {
+  if (event.locked || overlapsAnother(event, start, end)) return false;
+  setEvents((prev) => prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)));
+}}
+```
+
 **Haptics on grab.** `onDragStart` fires the instant an event is picked up for a
 move or resize, before anything is committed. The library stays expo-free, so
 bring your own haptics, e.g. [`expo-haptics`](https://docs.expo.dev/versions/latest/sdk/haptics/):
