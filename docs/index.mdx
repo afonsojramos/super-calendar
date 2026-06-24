@@ -1,0 +1,64 @@
+---
+title: react-native-bigger-calendar
+description: A gesture-driven, virtualized calendar for React Native and the web.
+---
+
+A calendar for React Native (and react-native-web) built on Reanimated 4, Gesture
+Handler, and Legend List. It renders month, week, day, 3-day, and schedule views,
+virtualizes and snap-pages every view, and leans into touch: pinch-to-zoom, drag
+to move and resize, and drag to create.
+
+It's an homage to
+[react-native-big-calendar](https://github.com/acroca/react-native-big-calendar),
+not a fork — the API differs and the internals are new.
+
+<Frame caption="The week view: events, business-hours shading, and the current-time line.">
+  <img src="/images/hero.png" alt="react-native-bigger-calendar week view" />
+</Frame>
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Install it and render your first calendar in a couple of minutes.
+  </Card>
+  <Card title="Live demo" icon="play" href="/demo">
+    Try the web build — drag, resize, zoom, and create events in the browser.
+  </Card>
+  <Card title="Dragging & creating" icon="hand-pointer" href="/guides/dragging">
+    Move, resize, reschedule across days, and sweep out new events.
+  </Card>
+  <Card title="API reference" icon="code" href="/reference/api">
+    Every `<Calendar>` prop and exported helper.
+  </Card>
+</CardGroup>
+
+## Highlights
+
+- **Five views** — month, week, day, 3-day (or any N), and a schedule list.
+- **Virtualized & paged** — every view snap-pages and only mounts a few dates at
+  a time, so far-future and far-past dates stay cheap.
+- **Gesture-driven** — pinch-to-zoom the time grid, long-press to drag events,
+  drag a grip to resize, and drag empty space to create.
+- **Drag across days**, with optional validation to reject a drop.
+- **Recurring events**, **time-zone display**, and a **dark theme** preset.
+- **Bring-your-own event type** (`CalendarEvent<T>`) and a `renderEvent` escape
+  hatch that works across every mode and event shape.
+- **Runs on the web** via react-native-web, with the touch gestures remapped to
+  mouse and keyboard.
+
+## At a glance
+
+| Capability                                   | react-native-bigger-calendar               | react-native-big-calendar     |
+| -------------------------------------------- | ------------------------------------------ | ----------------------------- |
+| Month / week / day / 3-day / custom / agenda | ✅                                         | ✅                            |
+| Generic event typing (`CalendarEvent<T>`)    | ✅                                         | ✅                            |
+| Virtualized, snap-paged views                | ✅                                         | ❌ renders all dates          |
+| Pinch-to-zoom (native) / Ctrl-scroll (web)   | ✅                                         | ❌                            |
+| Drag to move, resize & create                | ✅                                         | ❌ (declined upstream)        |
+| Overlapping events                           | ✅ side-by-side columns                    | ⚠️ stacked / indented         |
+| Recurring events                             | ✅ `expandRecurringEvents`                 | ❌ expand them yourself       |
+| Time-zone display                            | ✅ `eventsInTimeZone`                      | ❌                            |
+| Dark mode                                    | ✅ `darkTheme` preset                      | ❌ bring your own palette     |
+| Web                                          | ✅ arrow-key paging, Ctrl-scroll zoom      | ⚠️ partial                    |
+| Runtime dependencies                         | Reanimated + Gesture Handler + Legend List | dayjs + calendarize (lighter) |
+
+Legend: ✅ supported · ⚠️ partial or with known issues · ❌ not available.

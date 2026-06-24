@@ -1,0 +1,80 @@
+---
+title: API reference
+description: The main Calendar props and the package's exports.
+---
+
+`<Calendar>` is the batteries-included entry point. The props below are the
+common ones, grouped by purpose; every prop is typed via `CalendarProps<T>`, so
+your editor lists the full set with inline docs.
+
+## Data
+
+| Prop           | Type                 | Notes                                             |
+| -------------- | -------------------- | ------------------------------------------------- |
+| `events`       | `CalendarEvent<T>[]` | Your events. The generic `T` is your own data.    |
+| `date`         | `Date`               | The controlled anchor date.                       |
+| `mode`         | `CalendarMode`       | `month` `week` `day` `3days` `custom` `schedule`. |
+| `numberOfDays` | `number`             | Column count for `custom`.                        |
+| `weekStartsOn` | `0–6`                | 0 = Sunday, 1 = Monday.                           |
+
+## Navigation
+
+| Prop                | Type                            | Notes                                    |
+| ------------------- | ------------------------------- | ---------------------------------------- |
+| `onChangeDate`      | `(date) => void`                | Fires when paging changes the date.      |
+| `onChangeDateRange` | `(range: [Date, Date]) => void` | The visible window — handy for fetching. |
+| `freeSwipe`         | `boolean`                       | Fling across several pages.              |
+
+## Events & rendering
+
+| Prop                | Type                               | Notes                               |
+| ------------------- | ---------------------------------- | ----------------------------------- |
+| `renderEvent`       | `RenderEvent<T>`                   | Render events your way, every mode. |
+| `eventCellStyle`    | `style \| (event) => style`        | Tweak the built-in box.             |
+| `calendarCellStyle` | `(date) => style`                  | Per-date column/cell shading.       |
+| `businessHours`     | `(date) => { start, end } \| null` | Shade closed hours.                 |
+| `keyExtractor`      | `(event, index) => string`         | Stable event keys.                  |
+
+## Interactions
+
+| Prop              | Type                                     | Notes                                         |
+| ----------------- | ---------------------------------------- | --------------------------------------------- |
+| `onDragEvent`     | `(event, start, end) => void \| boolean` | Enable move/resize; return `false` to reject. |
+| `onDragStart`     | `(event) => void`                        | Fires on grab (e.g. haptics).                 |
+| `onCreateEvent`   | `(start, end) => void`                   | Drag empty space to create.                   |
+| `dragStepMinutes` | `number`                                 | Snap step (default 15).                       |
+| `onPressEvent`    | `(event) => void`                        | Tap an event.                                 |
+| `onPressCell`     | `(date) => void`                         | Tap empty grid space.                         |
+| `onPressDay`      | `(date) => void`                         | Tap a month day cell.                         |
+| `onPressMore`     | `(events, date) => void`                 | Tap the `+N more` overflow.                   |
+
+## Display
+
+| Prop                   | Type                   | Notes                           |
+| ---------------------- | ---------------------- | ------------------------------- |
+| `scrollOffsetMinutes`  | `number`               | Initial vertical scroll.        |
+| `hourHeight`           | `number`               | Row height (px per hour).       |
+| `timeslots`            | `number`               | Hour sub-divisions.             |
+| `ampm`                 | `boolean`              | 12-hour labels.                 |
+| `showNowIndicator`     | `boolean`              | Current-time line (default on). |
+| `maxVisibleEventCount` | `number`               | Month: fixed chip cap.          |
+| `theme`                | `PartialCalendarTheme` | Color/text/metric overrides.    |
+
+## Exports
+
+<CardGroup cols={2}>
+  <Card title="Components">
+    `Calendar`, `Agenda`, `MonthView`, `MonthPager`, `TimeGrid`, `DefaultEvent`
+  </Card>
+  <Card title="Theming">
+    `defaultTheme`, `darkTheme`, `mergeTheme`, `CalendarThemeProvider`, `useCalendarTheme`
+  </Card>
+  <Card title="Helpers">
+    `expandRecurringEvents`, `eventsInTimeZone`, `toZonedTime`, `layoutDayEvents`, `isAllDayEvent`,
+    `getWeekDays`, `getIsToday`, `isWeekend`, `minutesIntoDay`
+  </Card>
+  <Card title="Types">
+    `CalendarEvent`, `CalendarMode`, `RenderEventArgs`, `RecurrenceRule`, `BusinessHours`,
+    `EventDragHandler`, `CalendarTheme`, `PositionedEvent`
+  </Card>
+</CardGroup>

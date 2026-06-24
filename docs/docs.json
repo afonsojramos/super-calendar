@@ -1,0 +1,59 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "react-native-bigger-calendar",
+  "colors": {
+    "primary": "#1F6FEB",
+    "light": "#4D8DF5",
+    "dark": "#1A5FCC"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Getting started",
+        "pages": ["index", "quickstart", "demo"]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "guides/events",
+          "guides/dragging",
+          "guides/modes",
+          "guides/recurring-events",
+          "guides/time-zones",
+          "guides/theming",
+          "guides/web"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": ["reference/api"]
+      }
+    ]
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "npm",
+        "href": "https://www.npmjs.com/package/react-native-bigger-calendar"
+      }
+    ],
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/afonsojramos/react-native-bigger-calendar"
+    }
+  },
+  "contextual": {
+    "options": ["copy", "view", "chatgpt", "claude"]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/afonsojramos/react-native-bigger-calendar"
+    }
+  }
+}

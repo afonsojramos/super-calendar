@@ -1,0 +1,67 @@
+---
+title: Custom events
+description: Type your events and render them your way.
+---
+
+## The event type
+
+Events are plain objects. The only required fields are `start`, `end`, and
+`title`; everything else is yours. `CalendarEvent<T>` is generic, so you can
+attach your own fields and read them back in callbacks and renderers.
+
+```tsx
+import type { CalendarEvent } from "react-native-bigger-calendar";
+
+type Meta = { id: string; calendarId: string; color: string };
+
+const events: CalendarEvent<Meta>[] = [
+  {
+    title: "Standup",
+    start: new Date(2026, 5, 23, 9, 0),
+    end: new Date(2026, 5, 23, 9, 30),
+    id: "1",
+    calendarId: "work",
+    color: "#1F6FEB",
+  },
+];
+```
+
+- `allDay` lays the event out in the all-day lane above the grid instead of in
+  the columns. It's also inferred for midnight-to-midnight spans.
+- `disabled` opts an event out of drag interactions.
+- Multi-day events render on each day they span, clipped per day.
+
+## Render your own event
+
+Pass `renderEvent` — a component (so it can use hooks) that receives
+`RenderEventArgs`. It's used in every mode and for every event shape (timed,
+all-day, multi-day), so you only write it once.
+
+```tsx
+import type { RenderEventArgs } from "react-native-bigger-calendar";
+import { Pressable, Text } from "react-native";
+
+function MyEvent({ event, onPress }: RenderEventArgs<Meta>) {
+  return (
+    <Pressable onPress={onPress} style={{ flex: 1, backgroundColor: event.color, borderRadius: 6 }}>
+      <Text numberOfLines={1}>{event.title}</Text>
+    </Pressable>
+  );
+}
+
+<Calendar /* ... */ renderEvent={MyEvent} />;
+```
+
+<Tip>
+  Wrapping events in a portaling overlay (a context menu, popover) on the web? Portal it into your
+  app's React root, not `document.body` — see the [Web guide](/guides/web#portaling-overlays).
+</Tip>
+
+## Lighter touches
+
+If you only want to tweak the built-in event box, you don't need a full
+`renderEvent`:
+
+- `eventCellStyle` — a style (or a function of the event) merged onto the
+  built-in box.
+- `keyExtractor` — a stable key per event; defaults to start-time + index.

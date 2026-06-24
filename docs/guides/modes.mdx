@@ -1,0 +1,56 @@
+---
+title: Modes
+description: Month, week, day, 3-day, custom, and schedule views.
+---
+
+Set `mode` to one of `month`, `week`, `day`, `3days`, `custom`, or `schedule`.
+
+```tsx
+<Calendar mode="week" date={date} events={events} onChangeDate={setDate} />
+```
+
+- **`week`** pages by the calendar week. Set `weekStartsOn` (0 = Sunday,
+  1 = Monday).
+- **`day` / `3days`** page by their column count.
+- **`custom`** renders any number of days — set `numberOfDays` (e.g.
+  `mode="custom"` with `numberOfDays={5}` for a work-week).
+- **`schedule`** is a vertical, day-grouped agenda list of the events you pass —
+  no time grid.
+
+## Time grid options
+
+For `week`, `day`, `3days`, and `custom`:
+
+- `scrollOffsetMinutes` — initial vertical scroll (e.g. `8 * 60` to open at 8am).
+- `hourHeight`, `minHourHeight`, `maxHourHeight` — row height and pinch-zoom
+  bounds.
+- `timeslots` — sub-divisions drawn per hour.
+- `ampm` — 12-hour hour labels.
+- `showNowIndicator` — the current-time line (on by default).
+- `businessHours` — shade non-working hours (see [Theming](/guides/theming)).
+
+Tap handlers: `onPressCell` / `onLongPressCell` (empty space), `onPressEvent` /
+`onLongPressEvent`, and `onPressDateHeader`.
+
+## Month view
+
+Each day cell shows as many event chips as its height allows and collapses the
+rest into a `+N more` label.
+
+```tsx
+<Calendar mode="month" /* ... */ />                            // auto-fit (default)
+<Calendar mode="month" maxVisibleEventCount={3} /* ... */ />   // fixed cap
+```
+
+- `maxVisibleEventCount` — a fixed cap instead of auto-fit. Recommended when you
+  pass a custom `renderEvent`, since auto-fit assumes the built-in chip height.
+- `onPressMore` — tap the overflow label; receives the hidden events and the day.
+- `moreLabel` — customize the overflow text (e.g. `"+{moreCount}"`).
+- `onPressDay` — tap a day cell (e.g. to drill into the day view).
+
+## Paging
+
+By default one page moves per swipe. Set `freeSwipe` to let a fling carry across
+several pages (still snapping to a boundary). `onChangeDate` fires with the new
+anchor date; `onChangeDateRange` fires with the `[start, end]` of the visible
+window.

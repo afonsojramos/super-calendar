@@ -1,0 +1,20 @@
+---
+title: Time zones
+description: Display events in a specific time zone, DST-correct.
+---
+
+Events lay out from their local wall-clock time. To display them in a specific
+IANA zone regardless of the device, run them through `eventsInTimeZone` (or a
+single date through `toZonedTime`). It's DST-correct via `Intl`.
+
+```tsx
+import { Calendar, eventsInTimeZone } from "react-native-bigger-calendar";
+
+// Render every event at its New York wall-clock time.
+<Calendar /* ... */ events={eventsInTimeZone(events, "America/New_York")} />;
+```
+
+<Warning>
+  The returned dates are for display only — they carry the zone's wall clock, not the original
+  instant. Keep your source events around for editing and saving.
+</Warning>

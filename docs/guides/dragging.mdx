@@ -1,0 +1,83 @@
+---
+title: Dragging & creating
+description: Move, resize, reschedule across days, and create events by dragging.
+---
+
+All of this lives on the week/day grid and is opt-in: pass the relevant handler
+and update your own event state in response.
+
+## Move and resize
+
+Pass `onDragEvent` to make events draggable. Move an event (**long-press** it on
+native, **click-drag** it on web), or **drag the grip** at its bottom edge to
+resize. Drag **vertically to change the time, horizontally to move it to another
+day** (within the visible range). New `start`/`end` are snapped to
+`dragStepMinutes` (default 15).
+
+```tsx
+<Calendar
+  /* ... */
+  onDragEvent={(event, start, end) =>
+    setEvents((prev) => prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)))
+  }
+/>
+```
+
+### Reject a drop
+
+Return `false` from `onDragEvent` to refuse the new placement — the event snaps
+back to where it started. Use it to forbid overlaps, out-of-bounds slots, or
+locked events.
+
+```tsx
+onDragEvent={(event, start, end) => {
+  if (event.locked || overlapsAnother(event, start, end)) return false;
+  setEvents((prev) => prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)));
+}}
+```
+
+### Haptics on grab
+
+`onDragStart` fires the instant an event is picked up for a move or resize,
+before anything is committed. The library is expo-free, so bring your own
+haptics:
+
+```tsx
+import * as Haptics from "expo-haptics";
+
+<Calendar
+  /* ... */
+  onDragStart={() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }}
+/>;
+```
+
+## Drag to create
+
+Pass `onCreateEvent` to sweep out a new event on empty grid space:
+**long-press and drag** on native, **click-drag** on web. The handler receives
+the snapped `start`/`end` on release (a stationary press yields a one-step
+range). On native it supersedes `onLongPressCell`; on web, dragging empty space
+creates instead of scrolling (use the wheel to scroll), and **Escape** cancels an
+in-progress sweep before it commits.
+
+```tsx
+<Calendar
+  /* ... */
+  onCreateEvent={(start, end) =>
+    setEvents((prev) => [...prev, { id: makeId(), title: "New event", start, end }])
+  }
+/>
+```
+
+<Note>
+  A live ghost box previews the range as you sweep. Tap (no drag) on empty space still fires
+  `onPressCell` with the pressed date+time, so you can support both "tap to create a point" and
+  "drag to create a range."
+</Note>
+
+## Tuning the snap
+
+`dragStepMinutes` (default 15) controls how move, resize, and create snap. Set it
+to `5`, `30`, etc. to match your grid's granularity.

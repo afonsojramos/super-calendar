@@ -1,0 +1,36 @@
+---
+title: Live demo
+description: The example app, running on the web.
+---
+
+This is the [`example/`](https://github.com/afonsojramos/react-native-bigger-calendar/tree/main/example)
+app exported for the web and hosted on GitHub Pages. Everything here runs the
+real library.
+
+<Frame>
+  <iframe
+    src="https://afonsojramos.github.io/react-native-bigger-calendar/"
+    title="react-native-bigger-calendar web demo"
+    style={{ width: "100%", height: "720px", border: "0", borderRadius: "12px" }}
+    loading="lazy"
+  />
+</Frame>
+
+## Things to try
+
+- **Switch modes** with the tabs: month, week, 3-day, day, schedule.
+- **Pinch / Ctrl-scroll** on the week or day grid to zoom the hours.
+- **Click-drag an event** vertically to change its time, horizontally to move it
+  to another day. The exam is "locked" — its drop is rejected and it snaps back.
+- **Drag the grip** at an event's bottom edge to resize it.
+- **Click-drag empty space** to create an event; press **Escape** mid-drag to
+  cancel.
+- **Right-click an event** for the context menu (move / delete).
+- Note the shaded hours: business hours are 9–5 on weekdays, and weekends read as
+  closed.
+
+<Note>
+  On native, dragging starts on a long-press (so taps and scrolls aren't hijacked); on the web it
+  starts after a small drag, so a plain click still selects. See [Dragging &
+  creating](/guides/dragging) and [Web](/guides/web).
+</Note>

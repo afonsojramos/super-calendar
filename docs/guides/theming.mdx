@@ -1,0 +1,64 @@
+---
+title: Theming
+description: Colors, typography, dark mode, and business hours.
+---
+
+## Theme tokens
+
+Pass a `Partial<CalendarTheme>` — anything you omit falls back to `defaultTheme`.
+
+```tsx
+<Calendar
+  // ...
+  theme={{
+    colors: { todayBackground: "#E5484D", nowIndicator: "#E5484D" },
+    text: { dayNumber: { fontSize: 24, fontWeight: "800" } },
+  }}
+/>
+```
+
+See `CalendarTheme` for the full set of color, text, and metric tokens.
+
+### Dark mode
+
+A ready-made `darkTheme` is included. Switch on the system scheme with
+`useColorScheme()`:
+
+```tsx
+import { Calendar, darkTheme, defaultTheme } from "react-native-bigger-calendar";
+import { useColorScheme } from "react-native";
+
+const scheme = useColorScheme();
+<Calendar /* ... */ theme={scheme === "dark" ? darkTheme : defaultTheme} />;
+```
+
+### Reading the theme
+
+Inside a custom `renderEvent` (or any descendant), read the active theme with
+`useCalendarTheme()`.
+
+## Business hours
+
+Pass `businessHours` to tint the closed hours on the week/day grid. It's a
+function of the day, so open hours can vary and weekends can read as closed:
+return `{ start, end }` (hours, fractions allowed) to shade outside that range,
+or `null` to shade the whole day. The tint is the theme's
+`outsideHoursBackground`.
+
+```tsx
+<Calendar
+  /* ... */
+  businessHours={(date) => {
+    const weekday = date.getDay();
+    if (weekday === 0 || weekday === 6) return null; // weekends closed
+    return { start: 9, end: 17 };
+  }}
+/>
+```
+
+## Per-date column styling
+
+For shading specific dates (holidays, the selected day) across month cells and
+week/day columns, use `calendarCellStyle` — a function of the date returning a
+style. Unlike `businessHours` (which shades a time band), this tints the whole
+day.

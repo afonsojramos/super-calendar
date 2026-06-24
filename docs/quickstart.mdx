@@ -1,0 +1,93 @@
+---
+title: Quickstart
+description: Install the calendar and render your first view.
+---
+
+## Prerequisites
+
+A React Native app on the new architecture, with these peer dependencies
+installed: `react-native-reanimated` (v4), `react-native-gesture-handler`,
+`react-native-worklets`, and `@legendapp/list` (v3). The Expo SDK includes
+compatible versions.
+
+## Install
+
+<Steps>
+  <Step title="Add the package and peers">
+    <CodeGroup>
+    ```bash npm
+    npx expo install react-native-bigger-calendar react-native-reanimated react-native-gesture-handler react-native-worklets @legendapp/list date-fns
+    ```
+
+    ```bash pnpm
+    pnpm add react-native-bigger-calendar react-native-reanimated react-native-gesture-handler react-native-worklets @legendapp/list date-fns
+    ```
+    </CodeGroup>
+
+  </Step>
+
+  <Step title="Wrap your app in GestureHandlerRootView">
+    Gesture Handler needs a root view at the top of your tree.
+
+    ```tsx
+    import { GestureHandlerRootView } from "react-native-gesture-handler";
+
+    export default function App() {
+      return <GestureHandlerRootView style={{ flex: 1 }}>{/* ... */}</GestureHandlerRootView>;
+    }
+    ```
+
+  </Step>
+
+  <Step title="Render a calendar">
+    `<Calendar>` is controlled: you own `date` and `events`, and update them from
+    its callbacks.
+
+    ```tsx
+    import { useState } from "react";
+    import { Calendar, type CalendarEvent, type CalendarMode } from "react-native-bigger-calendar";
+
+    const events: CalendarEvent[] = [
+      { title: "Standup", start: new Date(2026, 5, 23, 9, 0), end: new Date(2026, 5, 23, 9, 30) },
+    ];
+
+    export function MyCalendar() {
+      const [date, setDate] = useState(() => new Date());
+      const [mode, setMode] = useState<CalendarMode>("week");
+      return (
+        <Calendar
+          mode={mode}
+          date={date}
+          events={events}
+          weekStartsOn={1}
+          onChangeDate={setDate}
+          onPressEvent={(event) => console.log(event.title)}
+        />
+      );
+    }
+    ```
+
+  </Step>
+</Steps>
+
+<Tip>
+  Targeting the web too? See the [Web guide](/guides/web) for the extra peers and how the touch
+  gestures map to mouse and keyboard.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Custom events" icon="paintbrush" href="/guides/events">
+    Type your events and render them your way.
+  </Card>
+  <Card title="Dragging & creating" icon="hand-pointer" href="/guides/dragging">
+    Turn on move, resize, and drag-to-create.
+  </Card>
+  <Card title="Modes" icon="table-cells" href="/guides/modes">
+    Month, week, day, 3-day, and schedule.
+  </Card>
+  <Card title="Theming" icon="palette" href="/guides/theming">
+    Colors, dark mode, and business hours.
+  </Card>
+</CardGroup>

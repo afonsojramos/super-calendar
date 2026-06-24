@@ -1,0 +1,43 @@
+---
+title: Recurring events
+description: Expand recurrence rules into concrete occurrences.
+---
+
+Give an event a `recurrence` rule and expand it into concrete occurrences for the
+range you're showing with `expandRecurringEvents`. The calendar doesn't expand
+recurrences itself, so you control the window (and can memoize it).
+
+```tsx
+import { Calendar, expandRecurringEvents } from "react-native-bigger-calendar";
+
+const events = [
+  // Every weekday standup, 20 occurrences:
+  {
+    title: "Standup",
+    start,
+    end,
+    recurrence: { freq: "weekly", weekdays: [1, 2, 3, 4, 5], count: 20 },
+  },
+];
+
+const visible = expandRecurringEvents(events, rangeStart, rangeEnd);
+
+<Calendar /* ... */ events={visible} />;
+```
+
+Rules support:
+
+- `freq` — `"daily"`, `"weekly"`, `"monthly"`, or `"yearly"`.
+- `interval` — every N periods (e.g. every 2 weeks).
+- `count` — stop after N occurrences.
+- `until` — stop on or before a date.
+- `weekdays` — which days, for `weekly` rules (0 = Sunday).
+
+Each occurrence keeps the original duration and fields; non-recurring events pass
+through unchanged.
+
+<Tip>
+  Compute the range from the visible window. `onChangeDateRange` gives you the `[start, end]` of
+  what's on screen each time the user pages — a good trigger to re-expand (and to fetch from a
+  server).
+</Tip>

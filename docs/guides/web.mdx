@@ -1,0 +1,52 @@
+---
+title: Web
+description: Running on react-native-web, with gestures mapped to mouse and keyboard.
+---
+
+The calendar runs on
+[react-native-web](https://necolas.github.io/react-native-web/); its
+dependencies (Legend List v3, Reanimated, Gesture Handler) all support the web.
+See it running on the [live demo](/demo).
+
+## Add the web peers
+
+```bash
+npx expo install react-dom react-native-web @expo/metro-runtime
+```
+
+The runnable [`example/`](https://github.com/afonsojramos/react-native-bigger-calendar/tree/main/example)
+builds with `expo start --web`.
+
+## Gestures on the web
+
+All modes render and navigate. The touch gestures are remapped:
+
+| Touch (native)            | Web                                      |
+| ------------------------- | ---------------------------------------- |
+| Horizontal swipe paging   | **←** / **→** arrow keys                 |
+| Pinch-to-zoom (week/day)  | **Ctrl/Cmd + scroll**                    |
+| Long-press to drag/create | **Click-drag** (after a small threshold) |
+
+Because dragging starts after a small click-drag on the web, a plain click still
+selects an event and a right-click still opens a context menu. Dragging empty
+space creates an event (scroll with the wheel); press **Escape** to cancel a
+sweep.
+
+## Portaling overlays
+
+<Warning>
+  If a `renderEvent` wraps events in a portaling overlay (a context menu, popover, etc.) from a UI
+  library, portal it into your app's React root, **not** `document.body`.
+</Warning>
+
+react-native-web registers React's event delegation on the root element (`#root`
+under Expo), so an overlay mounted outside it renders correctly but its click
+handlers never fire. Most libraries take a `container` prop for this — point it
+at `#root`. The example's context menu does exactly this:
+
+```tsx
+const [container, setContainer] = useState<HTMLElement | null>(null);
+useEffect(() => setContainer(document.getElementById("root")), []);
+// ...
+<Menu.Portal container={container}>{/* menu */}</Menu.Portal>;
+```
