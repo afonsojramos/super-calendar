@@ -2,6 +2,7 @@ export { Calendar, type CalendarProps } from "./components/Calendar";
 export { Agenda, type AgendaProps } from "./components/Agenda";
 export { MonthView, type MonthViewProps } from "./components/MonthView";
 export { MonthPager, type MonthPagerProps } from "./components/MonthPager";
+export { MonthList, type MonthListProps } from "./components/MonthList";
 export {
   TimeGrid,
   type TimeGridProps,
