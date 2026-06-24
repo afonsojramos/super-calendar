@@ -213,6 +213,21 @@ import * as Haptics from "expo-haptics";
 />;
 ```
 
+**Drag to create.** Pass `onCreateEvent` to sweep out a new event on empty grid
+space (iOS & Android): **long-press empty space and drag** to size the range. The
+handler receives the snapped `start`/`end` on release (a stationary press yields
+a one-step range) — create your own event in response. It supersedes
+`onLongPressCell` on empty space; tap-to-create via `onPressCell` still works.
+
+```tsx
+<Calendar
+  /* ... */
+  onCreateEvent={(start, end) =>
+    setEvents((prev) => [...prev, { id: makeId(), title: "New event", start, end }])
+  }
+/>
+```
+
 ### Recurring events
 
 Give an event a `recurrence` rule and expand it into concrete occurrences for the
