@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent, WeekStartsOn } from "../types";
+import type { DateRange } from "../utils/dateRange";
 import { getWeekDays } from "../utils/dates";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { MonthView } from "./MonthView";
@@ -58,6 +59,8 @@ export type MonthPagerProps<T> = {
   swipeEnabled?: boolean;
   showSixWeeks?: boolean;
   activeDate?: Date;
+  selectedDates?: Date[];
+  selectedRange?: DateRange;
   /** Replace the weekday-label header above the month grid. Receives the week's days. */
   renderHeaderForMonthView?: (weekDays: Date[]) => React.ReactNode;
 };
@@ -86,6 +89,8 @@ function MonthPagerInner<T>({
   swipeEnabled = true,
   showSixWeeks = false,
   activeDate,
+  selectedDates,
+  selectedRange,
   renderHeaderForMonthView,
 }: MonthPagerProps<T>) {
   const { width, height } = useWindowDimensions();
@@ -171,6 +176,8 @@ function MonthPagerInner<T>({
           isRTL={isRTL}
           showSixWeeks={showSixWeeks}
           activeDate={activeDate}
+          selectedDates={selectedDates}
+          selectedRange={selectedRange}
           calendarCellStyle={calendarCellStyle}
           renderEvent={renderEvent}
           keyExtractor={keyExtractor}
@@ -196,6 +203,8 @@ function MonthPagerInner<T>({
       isRTL,
       showSixWeeks,
       activeDate,
+      selectedDates,
+      selectedRange,
       calendarCellStyle,
       renderEvent,
       keyExtractor,

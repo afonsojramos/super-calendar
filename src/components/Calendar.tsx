@@ -11,6 +11,7 @@ import { useCallback, useMemo } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { useSharedValue } from "react-native-reanimated";
 import { CalendarThemeProvider, mergeTheme, type PartialCalendarTheme } from "../theme";
+import type { DateRange } from "../utils/dateRange";
 import type {
   CalendarEvent,
   CalendarMode,
@@ -167,6 +168,12 @@ export type CalendarProps<T> = {
   locale?: Locale;
   /** Highlight this date (header/cell/agenda) instead of the real "today". */
   activeDate?: Date;
+  /** Month mode only: mark a single day as selected. Wire `onPressDay` to update it. */
+  selectedDate?: Date | null;
+  /** Month mode only: mark several days as selected (multi-select). */
+  selectedDates?: Date[];
+  /** Month mode only: a selected span; pair with the `useDateRange` hook for range picking. */
+  selectedRange?: DateRange;
   /**
    * Lay the day columns out right-to-left (month, week/day grid and all-day lane).
    * Cosmetic only: the hour gutter stays on the left and paging still advances
@@ -269,6 +276,9 @@ export function Calendar<T>({
   showNowIndicator,
   locale,
   activeDate,
+  selectedDate,
+  selectedDates,
+  selectedRange,
   isRTL,
   freeSwipe,
   renderTimeGridHeader,
@@ -327,6 +337,13 @@ export function Calendar<T>({
     };
   }, [renderEvent, eventCellStyle, ampm, showTime, ellipsizeTitle]);
 
+  // Fold the single-date convenience prop into the multi-select list the month
+  // view consumes, so callers can use whichever shape fits their selection mode.
+  const monthSelectedDates = useMemo(() => {
+    if (selectedDate == null) return selectedDates;
+    return selectedDates ? [...selectedDates, selectedDate] : [selectedDate];
+  }, [selectedDate, selectedDates]);
+
   return (
     <CalendarThemeProvider value={mergedTheme}>
       {mode === "month" ? (
@@ -343,6 +360,8 @@ export function Calendar<T>({
           isRTL={isRTL}
           showSixWeeks={showSixWeeks}
           activeDate={activeDate}
+          selectedDates={monthSelectedDates}
+          selectedRange={selectedRange}
           renderHeaderForMonthView={renderHeaderForMonthView}
           calendarCellStyle={calendarCellStyle}
           renderEvent={resolvedRenderEvent}
