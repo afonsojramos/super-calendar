@@ -1,8 +1,11 @@
-import { useState } from "react";
+import * as Haptics from "expo-haptics";
+import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { Calendar, type CalendarEvent, type CalendarMode } from "react-native-bigger-calendar";
+import { EventContextMenu } from "./components/EventContextMenu";
+import { EventMenuProvider, type EventMenuActions } from "./components/EventMenu";
 
 // Freeze the clock so the demo always renders the same scene: the events, the
 // "today" highlight and the current-time line all anchor to this instant (Tue
@@ -21,6 +24,13 @@ type EventMeta = {
 };
 
 const MODES: CalendarMode[] = ["month", "week", "3days", "day", "schedule"];
+
+// Shift a date by some minutes (used by the right-click menu actions).
+function shiftedDate(date: Date, minutes: number): Date {
+  const next = new Date(date);
+  next.setMinutes(next.getMinutes() + minutes);
+  return next;
+}
 
 // Pin the calendar to a single view, overriding the tab bar — handy for
 // screenshots and docs. Set it to a mode (e.g. "week") to force that view; leave
@@ -83,6 +93,23 @@ export default function App() {
   // DEMO_MODE pins the view when set; otherwise the tab bar drives it.
   const activeMode = DEMO_MODE ?? mode;
 
+  // Actions the (web) right-click menu performs; matched back to events by id.
+  const menuActions = useMemo<EventMenuActions>(
+    () => ({
+      shift: (event, minutes) =>
+        setEvents((prev) =>
+          prev.map((e) =>
+            e.id === (event as CalendarEvent<EventMeta>).id
+              ? { ...e, start: shiftedDate(e.start, minutes), end: shiftedDate(e.end, minutes) }
+              : e,
+          ),
+        ),
+      remove: (event) =>
+        setEvents((prev) => prev.filter((e) => e.id !== (event as CalendarEvent<EventMeta>).id)),
+    }),
+    [],
+  );
+
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
@@ -98,26 +125,32 @@ export default function App() {
               </Pressable>
             ))}
           </View>
-          <Calendar
-            mode={activeMode}
-            date={date}
-            events={events}
-            weekStartsOn={1}
-            scrollOffsetMinutes={8 * 60}
-            onChangeDate={setDate}
-            onDragEvent={(event, start, end) =>
-              setEvents((prev) => prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)))
-            }
-            onPressEvent={(event) => console.log("press event:", event.title)}
-            onPressDay={(day) => {
-              setDate(day);
-              setMode("day");
-            }}
-            onPressMore={(dayEvents, day) =>
-              console.log("more:", day.toDateString(), dayEvents.length)
-            }
-            onPressCell={(at) => console.log("create at:", at.toISOString())}
-          />
+          <EventMenuProvider value={menuActions}>
+            <Calendar
+              mode={activeMode}
+              date={date}
+              events={events}
+              weekStartsOn={1}
+              scrollOffsetMinutes={8 * 60}
+              renderEvent={EventContextMenu}
+              onChangeDate={setDate}
+              onDragEvent={(event, start, end) =>
+                setEvents((prev) => prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)))
+              }
+              onDragStart={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              }}
+              onPressEvent={(event) => console.log("press event:", event.title)}
+              onPressDay={(day) => {
+                setDate(day);
+                setMode("day");
+              }}
+              onPressMore={(dayEvents, day) =>
+                console.log("more:", day.toDateString(), dayEvents.length)
+              }
+              onPressCell={(at) => console.log("create at:", at.toISOString())}
+            />
+          </EventMenuProvider>
         </SafeAreaView>
       </SafeAreaProvider>
     </GestureHandlerRootView>
