@@ -189,6 +189,17 @@ function AnimatedEventBox<T>({
     [positioned.startHours, positioned.durationHours, minHour],
   );
 
+  // Clear the drag preview once the committed change re-renders this box at its
+  // new geometry. The gesture holds the snapped offset through the commit (so the
+  // box never flashes back to the original spot); this drops it the moment the
+  // new start/duration lands, for consumers whose keyExtractor keeps it mounted.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+    moveOffset.value = 0;
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+    resizeDelta.value = 0;
+  }, [positioned.startHours, positioned.durationHours, moveOffset, resizeDelta]);
+
   // Keep the latest event/handler in a ref so the gestures stay memoized but
   // never call into a stale closure.
   const latest = useRef({ event: positioned.event, onDragEvent, onDragStart });
@@ -226,8 +237,14 @@ function AnimatedEventBox<T>({
         })
         .onEnd((event) => {
           const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
-          moveOffset.value = 0;
-          if (delta !== 0) runOnJS(commitDrag)(delta, delta);
+          if (delta === 0) {
+            moveOffset.value = 0;
+            return;
+          }
+          // Hold the snapped position so the box doesn't flash back to the
+          // original before the committed re-render lands.
+          moveOffset.value = (delta / MINUTES_PER_HOUR) * cellHeight.value;
+          runOnJS(commitDrag)(delta, delta);
         }),
     [draggable, snapMinutes, cellHeight, moveOffset, commitDrag, notifyDragStart],
   );
@@ -244,8 +261,12 @@ function AnimatedEventBox<T>({
         })
         .onEnd((event) => {
           const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
-          resizeDelta.value = 0;
-          if (delta !== 0) runOnJS(commitDrag)(0, delta);
+          if (delta === 0) {
+            resizeDelta.value = 0;
+            return;
+          }
+          resizeDelta.value = (delta / MINUTES_PER_HOUR) * cellHeight.value;
+          runOnJS(commitDrag)(0, delta);
         }),
     [resizable, snapMinutes, cellHeight, resizeDelta, commitDrag, notifyDragStart],
   );
