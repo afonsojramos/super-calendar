@@ -607,10 +607,11 @@ function TimetablePageInner<T>({
     return Gesture.Simultaneous(pinch, Gesture.Native());
   }, [cellHeight, committedCellHeight, pinchStartCellHeight, minHourHeight, maxHourHeight]);
 
-  // Drag-to-create: long-press empty grid and drag to sweep out a new event.
-  // Web has the context-menu / tap path instead (a drag overlay would intercept
-  // clicks), so this stays native-only like move/resize.
-  const createEnabled = onCreateEvent != null && !isWeb;
+  // Drag-to-create: sweep out a new event on empty grid. Native long-presses
+  // first (so a tap/scroll isn't hijacked); web uses a drag threshold like move,
+  // so a tap still creates a point via onPressCell and the wheel still scrolls
+  // (dragging empty space creates instead of scrolling, as on desktop calendars).
+  const createEnabled = onCreateEvent != null;
   // Live ghost-box geometry (px), driven on the UI thread during the sweep.
   const createActive = useSharedValue(0);
   const createTop = useSharedValue(0);
@@ -630,55 +631,57 @@ function TimetablePageInner<T>({
     [days, heightSource, minHour, snapMinutes, onCreateEvent],
   );
 
-  const createGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .enabled(createEnabled)
-        .activateAfterLongPress(DRAG_ACTIVATE_MS)
-        .onStart((event) => {
-          const idx = days.length === 1 ? 0 : Math.floor(event.x / dayWidth);
-          createDayIndex.value = idx;
-          createStartY.value = event.y;
-          createLeft.value = hourColumnWidth + idx * dayWidth;
-          createWidth.value = dayWidth;
-          createTop.value = event.y;
-          createHeight.value = 0;
-          createActive.value = 1;
-        })
-        .onUpdate((event) => {
-          const stepPx = (snapMinutes / MINUTES_PER_HOUR) * heightSource.value;
-          const snap = (y: number) => (stepPx > 0 ? Math.round(y / stepPx) * stepPx : y);
-          const startSnap = snap(createStartY.value);
-          const endSnap = snap(createStartY.value + event.translationY);
-          createTop.value = Math.min(startSnap, endSnap);
-          createHeight.value = Math.max(Math.abs(endSnap - startSnap), stepPx);
-        })
-        .onEnd((event) => {
-          runOnJS(commitCreate)(
-            createStartY.value,
-            createStartY.value + event.translationY,
-            createDayIndex.value,
-          );
-          createActive.value = 0;
-          createHeight.value = 0;
-        }),
-    [
-      createEnabled,
-      days.length,
-      dayWidth,
-      hourColumnWidth,
-      heightSource,
-      snapMinutes,
-      commitCreate,
-      createActive,
-      createTop,
-      createHeight,
-      createLeft,
-      createWidth,
-      createStartY,
-      createDayIndex,
-    ],
-  );
+  const createGesture = useMemo(() => {
+    const pan = Gesture.Pan()
+      .enabled(createEnabled)
+      .onStart((event) => {
+        const idx = days.length === 1 ? 0 : Math.floor(event.x / dayWidth);
+        createDayIndex.value = idx;
+        createStartY.value = event.y;
+        createLeft.value = hourColumnWidth + idx * dayWidth;
+        createWidth.value = dayWidth;
+        createTop.value = event.y;
+        createHeight.value = 0;
+        createActive.value = 1;
+      })
+      .onUpdate((event) => {
+        const stepPx = (snapMinutes / MINUTES_PER_HOUR) * heightSource.value;
+        const snap = (y: number) => (stepPx > 0 ? Math.round(y / stepPx) * stepPx : y);
+        const startSnap = snap(createStartY.value);
+        const endSnap = snap(createStartY.value + event.translationY);
+        createTop.value = Math.min(startSnap, endSnap);
+        createHeight.value = Math.max(Math.abs(endSnap - startSnap), stepPx);
+      })
+      .onEnd((event) => {
+        runOnJS(commitCreate)(
+          createStartY.value,
+          createStartY.value + event.translationY,
+          createDayIndex.value,
+        );
+        createActive.value = 0;
+        createHeight.value = 0;
+      });
+    // Native: hold to start. Web: activate past a small vertical drag so a plain
+    // tap still falls through to onPressCell.
+    return isWeb
+      ? pan.activeOffsetY([-DRAG_ACTIVATE_PX, DRAG_ACTIVATE_PX])
+      : pan.activateAfterLongPress(DRAG_ACTIVATE_MS);
+  }, [
+    createEnabled,
+    days.length,
+    dayWidth,
+    hourColumnWidth,
+    heightSource,
+    snapMinutes,
+    commitCreate,
+    createActive,
+    createTop,
+    createHeight,
+    createLeft,
+    createWidth,
+    createStartY,
+    createDayIndex,
+  ]);
 
   const createGhostStyle = useAnimatedStyle(() => ({
     top: createTop.value,
