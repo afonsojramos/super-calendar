@@ -134,9 +134,14 @@ export default function App() {
               scrollOffsetMinutes={8 * 60}
               renderEvent={EventContextMenu}
               onChangeDate={setDate}
-              onDragEvent={(event, start, end) =>
-                setEvents((prev) => prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)))
-              }
+              onDragEvent={(event, start, end) => {
+                // Demo: exams are locked — returning false rejects the drop and
+                // snaps the event back to where it started.
+                if ((event as CalendarEvent<EventMeta>).kind === "exam") return false;
+                setEvents((prev) =>
+                  prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)),
+                );
+              }}
               onDragStart={() => {
                 void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               }}
