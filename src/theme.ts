@@ -12,6 +12,8 @@ export interface CalendarTheme {
     gridLine: string;
     /** Background tint behind weekend columns/cells. */
     weekendBackground: string;
+    /** Background tint over hours outside `businessHours` on the week/day grid. */
+    outsideHoursBackground: string;
     /** Fill of the "today" badge (and any today highlight). */
     todayBackground: string;
     /** Text on top of the today badge. */
@@ -51,6 +53,7 @@ export const defaultTheme: CalendarTheme = {
   colors: {
     gridLine: "#E2E4E9",
     weekendBackground: "#F6F7F9",
+    outsideHoursBackground: "#F1F2F4",
     todayBackground: "#1F6FEB",
     todayText: "#FFFFFF",
     nowIndicator: "#E5484D",
@@ -80,6 +83,7 @@ export const darkTheme: CalendarTheme = {
   colors: {
     gridLine: "#2A2E37",
     weekendBackground: "#15171C",
+    outsideHoursBackground: "#101216",
     todayBackground: "#1F6FEB",
     todayText: "#FFFFFF",
     nowIndicator: "#E5484D",

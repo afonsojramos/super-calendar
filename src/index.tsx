@@ -5,6 +5,7 @@ export { MonthPager, type MonthPagerProps } from "./components/MonthPager";
 export {
   TimeGrid,
   type TimeGridProps,
+  type BusinessHours,
   type EventDragHandler,
   type EventDragStartHandler,
   type HourRenderer,

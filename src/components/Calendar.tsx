@@ -24,6 +24,7 @@ import { Agenda } from "./Agenda";
 import { DefaultEvent } from "./DefaultEvent";
 import { MonthPager } from "./MonthPager";
 import {
+  type BusinessHours,
   DEFAULT_HOUR_HEIGHT,
   type EventDragHandler,
   type EventDragStartHandler,
@@ -111,6 +112,12 @@ export type CalendarProps<T> = {
   eventCellStyle?: StyleProp<ViewStyle> | ((event: CalendarEvent<T>) => StyleProp<ViewStyle>);
   /** Per-date style for month cells and week/day columns (e.g. shade specific dates). */
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
+  /**
+   * Week/day grid only: open hours per day for business-hours shading. Hours
+   * outside the returned `{ start, end }` are tinted; return `null` to shade the
+   * whole day (closed). Omit for no shading.
+   */
+  businessHours?: BusinessHours;
   /** Stable key per event. Defaults to start-time + index. */
   keyExtractor?: EventKeyExtractor<T>;
   /** Partial theme merged over the defaults. */
@@ -235,6 +242,7 @@ export function Calendar<T>({
   renderEvent = DefaultEvent,
   eventCellStyle,
   calendarCellStyle,
+  businessHours,
   keyExtractor = defaultKeyExtractor as EventKeyExtractor<T>,
   theme,
   cellHeight: cellHeightProp,
@@ -377,6 +385,7 @@ export function Calendar<T>({
           hideHours={hideHours}
           timeslots={timeslots}
           calendarCellStyle={calendarCellStyle}
+          businessHours={businessHours}
           showWeekNumber={showWeekNumber}
           weekNumberPrefix={weekNumberPrefix}
           hourComponent={hourComponent}

@@ -494,6 +494,52 @@ const NowIndicator = ({ cellHeight, nowHours, minHour, left, width, color }: Now
   );
 };
 
+/**
+ * A day's open hours for `businessHours` shading: `{ start, end }` in hours
+ * (fractions allowed, e.g. 9.5), or `null` when the day is closed (fully shaded).
+ */
+export type BusinessHours = (date: Date) => { start: number; end: number } | null;
+
+type ShadeBandProps = {
+  cellHeight: SharedValue<number>;
+  startHour: number;
+  endHour: number;
+  minHour: number;
+  left: number;
+  width: number;
+  color: string;
+};
+
+// A muted band over a closed hour-range of one day column (driven by the live
+// cellHeight so it tracks the zoom).
+const ShadeBand = ({
+  cellHeight,
+  startHour,
+  endHour,
+  minHour,
+  left,
+  width,
+  color,
+}: ShadeBandProps) => {
+  const animatedStyle = useAnimatedStyle(
+    () => ({
+      top: (startHour - minHour) * cellHeight.value,
+      height: (endHour - startHour) * cellHeight.value,
+    }),
+    [startHour, endHour, minHour],
+  );
+  return (
+    <Animated.View
+      style={[
+        styles.shadeBand,
+        styles.nonInteractive,
+        { left, width, backgroundColor: color },
+        animatedStyle,
+      ]}
+    />
+  );
+};
+
 type TimetablePageProps<T> = {
   mode: TimeGridMode;
   numberOfDays: number;
@@ -520,6 +566,7 @@ type TimetablePageProps<T> = {
   verticalScrollEnabled: boolean;
   hourComponent?: HourRenderer;
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
+  businessHours?: BusinessHours;
   minHourHeight: number;
   maxHourHeight: number;
   showNowIndicator: boolean;
@@ -564,6 +611,7 @@ function TimetablePageInner<T>({
   minHourHeight,
   maxHourHeight,
   showNowIndicator,
+  businessHours,
   renderEvent,
   keyExtractor,
   snapMinutes,
@@ -610,6 +658,21 @@ function TimetablePageInner<T>({
   const dayLeft = (dayIndex: number) => hourColumnWidth + dayIndex * dayWidth;
 
   const dayLayouts = useMemo(() => days.map((day) => layoutDayEvents(events, day)), [days, events]);
+
+  // The closed hour-ranges of a day (to shade) given `businessHours`: the spans
+  // before open and after close, clamped to the visible window — or the whole
+  // window when the day is closed (`null`).
+  const closedHourBands = (day: Date): { start: number; end: number }[] => {
+    const open = businessHours?.(day);
+    if (open === undefined) return [];
+    if (open === null) return [{ start: minHour, end: maxHour }];
+    const openStart = Math.max(minHour, Math.min(maxHour, open.start));
+    const openEnd = Math.max(minHour, Math.min(maxHour, open.end));
+    const bands: { start: number; end: number }[] = [];
+    if (openStart > minHour) bands.push({ start: minHour, end: openStart });
+    if (openEnd < maxHour) bands.push({ start: openEnd, end: maxHour });
+    return bands;
+  };
 
   // Map a tap on empty grid space back to the date+time it represents. Reads the
   // live row height on the JS thread to convert the touch Y into minutes.
@@ -899,6 +962,23 @@ function TimetablePageInner<T>({
                 })
               : null}
 
+            {businessHours
+              ? days.flatMap((day, dayIndex) =>
+                  closedHourBands(day).map((band, bandIndex) => (
+                    <ShadeBand
+                      key={`closed-${day.toISOString()}-${bandIndex}`}
+                      cellHeight={heightSource}
+                      startHour={band.start}
+                      endHour={band.end}
+                      minHour={minHour}
+                      left={dayLeft(dayIndex)}
+                      width={dayWidth}
+                      color={theme.colors.outsideHoursBackground}
+                    />
+                  )),
+                )
+              : null}
+
             {days.map((day, dayIndex) => (
               <Animated.View
                 key={`separator-${day.toISOString()}`}
@@ -1031,6 +1111,7 @@ export type TimeGridProps<T> = {
   timeslots?: number;
   /** Per-date style merged onto each day column. */
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
+  businessHours?: BusinessHours;
   /** Show the ISO week number in the header gutter. Default false. */
   showWeekNumber?: boolean;
   /** Element rendered between the day header and the grid. */
@@ -1099,6 +1180,7 @@ function TimeGridInner<T>({
   hideHours = false,
   timeslots = 1,
   calendarCellStyle,
+  businessHours,
   showWeekNumber = false,
   headerComponent,
   minHour = 0,
@@ -1288,6 +1370,7 @@ function TimeGridInner<T>({
           verticalScrollEnabled={verticalScrollEnabled}
           hourComponent={hourComponent}
           calendarCellStyle={calendarCellStyle}
+          businessHours={businessHours}
           minHourHeight={minHourHeight}
           maxHourHeight={maxHourHeight}
           showNowIndicator={showNowIndicator}
@@ -1328,6 +1411,7 @@ function TimeGridInner<T>({
       verticalScrollEnabled,
       hourComponent,
       calendarCellStyle,
+      businessHours,
       minHourHeight,
       maxHourHeight,
       showNowIndicator,
@@ -1561,6 +1645,9 @@ const styles = StyleSheet.create({
   weekendColumn: {
     position: "absolute",
     top: 0,
+  },
+  shadeBand: {
+    position: "absolute",
   },
   daySeparator: {
     position: "absolute",
