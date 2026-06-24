@@ -368,6 +368,13 @@ horizontal swipe paging becomes **←** / **→** arrow-key paging (previous / n
 page), and pinch-to-zoom on the week/day grid becomes **Ctrl/Cmd + scroll**. The
 runnable [`example/`](./example) builds with `expo start --web`.
 
+If a `renderEvent` wraps events in a portaling overlay (a context menu, popover,
+etc.) from a UI library, portal it into your app's React root, not
+`document.body`. react-native-web registers React's event delegation on the root
+element (`#root` under Expo), so an overlay mounted outside it renders correctly
+but its click handlers never fire. Most libraries take a `container` prop for
+this; the example's context menu portals into `#root` for exactly this reason.
+
 ## Components
 
 `<Calendar>` is the batteries-included entry point. The building blocks it wraps
