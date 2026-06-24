@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent, WeekStartsOn } from "../types";
+import { type DateRange, isRangeEndpoint, isWithinDateRange } from "../utils/dateRange";
 import { getIsToday, isSameCalendarDay, isWeekend } from "../utils/dates";
 import { monthEventCapacity, monthVisibleCount } from "../utils/eventDisplay";
 import { eventDayKeys, isAllDayEvent } from "../utils/layout";
@@ -72,6 +73,10 @@ export type MonthViewProps<T> = {
   showSixWeeks?: boolean;
   /** Highlight this date instead of the real "today". */
   activeDate?: Date;
+  /** Days drawn as selected (their badge uses the theme's `selected*` colours). */
+  selectedDates?: Date[];
+  /** A selected span: endpoints get the selected badge, interior days a `rangeBackground` band. */
+  selectedRange?: DateRange;
   /** Per-date style merged onto the day cell. */
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
   renderEvent: RenderEvent<T>;
@@ -96,6 +101,8 @@ function MonthViewInner<T>({
   isRTL = false,
   showSixWeeks = false,
   activeDate,
+  selectedDates,
+  selectedRange,
   calendarCellStyle,
   renderEvent,
   keyExtractor,
@@ -178,19 +185,27 @@ function MonthViewInner<T>({
     const isToday = getIsToday(day);
     // Highlight the chosen `activeDate` when supplied, else the real today.
     const isHighlighted = activeDate ? isSameCalendarDay(day, activeDate) : isToday;
+    // Selection (single/multiple dates or a range endpoint) wins over the today
+    // badge; interior range days get a band behind the cell instead of a badge.
+    const isSelected =
+      (selectedDates?.some((selected) => isSameCalendarDay(selected, day)) ?? false) ||
+      isRangeEndpoint(day, selectedRange ?? null);
+    const isInRange = isWithinDateRange(day, selectedRange ?? null);
     const visibleCount = monthVisibleCount(dayEvents.length, capacity);
     const hiddenCount = dayEvents.length - visibleCount;
 
-    const dateColor = isHighlighted
-      ? theme.colors.todayText
-      : isCurrentMonth
-        ? theme.colors.text
-        : theme.colors.textDisabled;
+    const dateColor = isSelected
+      ? theme.colors.selectedText
+      : isHighlighted
+        ? theme.colors.todayText
+        : isCurrentMonth
+          ? theme.colors.text
+          : theme.colors.textDisabled;
 
     // Summarise the cell for screen readers: full date, today marker, and how
     // many events it holds (the chips inside are grouped under this cell).
     const eventCount = dayEvents.length;
-    const accessibilityLabel = `${format(day, "EEEE, d LLLL yyyy", { locale })}${isToday ? ", today" : ""}, ${eventCount} ${eventCount === 1 ? "event" : "events"}`;
+    const accessibilityLabel = `${format(day, "EEEE, d LLLL yyyy", { locale })}${isToday ? ", today" : ""}${isSelected ? ", selected" : ""}, ${eventCount} ${eventCount === 1 ? "event" : "events"}`;
 
     return (
       <TouchableOpacity
@@ -199,6 +214,8 @@ function MonthViewInner<T>({
           styles.dayCell,
           { borderColor: theme.colors.gridLine },
           isWeekend(day) && { backgroundColor: theme.colors.weekendBackground },
+          // Range band sits behind the cell; placed after weekend so it wins.
+          isInRange && { backgroundColor: theme.colors.rangeBackground },
           calendarCellStyle?.(day),
         ]}
         onPress={onPressDay ? () => onPressDay(day) : undefined}
@@ -213,10 +230,15 @@ function MonthViewInner<T>({
         <View
           style={[
             styles.dateBadge,
-            isHighlighted && {
-              backgroundColor: theme.colors.todayBackground,
-              borderRadius: theme.todayBadgeRadius,
-            },
+            isSelected
+              ? {
+                  backgroundColor: theme.colors.selectedBackground,
+                  borderRadius: theme.todayBadgeRadius,
+                }
+              : isHighlighted && {
+                  backgroundColor: theme.colors.todayBackground,
+                  borderRadius: theme.todayBadgeRadius,
+                },
           ]}
         >
           <Text style={[theme.text.dateCell, { color: dateColor }]} allowFontScaling={false}>
