@@ -384,6 +384,25 @@ paging follows the system scroll direction — so enable React Native's
   moves per swipe; set it to allow a fling to carry across several pages (still
   snapping to a page boundary). Applies to all modes.
 
+### Business hours
+
+Pass `businessHours` to tint the closed hours on the week/day grid. It's a
+function of the day, so open hours can vary (and weekends can read as closed) —
+return `{ start, end }` (hours, fractions allowed) to shade outside that range,
+or `null` to shade the whole day. The tint colour is the theme's
+`outsideHoursBackground`.
+
+```tsx
+<Calendar
+  /* ... */
+  businessHours={(date) => {
+    const weekday = date.getDay();
+    if (weekday === 0 || weekday === 6) return null; // weekends closed
+    return { start: 9, end: 17 };
+  }}
+/>
+```
+
 ### Web
 
 The calendar runs on [react-native-web](https://necolas.github.io/react-native-web/);
