@@ -55,7 +55,7 @@ import {
   isWeekend,
   viewDayCount,
 } from "../utils/dates";
-import { shiftMinutes, snapDeltaMinutes } from "../utils/drag";
+import { resolveDraggedBounds, snapDeltaMinutes } from "../utils/drag";
 import { layoutDayEvents, type PositionedEvent } from "../utils/layout";
 import { useWebGridZoom } from "../utils/useWebGridZoom";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
@@ -209,11 +209,16 @@ function AnimatedEventBox<T>({
     (deltaStartMin: number, deltaEndMin: number) => {
       const { event, onDragEvent: handler } = latest.current;
       if (!handler) return;
-      const start = shiftMinutes(event.start, deltaStartMin);
-      const end = shiftMinutes(event.end, deltaEndMin);
-      // Never let a resize collapse the event below one step.
-      if (end.getTime() - start.getTime() < snapMinutes * 60_000) return;
-      handler(event, start, end);
+      // Returns null (and we bail) when a resize would collapse below one step.
+      const next = resolveDraggedBounds(
+        event.start,
+        event.end,
+        deltaStartMin,
+        deltaEndMin,
+        snapMinutes,
+      );
+      if (!next) return;
+      handler(event, next.start, next.end);
     },
     [snapMinutes],
   );
