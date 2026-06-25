@@ -37,7 +37,9 @@ export type {
 export {
   type DateRange,
   type DateSelectionConstraints,
+  type DaySelectionState,
   type UseDateRangeOptions,
+  daySelectionState,
   isDateSelectable,
   isRangeEndpoint,
   isWithinDateRange,

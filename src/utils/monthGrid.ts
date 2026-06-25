@@ -1,14 +1,8 @@
 import { format, type Locale, isSameMonth } from "date-fns";
 import { useMemo } from "react";
 import type { WeekStartsOn } from "../types";
-import {
-  type DateRange,
-  type DateSelectionConstraints,
-  isDateSelectable,
-  isRangeEndpoint,
-  isWithinDateRange,
-} from "./dateRange";
-import { buildMonthWeeks, getIsToday, isSameCalendarDay, isWeekend } from "./dates";
+import { type DateRange, type DateSelectionConstraints, daySelectionState } from "./dateRange";
+import { buildMonthWeeks, getIsToday, isWeekend } from "./dates";
 
 /** A single day in the grid, with all the state a custom cell needs to render. */
 export interface MonthGridDay {
@@ -79,33 +73,25 @@ export function buildMonthGrid(month: Date, options: UseMonthGridOptions = {}): 
   } = options;
 
   const rows = buildMonthWeeks(month, weekStartsOn, { showSixWeeks, isRTL });
-  const range = selectedRange ?? null;
 
   const weeks: MonthGridWeek[] = rows.map((days) => ({
     id: days[0].toISOString(),
-    days: days.map((date): MonthGridDay => {
-      // isDateSelectable returns true when no constraints are set.
-      const isDisabled = !isDateSelectable(date, { minDate, maxDate, isDateDisabled });
-      const isRangeStart = range != null && isSameCalendarDay(date, range.start);
-      const isRangeEnd = range?.end != null && isSameCalendarDay(date, range.end);
-      const isSelected =
-        !isDisabled &&
-        ((selectedDates?.some((selected) => isSameCalendarDay(selected, date)) ?? false) ||
-          isRangeEndpoint(date, range));
-      return {
+    days: days.map(
+      (date): MonthGridDay => ({
         date,
         id: format(date, "yyyy-MM-dd"),
         label: format(date, "d"),
         isCurrentMonth: isSameMonth(date, month),
         isToday: getIsToday(date),
         isWeekend: isWeekend(date),
-        isDisabled,
-        isSelected,
-        isRangeStart: isRangeStart && !isDisabled,
-        isRangeEnd: (isRangeEnd ?? false) && !isDisabled,
-        isInRange: !isDisabled && isWithinDateRange(date, range),
-      };
-    }),
+        // Shared with MonthView, so the headless grid matches the built-in view.
+        ...daySelectionState(
+          date,
+          { selectedDates, selectedRange },
+          { minDate, maxDate, isDateDisabled },
+        ),
+      }),
+    ),
   }));
 
   // Weekday labels depend only on the first row's dates (already ordered).

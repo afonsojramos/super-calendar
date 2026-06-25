@@ -16,13 +16,7 @@ import {
 const isWeb = Platform.OS === "web";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent, WeekStartsOn } from "../types";
-import {
-  type DateRange,
-  isDateSelectable,
-  isRangeEndpoint,
-  isWithinDateRange,
-  useCalendarSelection,
-} from "../utils/dateRange";
+import { type DateRange, daySelectionState, useCalendarSelection } from "../utils/dateRange";
 import { buildMonthWeeks, getIsToday, isSameCalendarDay, isWeekend } from "../utils/dates";
 import { monthEventCapacity, monthVisibleCount } from "../utils/eventDisplay";
 import { eventDayKeys, isAllDayEvent } from "../utils/layout";
@@ -201,14 +195,13 @@ function MonthViewInner<T>({
     const isToday = getIsToday(day);
     // Highlight the chosen `activeDate` when supplied, else the real today.
     const isHighlighted = activeDate ? isSameCalendarDay(day, activeDate) : isToday;
-    // Selection (single/multiple dates or a range endpoint) wins over the today
-    // badge; interior range days get a band behind the cell instead of a badge.
-    const isDisabled = !isDateSelectable(day, { minDate, maxDate, isDateDisabled });
-    const isSelected =
-      !isDisabled &&
-      ((selectedDates?.some((selected) => isSameCalendarDay(selected, day)) ?? false) ||
-        isRangeEndpoint(day, selectedRange ?? null));
-    const isInRange = !isDisabled && isWithinDateRange(day, selectedRange ?? null);
+    // Selection band wins over the weekend tint; the today badge shows unless the
+    // day is selected. Shared with the headless grid so they never diverge.
+    const { isDisabled, isSelected, isInRange } = daySelectionState(
+      day,
+      { selectedDates, selectedRange },
+      { minDate, maxDate, isDateDisabled },
+    );
     const visibleCount = monthVisibleCount(dayEvents.length, capacity);
     const hiddenCount = dayEvents.length - visibleCount;
 

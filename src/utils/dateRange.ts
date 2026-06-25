@@ -64,6 +64,42 @@ export function isWithinDateRange(date: Date, range: DateRange | null): boolean 
   return day >= Math.min(a, b) && day <= Math.max(a, b);
 }
 
+/** The selection/disabled flags for one day. */
+export interface DaySelectionState {
+  /** Fails the min/max/disabled constraints. */
+  isDisabled: boolean;
+  /** A `selectedDates` day or a range endpoint (and not disabled). */
+  isSelected: boolean;
+  /** Inside a complete range, endpoints included (and not disabled). */
+  isInRange: boolean;
+  isRangeStart: boolean;
+  isRangeEnd: boolean;
+}
+
+/**
+ * The canonical per-day selection state, shared by `MonthView` (rendering) and
+ * `buildMonthGrid` (the headless grid) so the built-in views and a custom
+ * calendar can never disagree on what a day's state is.
+ */
+export function daySelectionState(
+  date: Date,
+  selection: { selectedDates?: Date[]; selectedRange?: DateRange | null },
+  constraints: DateSelectionConstraints = {},
+): DaySelectionState {
+  const isDisabled = !isDateSelectable(date, constraints);
+  const range = selection.selectedRange ?? null;
+  return {
+    isDisabled,
+    isSelected:
+      !isDisabled &&
+      ((selection.selectedDates?.some((selected) => isSameCalendarDay(selected, date)) ?? false) ||
+        isRangeEndpoint(date, range)),
+    isInRange: !isDisabled && isWithinDateRange(date, range),
+    isRangeStart: !isDisabled && range != null && isSameCalendarDay(date, range.start),
+    isRangeEnd: !isDisabled && range?.end != null && isSameCalendarDay(date, range.end),
+  };
+}
+
 /**
  * Per-day state shared with the month grid via context: the current selection
  * plus the selectability constraints. Threaded through context (not props) so

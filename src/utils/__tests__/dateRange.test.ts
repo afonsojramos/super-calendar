@@ -1,5 +1,6 @@
 import {
   type DateRange,
+  daySelectionState,
   isDateSelectable,
   isRangeEndpoint,
   isWithinDateRange,
@@ -116,5 +117,57 @@ describe("isWithinDateRange", () => {
   it("is false for an open or null range", () => {
     expect(isWithinDateRange(day(10), { start: new Date(2026, 5, 10), end: null })).toBe(false);
     expect(isWithinDateRange(day(10), null)).toBe(false);
+  });
+});
+
+describe("daySelectionState", () => {
+  const range: DateRange = { start: new Date(2026, 5, 10), end: new Date(2026, 5, 14) };
+
+  it("flags nothing without selection or constraints", () => {
+    expect(daySelectionState(day(12), {})).toEqual({
+      isDisabled: false,
+      isSelected: false,
+      isInRange: false,
+      isRangeStart: false,
+      isRangeEnd: false,
+    });
+  });
+
+  it("marks a discrete selected day", () => {
+    expect(daySelectionState(day(12), { selectedDates: [day(12)] })).toMatchObject({
+      isSelected: true,
+      isInRange: false,
+    });
+  });
+
+  it("marks range endpoints and interior", () => {
+    expect(daySelectionState(day(10), { selectedRange: range })).toMatchObject({
+      isRangeStart: true,
+      isRangeEnd: false,
+      isSelected: true,
+      isInRange: true,
+    });
+    expect(daySelectionState(day(14), { selectedRange: range })).toMatchObject({
+      isRangeEnd: true,
+      isSelected: true,
+    });
+    expect(daySelectionState(day(12), { selectedRange: range })).toMatchObject({
+      isSelected: false,
+      isInRange: true,
+    });
+  });
+
+  it("never selects a disabled day, even when in the selection", () => {
+    const state = daySelectionState(
+      day(10),
+      { selectedRange: range, selectedDates: [day(10)] },
+      { minDate: day(11) },
+    );
+    expect(state).toMatchObject({
+      isDisabled: true,
+      isSelected: false,
+      isInRange: false,
+      isRangeStart: false,
+    });
   });
 });
