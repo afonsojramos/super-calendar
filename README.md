@@ -564,8 +564,8 @@ multi-day event, drill-into-day on tap, and one-page paging.
 
 ```sh
 cd example
-npm install
-npx expo run:ios   # or: npx expo run:android
+pnpm install
+pnpm expo run:ios   # or: pnpm expo run:android
 ```
 
 It consumes the library straight from `../src` (via the example's
