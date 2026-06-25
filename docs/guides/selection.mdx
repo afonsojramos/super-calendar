@@ -1,93 +1,81 @@
 ---
 title: Date selection
-description: Single, multiple, and range date selection with disabled days.
+description: Single, multiple, and range date selection with drag and disabled days.
 ---
 
-The month view can mark days as selected. Pass one of the selection props to
-`<Calendar mode="month">` and drive it from your own state via `onPressDay`.
-Selection is rendered with the theme's `selected*` and `rangeBackground` tokens.
+Date picking lives on [`MonthList`](/guides/month-list), the vertically-scrolling
+month list. It takes the selection props and renders the selection as a
+background band across the span (no per-day circle), so it stays distinct from
+the "today" badge.
 
-## Single and multiple days
+## Range selection with useDateRange
 
-`selectedDate` marks one day; `selectedDates` marks several (they combine).
-
-```tsx
-const [selected, setSelected] = useState<Date | null>(null);
-
-<Calendar
-  mode="month"
-  date={date}
-  events={[]}
-  selectedDate={selected}
-  onChangeDate={setDate}
-  onPressDay={setSelected}
-/>;
-```
-
-## Range selection with `useDateRange`
-
-For start/end ranges, the `useDateRange` hook owns the state machine: the first
-press sets the start, the second sets the end (auto-swapping if you tap an
-earlier day), and a third press starts over.
+`useDateRange` owns the start/end state machine: the first press sets the start,
+the second sets the end (auto-swapping if you tap an earlier day), and a third
+press starts over.
 
 ```tsx
-import { Calendar, useDateRange } from "react-native-super-calendar";
+import { MonthList, useDateRange } from "react-native-super-calendar";
 
 function RangePicker() {
   const [date, setDate] = useState(new Date());
-  const { range, onPressDate, reset } = useDateRange();
+  const { range, onPressDate, selectRange } = useDateRange();
 
   return (
-    <Calendar
-      mode="month"
+    <MonthList
       date={date}
-      events={[]}
+      weekStartsOn={1}
       selectedRange={range ?? undefined}
-      onChangeDate={setDate}
       onPressDay={onPressDate}
+      onSelectDrag={selectRange}
+      onChangeVisibleMonth={setDate}
     />
   );
 }
 ```
 
-The range's two endpoints get the selected badge; the days between get a
-`rangeBackground` band. `reset()` clears the range, and `setRange` is returned
-for full control.
+Tap two days to set the ends, or **drag** to sweep out a range: long-press a day
+and drag, and the list auto-scrolls at the edges so a range can span months.
+Wire `onSelectDrag` to `useDateRange`'s `selectRange`.
 
-## Disabled days
+## Single and multiple days
 
-`minDate`, `maxDate`, and `isDateDisabled` mark days as unavailable: they render
-dimmed, ignore taps, and can never be selected (even if passed in
-`selectedDates`). The same constraints can be handed to `useDateRange` so a
-rejected day never opens a range.
+`selectedDates` marks discrete days. Drive it from `onPressDay`:
 
 ```tsx
-const minDate = useMemo(() => new Date(), []); // no past dates
-const { range, onPressDate } = useDateRange({ minDate });
+const [picked, setPicked] = useState<Date[]>([]);
 
-<Calendar
-  mode="month"
+<MonthList
   date={date}
-  events={[]}
-  selectedRange={range ?? undefined}
-  minDate={minDate}
-  isDateDisabled={(d) => d.getDay() === 0} // also block Sundays
-  onChangeDate={setDate}
-  onPressDay={onPressDate}
+  weekStartsOn={1}
+  selectedDates={picked}
+  onPressDay={(day) => setPicked((prev) => [...prev, day])}
+  onChangeVisibleMonth={setDate}
 />;
 ```
 
-<Tip>
-  Selection and constraints flow to day cells through context, so they repaint correctly even on
-  virtualized pages the list has already mounted.
-</Tip>
+## Disabled days
 
-## Theming the selection
+`minDate`, `maxDate`, and `isDateDisabled` render days dimmed, ignore taps, and
+keep them out of any selection (drag included). Pass the same constraints to
+`useDateRange` so a rejected day never opens a range:
 
-Three theme tokens control the look, defaulted from the "today" colours so
-existing themes need no change:
+```tsx
+const minDate = useMemo(() => new Date(), []); // no past dates
+const { range, onPressDate, selectRange } = useDateRange({ minDate });
 
-- `colors.selectedBackground` / `colors.selectedText` — the selected day badge.
-- `colors.rangeBackground` — the band behind in-range days.
+<MonthList
+  date={date}
+  weekStartsOn={1}
+  selectedRange={range ?? undefined}
+  minDate={minDate}
+  isDateDisabled={(d) => d.getDay() === 0} // also block Sundays
+  onPressDay={onPressDate}
+  onSelectDrag={selectRange}
+/>;
+```
 
-See [Theming](/guides/theming) for the full token set.
+<Note>
+  Selection is a `rangeBackground` band over the span; there is no per-day selected circle by
+  default, so the "today" badge stays distinct. See [Theming](/guides/theming) for the token.
+</Note>

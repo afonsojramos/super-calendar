@@ -27,14 +27,14 @@ your editor lists the full set with inline docs.
 
 ## Events & rendering
 
-| Prop                       | Type                               | Notes                                          |
-| -------------------------- | ---------------------------------- | ---------------------------------------------- |
-| `renderEvent`              | `RenderEvent<T>`                   | Render events your way, every mode.            |
-| `renderCustomDateForMonth` | `(date) => ReactNode`              | Month: replace the day-cell date badge.        |
-| `eventCellStyle`           | `style \| (event) => style`        | Tweak the built-in box.                        |
-| `calendarCellStyle`        | `(date) => style`                  | Per-date column/cell shading.                  |
-| `businessHours`            | `(date) => { start, end } \| null` | Shade closed hours.                            |
-| `keyExtractor`             | `(event, index) => string`         | Stable event keys.                             |
+| Prop                       | Type                               | Notes                                   |
+| -------------------------- | ---------------------------------- | --------------------------------------- |
+| `renderEvent`              | `RenderEvent<T>`                   | Render events your way, every mode.     |
+| `renderCustomDateForMonth` | `(date) => ReactNode`              | Month: replace the day-cell date badge. |
+| `eventCellStyle`           | `style \| (event) => style`        | Tweak the built-in box.                 |
+| `calendarCellStyle`        | `(date) => style`                  | Per-date column/cell shading.           |
+| `businessHours`            | `(date) => { start, end } \| null` | Shade closed hours.                     |
+| `keyExtractor`             | `(event, index) => string`         | Stable event keys.                      |
 
 ## Interactions
 
@@ -49,18 +49,12 @@ your editor lists the full set with inline docs.
 | `onPressDay`      | `(date) => void`                         | Tap a month day cell.                         |
 | `onPressMore`     | `(events, date) => void`                 | Tap the `+N more` overflow.                   |
 
-## Selection (month mode)
+## Selection
 
-See the [Date selection](/guides/selection) guide.
-
-| Prop             | Type                | Notes                                           |
-| ---------------- | ------------------- | ----------------------------------------------- |
-| `selectedDate`   | `Date \| null`      | Mark a single day selected.                     |
-| `selectedDates`  | `Date[]`            | Mark several days selected.                     |
-| `selectedRange`  | `DateRange`         | A selected span; pair with `useDateRange`.      |
-| `minDate`        | `Date`              | Earliest selectable day; earlier ones disabled. |
-| `maxDate`        | `Date`              | Latest selectable day; later ones disabled.     |
-| `isDateDisabled` | `(date) => boolean` | Disable specific days (dimmed, taps ignored).   |
+Date selection lives on [`MonthList`](/guides/month-list), not the paged `month`
+view. It takes `selectedDates` / `selectedRange` (+ `onSelectDrag` for drag),
+and `minDate` / `maxDate` / `isDateDisabled` for disabled days. See the
+[Date selection](/guides/selection) guide.
 
 ## Display
 

@@ -279,64 +279,64 @@ duration and fields; non-recurring events pass through unchanged.
 
 ### Date selection
 
-In `month` mode the calendar can mark days as selected. Pass `selectedDate`
-(single), `selectedDates` (multiple), or `selectedRange` (a span), and drive it
-from your own state via `onPressDay`. For ranges, the `useDateRange` hook owns
-the state machine — first press sets the start, second sets the end
-(auto-swapping if earlier), a third press starts over:
+Date picking lives on `MonthList`, the vertically-scrolling month list (the
+horizontally-paged `month` view is for browsing events, not picking). The
+selection renders as a background band across the span, with no per-day circle,
+so it stays distinct from the "today" badge. For ranges, the `useDateRange` hook
+owns the state machine: the first press sets the start, the second sets the end
+(auto-swapping if earlier), a third press starts over. Tap two days, or
+long-press and drag to sweep a range (the list auto-scrolls at the edges, so a
+range can span months):
 
 ```tsx
-import { Calendar, useDateRange } from "react-native-super-calendar";
+import { MonthList, useDateRange } from "react-native-super-calendar";
 
 function RangePicker() {
   const [date, setDate] = useState(new Date());
-  const { range, onPressDate, reset } = useDateRange();
+  const { range, onPressDate, selectRange } = useDateRange();
 
   return (
-    <Calendar
-      mode="month"
+    <MonthList
       date={date}
-      events={[]}
+      weekStartsOn={1}
       selectedRange={range ?? undefined}
-      onChangeDate={setDate}
       onPressDay={onPressDate}
+      onSelectDrag={selectRange}
+      onChangeVisibleMonth={setDate}
     />
   );
 }
 ```
 
-The range's endpoints get the selected badge; in-between days get a
-`rangeBackground` band. Colours come from the `selectedBackground`,
-`selectedText` and `rangeBackground` theme tokens (defaulted from the "today"
-colours).
+Use `selectedDates` to mark discrete days instead of a range. The band colour is
+the `rangeBackground` theme token.
 
 **Disabled days.** `minDate`, `maxDate` and `isDateDisabled` render days dimmed,
-ignore taps, and refuse selection. Hand the same constraints to `useDateRange`
-so a blocked day never opens a range:
+ignore taps, and keep them out of any selection (drag included). Hand the same
+constraints to `useDateRange` so a blocked day never opens a range:
 
 ```tsx
 const minDate = useMemo(() => new Date(), []); // no past dates
-const { range, onPressDate } = useDateRange({ minDate });
+const { range, onPressDate, selectRange } = useDateRange({ minDate });
 
-<Calendar
-  mode="month"
+<MonthList
   date={date}
-  events={[]}
+  weekStartsOn={1}
   selectedRange={range ?? undefined}
   minDate={minDate}
   isDateDisabled={(d) => d.getDay() === 0} // also block Sundays
-  onChangeDate={setDate}
   onPressDay={onPressDate}
+  onSelectDrag={selectRange}
 />;
 ```
 
 ### Month list
 
-`MonthList` stacks months in one continuous, virtualized vertical scroll (a
-month title then its grid, under a fixed weekday header) — the right fit for a
-date-range or booking UI. It reuses the same events, selection and disabled-day
-behaviour as the month view. It requires `renderEvent` and `keyExtractor` (pass
-`DefaultEvent` for the built-in box):
+`MonthList` is the continuous, virtualized vertical scroll of months behind the
+picker above (a month title then its grid, under a fixed weekday header), sized
+per month with no adjacent-month fill. It also renders events: pass `events`,
+and optionally a `renderEvent`. Both `renderEvent` and `keyExtractor` default,
+so an events-free picker needs neither:
 
 ```tsx
 import { MonthList } from "react-native-super-calendar";
@@ -347,8 +347,6 @@ import { MonthList } from "react-native-super-calendar";
   weekStartsOn={1}
   renderEvent={MyEvent}
   keyExtractor={(event) => event.id}
-  selectedRange={range ?? undefined}
-  onPressDay={onPressDate}
   onChangeVisibleMonth={setDate}
 />;
 ```

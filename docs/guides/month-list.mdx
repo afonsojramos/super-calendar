@@ -1,24 +1,24 @@
 ---
 title: Month list
-description: A vertically-scrolling, continuous list of months — the date picker.
+description: A vertically-scrolling, continuous list of months (the date picker).
 ---
 
 `MonthList` renders months stacked vertically in one continuous, virtualized
-scroll — a month-title separator followed by each month's grid, under a single
+scroll: a month-title separator followed by each month's grid, under a single
 fixed weekday header. Each month shows **only its own days** (no dimmed
 adjacent-month fill), and sizes to its own row count.
 
-It's the home for date picking: it takes the same selection props as
+It's the home for date picking. It takes the same selection props as
 [`MonthView`](/reference/api) and renders a range band that flows continuously
-across month boundaries — something the horizontally-paged month view can't do.
-An events-free picker needs nothing but `date` and the selection wiring:
+across month boundaries, which the horizontally-paged month view can't do. An
+events-free picker needs nothing but `date` and the selection wiring:
 
 ```tsx
 import { MonthList, useDateRange } from "react-native-super-calendar";
 
 function RangePicker() {
   const [date, setDate] = useState(new Date());
-  const { range, onPressDate } = useDateRange({ minDate: new Date() });
+  const { range, onPressDate, selectRange } = useDateRange({ minDate: new Date() });
 
   return (
     <MonthList
@@ -27,31 +27,34 @@ function RangePicker() {
       selectedRange={range ?? undefined}
       minDate={new Date()}
       onPressDay={onPressDate}
+      onSelectDrag={selectRange}
       onChangeVisibleMonth={setDate}
     />
   );
 }
 ```
 
-Pass `events` (plus an optional `renderEvent`) to show events in the grids too —
-it reuses `MonthView`, so events, selection, and disabled days behave exactly as
-in the month view.
+Tap two days to set the range ends, or long-press and drag to sweep one out (the
+list auto-scrolls at the edges so a range can span months). Pass `events` (plus
+an optional `renderEvent`) to show events in the grids too; it reuses
+`MonthView`, so events, selection, and disabled days behave as in the month view.
 
 ## Props
 
-| Prop                   | Type                       | Notes                                               |
-| ---------------------- | -------------------------- | --------------------------------------------------- |
-| `date`                 | `Date`                     | The month scrolled to on mount.                     |
-| `weekStartsOn`         | `0–6`                      | First day of the week.                              |
-| `events`               | `CalendarEvent<T>[]`       | Optional — omit for an events-free picker.          |
-| `weekRowHeight`        | `number`                   | Height of each week row (px). Default 56.           |
-| `renderEvent`          | `RenderEvent<T>`           | Optional — defaults to `DefaultEvent`.              |
-| `keyExtractor`         | `(event, index) => string` | Optional — defaults to start-time + index.          |
-| `selectedDates`        | `Date[]`                   | Selected days (see [Selection](/guides/selection)). |
-| `selectedRange`        | `DateRange`                | Selected span.                                      |
-| `minDate` / `maxDate`  | `Date`                     | Bound the selectable range.                         |
-| `isDateDisabled`       | `(date) => boolean`        | Disable specific days.                              |
-| `showAdjacentMonths`   | `boolean`                  | Show dimmed adjacent-month days. Default `false`.   |
-| `onPressDay`           | `(date) => void`           | Tap a day cell.                                     |
-| `onChangeVisibleMonth` | `(month) => void`          | Fires as a month scrolls into view.                 |
-| `renderMonthHeader`    | `(month) => ReactNode`     | Replace the default `LLLL yyyy` title.              |
+| Prop                   | Type                       | Notes                                                   |
+| ---------------------- | -------------------------- | ------------------------------------------------------- |
+| `date`                 | `Date`                     | The month scrolled to on mount.                         |
+| `weekStartsOn`         | `0–6`                      | First day of the week.                                  |
+| `events`               | `CalendarEvent<T>[]`       | Optional; omit for an events-free picker.               |
+| `weekRowHeight`        | `number`                   | Height of each week row (px). Default 56.               |
+| `renderEvent`          | `RenderEvent<T>`           | Optional; defaults to `DefaultEvent`.                   |
+| `keyExtractor`         | `(event, index) => string` | Optional; defaults to start-time + index.               |
+| `selectedDates`        | `Date[]`                   | Selected days (see [Selection](/guides/selection)).     |
+| `selectedRange`        | `DateRange`                | Selected span.                                          |
+| `minDate` / `maxDate`  | `Date`                     | Bound the selectable range.                             |
+| `isDateDisabled`       | `(date) => boolean`        | Disable specific days.                                  |
+| `onSelectDrag`         | `(start, end) => void`     | Drag-to-select; pair with `useDateRange().selectRange`. |
+| `showAdjacentMonths`   | `boolean`                  | Show dimmed adjacent-month days. Default `false`.       |
+| `onPressDay`           | `(date) => void`           | Tap a day cell.                                         |
+| `onChangeVisibleMonth` | `(month) => void`          | Fires as a month scrolls into view.                     |
+| `renderMonthHeader`    | `(month) => ReactNode`     | Replace the default `LLLL yyyy` title.                  |

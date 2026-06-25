@@ -57,7 +57,7 @@ Each `day` in `weeks[].days` carries:
 | Field                         | Notes                                              |
 | ----------------------------- | -------------------------------------------------- |
 | `date`                        | The `Date` for the cell.                           |
-| `id`                          | Stable `yyyy-MM-dd` string — handy as a React key. |
+| `id`                          | Stable `yyyy-MM-dd` string (handy as a React key). |
 | `label`                       | Day of month, e.g. `"1"`.                          |
 | `isCurrentMonth`              | False for leading/trailing adjacent-month days.    |
 | `isToday`                     | Matches the real today.                            |
@@ -75,6 +75,6 @@ Each `day` in `weeks[].days` carries:
 
 <Tip>
   Need the grid outside React (tests, server, exports)? Call the pure `buildMonthGrid(month,
-  options)` — `useMonthGrid` is just a memoized wrapper around it. `buildMonthWeeks(month,
+  options)`; `useMonthGrid` is just a memoized wrapper around it. `buildMonthWeeks(month,
   weekStartsOn)` returns the raw `Date[][]`.
 </Tip>

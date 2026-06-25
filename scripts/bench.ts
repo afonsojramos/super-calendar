@@ -1,7 +1,7 @@
 // Micro-benchmarks for the hot pure functions that run on every render/scroll.
 // Run: `pnpm bench` (executes TypeScript directly via bun, no build step).
 //
-// Measures CPU cost of the computational layer only — not React reconciliation,
+// Measures CPU cost of the computational layer only, not React reconciliation,
 // the Reanimated UI thread, or @legendapp/list scrolling. Numbers are on V8;
 // on-device Hermes is typically a few times slower.
 import { buildMonthWeeks } from "../src/utils/dates";
