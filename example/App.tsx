@@ -167,15 +167,12 @@ export default function App() {
                   <Text style={styles.clearText}>Clear</Text>
                 </Pressable>
               </View>
-              <Calendar
-                mode="month"
+              <MonthList
                 date={date}
-                events={[]}
                 weekStartsOn={1}
                 selectedRange={range ?? undefined}
                 minDate={pickerMinDate}
-                onChangeDate={setDate}
-                onPressEvent={() => {}}
+                onChangeVisibleMonth={setDate}
                 onPressDay={onPressDate}
               />
             </View>
