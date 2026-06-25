@@ -1,0 +1,147 @@
+---
+title: Migrating from react-native-big-calendar
+description: A copy-paste prompt (and manual mapping) to move an app from react-native-big-calendar.
+---
+
+super-calendar keeps the same month / week / day / 3-day / custom / schedule
+model and a similar `<Calendar>` API, so most props carry over by name. It is
+**not a drop-in swap**, though: it is built on Reanimated, Gesture Handler and
+Legend List, it fills its container instead of taking a `height`, and its
+`locale` is a date-fns `Locale` rather than a dayjs string.
+
+The fastest path is to hand the prompt below to your coding agent. Prefer to do
+it by hand? Jump to the [manual mapping](#manual-mapping).
+
+## The migration prompt
+
+Copy this into Claude Code, Cursor, or any coding agent working in your repo.
+
+```text
+You are migrating a React Native app from `react-native-big-calendar` to
+`react-native-super-calendar`. They share the same calendar model
+(month/week/day/3days/custom/schedule) and a similar `<Calendar>` API, but
+super-calendar is built on Reanimated and Legend List, so this is not a drop-in
+swap. Make the smallest changes that compile and preserve the current behaviour.
+
+1. Dependencies
+   - Remove `react-native-big-calendar`.
+   - Add `react-native-super-calendar` and its peers: `react-native-reanimated`
+     (v4), `react-native-gesture-handler`, `react-native-worklets`,
+     `@legendapp/list` (v3), and `date-fns`. On Expo use `npx expo install`.
+   - Make sure the Reanimated/worklets Babel plugin is configured (the Expo
+     babel preset already includes it).
+
+2. App setup
+   - Wrap the app root in `<GestureHandlerRootView style={{ flex: 1 }}>` from
+     `react-native-gesture-handler` if it isn't already.
+
+3. Imports
+   - Change every `from "react-native-big-calendar"` to
+     `from "react-native-super-calendar"`. Type imports map to `CalendarEvent<T>`,
+     `CalendarMode`, and `RenderEventArgs<T>`.
+
+4. Layout (most common gotcha)
+   - There is no `height` prop. Remove it and give `<Calendar>` a parent with a
+     real size (usually a `flex: 1` View). If the calendar collapses to 0px, the
+     parent has no height.
+
+5. Rename these props (keep the value):
+   - `hourRowHeight`   -> `hourHeight`
+   - `renderHeader`    -> `renderTimeGridHeader`
+   - `onPressMoreLabel`-> `onPressMore`  (now receives `(events, date)`)
+   - `hideNowIndicator={x}` -> `showNowIndicator={!x}`  (inverted; shown by default)
+
+6. Remove these props (handled automatically or unsupported):
+   - `overlapOffset` (overlapping events lay out in side-by-side columns)
+   - `eventMinHeightForMonthView` (month chips auto-fit; use
+     `maxVisibleEventCount` for a fixed cap)
+   - `enableEnrichedEvents`, `eventsAreSorted`, `enrichedEventsByDate`,
+     `isEventOrderingEnabled` (virtualized, no perf flags needed)
+   - every `*AccessibilityProps` (labels are built in)
+   - `onSwipeEnd` (use `onChangeDate`, or `onChangeDateRange` for the range)
+
+7. Move styling into the `theme` prop:
+   - `eventCellStyle` (per event) and `calendarCellStyle` (per date) stay.
+   - Global style props have no direct equivalent: fold
+     `calendarCellTextStyle`, `dayHeaderStyle`, `dayHeaderHighlightColor`,
+     `weekDayHeaderHighlightColor`, `bodyContainerStyle`, `headerContainerStyle`,
+     `calendarContainerStyle`, `hourStyle`, and `eventCellTextColor` into
+     `theme` (`{ colors, text, ... }`). A `darkTheme` preset is exported.
+
+8. Locale
+   - `locale` is a date-fns `Locale` object, not a dayjs string. Replace e.g.
+     `locale="fr"` with `import { fr } from "date-fns/locale"` and `locale={fr}`.
+
+9. Keep these unchanged: `events`, `date`, `mode`, `onChangeDate`,
+   `onPressEvent`, `onPressCell`, `onLongPressCell`, `onPressDateHeader`,
+   `weekStartsOn`, `weekEndsOn`, `ampm`, `showTime`, `minHour`, `maxHour`,
+   `timeslots`, `hideHours`, `showWeekNumber`, `weekNumberPrefix`,
+   `hourComponent`, `sortedMonthView`, `moreLabel`, `showAdjacentMonths`,
+   `showSixWeeks`, `disableMonthEventCellPress`, `maxVisibleEventCount`,
+   `activeDate`, `scrollOffsetMinutes`, `resetPageOnPressCell`, `swipeEnabled`,
+   `verticalScrollEnabled`, `showVerticalScrollIndicator`,
+   `itemSeparatorComponent`, `renderEvent`, `renderHeaderForMonthView`,
+   `showAllDayEventCell`, `isRTL`.
+
+10. Events
+    - `start` and `end` stay JS `Date`s. Force an event into the all-day lane
+      with `allDay: true` (whole-day midnight spans are inferred). Recurring
+      events are not auto-expanded; call
+      `expandRecurringEvents(events, rangeStart, rangeEnd)` if you need them.
+
+11. Custom event renderer
+    - big-calendar calls `renderEvent` as a function. super-calendar's
+      `renderEvent` is a React component (it may use hooks) receiving
+      `RenderEventArgs<T>`; return an element that fills its box (`flex: 1`).
+
+When done, run the type-checker and start the app. Verify: the calendar fills
+its container, paging changes the date, events land in the right slots, and any
+drag/zoom you want is wired (`onDragEvent`, `onCreateEvent`).
+```
+
+## Manual mapping
+
+### Renamed props
+
+| react-native-big-calendar | react-native-super-calendar | Note                                |
+| ------------------------- | --------------------------- | ----------------------------------- |
+| `hourRowHeight`           | `hourHeight`                | Same meaning.                       |
+| `renderHeader`            | `renderTimeGridHeader`      | Week/day header; receives the days. |
+| `onPressMoreLabel`        | `onPressMore`               | Now `(events, date) => void`.       |
+| `hideNowIndicator`        | `showNowIndicator`          | Inverted boolean; shown by default. |
+
+### Removed props
+
+| Prop                                                                                                                                          | What to do instead                                         |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `height`                                                                                                                                      | Give the parent a size (`flex: 1`); the calendar fills it. |
+| `overlapOffset`                                                                                                                               | Overlaps render in side-by-side columns automatically.     |
+| `eventMinHeightForMonthView`                                                                                                                  | Chips auto-fit; use `maxVisibleEventCount` for a cap.      |
+| `enableEnrichedEvents`, `eventsAreSorted`, `enrichedEventsByDate`, `isEventOrderingEnabled`                                                   | Not needed; the views are virtualized.                     |
+| `onSwipeEnd`                                                                                                                                  | `onChangeDate` / `onChangeDateRange`.                      |
+| `*AccessibilityProps`                                                                                                                         | Accessibility labels are built in.                         |
+| `calendarCellTextStyle`, `dayHeaderStyle`, `*HighlightColor`, `bodyContainerStyle`, `headerContainerStyle`, `hourStyle`, `eventCellTextColor` | Map into the `theme` prop.                                 |
+
+### Behaviour changes
+
+- **No `height`.** The calendar fills its parent, so wrap it in a sized
+  container. This is the most common cause of a blank screen after migrating.
+- **`locale` is a date-fns `Locale`**, not a dayjs locale string. Import the
+  locale you need from `date-fns/locale`.
+- **`renderEvent` is a component**, not a function call, so it can use hooks and
+  receives the live box height for progressive disclosure. See
+  [Custom events](/guides/events).
+- **Overlapping events** lay out in side-by-side columns instead of stacking
+  with an offset.
+- **Recurring events** are not expanded for you; use `expandRecurringEvents`
+  (see [Recurring events](/guides/recurring-events)).
+
+### Things super-calendar adds
+
+Drag to move, resize, and create ([Dragging](/guides/dragging)), pinch and
+Ctrl-scroll zoom, virtualized snap-paging, a `darkTheme` preset
+([Theming](/guides/theming)), time-zone display ([Time zones](/guides/time-zones)),
+and an "All day" label in the schedule (`allDayLabel`). See the
+[README comparison](https://github.com/afonsojramos/react-native-super-calendar#relationship-to-react-native-big-calendar)
+for the full picture, including where big-calendar's lighter footprint may still
+suit you better.
