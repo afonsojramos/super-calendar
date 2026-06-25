@@ -65,7 +65,7 @@ export type MonthViewProps<T> = {
   showSixWeeks?: boolean;
   /** Highlight this date instead of the real "today". */
   activeDate?: Date;
-  /** Days drawn as selected — filled with the `rangeBackground` band (no badge). */
+  /** Days drawn as selected, filled with the `rangeBackground` band (no badge). */
   selectedDates?: Date[];
   /** A selected span, filled edge-to-edge with the `rangeBackground` band. */
   selectedRange?: DateRange;
@@ -203,9 +203,7 @@ function MonthViewInner<T>({
     const isHighlighted = activeDate ? isSameCalendarDay(day, activeDate) : isToday;
     // Selection (single/multiple dates or a range endpoint) wins over the today
     // badge; interior range days get a band behind the cell instead of a badge.
-    const isDisabled =
-      (minDate != null || maxDate != null || isDateDisabled != null) &&
-      !isDateSelectable(day, { minDate, maxDate, isDateDisabled });
+    const isDisabled = !isDateSelectable(day, { minDate, maxDate, isDateDisabled });
     const isSelected =
       !isDisabled &&
       ((selectedDates?.some((selected) => isSameCalendarDay(selected, day)) ?? false) ||

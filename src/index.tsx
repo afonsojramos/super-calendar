@@ -45,6 +45,7 @@ export {
   useDateRange,
 } from "./utils/dateRange";
 export {
+  buildMonthGrid,
   type MonthGrid,
   type MonthGridDay,
   type MonthGridWeek,

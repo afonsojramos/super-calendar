@@ -162,22 +162,31 @@ function MonthListInner<T>({
   );
 
   const keyExtractorList = useCallback((item: Date) => item.toISOString(), []);
+  // Build every window month's week rows once (honouring isRTL, so drag hit-tests
+  // match the rendered column order). Reused for sizing and the drag mapping
+  // instead of rebuilding per frame.
+  const monthWeeks = useMemo(
+    () => monthDates.map((month) => buildMonthWeeks(month, weekStartsOn, { isRTL })),
+    [monthDates, weekStartsOn, isRTL],
+  );
   // Each month is as tall as its own week rows (4–6) plus the title; no padding
   // row, since adjacent-month days aren't filled in.
-  const blockHeight = useCallback(
-    (month: Date) =>
-      MONTH_HEADER_HEIGHT + buildMonthWeeks(month, weekStartsOn).length * weekRowHeight,
-    [weekStartsOn, weekRowHeight],
+  const blockHeightAt = useCallback(
+    (index: number) => MONTH_HEADER_HEIGHT + monthWeeks[index].length * weekRowHeight,
+    [monthWeeks, weekRowHeight],
   );
-  const getFixedItemSize = useCallback((item: Date) => blockHeight(item), [blockHeight]);
+  const getFixedItemSize = useCallback(
+    (_item: Date, index: number) => blockHeightAt(index),
+    [blockHeightAt],
+  );
 
   // Content-Y of each month's top (prefix sums), plus the total content height,
   // so a drag's absolute position maps to a month and day.
   const offsets = useMemo(() => {
     const out: number[] = [0];
-    for (let i = 0; i < monthDates.length; i++) out.push(out[i] + blockHeight(monthDates[i]));
+    for (let i = 0; i < monthWeeks.length; i++) out.push(out[i] + blockHeightAt(i));
     return out;
-  }, [monthDates, blockHeight]);
+  }, [monthWeeks, blockHeightAt]);
 
   // ---- drag-to-select -------------------------------------------------------
   const dragStartRef = useRef<Date | null>(null);
@@ -188,10 +197,10 @@ function MonthListInner<T>({
   const lastPanRef = useRef({ x: 0, y: 0 }); // native, viewport-relative
   const autoScrollRef = useRef<{ id: ReturnType<typeof setInterval>; dir: number } | null>(null);
 
+  // isDateSelectable already returns true when no constraints are set, so no
+  // separate short-circuit guard is needed.
   const isSelectable = useCallback(
-    (day: Date) =>
-      (minDate == null && maxDate == null && isDateDisabled == null) ||
-      isDateSelectable(day, { minDate, maxDate, isDateDisabled }),
+    (day: Date) => isDateSelectable(day, { minDate, maxDate, isDateDisabled }),
     [minDate, maxDate, isDateDisabled],
   );
 
@@ -203,19 +212,18 @@ function MonthListInner<T>({
       if (width <= 0) return null;
       const clampedY = Math.min(Math.max(contentY, 0), offsets[offsets.length - 1] - 1);
       let index = 0;
-      while (index < monthDates.length - 1 && offsets[index + 1] <= clampedY) index++;
-      const month = monthDates[index];
+      while (index < monthWeeks.length - 1 && offsets[index + 1] <= clampedY) index++;
       const localY = clampedY - offsets[index] - MONTH_HEADER_HEIGHT;
       if (localY < 0) return null; // on the month title
-      const weeks = buildMonthWeeks(month, weekStartsOn);
+      const weeks = monthWeeks[index];
       const row = Math.min(weeks.length - 1, Math.max(0, Math.floor(localY / weekRowHeight)));
       const col = Math.min(6, Math.max(0, Math.floor(x / (width / 7))));
       const day = weeks[row]?.[col];
       if (!day) return null;
-      if (!showAdjacentMonths && !isSameMonth(day, month)) return null;
+      if (!showAdjacentMonths && !isSameMonth(day, monthDates[index])) return null;
       return isSelectable(day) ? day : null;
     },
-    [offsets, monthDates, weekStartsOn, weekRowHeight, showAdjacentMonths, isSelectable],
+    [offsets, monthWeeks, monthDates, weekRowHeight, showAdjacentMonths, isSelectable],
   );
 
   const extendTo = useCallback(
@@ -332,8 +340,8 @@ function MonthListInner<T>({
 
   const dragEnabled = onSelectDrag != null;
   const renderItem = useCallback(
-    ({ item }: LegendListRenderItemProps<Date>) => (
-      <View style={{ height: blockHeight(item) }}>
+    ({ item, index }: LegendListRenderItemProps<Date>) => (
+      <View style={{ height: blockHeightAt(index) }}>
         {renderMonthHeader ? (
           renderMonthHeader(item)
         ) : (
@@ -369,7 +377,7 @@ function MonthListInner<T>({
       </View>
     ),
     [
-      blockHeight,
+      blockHeightAt,
       renderMonthHeader,
       theme,
       locale,

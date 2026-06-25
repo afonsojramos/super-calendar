@@ -80,13 +80,12 @@ export function buildMonthGrid(month: Date, options: UseMonthGridOptions = {}): 
 
   const rows = buildMonthWeeks(month, weekStartsOn, { showSixWeeks, isRTL });
   const range = selectedRange ?? null;
-  const hasConstraints = minDate != null || maxDate != null || isDateDisabled != null;
 
   const weeks: MonthGridWeek[] = rows.map((days) => ({
     id: days[0].toISOString(),
     days: days.map((date): MonthGridDay => {
-      const isDisabled =
-        hasConstraints && !isDateSelectable(date, { minDate, maxDate, isDateDisabled });
+      // isDateSelectable returns true when no constraints are set.
+      const isDisabled = !isDateSelectable(date, { minDate, maxDate, isDateDisabled });
       const isRangeStart = range != null && isSameCalendarDay(date, range.start);
       const isRangeEnd = range?.end != null && isSameCalendarDay(date, range.end);
       const isSelected =
