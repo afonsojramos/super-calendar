@@ -1,6 +1,6 @@
 {
   "name": "react-native-super-calendar",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "A generic, themeable month/week/day calendar for React Native with pinch-to-zoom, virtualized paging, and a render-prop event API.",
   "keywords": [
     "agenda",

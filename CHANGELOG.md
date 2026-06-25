@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.6.0](https://github.com/afonsojramos/react-native-super-calendar/compare/v0.5.0...v0.6.0) (2026-06-25)
+
+
+### Features
+
+* add date-range selection state and useDateRange hook ([384fbd5](https://github.com/afonsojramos/react-native-super-calendar/commit/384fbd568c8c5bfeae5f987a1b91256928ee5c63))
+* add headless useMonthGrid hook and buildMonthGrid builder ([e1c868a](https://github.com/afonsojramos/react-native-super-calendar/commit/e1c868a1c5ac5c2b241245d53f64adc782edc22b))
+* add selection and range theme tokens ([ae77454](https://github.com/afonsojramos/react-native-super-calendar/commit/ae774543953cbe932753e2c833ac5ce7a5caf22c))
+* add vertically-scrolling MonthList component ([23ed5c7](https://github.com/afonsojramos/react-native-super-calendar/commit/23ed5c777df11f87989f63dc9ca0030aef6ecb20))
+* default MonthList event props so it works as a standalone picker ([4a8f78d](https://github.com/afonsojramos/react-native-super-calendar/commit/4a8f78d1159c65c7bcbf552dde6d952bb371fbc5))
+* demo businessHours (9-5 weekdays, closed weekends) in the example ([377abe3](https://github.com/afonsojramos/react-native-super-calendar/commit/377abe30b06cd6dc4885ff7fd1da07ba96d2e54d))
+* demo date-range selection in the example app ([5babc4d](https://github.com/afonsojramos/react-native-super-calendar/commit/5babc4ddb9101630e0202a95fa6c63ff267daa13))
+* demo drop rejection by locking exam events in the example ([4978d2d](https://github.com/afonsojramos/react-native-super-calendar/commit/4978d2d236ad12b8c2f956e9367a137ebb61b300))
+* disable days outside min/max or isDateDisabled in month view ([62db94a](https://github.com/afonsojramos/react-native-super-calendar/commit/62db94a4e2fdf25da7b7895997a1d191d48d12d1))
+* **docs:** brand docs with the calendar icon, favicon and wordmark logo ([1bfd745](https://github.com/afonsojramos/react-native-super-calendar/commit/1bfd745a5fdc01f601c6e1fbb563d34e4228a86e))
+* **example:** demo MonthList and disabled picker dates ([746d291](https://github.com/afonsojramos/react-native-super-calendar/commit/746d29195c945ebc6eff1122ef3e96a9c70c736d))
+* **example:** set the app icon, splash and web favicon ([c735841](https://github.com/afonsojramos/react-native-super-calendar/commit/c7358415dedbc49cc58aa64983e10490623468f1))
+* export date-selection API from the package entry ([4dedd63](https://github.com/afonsojramos/react-native-super-calendar/commit/4dedd636512a5e6f20b687e6889ab54195d25aa3))
+* let onDragEvent return false to reject a drop and snap back ([b0f65e8](https://github.com/afonsojramos/react-native-super-calendar/commit/b0f65e800e4d3765e66d2a76f160a7cf3cbad580))
+* move date selection to MonthList with drag-select and cross-month ranges ([0c6fd79](https://github.com/afonsojramos/react-native-super-calendar/commit/0c6fd794b9541c8ec1a61793b03ad69b24557f08))
+* render selected days and range band in month view ([2cdb1a7](https://github.com/afonsojramos/react-native-super-calendar/commit/2cdb1a7b2327e9a33431df7ecf849bcec20f8ee7))
+* shade non-working hours via a businessHours prop ([5f129ec](https://github.com/afonsojramos/react-native-super-calendar/commit/5f129ec2e5c96fb6712c0a05ee6bdded0f8af92b))
+* thread date selection through Calendar and MonthPager ([3706341](https://github.com/afonsojramos/react-native-super-calendar/commit/3706341a5c2d2472684e1242726ffa1f3fb26f16))
+
+
+### Bug Fixes
+
+* correct RTL drag mapping, cache month weeks per frame, export buildMonthGrid, dedupe selectable guard ([13dc301](https://github.com/afonsojramos/react-native-super-calendar/commit/13dc301cd11f69004a222eb253c79817ad770d0b))
+* keep the example mode tabs on one scrollable row ([2794b53](https://github.com/afonsojramos/react-native-super-calendar/commit/2794b53e881f3eac46d7c399abcd7937eae60a59))
+* pin MonthList header height so the drag hit-test matches the layout ([628c3cb](https://github.com/afonsojramos/react-native-super-calendar/commit/628c3cb8bd3e4bc85fc087799e9c06d8aac1654f))
+* repaint month selection via context so cached pages update ([fcc1a50](https://github.com/afonsojramos/react-native-super-calendar/commit/fcc1a50bf77815f70c40196690d16eca247a5128))
+* show only the current month's days in MonthList ([3d01650](https://github.com/afonsojramos/react-native-super-calendar/commit/3d01650d9c8f3e3c5bd289f656e9694450a14927))
+
 ## [0.5.0](https://github.com/afonsojramos/react-native-super-calendar/compare/v0.4.0...v0.5.0) (2026-06-24)
 
 
