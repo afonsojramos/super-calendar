@@ -14,6 +14,7 @@ import {
   type DateRange,
 } from "../utils/dateRange";
 import { getWeekDays } from "../utils/dates";
+import { DefaultEvent } from "./DefaultEvent";
 import { MonthView } from "./MonthView";
 
 // Months rendered either side of the anchor. LegendList virtualises, so only a
@@ -23,10 +24,17 @@ const VIEWABILITY = { itemVisiblePercentThreshold: 60 };
 // Default fixed height per month block (title + six week rows). Override via prop.
 const DEFAULT_MONTH_HEIGHT = 360;
 
+// Stable empty events array, so a picker (no events) doesn't churn memoised props.
+const NO_EVENTS: CalendarEvent<unknown>[] = [];
+const noop = () => {};
+const defaultKeyExtractor: EventKeyExtractor<unknown> = (event) =>
+  `${event.start.toISOString()}|${event.end.toISOString()}|${event.title ?? ""}`;
+
 export type MonthListProps<T> = {
   /** The month scrolled to on mount. */
   date: Date;
-  events: CalendarEvent<T>[];
+  /** Events to render in the grids. Omit for an events-free date picker. */
+  events?: CalendarEvent<T>[];
   weekStartsOn: WeekStartsOn;
   /** Fixed height of each month block (px). Default 360. */
   monthHeight?: number;
@@ -44,11 +52,13 @@ export type MonthListProps<T> = {
   maxDate?: Date;
   isDateDisabled?: (date: Date) => boolean;
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
-  renderEvent: RenderEvent<T>;
-  keyExtractor: EventKeyExtractor<T>;
+  /** Replace the built-in event box. Defaults to `DefaultEvent`. */
+  renderEvent?: RenderEvent<T>;
+  /** Stable key per event. Defaults to start-time + index. */
+  keyExtractor?: EventKeyExtractor<T>;
   onPressDay?: (date: Date) => void;
   onLongPressDay?: (date: Date) => void;
-  onPressEvent: (event: CalendarEvent<T>) => void;
+  onPressEvent?: (event: CalendarEvent<T>) => void;
   onLongPressEvent?: (event: CalendarEvent<T>) => void;
   onPressMore?: (events: CalendarEvent<T>[], date: Date) => void;
   /** Fired with the month that scrolls into view. */
@@ -59,7 +69,7 @@ export type MonthListProps<T> = {
 
 function MonthListInner<T>({
   date,
-  events,
+  events = NO_EVENTS as CalendarEvent<T>[],
   weekStartsOn,
   monthHeight = DEFAULT_MONTH_HEIGHT,
   maxVisibleEventCount,
@@ -76,11 +86,11 @@ function MonthListInner<T>({
   maxDate,
   isDateDisabled,
   calendarCellStyle,
-  renderEvent,
-  keyExtractor,
+  renderEvent = DefaultEvent,
+  keyExtractor = defaultKeyExtractor as EventKeyExtractor<T>,
   onPressDay,
   onLongPressDay,
-  onPressEvent,
+  onPressEvent = noop,
   onLongPressEvent,
   onPressMore,
   onChangeVisibleMonth,
