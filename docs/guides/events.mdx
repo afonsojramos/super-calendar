@@ -29,6 +29,9 @@ const events: CalendarEvent<Meta>[] = [
 - `allDay` lays the event out in the all-day lane above the grid instead of in
   the columns. It's also inferred for midnight-to-midnight spans. Pass
   `showAllDayEventCell={false}` to hide the lane entirely (its events won't show).
+  In the `schedule` view (which has no lane) an all-day event reads "All day"
+  instead of a time range; override the wording with `allDayLabel` (e.g. for a
+  different language).
 - `disabled` opts an event out of drag interactions.
 - Multi-day events render on each day they span, clipped per day.
 
