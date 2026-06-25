@@ -17,6 +17,8 @@
 - 🤏 Zoomable week/day grid: pinch on iOS & Android, Ctrl/Cmd + scroll on web (UI thread, no re-renders)
 - ♾️ Virtualized, snap-paging months/weeks/days via [`@legendapp/list`](https://legendapp.com/open-source/list/)
 - 🧩 Bring-your-own event type (`CalendarEvent<T>`) and a `renderEvent` escape hatch
+- 🗓️ Date selection — single / multiple / range (`useDateRange`), disabled days, and a scrolling `MonthList`
+- 🪝 Headless `useMonthGrid` hook to build a fully custom calendar
 - 🎨 Fully themeable, with sensible defaults (no styling library required)
 - 🌐 Runs on iOS, Android and web (web via [react-native-web](https://necolas.github.io/react-native-web/); see [Web](#web))
 
@@ -38,6 +40,8 @@ an homage. 🙇
 | Virtualized, snap-paged views                | ✅                                         | ❌ renders all dates            |
 | Pinch-to-zoom (native) / Ctrl-scroll (web)   | ✅                                         | ❌                              |
 | Drag to move & resize events                 | ✅                                         | ❌ (declined upstream)          |
+| Date selection (single / range / multiple)   | ✅ `useDateRange` + disabled days          | ❌                              |
+| Headless grid hook (`useMonthGrid`)          | ✅                                         | ❌                              |
 | Overlapping events                           | ✅ side-by-side columns                    | ⚠️ stacked / indented           |
 | Month paging fires `onChangeDate`            | ✅                                         | ⚠️ known gaps                   |
 | Recurring events                             | ✅ `expandRecurringEvents`                 | ❌ expand them yourself         |
@@ -271,6 +275,100 @@ Rules support `freq` (`daily`/`weekly`/`monthly`/`yearly`), `interval`, `count`,
 `until`, and `weekdays` (for `weekly`). Each occurrence keeps the original
 duration and fields; non-recurring events pass through unchanged.
 
+### Date selection
+
+In `month` mode the calendar can mark days as selected. Pass `selectedDate`
+(single), `selectedDates` (multiple), or `selectedRange` (a span), and drive it
+from your own state via `onPressDay`. For ranges, the `useDateRange` hook owns
+the state machine — first press sets the start, second sets the end
+(auto-swapping if earlier), a third press starts over:
+
+```tsx
+import { Calendar, useDateRange } from "react-native-super-calendar";
+
+function RangePicker() {
+  const [date, setDate] = useState(new Date());
+  const { range, onPressDate, reset } = useDateRange();
+
+  return (
+    <Calendar
+      mode="month"
+      date={date}
+      events={[]}
+      selectedRange={range ?? undefined}
+      onChangeDate={setDate}
+      onPressDay={onPressDate}
+    />
+  );
+}
+```
+
+The range's endpoints get the selected badge; in-between days get a
+`rangeBackground` band. Colours come from the `selectedBackground`,
+`selectedText` and `rangeBackground` theme tokens (defaulted from the "today"
+colours).
+
+**Disabled days.** `minDate`, `maxDate` and `isDateDisabled` render days dimmed,
+ignore taps, and refuse selection. Hand the same constraints to `useDateRange`
+so a blocked day never opens a range:
+
+```tsx
+const minDate = useMemo(() => new Date(), []); // no past dates
+const { range, onPressDate } = useDateRange({ minDate });
+
+<Calendar
+  mode="month"
+  date={date}
+  events={[]}
+  selectedRange={range ?? undefined}
+  minDate={minDate}
+  isDateDisabled={(d) => d.getDay() === 0} // also block Sundays
+  onChangeDate={setDate}
+  onPressDay={onPressDate}
+/>;
+```
+
+### Month list
+
+`MonthList` stacks months in one continuous, virtualized vertical scroll (a
+month title then its grid, under a fixed weekday header) — the right fit for a
+date-range or booking UI. It reuses the same events, selection and disabled-day
+behaviour as the month view. It requires `renderEvent` and `keyExtractor` (pass
+`DefaultEvent` for the built-in box):
+
+```tsx
+import { MonthList } from "react-native-super-calendar";
+
+<MonthList
+  date={new Date()}
+  events={events}
+  weekStartsOn={1}
+  renderEvent={MyEvent}
+  keyExtractor={(event) => event.id}
+  selectedRange={range ?? undefined}
+  onPressDay={onPressDate}
+  onChangeVisibleMonth={setDate}
+/>;
+```
+
+### Headless month grid
+
+Want your own day-cell markup but not the date maths? `useMonthGrid(month,
+options)` returns the weeks, the weekday headers, and per-day state
+(`isToday`/`isSelected`/`isInRange`/`isDisabled`/`isCurrentMonth`/…) for you to
+render however you like:
+
+```tsx
+import { useMonthGrid } from "react-native-super-calendar";
+
+const { weeks, weekdays } = useMonthGrid(month, { weekStartsOn: 1, selectedRange: range });
+// weekdays -> header cells; weeks[].days -> your own <DayCell />
+```
+
+Need it outside React (tests, exports)? Call the pure `buildMonthGrid(month,
+options)` — the hook is just a memoized wrapper. `buildMonthWeeks(month,
+weekStartsOn)` returns the raw `Date[][]`.
+
 ### Time zones
 
 Events lay out from their local wall-clock time. To display them in a specific
@@ -430,14 +528,17 @@ this; the example's context menu portals into `#root` for exactly this reason.
 `<Calendar>` is the batteries-included entry point. The building blocks it wraps
 are also exported for advanced layouts:
 
-| Export             | Description                                           |
-| ------------------ | ----------------------------------------------------- |
-| `Calendar`         | Top-level component; switches between month/week/day. |
-| `MonthView`        | A single month grid.                                  |
-| `MonthPager`       | Horizontally-paged, virtualized months.               |
-| `TimeGrid`         | Paged, pinch-zoomable week/day time-grid.             |
-| `DefaultEvent`     | The built-in event renderer.                          |
-| `useCalendarTheme` | Read the active theme inside a custom renderer.       |
+| Export             | Description                                                |
+| ------------------ | ---------------------------------------------------------- |
+| `Calendar`         | Top-level component; switches between month/week/day.      |
+| `MonthView`        | A single month grid.                                       |
+| `MonthPager`       | Horizontally-paged, virtualized months.                    |
+| `MonthList`        | Vertically-scrolling, continuous list of months.           |
+| `TimeGrid`         | Paged, pinch-zoomable week/day time-grid.                  |
+| `DefaultEvent`     | The built-in event renderer.                               |
+| `useDateRange`     | Range-selection state machine for the month view.          |
+| `useMonthGrid`     | Headless grid data (weeks + per-day state) for custom UIs. |
+| `useCalendarTheme` | Read the active theme inside a custom renderer.            |
 
 ## Notes & limitations
 
