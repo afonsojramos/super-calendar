@@ -31,6 +31,8 @@ modern list virtualization — trading framework-agnosticism for a richer,
 gesture-driven experience. It's **not a fork**; the API differs, and the name is
 an homage. 🙇
 
+**Already using react-native-big-calendar?** The [migration guide](https://github.com/afonsojramos/react-native-super-calendar/blob/main/docs/migrating-from-big-calendar.mdx) has a copy-paste prompt for your coding agent plus a manual prop mapping.
+
 ### At a glance
 
 | Capability                                   | react-native-super-calendar                | react-native-big-calendar       |
@@ -93,6 +95,19 @@ side-by-side columns automatically.
 - **RTL** is cosmetic (`isRTL` reverses the day-column order, like
   big-calendar's): the hour gutter stays on the left and paging follows the
   system scroll direction. Enable React Native's `I18nManager` for full RTL.
+
+## Relationship to flash-calendar
+
+The date-picker surface (`MonthList`, `useDateRange`, and the headless
+`useMonthGrid`) is inspired by
+[`flash-calendar`](https://github.com/MarceloPrado/flash-calendar), an excellent
+headless date picker for React Native. If you only need date selection,
+flash-calendar is the lighter, more focused choice: a dedicated, FlashList-based
+picker with no event model. react-native-super-calendar folds picking into a
+full gesture calendar, so one library covers events and date selection, at the
+cost of the Reanimated, Gesture Handler, and Legend List peers. Pick
+flash-calendar for a standalone picker; pick this when you also need the event
+views.
 
 ## Install
 
