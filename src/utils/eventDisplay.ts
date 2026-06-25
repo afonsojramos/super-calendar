@@ -22,10 +22,12 @@ export function eventAccessibilityLabel(args: {
   start: Date;
   end: Date;
   ampm: boolean;
+  /** Spoken text for an all-day event. Default "all day". */
+  allDayLabel?: string;
 }): string {
   const timeFormat = args.ampm ? "h:mm a" : "HH:mm";
   const time = args.isAllDay
-    ? "all day"
+    ? (args.allDayLabel ?? "all day")
     : `${format(args.start, timeFormat)} to ${format(args.end, timeFormat)}`;
   return [args.title, time].filter(Boolean).join(", ");
 }
@@ -38,13 +40,27 @@ export function titleNumberOfLines(mode: CalendarMode, isAllDay: boolean): numbe
   return mode === "month" || isAllDay ? 1 : undefined;
 }
 
-/** The built-in renderer shows the time range on timed events only — never month cells or all-day chips. */
-export function shouldShowEventTime(
-  mode: CalendarMode,
-  isAllDay: boolean,
-  showTime: boolean,
-): boolean {
-  return mode !== "month" && !isAllDay && showTime;
+/**
+ * The secondary line under the title in the built-in renderer, or `null` when
+ * none should show. Timed events get their `start - end` range. An all-day event
+ * gets the literal "All day" in the schedule (which has no all-day lane to
+ * signal it positionally) and nothing on the day/week grid (the lane already
+ * does). Month cells and `showTime={false}` always return `null`.
+ */
+export function eventTimeLabel(args: {
+  mode: CalendarMode;
+  isAllDay: boolean;
+  start: Date;
+  end: Date;
+  ampm: boolean;
+  showTime: boolean;
+  /** Text for an all-day event in the schedule. Default "All day". */
+  allDayLabel?: string;
+}): string | null {
+  if (!args.showTime || args.mode === "month") return null;
+  if (args.isAllDay) return args.mode === "schedule" ? (args.allDayLabel ?? "All day") : null;
+  const timeFormat = args.ampm ? "h:mm a" : "HH:mm";
+  return `${format(args.start, timeFormat)} - ${format(args.end, timeFormat)}`;
 }
 
 /**

@@ -1,10 +1,10 @@
 import {
   eventAccessibilityLabel,
+  eventTimeLabel,
   isTimeVisibleAtHeight,
   MIN_BOX_HEIGHT_FOR_TIME,
   monthEventCapacity,
   monthVisibleCount,
-  shouldShowEventTime,
   titleEllipsizeMode,
   titleNumberOfLines,
 } from "../eventDisplay";
@@ -41,6 +41,19 @@ describe("eventAccessibilityLabel", () => {
     ).toBe("Holiday, all day");
   });
 
+  it("uses a custom all-day label when provided", () => {
+    expect(
+      eventAccessibilityLabel({
+        title: "Holiday",
+        isAllDay: true,
+        start,
+        end,
+        ampm: false,
+        allDayLabel: "Ganztägig",
+      }),
+    ).toBe("Holiday, Ganztägig");
+  });
+
   it("omits an empty title", () => {
     expect(eventAccessibilityLabel({ isAllDay: false, start, end, ampm: false })).toBe(
       "09:00 to 10:30",
@@ -66,23 +79,44 @@ describe("titleNumberOfLines", () => {
   });
 });
 
-describe("shouldShowEventTime", () => {
-  it("never shows the time in month cells", () => {
-    expect(shouldShowEventTime("month", false, true)).toBe(false);
-  });
+describe("eventTimeLabel", () => {
+  const start = new Date(2026, 0, 1, 9, 0, 0);
+  const end = new Date(2026, 0, 1, 10, 30, 0);
+  const base = { start, end, ampm: false, showTime: true };
 
-  it("never shows the time for all-day events", () => {
-    expect(shouldShowEventTime("week", true, true)).toBe(false);
+  it("never labels month cells", () => {
+    expect(eventTimeLabel({ ...base, mode: "month", isAllDay: false })).toBeNull();
   });
 
   it("honours showTime=false", () => {
-    expect(shouldShowEventTime("week", false, false)).toBe(false);
+    expect(eventTimeLabel({ ...base, mode: "week", isAllDay: false, showTime: false })).toBeNull();
   });
 
-  it("shows the time for timed events when enabled", () => {
-    expect(shouldShowEventTime("week", false, true)).toBe(true);
-    expect(shouldShowEventTime("day", false, true)).toBe(true);
-    expect(shouldShowEventTime("schedule", false, true)).toBe(true);
+  it("shows the time range for timed events", () => {
+    expect(eventTimeLabel({ ...base, mode: "week", isAllDay: false })).toBe("09:00 - 10:30");
+    expect(eventTimeLabel({ ...base, mode: "day", isAllDay: false })).toBe("09:00 - 10:30");
+    expect(eventTimeLabel({ ...base, mode: "schedule", isAllDay: false })).toBe("09:00 - 10:30");
+  });
+
+  it("uses 12h time when ampm is set", () => {
+    expect(eventTimeLabel({ ...base, mode: "week", isAllDay: false, ampm: true })).toBe(
+      "9:00 AM - 10:30 AM",
+    );
+  });
+
+  it("labels an all-day event 'All day' in the schedule (no lane to signal it)", () => {
+    expect(eventTimeLabel({ ...base, mode: "schedule", isAllDay: true })).toBe("All day");
+  });
+
+  it("uses a custom all-day label in the schedule when provided", () => {
+    expect(
+      eventTimeLabel({ ...base, mode: "schedule", isAllDay: true, allDayLabel: "Ganztägig" }),
+    ).toBe("Ganztägig");
+  });
+
+  it("shows nothing for all-day events on the day/week grid (the lane signals it)", () => {
+    expect(eventTimeLabel({ ...base, mode: "week", isAllDay: true })).toBeNull();
+    expect(eventTimeLabel({ ...base, mode: "day", isAllDay: true })).toBeNull();
   });
 });
 

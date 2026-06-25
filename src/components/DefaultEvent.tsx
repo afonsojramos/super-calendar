@@ -1,12 +1,11 @@
-import { format } from "date-fns";
 import { StyleSheet, Text, TouchableOpacity } from "react-native";
 import Animated, { useAnimatedStyle } from "react-native-reanimated";
 import { useCalendarTheme } from "../theme";
 import type { RenderEventArgs } from "../types";
 import {
   eventAccessibilityLabel,
+  eventTimeLabel,
   isTimeVisibleAtHeight,
-  shouldShowEventTime,
   titleEllipsizeMode,
   titleNumberOfLines,
 } from "../utils/eventDisplay";
@@ -24,24 +23,33 @@ export function DefaultEvent<T>({
   ampm = false,
   showTime = true,
   ellipsizeTitle = false,
+  allDayLabel,
   cellStyle,
   onPress,
   onLongPress,
 }: RenderEventArgs<T>) {
   const theme = useCalendarTheme();
-  const timeFormat = ampm ? "h:mm a" : "HH:mm";
   const isAllDayEvent = isAllDay ?? false;
-  const shouldShowTime = shouldShowEventTime(mode, isAllDayEvent, showTime);
+  const timeLabel = eventTimeLabel({
+    mode,
+    isAllDay: isAllDayEvent,
+    start: event.start,
+    end: event.end,
+    ampm,
+    showTime,
+    allDayLabel,
+  });
   const ellipsizeMode = titleEllipsizeMode(ellipsizeTitle);
 
-  // Announce the full event to screen readers: title plus "all day" or the time
-  // range (which is otherwise only shown visually).
+  // Announce the full event to screen readers: title plus the all-day label or
+  // the time range (which is otherwise only shown visually).
   const accessibilityLabel = eventAccessibilityLabel({
     title: event.title,
     isAllDay: isAllDayEvent,
     start: event.start,
     end: event.end,
     ampm,
+    allDayLabel,
   });
 
   // Hide the time on boxes too short to fit it (driven on the UI thread, so it
@@ -80,7 +88,7 @@ export function DefaultEvent<T>({
           {event.title}
         </Text>
       ) : null}
-      {shouldShowTime ? (
+      {timeLabel ? (
         <Animated.View style={timeStyle}>
           <Text
             style={[styles.time, { color: theme.colors.eventText }]}
@@ -90,7 +98,7 @@ export function DefaultEvent<T>({
             ellipsizeMode={ellipsizeMode}
             allowFontScaling={false}
           >
-            {`${format(event.start, timeFormat)} - ${format(event.end, timeFormat)}`}
+            {timeLabel}
           </Text>
         </Animated.View>
       ) : null}

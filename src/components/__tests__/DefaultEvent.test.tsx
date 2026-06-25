@@ -28,4 +28,31 @@ describe("DefaultEvent", () => {
     expect(getByText("Standup")).toBeTruthy();
     expect(getByLabelText("Standup, all day")).toBeTruthy();
   });
+
+  it("shows 'All day' instead of a time range for an all-day event in the schedule", () => {
+    const { getByText, queryByText } = render(
+      <DefaultEvent
+        event={{ ...event, allDay: true }}
+        mode="schedule"
+        isAllDay
+        onPress={() => {}}
+      />,
+    );
+    expect(getByText("All day")).toBeTruthy();
+    expect(queryByText(/09:00/)).toBeNull();
+  });
+
+  it("honours a custom allDayLabel in the schedule, visibly and for screen readers", () => {
+    const { getByText, getByLabelText } = render(
+      <DefaultEvent
+        event={{ ...event, allDay: true }}
+        mode="schedule"
+        isAllDay
+        allDayLabel="Ganztägig"
+        onPress={() => {}}
+      />,
+    );
+    expect(getByText("Ganztägig")).toBeTruthy();
+    expect(getByLabelText("Standup, Ganztägig")).toBeTruthy();
+  });
 });

@@ -83,6 +83,8 @@ export type RenderEventArgs<T = unknown> = {
   showTime?: boolean;
   /** Add a trailing ellipsis (…) when a clipped title overflows in the built-in renderer; otherwise the text is hard-clipped. Default false. */
   ellipsizeTitle?: boolean;
+  /** Label shown for an all-day event in the schedule (and its screen-reader text). Default "All day". */
+  allDayLabel?: string;
   /** Per-event style resolved from `eventCellStyle`; the built-in renderer merges it onto the box. */
   cellStyle?: StyleProp<ViewStyle>;
   onPress: () => void;

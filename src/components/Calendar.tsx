@@ -165,6 +165,8 @@ export type CalendarProps<T> = {
   showTime?: boolean;
   /** Add a trailing ellipsis (…) when an event title overflows in the built-in renderer; otherwise the text is clipped. Default false. */
   ellipsizeTitle?: boolean;
+  /** Label the built-in renderer shows for an all-day event in the schedule (and its screen-reader text). Default "All day". */
+  allDayLabel?: string;
   /** Initial vertical scroll, in minutes from midnight (week/day). */
   scrollOffsetMinutes?: number;
   /** Show the current-time line on the week/day grid. Default true. */
@@ -278,6 +280,7 @@ export function Calendar<T>({
   ampm,
   showTime,
   ellipsizeTitle,
+  allDayLabel,
   scrollOffsetMinutes,
   showNowIndicator,
   locale,
@@ -319,11 +322,18 @@ export function Calendar<T>({
     [onChangeDate, onChangeDateRange, mode, weekStartsOn, numberOfDays, weekEndsOn],
   );
 
-  // Inject `eventCellStyle`, `ampm`, `showTime` and `ellipsizeTitle` into the
-  // renderer once, so every view gets them for free without threading the props
-  // through each component. Skip the wrapper entirely when none are set.
+  // Inject `eventCellStyle`, `ampm`, `showTime`, `ellipsizeTitle` and
+  // `allDayLabel` into the renderer once, so every view gets them for free
+  // without threading the props through each component. Skip the wrapper
+  // entirely when none are set.
   const resolvedRenderEvent = useMemo<RenderEvent<T>>(() => {
-    if (eventCellStyle == null && ampm == null && showTime == null && ellipsizeTitle == null)
+    if (
+      eventCellStyle == null &&
+      ampm == null &&
+      showTime == null &&
+      ellipsizeTitle == null &&
+      allDayLabel == null
+    )
       return renderEvent;
     const Base = renderEvent;
     return function StyledEvent(props: RenderEventArgs<T>) {
@@ -336,10 +346,11 @@ export function Calendar<T>({
           ampm={ampm}
           showTime={showTime}
           ellipsizeTitle={ellipsizeTitle}
+          allDayLabel={allDayLabel}
         />
       );
     };
-  }, [renderEvent, eventCellStyle, ampm, showTime, ellipsizeTitle]);
+  }, [renderEvent, eventCellStyle, ampm, showTime, ellipsizeTitle, allDayLabel]);
 
   return (
     <CalendarThemeProvider value={mergedTheme}>

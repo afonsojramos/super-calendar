@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent } from "../types";
 import { getIsToday } from "../utils/dates";
+import { isAllDayEvent } from "../utils/layout";
 
 export type AgendaProps<T> = {
   events: CalendarEvent<T>[];
@@ -81,6 +82,7 @@ export function Agenda<T>({
           <RenderEventComponent
             event={item.event}
             mode="schedule"
+            isAllDay={isAllDayEvent(item.event)}
             onPress={() => onPressEvent(item.event)}
             onLongPress={onLongPressEvent ? () => onLongPressEvent(item.event) : undefined}
           />
