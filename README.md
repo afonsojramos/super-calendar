@@ -69,11 +69,13 @@ virtualization, or the helpers above.
 **Feature parity.** It also covers the rest of react-native-big-calendar's
 surface: month / day / 3-day / week / **custom N-day** (and `weekEndsOn`
 partial-weeks) / **agenda (`schedule`)** modes, **all-day events** (lane +
-`allDay` flag), multi-day clipping, `minHour`/`maxHour`, `ampm` (hour axis and
-event times), `showTime`, `timeslots`, `hideHours`, `showWeekNumber`,
-`weekNumberPrefix`, `hourComponent`, `sortedMonthView`, `moreLabel`,
-`showAdjacentMonths`, `showSixWeeks`, `disableMonthEventCellPress`, a default
-month weekday header (`renderHeaderForMonthView`), `activeDate`, per-event
+`allDay` flag, toggle the lane with `showAllDayEventCell`), multi-day clipping,
+`minHour`/`maxHour`, `ampm` (hour axis and event times), `showTime`, `timeslots`,
+`hideHours`, `showWeekNumber`, `weekNumberPrefix`, `hourComponent`,
+`sortedMonthView`, `moreLabel`, `showAdjacentMonths`, `showSixWeeks`,
+`disableMonthEventCellPress`, a default month weekday header
+(`renderHeaderForMonthView`), a custom month date badge
+(`renderCustomDateForMonth`), `activeDate`, per-event
 `disabled`, `onPress`/`onLongPress` for events, cells and date headers,
 `onChangeDateRange`, `resetPageOnPressCell`, `swipeEnabled`,
 `verticalScrollEnabled`, `showVerticalScrollIndicator`, an agenda

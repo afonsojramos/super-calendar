@@ -27,13 +27,14 @@ your editor lists the full set with inline docs.
 
 ## Events & rendering
 
-| Prop                | Type                               | Notes                               |
-| ------------------- | ---------------------------------- | ----------------------------------- |
-| `renderEvent`       | `RenderEvent<T>`                   | Render events your way, every mode. |
-| `eventCellStyle`    | `style \| (event) => style`        | Tweak the built-in box.             |
-| `calendarCellStyle` | `(date) => style`                  | Per-date column/cell shading.       |
-| `businessHours`     | `(date) => { start, end } \| null` | Shade closed hours.                 |
-| `keyExtractor`      | `(event, index) => string`         | Stable event keys.                  |
+| Prop                       | Type                               | Notes                                          |
+| -------------------------- | ---------------------------------- | ---------------------------------------------- |
+| `renderEvent`              | `RenderEvent<T>`                   | Render events your way, every mode.            |
+| `renderCustomDateForMonth` | `(date) => ReactNode`              | Month: replace the day-cell date badge.        |
+| `eventCellStyle`           | `style \| (event) => style`        | Tweak the built-in box.                        |
+| `calendarCellStyle`        | `(date) => style`                  | Per-date column/cell shading.                  |
+| `businessHours`            | `(date) => { start, end } \| null` | Shade closed hours.                            |
+| `keyExtractor`             | `(event, index) => string`         | Stable event keys.                             |
 
 ## Interactions
 
@@ -70,6 +71,7 @@ See the [Date selection](/guides/selection) guide.
 | `timeslots`            | `number`               | Hour sub-divisions.             |
 | `ampm`                 | `boolean`              | 12-hour labels.                 |
 | `showNowIndicator`     | `boolean`              | Current-time line (default on). |
+| `showAllDayEventCell`  | `boolean`              | All-day lane (default on).      |
 | `maxVisibleEventCount` | `number`               | Month: fixed chip cap.          |
 | `theme`                | `PartialCalendarTheme` | Color/text/metric overrides.    |
 
