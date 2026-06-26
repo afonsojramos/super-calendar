@@ -3,7 +3,15 @@
 // List, so it bundles cleanly into any renderer (react-dom, Solid, vanilla)
 // as well as React Native. Build your own calendar UI on top of these hooks,
 // the pure grid builder, the selection model, and the date helpers.
-export type { CalendarMode, WeekStartsOn } from "./types";
+export type {
+  CalendarEvent,
+  CalendarMode,
+  ICalendarEvent,
+  RecurrenceRule,
+  TimeGridMode,
+  WeekStartsOn,
+} from "./types";
+export { isAllDayEvent, layoutDayEvents, type PositionedEvent } from "./utils/layout";
 export {
   type DateRange,
   type DateSelectionConstraints,
@@ -28,8 +36,10 @@ export {
 export {
   buildMonthWeeks,
   getIsToday,
+  getViewDays,
   getWeekDays,
   isSameCalendarDay,
   isWeekend,
   minutesIntoDay,
+  viewDayCount,
 } from "./utils/dates";
