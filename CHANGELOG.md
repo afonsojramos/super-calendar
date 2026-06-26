@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.1.0](https://github.com/afonsojramos/react-native-super-calendar/compare/v1.0.0...v1.1.0) (2026-06-26)
+
+
+### Features
+
+* add headless subpath entry point ([fe89343](https://github.com/afonsojramos/react-native-super-calendar/commit/fe89343b1ca50a2492376729b05c9087403e32f8))
+* add pinch-zoom and drag-to-move/resize to the react-dom TimeGrid ([ce1e1bf](https://github.com/afonsojramos/react-native-super-calendar/commit/ce1e1bfc05d347e2cb40cfb3be07655c633ff27b))
+* add react-dom renderer with MonthView and MonthList picker ([7413301](https://github.com/afonsojramos/react-native-super-calendar/commit/7413301f385e04caf0d3d3a24684455f8cb0fcaf))
+* add react-dom TimeGrid for day/week/N-day views ([fdcd580](https://github.com/afonsojramos/react-native-super-calendar/commit/fdcd580bcaf43bd5ddd741b49a81cec8563c9dd3))
+* add roving tabindex and arrow-key navigation to the DOM MonthView ([beba91e](https://github.com/afonsojramos/react-native-super-calendar/commit/beba91e7e7bb9f76ceb304f51b4cbcc4c42297f2))
+* default to a rounded pill range band with opt-in full-cell fill in the DOM grid ([09e215f](https://github.com/afonsojramos/react-native-super-calendar/commit/09e215f38d37f5a2ae25b5b6e494a5901e206d2a))
+* expose event layout and view-day helpers from headless ([e66eefa](https://github.com/afonsojramos/react-native-super-calendar/commit/e66eefa4c288afbf37b672bc620cc2e0a210f248))
+* expose event-display helpers from headless ([ecbc353](https://github.com/afonsojramos/react-native-super-calendar/commit/ecbc353305c9dc2bbf6afe87b37ad94f6f3e224b))
+* fill the full day cell for range days and add a hover state in the DOM grid ([7556c97](https://github.com/afonsojramos/react-native-super-calendar/commit/7556c97754c04ae5bb6ada523ac512b9a35c7573))
+* make React Native peers optional for web-only installs ([694f553](https://github.com/afonsojramos/react-native-super-calendar/commit/694f55390caf661127eeb415b14c5e47f155ba0e))
+* progressive disclosure and keyboard-operable events in the DOM TimeGrid ([7bed549](https://github.com/afonsojramos/react-native-super-calendar/commit/7bed54929a58c0b5beffcaec83d12a513128a0fd))
+
 ## [1.0.0](https://github.com/afonsojramos/react-native-super-calendar/compare/v0.6.0...v1.0.0) (2026-06-25)
 
 
