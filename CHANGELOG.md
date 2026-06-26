@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.0](https://github.com/afonsojramos/react-native-super-calendar/compare/v0.6.0...v1.0.0) (2026-06-25)
+
+
+### Features
+
+* add picker subpath entry point ([0c5ba9b](https://github.com/afonsojramos/react-native-super-calendar/commit/0c5ba9b333f1968e05c8ebcc2466cc51eca4ad81))
+* add Reanimated-free DefaultMonthEvent renderer ([6881720](https://github.com/afonsojramos/react-native-super-calendar/commit/6881720e6de6a7c8c4b980f3594ed57e6584c92c))
+* distinguish all-day events in the schedule view with a configurable allDayLabel ([30a3d17](https://github.com/afonsojramos/react-native-super-calendar/commit/30a3d176027a6b3aca0c1eeec39c3f1518e462c1))
+
+
+### Miscellaneous Chores
+
+* release 1.0.0 ([f0b9047](https://github.com/afonsojramos/react-native-super-calendar/commit/f0b9047abc3b788e0afecaffe8d648d28d161d69))
+
 ## [0.6.0](https://github.com/afonsojramos/react-native-super-calendar/compare/v0.5.0...v0.6.0) (2026-06-25)
 
 
