@@ -18,11 +18,11 @@ export interface CalendarTheme {
     todayBackground: string;
     /** Text on top of the today badge. */
     todayText: string;
-    /** Reserved for an opt-in selected-day badge; the default band selection does not use it. */
+    /** Fill of a selected day / range-endpoint badge in the month grid. */
     selectedBackground: string;
-    /** Reserved for the opt-in selected-day badge's text; unused by default. */
+    /** Text on top of the selected-day badge. */
     selectedText: string;
-    /** Background band behind selected days (single, multiple, or a range) in the month grid. */
+    /** Background band behind the days in a range (a centered rounded pill by default). */
     rangeBackground: string;
     /** The current-time indicator line on the week/day grid. */
     nowIndicator: string;
@@ -53,6 +53,11 @@ export interface CalendarTheme {
   };
   /** Corner radius of the today badge. Use a large value for a circle. */
   todayBadgeRadius: number;
+  /**
+   * Height of the range selection band (the centered rounded "pill"); its corner
+   * radius is half this. Ignored when `fillCellOnSelection` fills the whole cell.
+   */
+  rangeBandHeight: number;
 }
 
 export const defaultTheme: CalendarTheme = {
@@ -81,6 +86,7 @@ export const defaultTheme: CalendarTheme = {
     eventTitle: { fontSize: 12, fontWeight: "700" },
   },
   todayBadgeRadius: 999,
+  rangeBandHeight: 22,
 };
 
 /**
@@ -107,6 +113,7 @@ export const darkTheme: CalendarTheme = {
   },
   text: defaultTheme.text,
   todayBadgeRadius: defaultTheme.todayBadgeRadius,
+  rangeBandHeight: defaultTheme.rangeBandHeight,
 };
 
 /** Deep-merge a partial theme over {@link defaultTheme}. */
@@ -116,6 +123,7 @@ export function mergeTheme(theme?: PartialCalendarTheme): CalendarTheme {
     colors: { ...defaultTheme.colors, ...theme.colors },
     text: { ...defaultTheme.text, ...theme.text },
     todayBadgeRadius: theme.todayBadgeRadius ?? defaultTheme.todayBadgeRadius,
+    rangeBandHeight: theme.rangeBandHeight ?? defaultTheme.rangeBandHeight,
   };
 }
 
@@ -123,6 +131,7 @@ export type PartialCalendarTheme = {
   colors?: Partial<CalendarTheme["colors"]>;
   text?: Partial<CalendarTheme["text"]>;
   todayBadgeRadius?: number;
+  rangeBandHeight?: number;
 };
 
 const CalendarThemeContext = createContext<CalendarTheme>(defaultTheme);

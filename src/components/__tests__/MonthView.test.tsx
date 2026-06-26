@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render, within } from "@testing-library/react-native";
 import { StyleSheet, Text, type ViewStyle } from "react-native";
 import { defaultTheme } from "../../theme";
 import type { CalendarEvent } from "../../types";
@@ -25,17 +25,32 @@ describe("MonthView selection", () => {
     expect(getByLabelText(/15 June 2026, selected/)).toBeTruthy();
   });
 
-  it("marks both range endpoints as selected and fills the interior with the range band", () => {
+  it("marks both range endpoints as selected and renders a band behind the interior", () => {
     const range = { start: new Date(2026, 5, 10), end: new Date(2026, 5, 14) };
     const { getByLabelText } = render(<MonthView {...baseProps} selectedRange={range} />);
 
     expect(getByLabelText(/10 June 2026, selected/)).toBeTruthy();
     expect(getByLabelText(/14 June 2026, selected/)).toBeTruthy();
 
-    // An interior day carries the range band, not the "selected" badge.
+    // An interior day carries the range band (a child layer), not the badge.
     const interior = getByLabelText(/12 June 2026, 0 events/);
-    expect(backgroundColorOf(interior)).toBe(defaultTheme.colors.rangeBackground);
+    const band = within(interior).getByTestId("month-range-band");
+    expect(backgroundColorOf(band)).toBe(defaultTheme.colors.rangeBackground);
     expect(() => getByLabelText(/12 June 2026, selected/)).toThrow();
+  });
+
+  it("renders the band as a rounded pill by default and a full-cell fill when opted in", () => {
+    const range = { start: new Date(2026, 5, 10), end: new Date(2026, 5, 14) };
+    const radiusOf = (n: { props: { style?: unknown } }) =>
+      StyleSheet.flatten(n.props.style as ViewStyle)?.borderTopLeftRadius ?? 0;
+
+    const pill = render(<MonthView {...baseProps} selectedRange={range} />);
+    const pillStart = within(pill.getByLabelText(/10 June 2026/)).getByTestId("month-range-band");
+    expect(radiusOf(pillStart)).toBeGreaterThan(0); // rounded leading edge
+
+    const fill = render(<MonthView {...baseProps} selectedRange={range} fillCellOnSelection />);
+    const fillStart = within(fill.getByLabelText(/10 June 2026/)).getByTestId("month-range-band");
+    expect(radiusOf(fillStart)).toBe(0); // square, fills the cell
   });
 
   it("leaves cells outside any selection unstyled by selection", () => {
@@ -43,7 +58,7 @@ describe("MonthView selection", () => {
       <MonthView {...baseProps} selectedDates={[new Date(2026, 5, 15)]} />,
     );
     const other = getByLabelText(/20 June 2026, 0 events/);
-    expect(backgroundColorOf(other)).not.toBe(defaultTheme.colors.rangeBackground);
+    expect(within(other).queryByTestId("month-range-band")).toBeNull();
   });
 });
 

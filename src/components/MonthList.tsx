@@ -87,6 +87,8 @@ export type MonthListProps<T> = {
   activeDate?: Date;
   selectedDates?: Date[];
   selectedRange?: DateRange;
+  /** Fill the whole cell on selection instead of the default rounded pill band. */
+  fillCellOnSelection?: boolean;
   minDate?: Date;
   maxDate?: Date;
   isDateDisabled?: (date: Date) => boolean;
@@ -128,6 +130,7 @@ function MonthListInner<T>({
   activeDate,
   selectedDates,
   selectedRange,
+  fillCellOnSelection,
   minDate,
   maxDate,
   isDateDisabled,
@@ -387,6 +390,7 @@ function MonthListInner<T>({
             disableMonthEventCellPress={disableMonthEventCellPress}
             isRTL={isRTL}
             activeDate={activeDate}
+            fillCellOnSelection={fillCellOnSelection}
             calendarCellStyle={calendarCellStyle}
             renderEvent={renderEvent}
             keyExtractor={keyExtractor}
@@ -416,6 +420,7 @@ function MonthListInner<T>({
       disableMonthEventCellPress,
       isRTL,
       activeDate,
+      fillCellOnSelection,
       calendarCellStyle,
       renderEvent,
       keyExtractor,

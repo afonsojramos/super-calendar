@@ -25,6 +25,8 @@ import { eventDayKeys, isAllDayEvent } from "../utils/layout";
 // event chips fit when auto-fitting `maxVisibleEventCount`.
 const DAY_CELL_PADDING_TOP = 4;
 const DATE_BADGE_HEIGHT = 24;
+// Vertical centre of the date badge, where the range band is centered.
+const BAND_CENTER_Y = DAY_CELL_PADDING_TOP + DATE_BADGE_HEIGHT / 2;
 const CELL_ROW_GAP = 2;
 const CHIP_PADDING_V = 2;
 // Pre-measure fallback so the first paint isn't empty or overflowing.
@@ -59,10 +61,15 @@ export type MonthViewProps<T> = {
   showSixWeeks?: boolean;
   /** Highlight this date instead of the real "today". */
   activeDate?: Date;
-  /** Days drawn as selected, filled with the `rangeBackground` band (no badge). */
+  /** Days drawn as selected (a filled badge), in the month grid. */
   selectedDates?: Date[];
-  /** A selected span, filled edge-to-edge with the `rangeBackground` band. */
+  /** A selected span: endpoints get a filled badge, the span gets the range band. */
   selectedRange?: DateRange;
+  /**
+   * Fill the whole cell with the range band instead of the default centered
+   * rounded "pill" strip. Default false.
+   */
+  fillCellOnSelection?: boolean;
   /** Earliest selectable day (inclusive); earlier days render disabled. */
   minDate?: Date;
   /** Latest selectable day (inclusive); later days render disabled. */
@@ -104,6 +111,7 @@ function MonthViewInner<T>({
   activeDate,
   selectedDates: selectedDatesProp,
   selectedRange: selectedRangeProp,
+  fillCellOnSelection = false,
   minDate: minDateProp,
   maxDate: maxDateProp,
   isDateDisabled: isDateDisabledProp,
@@ -197,7 +205,7 @@ function MonthViewInner<T>({
     const isHighlighted = activeDate ? isSameCalendarDay(day, activeDate) : isToday;
     // Selection band wins over the weekend tint; the today badge shows unless the
     // day is selected. Shared with the headless grid so they never diverge.
-    const { isDisabled, isSelected, isInRange } = daySelectionState(
+    const { isDisabled, isSelected, isInRange, isRangeStart, isRangeEnd } = daySelectionState(
       day,
       { selectedDates, selectedRange },
       { minDate, maxDate, isDateDisabled },
@@ -205,12 +213,17 @@ function MonthViewInner<T>({
     const visibleCount = monthVisibleCount(dayEvents.length, capacity);
     const hiddenCount = dayEvents.length - visibleCount;
 
-    // Selection is shown as a background band over the span (no per-day badge),
-    // so selected days keep their normal number colour; today keeps its badge.
+    // The range shows as a band behind the days; endpoints and discrete selected
+    // days get a filled badge on top. Today's badge wins when it coincides.
+    const isFilledBadge = isHighlighted || isSelected;
+    // A single-day range (start === end) is the badge alone, no band behind it.
+    const hasBand = isInRange && !(isRangeStart && isRangeEnd);
     const dateColor = isDisabled
       ? theme.colors.textDisabled
-      : isHighlighted
-        ? theme.colors.todayText
+      : isFilledBadge
+        ? isHighlighted
+          ? theme.colors.todayText
+          : theme.colors.selectedText
         : isCurrentMonth
           ? theme.colors.text
           : theme.colors.textDisabled;
@@ -232,9 +245,6 @@ function MonthViewInner<T>({
           styles.dayCell,
           { borderColor: theme.colors.gridLine },
           isWeekend(day) && { backgroundColor: theme.colors.weekendBackground },
-          // Selection band fills the whole span (endpoints + interior + discrete
-          // days); placed after weekend so it wins.
-          (isInRange || isSelected) && { backgroundColor: theme.colors.rangeBackground },
           calendarCellStyle?.(day),
         ]}
         onPress={handlePressDay}
@@ -254,14 +264,39 @@ function MonthViewInner<T>({
         role="cell"
         accessibilityLabel={accessibilityLabel}
       >
+        {hasBand ? (
+          <View
+            testID="month-range-band"
+            pointerEvents="none"
+            style={[
+              styles.rangeBand,
+              { backgroundColor: theme.colors.rangeBackground },
+              fillCellOnSelection
+                ? { top: 0, bottom: 0 }
+                : { top: BAND_CENTER_Y - theme.rangeBandHeight / 2, height: theme.rangeBandHeight },
+              !fillCellOnSelection &&
+                isRangeStart && {
+                  borderTopLeftRadius: theme.rangeBandHeight / 2,
+                  borderBottomLeftRadius: theme.rangeBandHeight / 2,
+                },
+              !fillCellOnSelection &&
+                isRangeEnd && {
+                  borderTopRightRadius: theme.rangeBandHeight / 2,
+                  borderBottomRightRadius: theme.rangeBandHeight / 2,
+                },
+            ]}
+          />
+        ) : null}
         {renderCustomDateForMonth ? (
           renderCustomDateForMonth(day)
         ) : (
           <View
             style={[
               styles.dateBadge,
-              isHighlighted && {
-                backgroundColor: theme.colors.todayBackground,
+              isFilledBadge && {
+                backgroundColor: isHighlighted
+                  ? theme.colors.todayBackground
+                  : theme.colors.selectedBackground,
                 borderRadius: theme.todayBadgeRadius,
               },
             ]}
@@ -341,6 +376,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     height: 24,
     width: 24,
+  },
+  rangeBand: {
+    position: "absolute",
+    left: 0,
+    right: 0,
   },
   monthEvent: {
     width: "92%",
