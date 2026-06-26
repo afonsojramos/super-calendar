@@ -126,6 +126,13 @@ npm install react-native-reanimated react-native-worklets react-native-gesture-h
 Make sure Reanimated and Gesture Handler are set up per their own docs (Babel
 plugin, `GestureHandlerRootView` at the root of your app).
 
+These are declared as optional peers so web-only installs (the `/dom` and
+`/picker` entry points) aren't asked to install React Native packages they don't
+use. The full calendar still needs them: because its components import Reanimated
+and Gesture Handler directly, a missing one surfaces as a clear Metro
+`Unable to resolve "react-native-reanimated"` build error rather than a silent
+failure, so install the line above when you use `Calendar` or the time grid.
+
 ### Picker only? Skip Reanimated
 
 If you only need date selection, import it from the
