@@ -1,5 +1,16 @@
 import { cellRangeFromDrag, resolveDraggedBounds, shiftMinutes, snapDeltaMinutes } from "../drag";
 
+describe("cellRangeFromDrag clamping", () => {
+  it("clamps a drag past the grid bottom to the end of the day, not past midnight", () => {
+    const day = new Date(2026, 5, 26);
+    const range = cellRangeFromDrag(day, 0, 1_000_000, 48, 0, 15);
+    expect(range).not.toBeNull();
+    // End is exactly the next midnight (24:00), never spilling into the next day.
+    expect(range?.end.getTime()).toBe(new Date(2026, 5, 27).getTime());
+    expect(range?.start.getTime()).toBe(day.getTime());
+  });
+});
+
 describe("snapDeltaMinutes", () => {
   // 64px per hour grid, snapping to 15-minute steps.
   it("snaps a one-hour drag to 60 minutes", () => {

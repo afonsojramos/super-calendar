@@ -1,5 +1,31 @@
-import { eventDayKeys, isAllDayEvent, layoutDayEvents } from "../layout";
+import { eventDayKeys, groupEventsByDay, isAllDayEvent, layoutDayEvents } from "../layout";
 import type { CalendarEvent } from "../../types";
+
+describe("groupEventsByDay", () => {
+  const key = (d: Date) => {
+    const s = new Date(d);
+    s.setHours(0, 0, 0, 0);
+    return s.toISOString();
+  };
+
+  it("indexes events under each day they touch", () => {
+    const single: CalendarEvent = {
+      title: "A",
+      start: new Date(2026, 5, 26, 9),
+      end: new Date(2026, 5, 26, 10),
+    };
+    const span: CalendarEvent = {
+      title: "B",
+      start: new Date(2026, 5, 26),
+      end: new Date(2026, 5, 28),
+    };
+    const map = groupEventsByDay([single, span]);
+    expect(map.get(key(new Date(2026, 5, 26)))).toEqual([single, span]);
+    expect(map.get(key(new Date(2026, 5, 27)))).toEqual([span]);
+    // End at midnight of the 28th does not include the 28th.
+    expect(map.get(key(new Date(2026, 5, 28)))).toBeUndefined();
+  });
+});
 
 const at = (h: number, m = 0) => new Date(2026, 5, 15, h, m); // 15 Jun 2026, local
 const ev = (startH: number, endH: number, id?: string): CalendarEvent<{ id?: string }> => ({

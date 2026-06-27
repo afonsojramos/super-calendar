@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import type { CalendarMode } from "../types";
+import type { BusinessHours, CalendarMode } from "../types";
 
 /**
  * Minimum event-box height (px) before the built-in renderer shows the time line
@@ -111,4 +111,28 @@ export function monthEventCapacity(
 export function monthVisibleCount(total: number, capacity: MonthEventCapacity): number {
   if (total <= capacity.full) return total;
   return Math.max(1, capacity.withMore);
+}
+
+/**
+ * The closed hour-spans of a day to shade on the time grid, given a
+ * `businessHours` callback and the visible `[minHour, maxHour]` window: the spans
+ * before open and after close (clamped to the window), the whole window when the
+ * day is closed (`null`), or none when the callback returns `undefined`. Shared by
+ * both renderers so shading stays identical.
+ */
+export function closedHourBands(
+  day: Date,
+  businessHours: BusinessHours | undefined,
+  minHour = 0,
+  maxHour = 24,
+): { start: number; end: number }[] {
+  const open = businessHours?.(day);
+  if (open === undefined) return [];
+  if (open === null) return [{ start: minHour, end: maxHour }];
+  const start = Math.max(minHour, Math.min(maxHour, open.start));
+  const end = Math.max(minHour, Math.min(maxHour, open.end));
+  const bands: { start: number; end: number }[] = [];
+  if (start > minHour) bands.push({ start: minHour, end: start });
+  if (end < maxHour) bands.push({ start: end, end: maxHour });
+  return bands;
 }

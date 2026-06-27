@@ -63,10 +63,12 @@ export function cellRangeFromDrag(
     const rawMinutes = (minHour + px / cellHeightPx) * 60;
     return Math.round(rawMinutes / snapMinutes) * snapMinutes;
   };
-  let lower = snapAt(startPx);
-  let upper = snapAt(endPx);
+  const MAX = 24 * 60;
+  let lower = Math.max(0, Math.min(MAX - snapMinutes, snapAt(startPx)));
+  let upper = Math.max(0, Math.min(MAX, snapAt(endPx)));
   if (upper < lower) [lower, upper] = [upper, lower];
-  if (upper - lower < snapMinutes) upper = lower + snapMinutes;
+  // Keep the range at least one step wide without spilling past midnight.
+  if (upper - lower < snapMinutes) upper = Math.min(MAX, lower + snapMinutes);
   const start = new Date(day);
   start.setHours(0, 0, 0, 0);
   start.setMinutes(lower);

@@ -60,3 +60,11 @@ export type EventKeyExtractor<T = unknown> = (event: CalendarEvent<T>, index: nu
 
 /** Sunday = 0 … Saturday = 6, matching `Date.prototype.getDay()`. */
 export type WeekStartsOn = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+/**
+ * A day's open hours for `businessHours` shading on the time grid: `{ start, end }`
+ * in hours (fractions allowed, e.g. 9.5), or `null` when the day is closed (fully
+ * shaded). `undefined` from the callback means "no business-hours shading". Shared
+ * by both renderers; pair with `closedHourBands` to get the spans to shade.
+ */
+export type BusinessHours = (date: Date) => { start: number; end: number } | null;

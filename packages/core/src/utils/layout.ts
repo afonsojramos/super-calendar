@@ -132,3 +132,22 @@ export function eventDayKeys<T>(event: CalendarEvent<T>): string[] {
   }
   return keys;
 }
+
+/**
+ * Index events by the `startOfDay` ISO key of every day they touch (via
+ * {@link eventDayKeys}), so a month grid can look up a day's events with
+ * `startOfDay(date).toISOString()`. Built once and shared across month cells.
+ */
+export function groupEventsByDay<T>(
+  events: readonly CalendarEvent<T>[],
+): Map<string, CalendarEvent<T>[]> {
+  const map = new Map<string, CalendarEvent<T>[]>();
+  for (const event of events) {
+    for (const key of eventDayKeys(event)) {
+      const list = map.get(key);
+      if (list) list.push(event);
+      else map.set(key, [event]);
+    }
+  }
+  return map;
+}
