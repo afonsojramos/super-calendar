@@ -5,3 +5,6 @@ dist/
 
 # Playwright MCP scratch output
 .playwright-mcp/
+
+# compound-engineering pipeline run artifacts
+.context/
