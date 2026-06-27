@@ -1,0 +1,13 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@super-calendar/native": ["../../packages/native/src/index.tsx"],
+      "@super-calendar/native/picker": ["../../packages/native/src/picker.tsx"],
+      "@super-calendar/core": ["../../packages/core/src/index.ts"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"]
+}

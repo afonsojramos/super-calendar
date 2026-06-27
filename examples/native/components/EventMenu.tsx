@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { CalendarEvent } from "react-native-super-calendar";
+import type { CalendarEvent } from "@super-calendar/native";
 
 /** Actions the example's right-click menu can perform on an event. */
 export type EventMenuActions = {

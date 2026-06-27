@@ -3,9 +3,9 @@ import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { Calendar, type CalendarEvent, type CalendarMode } from "react-native-super-calendar";
+import { Calendar, type CalendarEvent, type CalendarMode } from "@super-calendar/native";
 // The picker surface imports from the Reanimated-free /picker entry point.
-import { type DateRange, MonthList, useDateRange } from "react-native-super-calendar/picker";
+import { type DateRange, MonthList, useDateRange } from "@super-calendar/native/picker";
 import { EventContextMenu } from "./components/EventContextMenu";
 import { EventMenuProvider, type EventMenuActions } from "./components/EventMenu";
 

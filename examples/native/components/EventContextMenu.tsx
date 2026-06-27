@@ -1,4 +1,4 @@
-import { DefaultEvent, type RenderEventArgs } from "react-native-super-calendar";
+import { DefaultEvent, type RenderEventArgs } from "@super-calendar/native";
 
 // Native: the base-ui context menu is web-only, so just render the built-in
 // event. (Native uses long-press drag-to-move instead.)

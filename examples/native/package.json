@@ -1,5 +1,5 @@
 {
-  "name": "react-native-super-calendar-example",
+  "name": "@super-calendar/example-native",
   "version": "0.0.0",
   "private": true,
   "main": "index.ts",
@@ -13,6 +13,7 @@
     "@base-ui/react": "^1.6.0",
     "@expo/metro-runtime": "~56.0.15",
     "@legendapp/list": "^3.0.6",
+    "@super-calendar/native": "workspace:*",
     "cnfast": "^0.0.8",
     "date-fns": "4.4.0",
     "expo": "~56.0.6",
@@ -24,7 +25,6 @@
     "react-native-gesture-handler": "~2.31.1",
     "react-native-reanimated": "4.3.1",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-super-calendar": "link:..",
     "react-native-web": "^0.21.2",
     "react-native-worklets": "0.8.3"
   },
