@@ -103,6 +103,7 @@ export function MonthList({
             selectedRange={selectedRange}
             selectedDates={selectedDates}
             fillCellOnSelection={fillCellOnSelection}
+            showAdjacentMonths={false}
             showWeekdays={false}
             locale={locale}
             theme={themeOverrides}

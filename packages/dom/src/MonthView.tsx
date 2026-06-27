@@ -36,8 +36,8 @@ export interface MonthViewProps extends DateSelectionConstraints {
   selectedRange?: DateRange;
   /** Discrete selected days (single / multiple). */
   selectedDates?: Date[];
-  /** Show only this month's days (default true), matching the picker look. */
-  ownDaysOnly?: boolean;
+  /** Render days from the neighbouring months in the leading/trailing cells (default true). */
+  showAdjacentMonths?: boolean;
   /**
    * Fill the whole cell with the range background instead of the default
    * centered rounded "pill" strip. Default false.
@@ -142,7 +142,7 @@ export function MonthView({
   weekStartsOn = 0,
   selectedRange,
   selectedDates,
-  ownDaysOnly = true,
+  showAdjacentMonths = true,
   fillCellOnSelection = false,
   showTitle = true,
   showWeekdays = true,
@@ -248,7 +248,7 @@ export function MonthView({
             style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}
           >
             {week.days.map((day) => {
-              const hidden = ownDaysOnly && !day.isCurrentMonth;
+              const hidden = !showAdjacentMonths && !day.isCurrentMonth;
               if (hidden) {
                 return (
                   <div

@@ -61,7 +61,7 @@ export interface TimeGridProps<T = unknown> {
   minHourHeight?: number;
   maxHourHeight?: number;
   /** Snap dragged events to this many minutes (default 15). */
-  snapMinutes?: number;
+  dragStepMinutes?: number;
   /** Render event time ranges in 12-hour AM/PM (default false, 24h). */
   ampm?: boolean;
   locale?: Locale;
@@ -69,7 +69,7 @@ export interface TimeGridProps<T = unknown> {
   height?: number | string;
   renderEvent?: DomRenderEvent<T>;
   onPressEvent?: (event: CalendarEvent<T>) => void;
-  onPressDayHeader?: (day: Date) => void;
+  onPressDateHeader?: (day: Date) => void;
   /** Enables drag-to-move and resize; called with the proposed new start/end. */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void;
   className?: string;
@@ -155,14 +155,14 @@ export function TimeGrid<T = unknown>({
   zoomable = true,
   minHourHeight = 24,
   maxHourHeight = 160,
-  snapMinutes = 15,
+  dragStepMinutes = 15,
   ampm = false,
   locale,
   theme: themeOverrides,
   height = 600,
   renderEvent,
   onPressEvent,
-  onPressDayHeader,
+  onPressDateHeader,
   onDragEvent,
   className,
   style,
@@ -170,7 +170,7 @@ export function TimeGrid<T = unknown>({
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const dfns = locale ? { locale } : undefined;
-  const snapHours = snapMinutes / 60;
+  const snapHours = dragStepMinutes / 60;
 
   const [hourHeight, setHourHeight] = useState(initialHourHeight);
   useEffect(() => setHourHeight(initialHourHeight), [initialHourHeight]);
@@ -333,16 +333,16 @@ export function TimeGrid<T = unknown>({
             <button
               key={day.toISOString()}
               type="button"
-              tabIndex={onPressDayHeader ? 0 : -1}
-              aria-hidden={onPressDayHeader ? undefined : true}
-              onClick={onPressDayHeader ? () => onPressDayHeader(day) : undefined}
+              tabIndex={onPressDateHeader ? 0 : -1}
+              aria-hidden={onPressDateHeader ? undefined : true}
+              onClick={onPressDateHeader ? () => onPressDateHeader(day) : undefined}
               style={{
                 flex: 1,
                 border: "none",
                 background: "transparent",
                 font: "inherit",
                 color: theme.textMuted,
-                cursor: onPressDayHeader ? "pointer" : "default",
+                cursor: onPressDateHeader ? "pointer" : "default",
                 padding: "6px 0",
                 display: "flex",
                 flexDirection: "column",
