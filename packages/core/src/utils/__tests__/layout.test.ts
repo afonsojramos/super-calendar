@@ -1,5 +1,49 @@
-import { eventDayKeys, groupEventsByDay, isAllDayEvent, layoutDayEvents } from "../layout";
+import {
+  closedHourBands,
+  eventDayKeys,
+  groupEventsByDay,
+  isAllDayEvent,
+  layoutDayEvents,
+} from "../layout";
 import type { CalendarEvent } from "../../types";
+
+describe("closedHourBands", () => {
+  const day = new Date(2026, 5, 26);
+
+  it("returns no bands when the callback is undefined or returns undefined", () => {
+    expect(closedHourBands(day, undefined)).toEqual([]);
+    expect(closedHourBands(day, () => undefined as never)).toEqual([]);
+  });
+
+  it("shades the whole window when the day is closed (null)", () => {
+    expect(closedHourBands(day, () => null, 0, 24)).toEqual([{ start: 0, end: 24 }]);
+  });
+
+  it("shades before open and after close, clamped to the window", () => {
+    expect(closedHourBands(day, () => ({ start: 9, end: 17 }), 0, 24)).toEqual([
+      { start: 0, end: 9 },
+      { start: 17, end: 24 },
+    ]);
+    // Open hours wider than the window collapse to no bands.
+    expect(closedHourBands(day, () => ({ start: 0, end: 24 }), 8, 18)).toEqual([]);
+  });
+
+  it("emits no leading/trailing band when open hours touch the window edge", () => {
+    // Open from the window start: no leading band.
+    expect(closedHourBands(day, () => ({ start: 8, end: 24 }), 8, 24)).toEqual([]);
+    // Open until the window end: no trailing band.
+    expect(closedHourBands(day, () => ({ start: 0, end: 18 }), 0, 18)).toEqual([]);
+  });
+
+  it("treats inverted or empty open hours as fully closed", () => {
+    expect(closedHourBands(day, () => ({ start: 17, end: 9 }), 0, 24)).toEqual([
+      { start: 0, end: 24 },
+    ]);
+    expect(closedHourBands(day, () => ({ start: 12, end: 12 }), 0, 24)).toEqual([
+      { start: 0, end: 24 },
+    ]);
+  });
+});
 
 describe("groupEventsByDay", () => {
   const key = (d: Date) => {

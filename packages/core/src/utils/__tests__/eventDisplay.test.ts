@@ -1,5 +1,4 @@
 import {
-  closedHourBands,
   eventAccessibilityLabel,
   eventTimeLabel,
   isTimeVisibleAtHeight,
@@ -9,28 +8,6 @@ import {
   titleEllipsizeMode,
   titleNumberOfLines,
 } from "../eventDisplay";
-
-describe("closedHourBands", () => {
-  const day = new Date(2026, 5, 26);
-
-  it("returns no bands when the callback is undefined or returns undefined", () => {
-    expect(closedHourBands(day, undefined)).toEqual([]);
-    expect(closedHourBands(day, () => undefined as never)).toEqual([]);
-  });
-
-  it("shades the whole window when the day is closed (null)", () => {
-    expect(closedHourBands(day, () => null, 0, 24)).toEqual([{ start: 0, end: 24 }]);
-  });
-
-  it("shades before open and after close, clamped to the window", () => {
-    expect(closedHourBands(day, () => ({ start: 9, end: 17 }), 0, 24)).toEqual([
-      { start: 0, end: 9 },
-      { start: 17, end: 24 },
-    ]);
-    // Open hours wider than the window collapse to no bands.
-    expect(closedHourBands(day, () => ({ start: 0, end: 24 }), 8, 18)).toEqual([]);
-  });
-});
 
 describe("titleEllipsizeMode", () => {
   it("clips by default", () => {

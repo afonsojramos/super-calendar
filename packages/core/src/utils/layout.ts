@@ -1,5 +1,5 @@
 import { addDays, differenceInMinutes, max as maxDate, min as minDate, startOfDay } from "date-fns";
-import type { CalendarEvent } from "../types";
+import type { BusinessHours, CalendarEvent } from "../types";
 
 const MINUTES_PER_HOUR = 60;
 // Minimum duration (in hours) a positioned event is given, so a zero/negative
@@ -150,4 +150,31 @@ export function groupEventsByDay<T>(
     }
   }
   return map;
+}
+
+/**
+ * The closed hour-spans of a day to shade on the time grid, given a
+ * `businessHours` callback and the visible `[minHour, maxHour]` window: the spans
+ * before open and after close (clamped to the window), the whole window when the
+ * day is closed (`null`) or the open hours are inverted/empty, or none when the
+ * callback returns `undefined`. Shared by both renderers so shading stays
+ * identical. Co-located with `groupEventsByDay`; both feed the grid layout.
+ */
+export function closedHourBands(
+  day: Date,
+  businessHours: BusinessHours | undefined,
+  minHour = 0,
+  maxHour = 24,
+): { start: number; end: number }[] {
+  const open = businessHours?.(day);
+  if (open === undefined) return [];
+  if (open === null) return [{ start: minHour, end: maxHour }];
+  const start = Math.max(minHour, Math.min(maxHour, open.start));
+  const end = Math.max(minHour, Math.min(maxHour, open.end));
+  // Inverted or empty open hours mean nothing is open: shade the whole window.
+  if (start >= end) return [{ start: minHour, end: maxHour }];
+  const bands: { start: number; end: number }[] = [];
+  if (start > minHour) bands.push({ start: minHour, end: start });
+  if (end < maxHour) bands.push({ start: end, end: maxHour });
+  return bands;
 }
