@@ -2,7 +2,12 @@
 // Built on the library's headless core and Legend List's DOM renderer. Pair with
 // the headless hooks (useDateRange, useMonthGrid) re-exported below for selection
 // state and custom layouts.
-export { MonthView, type MonthViewProps } from "./MonthView";
+export {
+  type DomMonthEvent,
+  type DomMonthEventArgs,
+  MonthView,
+  type MonthViewProps,
+} from "./MonthView";
 export { MonthList, type MonthListProps } from "./MonthList";
 export {
   type BusinessHours,

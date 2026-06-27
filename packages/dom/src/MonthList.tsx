@@ -3,14 +3,15 @@ import { addMonths, type Locale, startOfMonth } from "date-fns";
 import { type CSSProperties, useMemo } from "react";
 import {
   buildMonthGrid,
+  type CalendarEvent,
   type DateRange,
   type DateSelectionConstraints,
   type WeekStartsOn,
 } from "@super-calendar/core";
-import { MonthView } from "./MonthView";
+import { type DomMonthEvent, MonthView } from "./MonthView";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
-export interface MonthListProps extends DateSelectionConstraints {
+export interface MonthListProps<T = unknown> extends DateSelectionConstraints {
   /** Anchor month; the list spans `pastMonths` before to `futureMonths` after. */
   date: Date;
   /** Months to render before the anchor (default 1). */
@@ -18,6 +19,18 @@ export interface MonthListProps extends DateSelectionConstraints {
   /** Months to render after the anchor (default 12). */
   futureMonths?: number;
   weekStartsOn?: WeekStartsOn;
+  /** Events to render as chips in each day cell (calendar layout when provided). */
+  events?: CalendarEvent<T>[];
+  /** Custom chip renderer; falls back to the built-in titled chip. */
+  renderEvent?: DomMonthEvent<T>;
+  /** Max chips shown per day before a "+N more" row (default 3). */
+  maxVisibleEventCount?: number;
+  /** Template for the overflow row; `{moreCount}` is replaced. */
+  moreLabel?: string;
+  /** Tap an event chip. */
+  onPressEvent?: (event: CalendarEvent<T>) => void;
+  /** Tap the "+N more" overflow row. */
+  onPressMore?: (events: CalendarEvent<T>[], date: Date) => void;
   selectedRange?: DateRange;
   selectedDates?: Date[];
   /** Fill the whole cell on selection instead of the default rounded pill band. */
@@ -36,11 +49,17 @@ export interface MonthListProps extends DateSelectionConstraints {
  * Legend List's DOM renderer and the library's headless grid logic. Selection is
  * controlled, pass `selectedRange` (or `selectedDates`) and handle `onPressDay`.
  */
-export function MonthList({
+export function MonthList<T = unknown>({
   date,
   pastMonths = 1,
   futureMonths = 12,
   weekStartsOn = 0,
+  events,
+  renderEvent,
+  maxVisibleEventCount,
+  moreLabel,
+  onPressEvent,
+  onPressMore,
   selectedRange,
   selectedDates,
   fillCellOnSelection = false,
@@ -53,7 +72,7 @@ export function MonthList({
   onPressDay,
   className,
   style,
-}: MonthListProps) {
+}: MonthListProps<T>) {
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
 
   const months = useMemo(() => {
@@ -91,15 +110,21 @@ export function MonthList({
       </div>
       <LegendList
         data={months}
-        extraData={selectedRange ?? selectedDates}
+        extraData={[selectedRange, selectedDates, events]}
         keyExtractor={(m: Date) => m.toISOString()}
         recycleItems={false}
         estimatedItemSize={theme.cellHeight * 7 + 40}
         style={{ height, overflowY: "auto" }}
         renderItem={({ item }: { item: Date }) => (
-          <MonthView
+          <MonthView<T>
             date={item}
             weekStartsOn={weekStartsOn}
+            events={events}
+            renderEvent={renderEvent}
+            maxVisibleEventCount={maxVisibleEventCount}
+            moreLabel={moreLabel}
+            onPressEvent={onPressEvent}
+            onPressMore={onPressMore}
             selectedRange={selectedRange}
             selectedDates={selectedDates}
             fillCellOnSelection={fillCellOnSelection}

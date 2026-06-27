@@ -8,6 +8,7 @@ import {
   startOfMonth,
 } from "date-fns";
 import {
+  type ComponentType,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   useEffect,
@@ -18,20 +19,52 @@ import {
 import {
   bandRounding,
   buildMonthGrid,
+  type CalendarEvent,
   dayBadgeKind,
   type DateRange,
   type DateSelectionConstraints,
+  eventDayKeys,
   type MonthGridDay,
   rangeBandKind,
   type WeekStartsOn,
 } from "@super-calendar/core";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
-export interface MonthViewProps extends DateSelectionConstraints {
+// Chip metrics for the events layout (when `events` is provided).
+const DATE_ROW = 24;
+const CHIP_HEIGHT = 18;
+const CHIP_GAP = 2;
+const CELL_PAD = 4;
+
+/** Props passed to a custom month event chip renderer. */
+export interface DomMonthEventArgs<T = unknown> {
+  event: CalendarEvent<T>;
+  onPress: () => void;
+}
+
+export type DomMonthEvent<T = unknown> = ComponentType<DomMonthEventArgs<T>>;
+
+export interface MonthViewProps<T = unknown> extends DateSelectionConstraints {
   /** Any day within the month to render. */
   date: Date;
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */
   weekStartsOn?: WeekStartsOn;
+  /**
+   * Events to render as chips in each day cell. Passing this (even `[]`) switches
+   * the grid to the calendar layout (date in the corner, chips below); omit it for
+   * the compact date-picker look.
+   */
+  events?: CalendarEvent<T>[];
+  /** Custom chip renderer; falls back to the built-in titled chip. */
+  renderEvent?: DomMonthEvent<T>;
+  /** Max chips shown per day before a "+N more" row (default 3). */
+  maxVisibleEventCount?: number;
+  /** Template for the overflow row; `{moreCount}` is replaced (default "{moreCount} more"). */
+  moreLabel?: string;
+  /** Tap an event chip. */
+  onPressEvent?: (event: CalendarEvent<T>) => void;
+  /** Tap the "+N more" overflow row. */
+  onPressMore?: (events: CalendarEvent<T>[], date: Date) => void;
   /** Selected span; days between the endpoints get the range band. */
   selectedRange?: DateRange;
   /** Discrete selected days (single / multiple). */
@@ -136,10 +169,107 @@ function badgeStyle(day: MonthGridDay, theme: DomCalendarTheme, hovered: boolean
   };
 }
 
+// --- Calendar (events) layout styles -------------------------------------
+
+function eventCellStyle(day: MonthGridDay, theme: DomCalendarTheme, height: number): CSSProperties {
+  return {
+    position: "relative",
+    minHeight: height,
+    border: "none",
+    borderTop: `1px solid ${theme.gridLine}`,
+    background: day.isWeekend && !day.isInRange ? theme.weekendBackground : "transparent",
+    color: day.isDisabled ? theme.textDisabled : theme.text,
+    cursor: day.isDisabled ? "default" : "pointer",
+    display: "flex",
+    flexDirection: "column",
+    gap: CHIP_GAP,
+    padding: CELL_PAD,
+    boxSizing: "border-box",
+    textAlign: "left",
+    WebkitTapHighlightColor: "transparent",
+  };
+}
+
+function compactBadgeStyle(day: MonthGridDay, theme: DomCalendarTheme): CSSProperties {
+  const badge = dayBadgeKind(day, day.isToday);
+  const filled = badge !== "none";
+  return {
+    position: "relative",
+    zIndex: 1,
+    alignSelf: "flex-end",
+    width: DATE_ROW - 2,
+    height: DATE_ROW - 2,
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 13,
+    background: filled
+      ? badge === "today"
+        ? theme.todayBackground
+        : theme.selectedBackground
+      : "transparent",
+    color: filled ? (day.isToday ? theme.todayText : theme.selectedText) : "inherit",
+  };
+}
+
+const chipButtonStyle: CSSProperties = {
+  position: "relative",
+  zIndex: 1,
+  border: "none",
+  padding: 0,
+  margin: 0,
+  background: "transparent",
+  cursor: "pointer",
+  textAlign: "left",
+  fontFamily: "inherit",
+};
+
+function chipStyle(theme: DomCalendarTheme): CSSProperties {
+  return {
+    display: "block",
+    height: CHIP_HEIGHT,
+    lineHeight: `${CHIP_HEIGHT}px`,
+    padding: "0 6px",
+    borderRadius: 4,
+    background: theme.eventBackground,
+    color: theme.eventText,
+    fontSize: 11,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  };
+}
+
+function moreButtonStyle(theme: DomCalendarTheme): CSSProperties {
+  return {
+    position: "relative",
+    zIndex: 1,
+    border: "none",
+    background: "transparent",
+    cursor: "pointer",
+    textAlign: "left",
+    padding: "0 6px",
+    height: CHIP_HEIGHT,
+    lineHeight: `${CHIP_HEIGHT}px`,
+    fontSize: 11,
+    fontWeight: 600,
+    fontFamily: "inherit",
+    color: theme.textMuted,
+  };
+}
+
 /** A single static month grid, rendered with plain DOM elements. */
-export function MonthView({
+export function MonthView<T = unknown>({
   date,
   weekStartsOn = 0,
+  events,
+  renderEvent,
+  maxVisibleEventCount = 3,
+  moreLabel = "{moreCount} more",
+  onPressEvent,
+  onPressMore,
   selectedRange,
   selectedDates,
   showAdjacentMonths = true,
@@ -154,8 +284,27 @@ export function MonthView({
   onPressDay,
   className,
   style,
-}: MonthViewProps) {
+}: MonthViewProps<T>) {
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
+
+  // Calendar layout (date in the corner + event chips) is on whenever `events`
+  // is provided; otherwise the compact picker badge layout is used.
+  const eventsMode = events !== undefined;
+  const eventsByDay = useMemo(() => {
+    const map = new Map<string, CalendarEvent<T>[]>();
+    for (const event of events ?? []) {
+      for (const key of eventDayKeys(event)) {
+        const list = map.get(key);
+        if (list) list.push(event);
+        else map.set(key, [event]);
+      }
+    }
+    return map;
+  }, [events]);
+  const Chip = renderEvent;
+  // Reserve `maxVisibleEventCount` rows below the date so every cell is uniform;
+  // when a day overflows, the last row becomes the "+N more" affordance.
+  const eventRowHeight = CELL_PAD * 2 + DATE_ROW + maxVisibleEventCount * (CHIP_HEIGHT + CHIP_GAP);
   const { weeks, weekdays } = useMemo(
     () =>
       buildMonthGrid(date, {
@@ -249,17 +398,82 @@ export function MonthView({
           >
             {week.days.map((day) => {
               const hidden = !showAdjacentMonths && !day.isCurrentMonth;
+              const cellHeight = eventsMode ? eventRowHeight : theme.cellHeight;
               if (hidden) {
+                return (
+                  <div key={day.id} role="gridcell" aria-hidden style={{ height: cellHeight }} />
+                );
+              }
+              const band = rangeBandStyle(day, theme, fillCellOnSelection);
+              const label = format(day.date, "EEEE, d MMMM yyyy", locale ? { locale } : undefined);
+
+              if (eventsMode) {
+                const dayEvents = eventsByDay.get(startOfDay(day.date).toISOString()) ?? [];
+                const overflow = dayEvents.length > maxVisibleEventCount;
+                const shown = overflow ? dayEvents.slice(0, maxVisibleEventCount - 1) : dayEvents;
+                const rest = dayEvents.slice(shown.length);
                 return (
                   <div
                     key={day.id}
                     role="gridcell"
-                    aria-hidden
-                    style={{ height: theme.cellHeight }}
-                  />
+                    data-day={day.id}
+                    tabIndex={day.id === focusKey ? 0 : -1}
+                    aria-disabled={day.isDisabled || undefined}
+                    aria-label={label}
+                    style={eventCellStyle(day, theme, cellHeight)}
+                    onClick={day.isDisabled ? undefined : () => onPressDay?.(day.date)}
+                    onKeyDown={
+                      day.isDisabled
+                        ? undefined
+                        : (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              onPressDay?.(day.date);
+                            }
+                          }
+                    }
+                  >
+                    {band ? <span data-band aria-hidden style={band} /> : null}
+                    <span style={compactBadgeStyle(day, theme)}>{day.label}</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: CHIP_GAP }}>
+                      {shown.map((event, i) => {
+                        const onPress = () => onPressEvent?.(event);
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onPress();
+                            }}
+                            style={chipButtonStyle}
+                            title={event.title}
+                          >
+                            {Chip ? (
+                              <Chip event={event} onPress={onPress} />
+                            ) : (
+                              <span style={chipStyle(theme)}>{event.title}</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                      {overflow ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onPressMore?.(rest, day.date);
+                          }}
+                          style={moreButtonStyle(theme)}
+                        >
+                          {moreLabel.replace("{moreCount}", String(rest.length))}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
                 );
               }
-              const band = rangeBandStyle(day, theme, fillCellOnSelection);
+
               return (
                 <button
                   key={day.id}
@@ -268,11 +482,7 @@ export function MonthView({
                   data-day={day.id}
                   tabIndex={day.id === focusKey ? 0 : -1}
                   aria-disabled={day.isDisabled || undefined}
-                  aria-label={format(
-                    day.date,
-                    "EEEE, d MMMM yyyy",
-                    locale ? { locale } : undefined,
-                  )}
+                  aria-label={label}
                   aria-pressed={day.isSelected || day.isInRange}
                   style={dayCellStyle(day, theme)}
                   onClick={day.isDisabled ? undefined : () => onPressDay?.(day.date)}
