@@ -60,6 +60,7 @@ export { expandRecurringEvents } from "@super-calendar/core";
 export { eventsInTimeZone, toZonedTime } from "@super-calendar/core";
 export {
   buildMonthWeeks,
+  getViewDays,
   getWeekDays,
   getIsToday,
   isWeekend,
