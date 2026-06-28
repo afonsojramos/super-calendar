@@ -66,7 +66,6 @@ export function Agenda<T>({
         return (
           <Text
             style={[
-              theme.text.weekday,
               styles.header,
               { color: isHighlighted ? theme.colors.todayBackground : theme.colors.textMuted },
             ]}
@@ -92,6 +91,10 @@ export function Agenda<T>({
     [theme, locale, activeDate, onPressDay, onPressEvent, onLongPressEvent, RenderEventComponent],
   );
 
+  if (rows.length === 0) {
+    return <Text style={[styles.empty, { color: theme.colors.textMuted }]}>No events</Text>;
+  }
+
   return (
     <LegendList
       style={styles.list}
@@ -112,6 +115,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    fontSize: 13,
+    fontWeight: "600",
     paddingTop: 12,
     paddingBottom: 4,
     paddingHorizontal: 12,
@@ -119,5 +124,10 @@ const styles = StyleSheet.create({
   eventRow: {
     paddingHorizontal: 12,
     paddingVertical: 2,
+  },
+  empty: {
+    fontSize: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
   },
 });

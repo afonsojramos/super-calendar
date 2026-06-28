@@ -74,6 +74,10 @@ export function DefaultEvent<T>({
   // returns 1 for the single-line contexts and undefined for the wrapping ones.
   const fixedTitleLines = titleNumberOfLines(mode, isAllDayEvent);
 
+  // The schedule view is a list, not a grid, so its rows are a roomier card with
+  // a larger title and time, mirroring the dom renderer's default agenda row.
+  const isSchedule = mode === "schedule";
+
   // Whole-line title clamp + time visibility, recomputed on the UI thread as the
   // box grows or shrinks with pinch-zoom, so the title never shows a half-cut
   // line and the secondary time only appears once a full line is free below it.
@@ -105,6 +109,7 @@ export function DefaultEvent<T>({
     <TouchableOpacity
       style={[
         styles.box,
+        isSchedule && styles.scheduleBox,
         { backgroundColor: theme.colors.eventBackground },
         event.disabled && styles.disabled,
         cellStyle,
@@ -120,7 +125,11 @@ export function DefaultEvent<T>({
         fixedTitleLines == null ? (
           <Animated.View style={[styles.titleClip, titleClipStyle]}>
             <Text
-              style={[theme.text.eventTitle, { color: theme.colors.eventText }]}
+              style={[
+                theme.text.eventTitle,
+                isSchedule && styles.scheduleTitle,
+                { color: theme.colors.eventText },
+              ]}
               ellipsizeMode={ellipsizeMode}
               allowFontScaling={false}
             >
@@ -129,7 +138,12 @@ export function DefaultEvent<T>({
           </Animated.View>
         ) : (
           <Text
-            style={[theme.text.eventTitle, styles.title, { color: theme.colors.eventText }]}
+            style={[
+              theme.text.eventTitle,
+              styles.title,
+              isSchedule && styles.scheduleTitle,
+              { color: theme.colors.eventText },
+            ]}
             // Month cells and the all-day lane are compact: a single clipped line.
             numberOfLines={fixedTitleLines}
             ellipsizeMode={ellipsizeMode}
@@ -142,7 +156,11 @@ export function DefaultEvent<T>({
       {timeLabel ? (
         <Animated.View style={timeStyle}>
           <Text
-            style={[styles.time, { color: theme.colors.eventText }]}
+            style={[
+              styles.time,
+              isSchedule && styles.scheduleTime,
+              { color: theme.colors.eventText },
+            ]}
             // Wrap rather than clip horizontally: a narrow column shows the full
             // range across two lines instead of a cut-off "11:00 - 1".
             numberOfLines={2}
@@ -169,6 +187,22 @@ const styles = StyleSheet.create({
     paddingVertical: BOX_PADDING_V,
     paddingHorizontal: 4,
     overflow: "hidden",
+  },
+  // The roomy schedule-row card, matching the dom default agenda row.
+  scheduleBox: {
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  scheduleTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 18,
+  },
+  scheduleTime: {
+    fontSize: 13,
+    lineHeight: 18,
+    opacity: 0.75,
   },
   // Clips the wrapped title to the animated whole-line max-height.
   titleClip: {
