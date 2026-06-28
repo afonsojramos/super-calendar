@@ -14,7 +14,8 @@ Both renderers depend on core via `workspace:*`. The npm slug and repo are `reac
 
 - This is a library, so customizability is key, but good defaults are equally important. Expose props, theme tokens, and render overrides for flexibility, while making the zero-config path look and behave well out of the box.
 - Treat the public API (the package `exports`) as a contract: don't make breaking changes casually.
-- Document the public API only (exports from each package). Any time you change a public API, update the docs in the same change: `docs/` (Mintlify `.mdx`), `docs/reference/api.mdx`, and the package `README.md`.
+- Keep the dom and native public surfaces aligned. For the shared components (`MonthView`, `MonthList`, `TimeGrid`), a prop added on one renderer should carry the same name on the other; a genuinely web-only prop is allowed but must be allowlisted in `tests/renderer-parity.test.ts`, which guards `dom ⊆ native ∪ platform`. Native is the reference and may carry extra RN-only props (Agenda, MonthPager, styling). The `Calendar` wrappers differ by design and aren't parity-checked, so mirror shared additions there by hand.
+- Document the public API only (exports from each package). At the end of any piece of work, check whether it changed the public API or behavior; if so, update the docs in the same change before calling it done: `docs/` (Mintlify `.mdx`), `docs/reference/api.mdx`, and the package `README.md`.
 - Core stays render-agnostic. Don't import `react-dom` or `react-native` into `packages/core`, and don't pull a renderer's peers into core.
 
 ## Project specifics to watch
