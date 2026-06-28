@@ -196,7 +196,8 @@ function MonthViewInner<T>({
               borderRightWidth: StyleSheet.hairlineWidth,
               borderColor: theme.colors.gridLine,
             },
-            isWeekend(day) && { backgroundColor: theme.colors.weekendBackground },
+            // No weekend tint on blank placeholders, so the shading doesn't bleed
+            // into the empty cells of non-existent days.
           ]}
         />
       );
