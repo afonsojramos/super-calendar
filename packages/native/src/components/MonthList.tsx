@@ -503,11 +503,11 @@ function MonthListInner<T>({
   return (
     <CalendarSelectionProvider value={selection}>
       <View style={styles.container}>
-        <View style={styles.weekdayHeader}>
+        <View style={[styles.weekdayHeader, { borderBottomColor: theme.colors.gridLine }]}>
           {weekDays.map((day) => (
             <Text
               key={day.toISOString()}
-              style={[theme.text.weekday, styles.weekdayLabel, { color: theme.colors.textMuted }]}
+              style={[styles.weekdayLabel, { color: theme.colors.textMuted }]}
               allowFontScaling={false}
             >
               {format(day, "EEE", { locale })}
@@ -561,6 +561,10 @@ const styles = StyleSheet.create({
   monthHeader: { justifyContent: "center" },
   monthTitle: { paddingHorizontal: 8 },
   grid: { flex: 1 },
-  weekdayHeader: { flexDirection: "row", paddingBottom: 4 },
-  weekdayLabel: { flex: 1, textAlign: "center" },
+  weekdayHeader: {
+    flexDirection: "row",
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  weekdayLabel: { flex: 1, textAlign: "center", fontSize: 12, fontWeight: "600" },
 });
