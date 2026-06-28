@@ -60,6 +60,11 @@ export type CalendarProps<T> = {
   onDragStart?: EventDragStartHandler<T>;
   /** Minutes a drag-to-move/resize snaps to. Default 15. */
   dragStepMinutes?: number;
+  /**
+   * Show the resize grip on draggable events. Default true. Set false to keep
+   * drag-to-move and drag-to-resize working while hiding the visible indicator.
+   */
+  showDragHandle?: boolean;
   /** Tap a day cell (month mode) — e.g. drill into the day view. */
   onPressDay?: (date: Date) => void;
   /** Long-press a day cell (month mode). */
@@ -237,6 +242,7 @@ export function Calendar<T>({
   onDragEvent,
   onDragStart,
   dragStepMinutes,
+  showDragHandle,
   onPressDay,
   onLongPressDay,
   onPressMore,
@@ -433,6 +439,7 @@ export function Calendar<T>({
           onPressEvent={handlePressEvent}
           onLongPressEvent={handleLongPressEvent}
           onDragEvent={onDragEvent}
+          showDragHandle={showDragHandle}
           onDragStart={onDragStart}
           dragStepMinutes={dragStepMinutes}
           onPressCell={onPressCell}

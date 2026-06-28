@@ -174,6 +174,7 @@ type AnimatedEventBoxProps<T> = {
   onLongPress?: (event: CalendarEvent<T>) => void;
   onDragEvent?: EventDragHandler<T>;
   onDragStart?: EventDragStartHandler<T>;
+  showDragHandle: boolean;
 };
 
 function AnimatedEventBox<T>({
@@ -192,6 +193,7 @@ function AnimatedEventBox<T>({
   onLongPress,
   onDragEvent,
   onDragStart,
+  showDragHandle,
 }: AnimatedEventBoxProps<T>) {
   const RenderEventComponent = renderEvent;
   const theme = useCalendarTheme();
@@ -377,7 +379,11 @@ function AnimatedEventBox<T>({
       {resizable ? (
         <GestureDetector gesture={resizeGesture}>
           <Animated.View style={styles.resizeHandle}>
-            <View style={[styles.resizeGrip, { backgroundColor: theme.colors.eventText }]} />
+            {/* The grip is the only visible drag affordance; hiding it keeps the
+                resize gesture working but removes the indicator. */}
+            {showDragHandle ? (
+              <View style={[styles.resizeGrip, { backgroundColor: theme.colors.eventText }]} />
+            ) : null}
           </Animated.View>
         </GestureDetector>
       ) : null}
@@ -575,6 +581,7 @@ type TimetablePageProps<T> = {
   renderEvent: RenderEvent<T>;
   keyExtractor: EventKeyExtractor<T>;
   snapMinutes: number;
+  showDragHandle: boolean;
   onPressEvent: (event: CalendarEvent<T>) => void;
   onLongPressEvent?: (event: CalendarEvent<T>) => void;
   onDragEvent?: EventDragHandler<T>;
@@ -618,6 +625,7 @@ function TimetablePageInner<T>({
   renderEvent,
   keyExtractor,
   snapMinutes,
+  showDragHandle,
   onPressEvent,
   onLongPressEvent,
   onDragEvent,
@@ -1033,6 +1041,7 @@ function TimetablePageInner<T>({
                       mode={mode}
                       renderEvent={renderEvent}
                       snapMinutes={snapMinutes}
+                      showDragHandle={showDragHandle}
                       onPress={onPressEvent}
                       onLongPress={onLongPressEvent}
                       onDragEvent={onDragEvent}
@@ -1137,6 +1146,11 @@ export type TimeGridProps<T> = {
   resetPageOnPressCell?: boolean;
   /** Minutes a drag-to-move/resize snaps to. Default 15. */
   dragStepMinutes?: number;
+  /**
+   * Show the resize grip on draggable events. Default true. Set false to keep
+   * drag-to-move and drag-to-resize working while hiding the visible indicator.
+   */
+  showDragHandle?: boolean;
   onPressEvent: (event: CalendarEvent<T>) => void;
   onLongPressEvent?: (event: CalendarEvent<T>) => void;
   /**
@@ -1193,6 +1207,7 @@ function TimeGridInner<T>({
   activeDate,
   resetPageOnPressCell = false,
   dragStepMinutes = DEFAULT_DRAG_STEP_MINUTES,
+  showDragHandle = true,
   onPressEvent,
   onLongPressEvent,
   onDragEvent,
@@ -1371,6 +1386,7 @@ function TimeGridInner<T>({
           renderEvent={renderEvent}
           keyExtractor={keyExtractor}
           snapMinutes={Math.max(1, dragStepMinutes)}
+          showDragHandle={showDragHandle}
           onPressEvent={onPressEvent}
           onLongPressEvent={onLongPressEvent}
           onDragEvent={onDragEvent}
@@ -1413,6 +1429,7 @@ function TimeGridInner<T>({
       renderEvent,
       keyExtractor,
       dragStepMinutes,
+      showDragHandle,
       onPressEvent,
       onLongPressEvent,
       onDragEvent,
