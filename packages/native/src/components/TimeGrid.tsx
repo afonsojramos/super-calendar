@@ -1596,7 +1596,7 @@ const DefaultHeader = ({
   const dayWidth = (width - hourColumnWidth) / days.length;
 
   return (
-    <View style={styles.headerRow}>
+    <View style={[styles.headerRow, { borderBottomColor: theme.colors.gridLine }]}>
       <View style={[styles.weekNumberGutter, { width: hourColumnWidth }]}>
         {showWeekNumber && hourColumnWidth > 0 && days[0] ? (
           <Text
@@ -1689,6 +1689,7 @@ const styles = StyleSheet.create({
     // paddingVertical provides the spacing, matching the dom renderer (no extra
     // bottom padding that would push the content up).
     alignItems: "center",
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   weekNumberGutter: {
     alignItems: "center",
