@@ -33,13 +33,14 @@ they resolve to the single copy your app already uses.
 
 | Export      | Renders                                                                   |
 | ----------- | ------------------------------------------------------------------------- |
-| `Calendar`  | Batteries-included: picks the view from `mode` (`month` or a time grid).  |
+| `Calendar`  | Batteries-included: picks the view from `mode` (month, schedule, grid).   |
 | `TimeGrid`  | A day/week/N-day time grid with an all-day lane and a now line.           |
+| `Agenda`    | A day-grouped, scrolling list of events: the schedule view.               |
 | `MonthList` | A scrolling, virtualized month: a date picker, or a calendar with events. |
 | `MonthView` | A single month grid: compact picker, or a calendar with event chips.      |
 
-`Calendar` mirrors the React Native component's API for the views that exist on
-the web (there is no `schedule`/Agenda here). You can also drop down to the
+`Calendar` mirrors the React Native component's API across every view, including
+`mode="schedule"` (the `Agenda` list). You can also drop down to the
 individual views. The selection hook (`useDateRange`) and grid helpers
 (`useMonthGrid`, `buildMonthGrid`, `layoutDayEvents`) are re-exported from the
 core, so you import everything from one place.
@@ -48,9 +49,9 @@ The month views take an optional `events` prop: pass it (even `[]`) and the grid
 switches from the compact picker look to a calendar layout with event chips and a
 "+N more" overflow; omit it for the picker. `TimeGrid` supports `businessHours`
 shading, `timeslots`, `onPressCell`, drag-to-create (`onCreateEvent`), and
-drag-to-move/resize (`onDragEvent`, which can return `false` to reject a drop). A
-focused day column is keyboard-operable: Enter or Space fires `onPressCell` (or
-`onCreateEvent`) at the visible time, so creating isn't pointer-only.
+drag-to-move/resize (`onDragEvent`, which can return `false` to reject a drop).
+Creating on empty space is pointer-only (drag to sweep out a range); see
+[Keyboard navigation](#keyboard-navigation) for how focus moves.
 
 ## The Calendar wrapper
 
@@ -77,10 +78,34 @@ export function App() {
 }
 ```
 
-Switch `mode` to `"month"` for a month grid with event chips, or `"day"` /
-`"3days"` / `"custom"` (with `numberOfDays`) for the time grid. Custom rendering
-splits by view: `renderTimeEvent` for the time grid and `renderMonthEvent` for
-month chips.
+Switch `mode` to `"month"` for a month grid with event chips, `"schedule"` for a
+day-grouped agenda list, or `"day"` / `"3days"` / `"custom"` (with `numberOfDays`)
+for the time grid. Custom rendering splits by view: `renderTimeEvent` for the time
+grid, `renderMonthEvent` for month chips, and `renderScheduleEvent` for agenda
+rows.
+
+## Schedule (agenda)
+
+`mode="schedule"` (or the `Agenda` component directly) renders a scrolling list of
+events grouped under a date header per day, sorted by start. It does not window
+by `date`: it shows exactly the `events` you pass, so you control the range. Each
+row defaults to a time + title; override it with `renderScheduleEvent`.
+
+```tsx
+import { Agenda, type CalendarEvent } from "@super-calendar/dom";
+
+const events: CalendarEvent[] = [
+  { title: "Standup", start: new Date(2026, 5, 23, 9, 0), end: new Date(2026, 5, 23, 9, 30) },
+  { title: "Lunch", start: new Date(2026, 5, 23, 12, 0), end: new Date(2026, 5, 23, 13, 0) },
+];
+
+<Agenda
+  events={events}
+  height={520}
+  onPressEvent={(event) => console.log(event.title)}
+  onPressDay={(day) => console.log("header", day)}
+/>;
+```
 
 ## A time grid and a range picker
 
@@ -132,6 +157,48 @@ Selection works as in the native [Date selection](/guides/selection) guide:
 `selectedRange` (or `selectedDates`) plus `minDate` / `maxDate` /
 `isDateDisabled` to `MonthList`. Selection is driven by clicking days; the
 react-dom renderer does not implement pointer drag-select.
+
+## Keyboard navigation
+
+Tab moves through **events only**. Empty day columns (time grid) and empty day
+cells (month) are not tab stops, so keyboard focus lands on each event in turn
+rather than stopping on every blank cell. Events are buttons: Enter or Space
+activates them (`onPressEvent`).
+
+This is a deliberate default. The alternative, making every empty cell focusable,
+turns a week into seven tab stops before the first event and a month into dozens.
+Creating on empty space stays pointer-only (drag to sweep out a range); if you
+want a keyboard way to add an event, render your own "New event" button.
+
+Two cases keep full day-cell navigation:
+
+- The **date picker** (`MonthList` or `MonthView` rendered without `events`) is
+  always keyboard-navigable: one roving tab stop per month, arrow keys move the
+  focus, Enter selects the day. Date selection is the whole point there.
+- **Month with events**, opt in with `keyboardDayNavigation` to add the same
+  roving day focus on top of the event chips, so Enter on a focused day opens it
+  (`onPressDay`). It is off by default.
+
+```tsx
+import { Calendar, type CalendarEvent } from "@super-calendar/dom";
+
+const events: CalendarEvent[] = [
+  { title: "Standup", start: new Date(2026, 5, 23, 9, 0), end: new Date(2026, 5, 23, 9, 30) },
+];
+
+// Month view where arrow keys also move a roving day focus (Enter opens the day).
+<Calendar
+  mode="month"
+  date={new Date()}
+  events={events}
+  keyboardDayNavigation
+  onPressDay={(day) => console.log("open day", day)}
+/>;
+```
+
+`keyboardDayNavigation` is a web-only concern, so it exists on the react-dom
+`Calendar`, `MonthView`, and `MonthList` only. The React Native renderer pages
+with the arrow keys on react-native-web instead.
 
 ## Theming
 

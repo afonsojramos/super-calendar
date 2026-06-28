@@ -41,6 +41,11 @@ selects an event and a right-click still opens a context menu. Dragging empty
 space creates an event (scroll with the wheel); press **Escape** to cancel a
 sweep.
 
+Keyboard focus (**Tab**) moves through events only. Empty day cells and time-grid
+columns are deliberately not tab stops, so focus doesn't stop on every blank day,
+matching the [react-dom renderer](/guides/dom). The month-grid date picker
+(rendered without events) stays fully day-navigable for selection.
+
 ## Portaling overlays
 
 <Warning>
