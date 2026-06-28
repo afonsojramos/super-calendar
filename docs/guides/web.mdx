@@ -1,9 +1,18 @@
 ---
-title: Web
-description: Running on react-native-web, with gestures mapped to mouse and keyboard.
+title: React Native on the web
+sidebarTitle: react-native-web
+description: Run the React Native package in the browser with react-native-web.
 ---
 
-The calendar runs on
+There are two ways to put the calendar in a browser:
+
+- **[`@super-calendar/dom`](/guides/dom)** is a pure react-dom renderer with no
+  React Native in the tree. Choose it for web-only or web-first apps.
+- **`@super-calendar/native` on react-native-web** runs the same React Native
+  code in the browser. Choose it when you already ship a native app and want one
+  codebase. The rest of this page covers that path.
+
+The native package runs on
 [react-native-web](https://necolas.github.io/react-native-web/); its
 dependencies (Legend List v3, Reanimated, Gesture Handler) all support the web.
 See it running on the [live demo](/demo).
@@ -14,7 +23,7 @@ See it running on the [live demo](/demo).
 npx expo install react-dom react-native-web @expo/metro-runtime
 ```
 
-The runnable [`example/`](https://github.com/afonsojramos/react-native-super-calendar/tree/main/example)
+The runnable [`examples/native`](https://github.com/afonsojramos/react-native-super-calendar/tree/main/examples/native)
 builds with `expo start --web`.
 
 ## Gestures on the web

@@ -1,0 +1,156 @@
+---
+title: react-dom renderer
+description: A pure react-dom calendar with no React Native runtime, from @super-calendar/dom.
+---
+
+`@super-calendar/dom` renders the calendar with real DOM elements. There is no
+React Native and no react-native-web in the tree: it builds on the same headless
+core as the native package and on Legend List's DOM renderer. Reach for it when
+your app is web-only, or web-first, and you don't want to pull a React Native
+runtime into the bundle.
+
+If you already ship a React Native app and want one codebase that also runs in
+the browser, use [`@super-calendar/native` on react-native-web](/guides/web)
+instead.
+
+## Install
+
+<CodeGroup>
+```bash npm
+npm install @super-calendar/dom react react-dom @legendapp/list date-fns
+```
+
+```bash pnpm
+pnpm add @super-calendar/dom react react-dom @legendapp/list date-fns
+```
+
+</CodeGroup>
+
+`react`, `react-dom`, `@legendapp/list`, and `date-fns` are peer dependencies, so
+they resolve to the single copy your app already uses.
+
+## What it renders
+
+| Export      | Renders                                                                   |
+| ----------- | ------------------------------------------------------------------------- |
+| `Calendar`  | Batteries-included: picks the view from `mode` (`month` or a time grid).  |
+| `TimeGrid`  | A day/week/N-day time grid with an all-day lane and a now line.           |
+| `MonthList` | A scrolling, virtualized month: a date picker, or a calendar with events. |
+| `MonthView` | A single month grid: compact picker, or a calendar with event chips.      |
+
+`Calendar` mirrors the React Native component's API for the views that exist on
+the web (there is no `schedule`/Agenda here). You can also drop down to the
+individual views. The selection hook (`useDateRange`) and grid helpers
+(`useMonthGrid`, `buildMonthGrid`, `layoutDayEvents`) are re-exported from the
+core, so you import everything from one place.
+
+The month views take an optional `events` prop: pass it (even `[]`) and the grid
+switches from the compact picker look to a calendar layout with event chips and a
+"+N more" overflow; omit it for the picker. `TimeGrid` supports `businessHours`
+shading, `timeslots`, `onPressCell`, drag-to-create (`onCreateEvent`), and
+drag-to-move/resize (`onDragEvent`, which can return `false` to reject a drop). A
+focused day column is keyboard-operable: Enter or Space fires `onPressCell` (or
+`onCreateEvent`) at the visible time, so creating isn't pointer-only.
+
+## The Calendar wrapper
+
+The quickest start mirrors the native component: pick a `mode` and pass events.
+
+```tsx
+import { Calendar, type CalendarEvent } from "@super-calendar/dom";
+
+const events: CalendarEvent[] = [
+  { title: "Standup", start: new Date(2026, 5, 23, 9, 0), end: new Date(2026, 5, 23, 9, 30) },
+];
+
+export function App() {
+  return (
+    <Calendar
+      mode="week"
+      date={new Date()}
+      events={events}
+      weekStartsOn={1}
+      height={520}
+      onPressEvent={(event) => console.log(event.title)}
+    />
+  );
+}
+```
+
+Switch `mode` to `"month"` for a month grid with event chips, or `"day"` /
+`"3days"` / `"custom"` (with `numberOfDays`) for the time grid. Custom rendering
+splits by view: `renderTimeEvent` for the time grid and `renderMonthEvent` for
+month chips.
+
+## A time grid and a range picker
+
+```tsx
+import { useMemo } from "react";
+import { type CalendarEvent, MonthList, TimeGrid, useDateRange } from "@super-calendar/dom";
+
+const events: CalendarEvent[] = [
+  { title: "Standup", start: new Date(2026, 5, 23, 9, 0), end: new Date(2026, 5, 23, 9, 30) },
+  {
+    title: "Design review",
+    start: new Date(2026, 5, 23, 9, 15),
+    end: new Date(2026, 5, 23, 10, 30),
+  },
+];
+
+export function App() {
+  const today = useMemo(() => new Date(), []);
+  const { range, onPressDate, reset } = useDateRange({ minDate: today });
+
+  return (
+    <>
+      <TimeGrid date={today} mode="week" weekStartsOn={1} events={events} height={480} />
+
+      <MonthList
+        date={today}
+        minDate={today}
+        weekStartsOn={1}
+        selectedRange={range ?? undefined}
+        onPressDay={onPressDate}
+        height={420}
+      />
+      <button type="button" onClick={reset}>
+        Clear
+      </button>
+    </>
+  );
+}
+```
+
+`TimeGrid` and `MonthList` take an explicit `height` because they virtualize and
+scroll inside that box. Everything else (events, selection, week start) matches
+the native API, since both renderers share the core types.
+
+## Selection
+
+Selection works as in the native [Date selection](/guides/selection) guide:
+`useDateRange` returns `range` and an `onPressDate` handler, and you pass
+`selectedRange` (or `selectedDates`) plus `minDate` / `maxDate` /
+`isDateDisabled` to `MonthList`. Selection is driven by clicking days; the
+react-dom renderer does not implement pointer drag-select.
+
+## Theming
+
+The DOM theme is a flat object of colors plus a few metrics, separate from the
+React Native `CalendarTheme` (which carries `TextStyle`/`ViewStyle`). Both derive
+their colors from the same core tokens, so the palettes match and the
+[color-token list](/guides/theming#color-tokens) applies here too (just flat,
+not nested under `colors`).
+
+```tsx
+import { darkDomTheme, mergeDomTheme, TimeGrid } from "@super-calendar/dom";
+
+// mergeDomTheme(overrides, base?) — base defaults to defaultDomTheme.
+const brand = mergeDomTheme({ selectedBackground: "#7c3aed", cellHeight: 56 });
+
+<TimeGrid date={new Date()} mode="day" theme={brand} height={480} />;
+// or pass `theme={darkDomTheme}` for dark mode
+```
+
+See it running on the [live demo](/demo) and in the
+[`examples/web`](https://github.com/afonsojramos/react-native-super-calendar/tree/main/examples/web)
+Vite app.

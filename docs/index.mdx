@@ -1,13 +1,23 @@
 ---
-title: react-native-super-calendar
+title: super-calendar
 sidebarTitle: Overview
 description: A gesture-driven, virtualized calendar for React Native and the web.
 ---
 
-A calendar for React Native (and react-native-web) built on Reanimated 4, Gesture
-Handler, and Legend List. It renders month, week, day, 3-day, and schedule views,
-virtualizes and snap-pages every view, and leans into touch: pinch-to-zoom, drag
-to move and resize, and drag to create.
+A calendar for React Native and the web, built on a render-agnostic core. It
+renders month, week, day, 3-day, and schedule views, virtualizes and snap-pages
+every view, and leans into touch: pinch-to-zoom, drag to move and resize, and
+drag to create.
+
+It ships as three packages:
+
+- **`@super-calendar/native`** — the React Native renderer (Reanimated 4, Gesture
+  Handler, Legend List). This is what most of these docs cover.
+- **`@super-calendar/dom`** — a pure react-dom renderer with no React Native
+  runtime, for web-only or web-first apps. See the
+  [react-dom renderer](/guides/dom) guide.
+- **`@super-calendar/core`** — the platform-free logic, types, and hooks both
+  renderers share. See [Headless usage](/guides/headless).
 
 It's an homage to
 [react-native-big-calendar](https://github.com/acroca/react-native-big-calendar),
@@ -17,7 +27,7 @@ not a fork — the API differs and the internals are new. The date-picker surfac
 if you want a standalone, headless picker rather than a full calendar.
 
 <Frame caption="The week view: events, business-hours shading, and the current-time line.">
-  <img src="/images/hero.png" alt="react-native-super-calendar week view" />
+  <img src="/images/hero.png" alt="super-calendar week view" />
 </Frame>
 
 <CardGroup cols={2}>
@@ -32,6 +42,9 @@ if you want a standalone, headless picker rather than a full calendar.
   </Card>
   <Card title="API reference" icon="code" href="/reference/api">
     Every `<Calendar>` prop and exported helper.
+  </Card>
+  <Card title="react-dom renderer" icon="globe" href="/guides/dom">
+    Run in the browser with no React Native runtime.
   </Card>
 </CardGroup>
 
@@ -48,12 +61,13 @@ if you want a standalone, headless picker rather than a full calendar.
 - **Recurring events**, **time-zone display**, and a **dark theme** preset.
 - **Bring-your-own event type** (`CalendarEvent<T>`) and a `renderEvent` escape
   hatch that works across every mode and event shape.
-- **Runs on the web** via react-native-web, with the touch gestures remapped to
-  mouse and keyboard.
+- **Runs on the web** two ways: a pure react-dom renderer
+  (`@super-calendar/dom`), or the React Native package on react-native-web with
+  the touch gestures remapped to mouse and keyboard.
 
 ## At a glance
 
-| Capability                                   | react-native-super-calendar                | react-native-big-calendar     |
+| Capability                                   | @super-calendar/native                     | react-native-big-calendar     |
 | -------------------------------------------- | ------------------------------------------ | ----------------------------- |
 | Month / week / day / 3-day / custom / agenda | ✅                                         | ✅                            |
 | Generic event typing (`CalendarEvent<T>`)    | ✅                                         | ✅                            |

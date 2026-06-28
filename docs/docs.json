@@ -25,9 +25,12 @@
           "guides/headless",
           "guides/recurring-events",
           "guides/time-zones",
-          "guides/theming",
-          "guides/web"
+          "guides/theming"
         ]
+      },
+      {
+        "group": "Web",
+        "pages": ["guides/dom", "guides/web"]
       },
       {
         "group": "Reference",
