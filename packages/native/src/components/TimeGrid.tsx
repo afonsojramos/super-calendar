@@ -646,9 +646,21 @@ function TimetablePageInner<T>({
   // emit onScroll events; letting those write `scrollY` could broadcast a transient
   // 0 to every page (the random "snaps to midnight" behaviour), so they're ignored.
   const isDragging = useSharedValue(false);
+  // Mirror `isActive` to a shared value so the scroll worklet reads the *current*
+  // active state. A plain `isActive` captured in the worklet goes stale, so only the
+  // page active when the handler was first created would record its scrolls — which
+  // is why a position set on a later page was lost and an earlier one came back.
+  const isActiveShared = useSharedValue(isActive);
+  useEffect(() => {
+    isActiveShared.value = isActive;
+  }, [isActive, isActiveShared]);
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
-      if (isActive && isDragging.value) {
+      // Native captures the active page's scroll on a real drag. (Web is handled by
+      // the container-level scroll listener in TimeGridInner, because LegendList
+      // recycles the page containers there and per-page `isActive` can't reliably
+      // tell which DOM node the user is actually scrolling.)
+      if (isActiveShared.value && isDragging.value) {
         // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
         scrollY.value = event.contentOffset.y;
       }
@@ -1265,6 +1277,9 @@ function TimeGridInner<T>({
   // The grid's outer view; on web its ref resolves to the DOM node we attach the
   // Ctrl/Cmd + scroll zoom listener to.
   const containerRef = useRef<View>(null);
+  // Web: ignore scroll events until this time (ms). Set around a page change so the
+  // recycle-reset and the offset-restore aren't mistaken for a user scroll.
+  const suppressCaptureUntilRef = useRef(0);
   // Horizontal list items need an explicit cross-axis height; seed it with the
   // window height (so it renders immediately and in tests) and refine on layout.
   const [pageHeight, setPageHeight] = useState(height);
@@ -1413,6 +1428,8 @@ function TimeGridInner<T>({
         }
       }
     };
+    // Don't capture the scroll events this transition emits (recycle-reset, restore).
+    suppressCaptureUntilRef.current = Date.now() + 400;
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => {
       restoreVisiblePage();
@@ -1426,6 +1443,29 @@ function TimeGridInner<T>({
     // height on first open (the mount pass runs before the pages have laid out).
     // eslint-disable-next-line react-hooks/exhaustive-deps -- containerRef/scrollY are stable
   }, [activeIndex, pageHeight]);
+
+  // Web: record the on-screen page's scroll into the shared offset on genuine user
+  // scrolls, so switching pages preserves the position. Programmatic scrolls (the
+  // recycle-reset and the restore above) are skipped via the suppression window, so
+  // they can't clobber it. Scoped to the visible page so off-screen sync is ignored.
+  useEffect(() => {
+    if (!isWeb) return;
+    const root = containerRef.current as unknown as HTMLElement | null;
+    if (!root) return;
+    const onScrollCapture = (event: Event) => {
+      if (Date.now() < suppressCaptureUntilRef.current) return;
+      const el = event.target as HTMLElement | null;
+      if (!el || typeof el.scrollTop !== "number" || el.clientHeight <= 100) return;
+      const rect = el.getBoundingClientRect();
+      const vw = (root.ownerDocument?.defaultView ?? globalThis).innerWidth;
+      if (rect.left <= -50 || rect.right > vw + 50) return;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      scrollY.value = el.scrollTop;
+    };
+    root.addEventListener("scroll", onScrollCapture, true);
+    return () => root.removeEventListener("scroll", onScrollCapture, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- containerRef/scrollY are stable
+  }, []);
 
   // Web arrow-key paging (swipe is disabled there); the effect above scrolls to
   // the new page once `onChangeDate` updates `date`.
