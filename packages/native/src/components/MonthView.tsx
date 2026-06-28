@@ -177,6 +177,10 @@ function MonthViewInner<T>({
     return map;
   }, [events, sortedMonthView]);
 
+  // Draw the day-cell grid only for an events calendar; the events-free date
+  // picker reads cleaner without it (matching the dom renderer).
+  const showGrid = events.length > 0;
+
   const renderDay = (day: Date) => {
     const isCurrentMonth = isSameMonth(day, date);
 
@@ -187,7 +191,11 @@ function MonthViewInner<T>({
           key={day.toISOString()}
           style={[
             styles.dayCell,
-            { borderColor: theme.colors.gridLine },
+            showGrid && {
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderRightWidth: StyleSheet.hairlineWidth,
+              borderColor: theme.colors.gridLine,
+            },
             isWeekend(day) && { backgroundColor: theme.colors.weekendBackground },
           ]}
         />
@@ -239,7 +247,11 @@ function MonthViewInner<T>({
         key={day.toISOString()}
         style={[
           styles.dayCell,
-          { borderColor: theme.colors.gridLine },
+          showGrid && {
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderRightWidth: StyleSheet.hairlineWidth,
+            borderColor: theme.colors.gridLine,
+          },
           isWeekend(day) && { backgroundColor: theme.colors.weekendBackground },
           calendarCellStyle?.(day),
         ]}
@@ -370,8 +382,6 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     gap: 2,
     overflow: "hidden",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderRightWidth: StyleSheet.hairlineWidth,
   },
   dateBadge: {
     justifyContent: "center",

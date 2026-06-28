@@ -62,6 +62,24 @@ describe("MonthView selection", () => {
   });
 });
 
+describe("MonthView grid", () => {
+  const borderOf = (n: { props: { style?: unknown } }) =>
+    StyleSheet.flatten(n.props.style as ViewStyle)?.borderTopWidth ?? 0;
+
+  it("draws no day-cell grid for the events-free picker", () => {
+    const { getByLabelText } = render(<MonthView {...baseProps} />); // events: []
+    expect(borderOf(getByLabelText(/15 June 2026/))).toBe(0);
+  });
+
+  it("draws the day-cell grid when there are events (calendar)", () => {
+    const events: CalendarEvent[] = [
+      { title: "X", start: new Date(2026, 5, 15, 9), end: new Date(2026, 5, 15, 10) },
+    ];
+    const { getByLabelText } = render(<MonthView {...baseProps} events={events} />);
+    expect(borderOf(getByLabelText(/15 June 2026/))).toBeGreaterThan(0);
+  });
+});
+
 describe("MonthView renderCustomDateForMonth", () => {
   it("replaces the default date badge with the custom renderer's output", () => {
     const { getByText, queryByText } = render(
