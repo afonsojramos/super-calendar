@@ -180,6 +180,7 @@ function eventCellStyle(day: MonthGridDay, theme: DomCalendarTheme, height: numb
   return {
     position: "relative",
     minHeight: height,
+    minWidth: 0,
     border: "none",
     borderTop: `1px solid ${theme.gridLine}`,
     background: day.isWeekend && !day.isInRange ? theme.weekendBackground : "transparent",
@@ -377,7 +378,7 @@ export function MonthView<T = unknown>({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(7, 1fr)",
+            gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
             borderBottom: `1px solid ${theme.gridLine}`,
             padding: "6px 0",
           }}

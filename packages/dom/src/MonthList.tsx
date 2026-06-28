@@ -107,7 +107,7 @@ export function MonthList<T = unknown>({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
+          gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
           borderBottom: `1px solid ${theme.gridLine}`,
           padding: "8px 0",
         }}

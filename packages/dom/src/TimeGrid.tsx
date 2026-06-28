@@ -553,7 +553,18 @@ export function TimeGrid<T = unknown>({
             return (
               <div
                 key={days[i].toISOString()}
-                style={{ flex: 1, padding: 2, display: "flex", flexDirection: "column", gap: 2 }}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  // Mirror the day column's geometry so the all-day chip lines up
+                  // exactly with the timed events below it: a 1px left border (the
+                  // grid line, transparent here) plus a 1px horizontal inset.
+                  borderLeft: "1px solid transparent",
+                  padding: "2px 1px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2,
+                }}
               >
                 {list.map((event) => {
                   const args: DomRenderEventArgs<T> = {
