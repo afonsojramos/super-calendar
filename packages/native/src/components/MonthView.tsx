@@ -26,7 +26,7 @@ import {
   isWeekend,
 } from "@super-calendar/core";
 import { monthEventCapacity, monthVisibleCount } from "@super-calendar/core";
-import { groupEventsByDay, isAllDayEvent } from "@super-calendar/core";
+import { compareDayEvents, groupEventsByDay, isAllDayEvent } from "@super-calendar/core";
 
 // Day-cell metrics, mirrored from the styles below, used to estimate how many
 // event chips fit when auto-fitting `maxVisibleEventCount`.
@@ -194,7 +194,8 @@ function MonthViewInner<T>({
   const eventsByDay = useMemo(() => {
     const map = groupEventsByDay(events);
     if (sortedMonthView) {
-      for (const list of map.values()) list.sort((a, b) => a.start.getTime() - b.start.getTime());
+      // All-day events head the day, then timed events by start (shared with dom).
+      for (const list of map.values()) list.sort(compareDayEvents);
     }
     return map;
   }, [events, sortedMonthView]);

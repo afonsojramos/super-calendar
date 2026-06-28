@@ -1,5 +1,6 @@
 import {
   closedHourBands,
+  compareDayEvents,
   eventDayKeys,
   groupEventsByDay,
   isAllDayEvent,
@@ -68,6 +69,44 @@ describe("groupEventsByDay", () => {
     expect(map.get(key(new Date(2026, 5, 27)))).toEqual([span]);
     // End at midnight of the 28th does not include the 28th.
     expect(map.get(key(new Date(2026, 5, 28)))).toBeUndefined();
+  });
+});
+
+describe("compareDayEvents", () => {
+  const timed = (h: number, title: string): CalendarEvent => ({
+    title,
+    start: new Date(2026, 5, 26, h),
+    end: new Date(2026, 5, 26, h + 1),
+  });
+  const allDay = (title: string): CalendarEvent => ({
+    title,
+    start: new Date(2026, 5, 26),
+    end: new Date(2026, 5, 27),
+    allDay: true,
+  });
+
+  it("puts all-day events before timed events", () => {
+    const morning = timed(9, "Morning");
+    const holiday = allDay("Holiday");
+    expect([morning, holiday].sort(compareDayEvents)).toEqual([holiday, morning]);
+  });
+
+  it("orders timed events by start time", () => {
+    const a = timed(9, "A");
+    const b = timed(14, "B");
+    expect([b, a].sort(compareDayEvents)).toEqual([a, b]);
+  });
+
+  it("keeps all-day events ahead even when their start is later in the day", () => {
+    // An explicit all-day flag wins regardless of the start clock time.
+    const lateAllDay: CalendarEvent = {
+      title: "All day",
+      start: new Date(2026, 5, 26, 15),
+      end: new Date(2026, 5, 26, 16),
+      allDay: true,
+    };
+    const early = timed(8, "Early");
+    expect([early, lateAllDay].sort(compareDayEvents)).toEqual([lateAllDay, early]);
   });
 });
 

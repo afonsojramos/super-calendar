@@ -4,6 +4,7 @@ import { type CSSProperties, useMemo } from "react";
 import {
   buildMonthGrid,
   type CalendarEvent,
+  compareDayEvents,
   type DateRange,
   type DateSelectionConstraints,
   groupEventsByDay,
@@ -97,7 +98,13 @@ export function MonthList<T = unknown>({
   );
 
   // Build the day→events index once for the whole list rather than per month.
-  const eventsByDay = useMemo(() => (events ? groupEventsByDay(events) : undefined), [events]);
+  const eventsByDay = useMemo(() => {
+    if (!events) return undefined;
+    const map = groupEventsByDay(events);
+    // Each day reads all-day events first, then timed events by start.
+    for (const list of map.values()) list.sort(compareDayEvents);
+    return map;
+  }, [events]);
 
   // Stable reference so LegendList only re-renders rows when selection or events
   // actually change, not on every parent render.

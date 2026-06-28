@@ -20,6 +20,7 @@ import {
   bandRounding,
   buildMonthGrid,
   type CalendarEvent,
+  compareDayEvents,
   dayBadgeKind,
   type DateRange,
   type DateSelectionConstraints,
@@ -318,10 +319,14 @@ export function MonthView<T = unknown>({
   const dayRoving = !eventsMode || keyboardDayNavigation;
   // Use the list-built index when provided (MonthList), else build it for this
   // month. Either way lookups use startOfDay(date).toISOString().
-  const eventsByDay = useMemo(
-    () => eventsByDayProp ?? groupEventsByDay(events ?? []),
-    [eventsByDayProp, events],
-  );
+  const eventsByDay = useMemo(() => {
+    // The list (MonthList) sorts before passing its index in; only sort here when
+    // building our own, so each day reads all-day events first, then by start.
+    if (eventsByDayProp) return eventsByDayProp;
+    const map = groupEventsByDay(events ?? []);
+    for (const list of map.values()) list.sort(compareDayEvents);
+    return map;
+  }, [eventsByDayProp, events]);
   const Chip = renderEvent;
   // Reserve `maxVisibleEventCount` rows below the date so every cell is uniform;
   // when a day overflows, the last row becomes the "+N more" affordance.

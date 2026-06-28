@@ -153,6 +153,19 @@ export function groupEventsByDay<T>(
 }
 
 /**
+ * Order a day's events for the month and list views: all-day events come first
+ * (they head the day regardless of their start time), then timed events by start.
+ * Shared by both renderers so the order is identical. Use as an `Array.sort`
+ * comparator.
+ */
+export function compareDayEvents<T>(a: CalendarEvent<T>, b: CalendarEvent<T>): number {
+  const aAllDay = isAllDayEvent(a);
+  const bAllDay = isAllDayEvent(b);
+  if (aAllDay !== bAllDay) return aAllDay ? -1 : 1;
+  return a.start.getTime() - b.start.getTime();
+}
+
+/**
  * The closed hour-spans of a day to shade on the time grid, given a
  * `businessHours` callback and the visible `[minHour, maxHour]` window: the spans
  * before open and after close (clamped to the window), the whole window when the
