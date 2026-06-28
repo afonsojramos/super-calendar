@@ -99,9 +99,12 @@ const MIN_EVENT_HEIGHT = 32;
 // Inset each event box within its slot so adjacent boxes (and column edges) get a
 // little breathing room instead of butting edge-to-edge.
 const EVENT_GAP = 2;
-// Hold this long before a drag-to-move begins on native, so a normal scroll/tap
-// isn't hijacked.
-const DRAG_ACTIVATE_MS = 220;
+// Hold this long before drag-to-create (sweeping empty grid space) begins on
+// native, so a normal scroll/tap isn't hijacked.
+const DRAG_ACTIVATE_MS = 300;
+// Moving an existing event takes a longer, deliberate hold, so a tap or scroll
+// over a busy day never picks one up by accident.
+const MOVE_ACTIVATE_MS = 500;
 // Web has no long-press, so a drag-to-move activates only after the pointer
 // moves this far vertically — below it a press stays a click (select /
 // right-click menu).
@@ -323,7 +326,7 @@ function AnimatedEventBox<T>({
       ? pan
           .activeOffsetX([-DRAG_ACTIVATE_PX, DRAG_ACTIVATE_PX])
           .activeOffsetY([-DRAG_ACTIVATE_PX, DRAG_ACTIVATE_PX])
-      : pan.activateAfterLongPress(DRAG_ACTIVATE_MS);
+      : pan.activateAfterLongPress(MOVE_ACTIVATE_MS);
   }, [
     draggable,
     snapMinutes,

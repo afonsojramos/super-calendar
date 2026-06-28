@@ -58,7 +58,7 @@ const DEFAULT_WEEK_ROW_HEIGHT = 56;
 const DEFAULT_EVENT_WEEK_ROW_HEIGHT = 96;
 // Drag-to-select: native holds to start (so a scroll/tap isn't hijacked) then
 // pans across months; nearing an edge auto-scrolls the list.
-const LONG_PRESS_MS = 250;
+const LONG_PRESS_MS = 500;
 const AUTOSCROLL_EDGE_PX = 64;
 const AUTOSCROLL_STEP_PX = 14;
 const AUTOSCROLL_INTERVAL_MS = 16;
