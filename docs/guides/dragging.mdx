@@ -23,6 +23,22 @@ day** (within the visible range). New `start`/`end` are snapped to
 />
 ```
 
+### Hide the drag handle
+
+By default a small grip shows at each draggable event's bottom edge. Set
+`showDragHandle={false}` to hide that indicator while keeping drag-to-move and
+drag-to-resize fully working, so events stay editable without the visual marker.
+
+```tsx
+<Calendar
+  /* ... */
+  showDragHandle={false}
+  onDragEvent={(event, start, end) =>
+    setEvents((prev) => prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)))
+  }
+/>
+```
+
 ### Reject a drop
 
 Return `false` from `onDragEvent` to refuse the new placement — the event snaps
