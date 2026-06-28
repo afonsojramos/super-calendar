@@ -1693,8 +1693,10 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: "row",
+    // Center the weekday/number block vertically; the day header's own symmetric
+    // paddingVertical provides the spacing, matching the dom renderer (no extra
+    // bottom padding that would push the content up).
     alignItems: "center",
-    paddingBottom: 8,
   },
   weekNumberGutter: {
     alignItems: "center",
