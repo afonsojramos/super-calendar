@@ -140,6 +140,9 @@ function MonthViewInner<T>({
   const RenderEventComponent = renderEvent;
   // Measured grid height, used to auto-fit the event chips per cell.
   const [gridHeight, setGridHeight] = useState(0);
+  // Web-only hover highlight on the day badge (mouse pointers); stays null on
+  // touch/native, so it never re-renders there. Mirrors the dom renderer.
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
   const weeks = useMemo(
     () => buildMonthWeeks(date, weekStartsOn, { showSixWeeks, isRTL }),
@@ -223,6 +226,9 @@ function MonthViewInner<T>({
     const isFilledBadge = dayBadgeKind({ isSelected }, isHighlighted) !== "none";
     const hasBand =
       rangeBandKind({ isInRange, isRangeStart, isRangeEnd }, fillCellOnSelection) !== "none";
+    const dayKey = day.toISOString();
+    // A hovered, non-filled day gets the subtle badge highlight on the web.
+    const isHovered = isWeb && !isDisabled && hoveredKey === dayKey;
     const dateColor = isDisabled
       ? theme.colors.textDisabled
       : isFilledBadge
@@ -259,12 +265,17 @@ function MonthViewInner<T>({
         onPress={handlePressDay}
         onLongPress={handleLongPressDay}
         disabled={isDisabled || (!onPressDay && !onLongPressDay)}
-        // Web drag-to-select: relay pointer down/enter so MonthList can extend a
-        // range as the pressed pointer sweeps across cells (native uses a pan).
-        {...(isWeb && !isDisabled && onDayPointerDown
+        // Web only: track hover for the badge highlight, and (when drag-select is
+        // wired) relay pointer down/enter so MonthList can extend a range as the
+        // pressed pointer sweeps across cells. Native uses a pan, no hover.
+        {...(isWeb && !isDisabled
           ? {
-              onPointerDown: () => onDayPointerDown(day),
-              onPointerEnter: () => onDayPointerEnter?.(day),
+              onPointerEnter: () => {
+                setHoveredKey(dayKey);
+                if (onDayPointerDown) onDayPointerEnter?.(day);
+              },
+              onPointerLeave: () => setHoveredKey((k) => (k === dayKey ? null : k)),
+              ...(onDayPointerDown ? { onPointerDown: () => onDayPointerDown(day) } : {}),
             }
           : null)}
         // A cell, not a button — it contains the event-chip buttons, and a nested
@@ -314,6 +325,11 @@ function MonthViewInner<T>({
                   : theme.colors.selectedBackground,
                 borderRadius: theme.todayBadgeRadius,
               },
+              isHovered &&
+                !isFilledBadge && {
+                  backgroundColor: theme.colors.hoverBackground,
+                  borderRadius: theme.todayBadgeRadius,
+                },
             ]}
           >
             <Text style={[theme.text.dateCell, { color: dateColor }]} allowFontScaling={false}>
