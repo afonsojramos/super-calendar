@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1](https://github.com/afonsojramos/super-calendar/compare/core-v2.1.0...core-v2.1.1) (2026-06-29)
+
+
+### Bug Fixes
+
+* correct package repository url to match renamed repo ([84ceb4b](https://github.com/afonsojramos/super-calendar/commit/84ceb4bebfd9d55ab2ed4d1ebd8fffa39deb2fe4))
+
 ## [2.1.0](https://github.com/afonsojramos/super-calendar/compare/core-v2.0.0...core-v2.1.0) (2026-06-29)
 
 
