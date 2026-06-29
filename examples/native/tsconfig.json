@@ -8,7 +8,8 @@
       "@super-calendar/native/picker": ["../../packages/native/src/picker.tsx"],
       "@super-calendar/core": ["../../packages/core/src/index.ts"],
       "@super-calendar/example-shared": ["../shared/src/EventMenu.tsx"],
-      "@super-calendar/example-shared/menu": ["../shared/src/EventMenuWrapper.tsx"]
+      "@super-calendar/example-shared/menu": ["../shared/src/EventMenuWrapper.tsx"],
+      "@super-calendar/example-shared/events": ["../shared/src/events.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"]

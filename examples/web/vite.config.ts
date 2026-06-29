@@ -19,6 +19,7 @@ export default defineConfig({
       "@super-calendar/core": path.join(root, "packages/core/src/index.ts"),
       "@super-calendar/example-shared/global.css": path.join(shared, "global.css"),
       "@super-calendar/example-shared/menu": path.join(shared, "EventMenuWrapper.tsx"),
+      "@super-calendar/example-shared/events": path.join(shared, "events.ts"),
       "@super-calendar/example-shared": path.join(shared, "EventMenu.tsx"),
     },
   },

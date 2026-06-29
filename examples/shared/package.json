@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/EventMenu.tsx",
     "./menu": "./src/EventMenuWrapper.tsx",
+    "./events": "./src/events.ts",
     "./global.css": "./src/global.css"
   },
   "dependencies": {

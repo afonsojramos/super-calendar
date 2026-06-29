@@ -13,7 +13,8 @@
       "@super-calendar/dom": ["../../packages/dom/src/index.ts"],
       "@super-calendar/core": ["../../packages/core/src/index.ts"],
       "@super-calendar/example-shared": ["../shared/src/EventMenu.tsx"],
-      "@super-calendar/example-shared/menu": ["../shared/src/EventMenuWrapper.tsx"]
+      "@super-calendar/example-shared/menu": ["../shared/src/EventMenuWrapper.tsx"],
+      "@super-calendar/example-shared/events": ["../shared/src/events.ts"]
     }
   },
   "include": ["src", "vite.config.ts"]
