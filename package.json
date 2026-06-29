@@ -3,14 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "description": "Monorepo for super-calendar: a render-agnostic core with React Native and react-dom renderers.",
-  "homepage": "https://github.com/afonsojramos/react-native-super-calendar#readme",
+  "homepage": "https://github.com/afonsojramos/super-calendar#readme",
   "bugs": {
-    "url": "https://github.com/afonsojramos/react-native-super-calendar/issues"
+    "url": "https://github.com/afonsojramos/super-calendar/issues"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/afonsojramos/react-native-super-calendar.git"
+    "url": "git+https://github.com/afonsojramos/super-calendar.git"
   },
   "scripts": {
     "build": "pnpm -r build",

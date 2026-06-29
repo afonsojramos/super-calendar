@@ -13,7 +13,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/afonsojramos/react-native-super-calendar.git",
+    "url": "git+https://github.com/afonsojramos/super-calendar.git",
     "directory": "packages/core"
   },
   "source": "./src/index.ts",

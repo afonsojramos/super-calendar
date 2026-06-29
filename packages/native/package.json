@@ -16,12 +16,12 @@
   ],
   "homepage": "https://super-calendar.afonsojramos.me",
   "bugs": {
-    "url": "https://github.com/afonsojramos/react-native-super-calendar/issues"
+    "url": "https://github.com/afonsojramos/super-calendar/issues"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/afonsojramos/react-native-super-calendar.git",
+    "url": "git+https://github.com/afonsojramos/super-calendar.git",
     "directory": "packages/native"
   },
   "source": "./src/index.tsx",
