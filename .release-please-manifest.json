@@ -1,5 +1,5 @@
 {
-  "packages/core": "2.0.0",
-  "packages/native": "2.0.0",
-  "packages/dom": "2.0.0"
+  "packages/core": "1.0.0",
+  "packages/native": "1.0.0",
+  "packages/dom": "1.0.0"
 }
