@@ -247,8 +247,10 @@ function MonthViewInner<T>({
     const hasBand =
       rangeBandKind({ isInRange, isRangeStart, isRangeEnd }, fillCellOnSelection) !== "none";
     const dayKey = day.toISOString();
-    // A hovered, non-filled day gets the subtle badge highlight on the web.
-    const isHovered = isWeb && !isDisabled && hoveredKey === dayKey;
+    // A hovered, non-filled day gets the subtle badge highlight on the web, but only
+    // in the events-free picker. The events calendar (month and list views) has no
+    // hover, matching the dom renderer (its events-mode cell omits it).
+    const isHovered = isWeb && !isDisabled && !showGrid && hoveredKey === dayKey;
     const dateColor = isDisabled
       ? theme.colors.textDisabled
       : isFilledBadge
@@ -295,10 +297,13 @@ function MonthViewInner<T>({
         {...(isWeb && !isDisabled
           ? {
               onPointerEnter: () => {
-                setHoveredKey(dayKey);
+                // Hover highlight is picker-only; the events calendar matches dom (none).
+                if (!showGrid) setHoveredKey(dayKey);
                 if (onDayPointerDown) onDayPointerEnter?.(day);
               },
-              onPointerLeave: () => setHoveredKey((k) => (k === dayKey ? null : k)),
+              onPointerLeave: () => {
+                if (!showGrid) setHoveredKey((k) => (k === dayKey ? null : k));
+              },
               ...(onDayPointerDown ? { onPointerDown: () => onDayPointerDown(day) } : {}),
             }
           : null)}
