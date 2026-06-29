@@ -40,7 +40,7 @@ describe("TimeGrid event updates", () => {
     const { rerender, getByLabelText, queryByLabelText } = render(
       <Calendar mode="day" date={date} events={events} onChangeDate={noop} onPressEvent={noop} />,
     );
-    expect(lastListProps()?.extraData).toBe(events);
+    expect((lastListProps()?.extraData as { events?: unknown })?.events).toBe(events);
     expect(getByLabelText(/Standup, 09:00 to 10:00/)).toBeTruthy();
 
     const moved: CalendarEvent<WithId> = {
@@ -59,7 +59,7 @@ describe("TimeGrid event updates", () => {
       />,
     );
 
-    expect(lastListProps()?.extraData).toBe(movedEvents);
+    expect((lastListProps()?.extraData as { events?: unknown })?.events).toBe(movedEvents);
     expect(getByLabelText(/Standup, 11:00 to 12:00/)).toBeTruthy();
     expect(queryByLabelText(/Standup, 09:00 to 10:00/)).toBeNull();
   });

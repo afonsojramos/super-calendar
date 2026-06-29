@@ -555,7 +555,11 @@ type TimetablePageProps<T> = {
   committedCellHeight: SharedValue<number>;
   scrollY: SharedValue<number>;
   isActive: boolean;
-  scrollOffsetMinutes: number;
+  /** Initial vertical scroll position (px): the live shared offset, so a page that
+   * mounts after a scroll appears there rather than snapping from the default. */
+  initialScrollY: number;
+  /** Record the rested vertical offset (px) so later-mounted pages seed from it. */
+  onSettleOffset: (y: number) => void;
   weekStartsOn: WeekStartsOn;
   weekEndsOn?: WeekStartsOn;
   /** Full grid width (hour gutter + day columns). Comes from the container, not the window. */
@@ -601,7 +605,8 @@ function TimetablePageInner<T>({
   committedCellHeight,
   scrollY,
   isActive,
-  scrollOffsetMinutes,
+  initialScrollY,
+  onSettleOffset,
   weekStartsOn,
   weekEndsOn,
   width,
@@ -669,39 +674,55 @@ function TimetablePageInner<T>({
       // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
       isDragging.value = true;
     },
-    onEndDrag: () => {
+    onEndDrag: (event) => {
       // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
       isDragging.value = false;
+      // Capture the rested position. The mid-drag onScroll above stops at the
+      // finger-lift point; without this, the momentum tail after it is lost and the
+      // saved offset falls short of where the page actually settles.
+      if (!isWeb && isActiveShared.value) {
+        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+        scrollY.value = event.contentOffset.y;
+        runOnJS(onSettleOffset)(event.contentOffset.y);
+      }
     },
-    onMomentumEnd: () => {
+    onMomentumEnd: (event) => {
       // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
       isDragging.value = false;
+      if (!isWeb && isActiveShared.value) {
+        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+        scrollY.value = event.contentOffset.y;
+        runOnJS(onSettleOffset)(event.contentOffset.y);
+      }
     },
   });
 
+  // Keep *inactive* pages aligned to the shared offset as it changes, so they're
+  // already in position before they drag into view. Reads `isActiveShared` (not the
+  // captured `isActive`) so the worklet sees the current state.
   useAnimatedReaction(
     () => scrollY.value,
     (current, previous) => {
-      if (!isActive && current !== previous) {
+      if (!isActiveShared.value && current !== previous) {
         scrollTo(scrollRef, 0, current, false);
       }
     },
   );
 
-  // When a page becomes the visible one (paged or jumped to), snap it to the shared
-  // vertical offset. The reaction above only syncs *inactive* pages, and only when
-  // `scrollY` changes, so a page that mounts while off-screen (or whose initial
-  // contentOffset lost a layout race) would otherwise stay stuck at the top — the
-  // random "lands at midnight instead of working hours" behaviour. Imperative so it
-  // applies on both react-native-web and native.
-  // Native only: web is handled by the container-level effect in TimeGridInner,
-  // which resets the on-screen page's DOM scroll node directly (the per-page ref
-  // can't reliably reach the recycled container on react-native-web).
-  useEffect(() => {
-    if (isWeb || !isActive) return;
-    scrollRef.current?.scrollTo?.({ y: scrollY.value, animated: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- scrollRef/scrollY are stable refs/shared values
-  }, [isActive]);
+  // When a page becomes the active one (paged or jumped to), align it to the shared
+  // offset. The reaction above only syncs *inactive* pages, and only when `scrollY`
+  // changes, so a page that paged in after the last change (the third page on from a
+  // drag, say) would keep its seeded default. Uses reanimated's `scrollTo` worklet:
+  // the imperative `scrollRef.current.scrollTo()` does not take effect on a
+  // useAnimatedRef, which is why that page stayed at the default. Native only; web is
+  // handled by the container-level effect in TimeGridInner.
+  useAnimatedReaction(
+    () => isActiveShared.value,
+    (active, previous) => {
+      if (isWeb || !active || active === previous) return;
+      scrollTo(scrollRef, 0, scrollY.value, false);
+    },
+  );
 
   const days = useMemo(
     () => getViewDays(mode, date, weekStartsOn, numberOfDays, isRTL, weekEndsOn),
@@ -960,10 +981,7 @@ function TimetablePageInner<T>({
           onScroll={scrollHandler}
           scrollEventThrottle={16}
           contentContainerStyle={{ paddingTop: HOUR_LABEL_TOP_INSET }}
-          contentOffset={{
-            x: 0,
-            y: Math.max(0, scrollOffsetMinutes / MINUTES_PER_HOUR - minHour) * hourHeight,
-          }}
+          contentOffset={{ x: 0, y: initialScrollY }}
         >
           <Animated.View style={[styles.content, fullHeightStyle]}>
             {/* Behind the events, so empty-space taps/drags create while event
@@ -1301,9 +1319,17 @@ function TimeGridInner<T>({
   // Shared vertical scroll offset so every mounted page stays aligned. Seeded
   // from the numeric hourHeight rather than reading cellHeight.value (which
   // would warn about reading a shared value during render).
-  const scrollY = useSharedValue(
-    Math.max(0, scrollOffsetMinutes / MINUTES_PER_HOUR - clampedMinHour) * hourHeight,
-  );
+  const seedDefaultY =
+    Math.max(0, scrollOffsetMinutes / MINUTES_PER_HOUR - clampedMinHour) * hourHeight;
+  const scrollY = useSharedValue(seedDefaultY);
+  // Plain mirror of the last settled vertical offset. A page that mounts after a
+  // scroll seeds its contentOffset here instead of the default, so it appears at the
+  // saved time straight away rather than rendering at the default and snapping (the
+  // one-frame flash). Null until the first scroll, when `seedDefaultY` is used.
+  const offsetSeedRef = useRef<number | null>(null);
+  const captureOffsetSeed = useCallback((y: number) => {
+    offsetSeedRef.current = y;
+  }, []);
   // Zoom committed at the end of the last pinch; off-screen pages animate off
   // this so they don't re-run their worklets every frame while the visible page
   // zooms.
@@ -1461,6 +1487,7 @@ function TimeGridInner<T>({
       if (rect.left <= -50 || rect.right > vw + 50) return;
       // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
       scrollY.value = el.scrollTop;
+      offsetSeedRef.current = el.scrollTop;
     };
     root.addEventListener("scroll", onScrollCapture, true);
     return () => root.removeEventListener("scroll", onScrollCapture, true);
@@ -1530,7 +1557,8 @@ function TimeGridInner<T>({
           committedCellHeight={committedCellHeight}
           scrollY={scrollY}
           isActive={index === activeIndex}
-          scrollOffsetMinutes={scrollOffsetMinutes}
+          initialScrollY={offsetSeedRef.current ?? seedDefaultY}
+          onSettleOffset={captureOffsetSeed}
           weekStartsOn={weekStartsOn}
           weekEndsOn={weekEndsOn}
           hourColumnWidth={hourColumnWidth}
@@ -1573,7 +1601,8 @@ function TimeGridInner<T>({
       committedCellHeight,
       scrollY,
       activeIndex,
-      scrollOffsetMinutes,
+      seedDefaultY,
+      captureOffsetSeed,
       weekStartsOn,
       weekEndsOn,
       hourColumnWidth,
@@ -1604,6 +1633,13 @@ function TimeGridInner<T>({
       onCreateEvent,
     ],
   );
+
+  // Pages are keyed by date, so LegendList keeps the items it has already rendered
+  // and only re-renders them when `data` or `extraData` changes. Feed both `events`
+  // (so a moved event repaints in place) and `activeIndex` (so each page's
+  // `isActive` updates as you swipe). Without `activeIndex`, a page that pages in
+  // never learns it became active and stays at its seeded scroll offset.
+  const listExtraData = useMemo(() => ({ events, activeIndex }), [events, activeIndex]);
 
   return (
     <View ref={containerRef} style={styles.container}>
@@ -1641,10 +1677,7 @@ function TimeGridInner<T>({
           ref={listRef}
           style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
           data={pageDates}
-          // Pages are keyed by date, so the list won't repaint when `events`
-          // changes (a drag/menu commit, or any external setEvents). Feed it as
-          // extraData so the visible page re-renders the moved event in place.
-          extraData={events}
+          extraData={listExtraData}
           horizontal
           recycleItems={false}
           keyExtractor={keyExtractorList}
