@@ -32,6 +32,7 @@ import {
   TimeGrid,
 } from "./TimeGrid";
 
+/** Props for the {@link Calendar} component. */
 export type CalendarProps<T> = {
   events: CalendarEvent<T>[];
   mode: CalendarMode;
@@ -231,6 +232,32 @@ function visibleRange(
   return [startOfDay(days[0]), endOfDay(days[days.length - 1])];
 }
 
+/**
+ * The top-level calendar. Switches between month, week, day, 3days, custom, and
+ * schedule modes, and is gesture-driven and virtualized. It is a controlled
+ * component: pass `date` and `mode` and update them from `onChangeDate`.
+ *
+ * @example
+ * ```tsx
+ * import { Calendar, type CalendarEvent } from "react-native-super-calendar";
+ *
+ * function MyCalendar() {
+ *   const [date, setDate] = useState(new Date());
+ *   const events: CalendarEvent[] = [
+ *     { title: "Standup", start: new Date(), end: new Date() },
+ *   ];
+ *   return (
+ *     <Calendar
+ *       mode="week"
+ *       date={date}
+ *       events={events}
+ *       onChangeDate={setDate}
+ *       onPressEvent={(e) => console.log(e.title)}
+ *     />
+ *   );
+ * }
+ * ```
+ */
 export function Calendar<T>({
   events,
   mode,

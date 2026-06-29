@@ -7,34 +7,44 @@ import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
 /** Props passed to a custom agenda (schedule) event renderer. */
 export interface DomAgendaEventArgs<T = unknown> {
+  /** The event to render. */
   event: CalendarEvent<T>;
   /** Always "schedule"; lets a renderer shared with other views branch on it. */
   mode: "schedule";
+  /** Whether the event is all-day. */
   isAllDay: boolean;
   /** Render the time range in 12-hour AM/PM. */
   ampm?: boolean;
+  /** Call to fire the view's `onPressEvent` for this row. */
   onPress: () => void;
 }
 
+/** A component that renders a single agenda (schedule) event row. */
 export type DomAgendaEvent<T = unknown> = ComponentType<DomAgendaEventArgs<T>>;
 
+/** Props for {@link Agenda}. */
 export interface AgendaProps<T = unknown> {
   /** Events to list. The consumer controls which (and therefore the date range). */
   events: CalendarEvent<T>[];
+  /** date-fns locale for the day headers and time labels. */
   locale?: Locale;
   /** Render times in 12-hour AM/PM (default false, 24h). */
   ampm?: boolean;
   /** Highlight this date's header instead of the real "today". */
   activeDate?: Date;
+  /** Theme overrides; falls back to the default light theme. */
   theme?: Partial<DomCalendarTheme>;
   /** Height of the scroll viewport, in px (default 480). */
   height?: number | string;
   /** Replace the built-in event row. */
   renderEvent?: DomAgendaEvent<T>;
+  /** Tap an event row. */
   onPressEvent?: (event: CalendarEvent<T>) => void;
   /** Tap a day's header. */
   onPressDay?: (date: Date) => void;
+  /** Class applied to the root element. */
   className?: string;
+  /** Inline styles applied to the root element. */
   style?: CSSProperties;
 }
 
@@ -79,6 +89,11 @@ function DefaultAgendaRow<T>({
  * elements. Events are sorted by start and grouped under a date header per day;
  * the consumer controls which events (and therefore which dates) are shown. The
  * react-dom counterpart of the React Native `Agenda`.
+ *
+ * @example
+ * ```tsx
+ * <Agenda events={events} onPressEvent={(e) => console.log(e.title)} />
+ * ```
  */
 export function Agenda<T = unknown>({
   events,

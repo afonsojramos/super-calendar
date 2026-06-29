@@ -13,7 +13,9 @@ import { isSameCalendarDay } from "./dates";
 
 /** A selected span. `end` is `null` while only the first endpoint has been picked. */
 export interface DateRange {
+  /** The first endpoint. */
   start: Date;
+  /** The second endpoint, or `null` while only the first has been picked. */
   end: Date | null;
 }
 
@@ -81,7 +83,9 @@ export interface DaySelectionState {
   isSelected: boolean;
   /** Inside a complete range, endpoints included (and not disabled). */
   isInRange: boolean;
+  /** The range's start endpoint (and not disabled). */
   isRangeStart: boolean;
+  /** The range's end endpoint (and not disabled). */
   isRangeEnd: boolean;
 }
 
@@ -115,7 +119,9 @@ export function daySelectionState(
  * cached/virtualized day cells still repaint when any of it changes.
  */
 export interface CalendarSelection extends DateSelectionConstraints {
+  /** Selected discrete days (single or multiple). */
   selectedDates?: Date[];
+  /** Selected span. */
   selectedRange?: DateRange;
 }
 
@@ -128,6 +134,7 @@ const CalendarSelectionContext: Context<CalendarSelection> = createContext<Calen
  */
 export const CalendarSelectionProvider = CalendarSelectionContext.Provider;
 
+/** Reads the active selection provided by {@link CalendarSelectionProvider}. */
 export const useCalendarSelection = (): CalendarSelection => useContext(CalendarSelectionContext);
 
 /** Options for {@link useDateRange}. */

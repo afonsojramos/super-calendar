@@ -42,6 +42,7 @@ const FALLBACK_VISIBLE_COUNT = 3;
 const numericStyle = (value: number | string | undefined, fallback: number) =>
   typeof value === "number" ? value : fallback;
 
+/** Props for {@link MonthView}, the single-month grid. */
 export type MonthViewProps<T> = {
   date: Date;
   events: CalendarEvent<T>[];
@@ -454,6 +455,22 @@ function MonthViewInner<T>({
   );
 }
 
+/**
+ * A single month rendered as a 7-column grid of day cells, each showing its
+ * event chips with a "+N more" overflow. Render it on its own for a static
+ * month, or let `MonthList`/`Calendar` page through months for you.
+ *
+ * @example
+ * ```tsx
+ * import { MonthView, type CalendarEvent } from "react-native-super-calendar";
+ *
+ * <MonthView
+ *   date={new Date()}
+ *   events={events}
+ *   onPressDay={(day) => console.log(day)}
+ * />
+ * ```
+ */
 export const MonthView = memo(MonthViewInner) as typeof MonthViewInner;
 
 const styles = StyleSheet.create({

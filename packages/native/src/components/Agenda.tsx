@@ -7,6 +7,7 @@ import type { CalendarEvent, EventKeyExtractor, RenderEvent } from "../types";
 import { getIsToday } from "@super-calendar/core";
 import { isAllDayEvent } from "@super-calendar/core";
 
+/** Props for {@link Agenda}, the day-grouped list view of events. */
 export type AgendaProps<T> = {
   events: CalendarEvent<T>[];
   locale?: Locale;

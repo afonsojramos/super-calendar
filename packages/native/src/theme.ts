@@ -10,6 +10,7 @@ import type { TextStyle } from "react-native";
 export interface CalendarTheme {
   /** The shared colour palette (sourced from `@super-calendar/core`). */
   colors: CalendarColors;
+  /** Text styles for the calendar's labels and the built-in event box. */
   text: {
     /** Large day number in the week/day header. */
     dayNumber: TextStyle;
@@ -33,6 +34,7 @@ export interface CalendarTheme {
   rangeBandHeight: number;
 }
 
+/** The default light theme. Every key the calendar reads falls back to this. */
 export const defaultTheme: CalendarTheme = {
   colors: lightColors,
   text: {
@@ -72,6 +74,11 @@ export function mergeTheme(theme?: PartialCalendarTheme): CalendarTheme {
   };
 }
 
+/**
+ * A theme with every key optional. Pass this to `<Calendar theme={...} />` to
+ * override only the colours, text styles, or metrics you care about; the rest
+ * come from {@link defaultTheme}.
+ */
 export type PartialCalendarTheme = {
   colors?: Partial<CalendarTheme["colors"]>;
   text?: Partial<CalendarTheme["text"]>;
@@ -81,6 +88,12 @@ export type PartialCalendarTheme = {
 
 const CalendarThemeContext: Context<CalendarTheme> = createContext<CalendarTheme>(defaultTheme);
 
+/**
+ * Context provider that supplies the active {@link CalendarTheme} to descendants.
+ * `<Calendar>` wraps its subtree in this; use it directly only to theme custom
+ * components rendered outside a `<Calendar>`.
+ */
 export const CalendarThemeProvider = CalendarThemeContext.Provider;
 
+/** Read the active {@link CalendarTheme} from context. Useful inside custom renderers. */
 export const useCalendarTheme = (): CalendarTheme => useContext(CalendarThemeContext);

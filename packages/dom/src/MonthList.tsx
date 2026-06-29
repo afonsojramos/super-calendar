@@ -13,6 +13,7 @@ import {
 import { type DomMonthEvent, MonthView } from "./MonthView";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
+/** Props for {@link MonthList}. */
 export interface MonthListProps<T = unknown> extends DateSelectionConstraints {
   /** Anchor month; the list spans `pastMonths` before to `futureMonths` after. */
   date: Date;
@@ -20,6 +21,7 @@ export interface MonthListProps<T = unknown> extends DateSelectionConstraints {
   pastMonths?: number;
   /** Months to render after the anchor (default 12). */
   futureMonths?: number;
+  /** First day of the week. Sunday = 0 (default) ... Saturday = 6. */
   weekStartsOn?: WeekStartsOn;
   /** Events to render as chips in each day cell (calendar layout when provided). */
   events?: CalendarEvent<T>[];
@@ -33,11 +35,15 @@ export interface MonthListProps<T = unknown> extends DateSelectionConstraints {
   onPressEvent?: (event: CalendarEvent<T>) => void;
   /** Tap the "+N more" overflow row. */
   onPressMore?: (events: CalendarEvent<T>[], date: Date) => void;
+  /** Selected span; days between the endpoints get the range band. */
   selectedRange?: DateRange;
+  /** Discrete selected days (single / multiple). */
   selectedDates?: Date[];
   /** Fill the whole cell on selection instead of the default rounded pill band. */
   fillCellOnSelection?: boolean;
+  /** date-fns locale for the month titles and weekday labels. */
   locale?: Locale;
+  /** Theme overrides; falls back to the default light theme. */
   theme?: Partial<DomCalendarTheme>;
   /** Height of the scroll viewport, in px (default 480). */
   height?: number | string;
@@ -47,8 +53,11 @@ export interface MonthListProps<T = unknown> extends DateSelectionConstraints {
    * layout (no `events`) is always navigable regardless.
    */
   keyboardDayNavigation?: boolean;
+  /** Fired when a selectable day is clicked. */
   onPressDay?: (date: Date) => void;
+  /** Class applied to the root element. */
   className?: string;
+  /** Inline styles applied to the root element. */
   style?: CSSProperties;
 }
 

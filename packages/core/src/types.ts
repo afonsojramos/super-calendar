@@ -1,3 +1,4 @@
+/** The view the calendar renders: a day-column grid (`day`, `3days`, `week`, `custom`), the `month` grid, or the `schedule` list. */
 export type CalendarMode = "day" | "3days" | "week" | "custom" | "month" | "schedule";
 
 /** The time-grid modes (day-column views, excluding month and schedule). */
@@ -10,8 +11,11 @@ export type TimeGridMode = Exclude<CalendarMode, "month" | "schedule">;
  * threaded through untouched via the `T` generic.
  */
 export interface ICalendarEvent {
+  /** When the event begins. */
   start: Date;
+  /** When the event ends. */
   end: Date;
+  /** Display label, shown by the built-in default renderer. */
   title?: string;
   /**
    * Force this event into the all-day lane (above the time grid) instead of the
@@ -34,6 +38,7 @@ export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
 
 /** A simple, RRULE-inspired repeat rule expanded by `expandRecurringEvents`. */
 export interface RecurrenceRule {
+  /** How often the event repeats. */
   freq: RecurrenceFrequency;
   /** Repeat every N periods. Default 1. */
   interval?: number;

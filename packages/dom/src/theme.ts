@@ -5,6 +5,10 @@
 // DOM-specific pixel metrics and font stack live here.
 import { type CalendarColors, darkColors, lightColors } from "@super-calendar/core";
 
+/**
+ * Theme for the react-dom renderer. Combines the shared color palette from
+ * `@super-calendar/core` with the DOM-specific pixel metrics and font stack.
+ */
 export type DomCalendarTheme = CalendarColors & {
   /** Row height of a day cell, in px. */
   cellHeight: number;
@@ -25,8 +29,10 @@ const SYSTEM_FONT =
 
 const METRICS = { cellHeight: 48, dayBadgeSize: 34, rangeBandHeight: 32, fontFamily: SYSTEM_FONT };
 
+/** The default light theme: the core light palette plus the DOM metrics. */
 export const defaultDomTheme: DomCalendarTheme = { ...lightColors, ...METRICS };
 
+/** The dark theme: the core dark palette plus the DOM metrics. */
 export const darkDomTheme: DomCalendarTheme = { ...darkColors, ...METRICS };
 
 /** Merge a partial override onto a base theme (defaults to {@link defaultDomTheme}). */

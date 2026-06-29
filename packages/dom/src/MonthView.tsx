@@ -41,12 +41,16 @@ const CELL_PAD = 4;
 
 /** Props passed to a custom month event chip renderer. */
 export interface DomMonthEventArgs<T = unknown> {
+  /** The event to render. */
   event: CalendarEvent<T>;
+  /** Call to fire the view's `onPressEvent` for this chip. */
   onPress: () => void;
 }
 
+/** A component that renders a single month-grid event chip. */
 export type DomMonthEvent<T = unknown> = ComponentType<DomMonthEventArgs<T>>;
 
+/** Props for {@link MonthView}. */
 export interface MonthViewProps<T = unknown> extends DateSelectionConstraints {
   /** Any day within the month to render. */
   date: Date;
@@ -96,7 +100,9 @@ export interface MonthViewProps<T = unknown> extends DateSelectionConstraints {
    * (rendered without `events`) is always navigable regardless of this flag.
    */
   keyboardDayNavigation?: boolean;
+  /** Class applied to the root element. */
   className?: string;
+  /** Inline styles applied to the root element. */
   style?: CSSProperties;
 }
 
@@ -282,7 +288,14 @@ interface MonthViewInternalProps<T = unknown> extends MonthViewProps<T> {
   eventsByDay?: ReadonlyMap<string, CalendarEvent<T>[]>;
 }
 
-/** A single static month grid, rendered with plain DOM elements. */
+/**
+ * A single static month grid, rendered with plain DOM elements.
+ *
+ * @example
+ * ```tsx
+ * <MonthView date={new Date()} events={events} onPressDay={(d) => setDate(d)} />
+ * ```
+ */
 export function MonthView<T = unknown>({
   date,
   weekStartsOn = 0,

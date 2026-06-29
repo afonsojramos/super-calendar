@@ -105,13 +105,16 @@ export const buildMonthWeeks = (
   return weeks;
 };
 
+/** True when `date` is a Saturday or Sunday. */
 export const isWeekend = (date: Date): boolean => {
   const day = date.getDay();
   return day === 0 || day === 6;
 };
 
+/** True when `date` falls on the current calendar day. */
 export const getIsToday = (date: Date): boolean => isToday(date);
 
+/** True when `a` and `b` are the same calendar day (ignoring the time of day). */
 export const isSameCalendarDay = (a: Date, b: Date): boolean => isSameDay(a, b);
 
 /** Minutes elapsed since midnight (0–1439). */

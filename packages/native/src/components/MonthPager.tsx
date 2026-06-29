@@ -34,6 +34,7 @@ const PAGE_WINDOW = 60;
 // paging commits once per settle rather than mid-swipe.
 const PAGE_VIEWABILITY = { itemVisiblePercentThreshold: 90 };
 
+/** Props for {@link MonthPager}, the horizontally swipeable month carousel. */
 export type MonthPagerProps<T> = {
   date: Date;
   events: CalendarEvent<T>[];
@@ -318,6 +319,24 @@ function MonthPagerInner<T>({
   );
 }
 
+/**
+ * A horizontally swipeable month carousel. Swipe left/right to page between
+ * months; the committed month is reported through `onChangeDate`. It is the
+ * Reanimated-driven month view that `Calendar` uses in month mode.
+ *
+ * @example
+ * ```tsx
+ * import { MonthPager } from "react-native-super-calendar";
+ *
+ * <MonthPager
+ *   date={date}
+ *   events={events}
+ *   weekStartsOn={0}
+ *   onChangeDate={setDate}
+ *   onPressEvent={(e) => console.log(e.title)}
+ * />
+ * ```
+ */
 export const MonthPager = memo(MonthPagerInner) as typeof MonthPagerInner;
 
 type MonthWeekdayHeaderProps = {

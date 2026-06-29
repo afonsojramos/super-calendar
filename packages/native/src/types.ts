@@ -20,6 +20,11 @@ export type {
 // The React Native render contract lives here, not in core: it references
 // Reanimated (`SharedValue`) and React Native (`ViewStyle`) types, which must
 // not leak into the platform-free core.
+/**
+ * Props passed to a {@link RenderEvent} component for one event. Carries the
+ * event, the current mode, press handlers, and built-in renderer hints such as
+ * `boxHeight`, `continuesBefore`/`continuesAfter`, and `isAllDay`.
+ */
 export type RenderEventArgs<T = unknown> = {
   event: CalendarEvent<T>;
   mode: CalendarMode;

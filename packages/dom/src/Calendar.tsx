@@ -13,6 +13,7 @@ import { type DomMonthEvent, MonthView } from "./MonthView";
 import { type DomRenderEvent, TimeGrid } from "./TimeGrid";
 import type { DomCalendarTheme } from "./theme";
 
+/** Props for {@link Calendar}. */
 export interface CalendarProps<T = unknown> extends DateSelectionConstraints {
   /**
    * The view to render (default "week"). `month` renders a month grid, `schedule`
@@ -27,11 +28,15 @@ export interface CalendarProps<T = unknown> extends DateSelectionConstraints {
   weekStartsOn?: WeekStartsOn;
   /** Column count for `mode="custom"`. */
   numberOfDays?: number;
+  /** date-fns locale for titles, headers, and time labels. */
   locale?: Locale;
+  /** Theme overrides; falls back to the default light theme. */
   theme?: Partial<DomCalendarTheme>;
   /** Height of the scroll viewport, in px. */
   height?: number | string;
+  /** Class applied to the root element. */
   className?: string;
+  /** Inline styles applied to the root element. */
   style?: CSSProperties;
 
   /** Tap an event (both layouts). */
@@ -105,6 +110,11 @@ export interface CalendarProps<T = unknown> extends DateSelectionConstraints {
  * view for `mode`. `month` renders a single {@link MonthView}; `schedule` renders
  * an {@link Agenda}; the time-grid modes render a {@link TimeGrid}. For a
  * scrolling month picker, use {@link MonthList} directly.
+ *
+ * @example
+ * ```tsx
+ * <Calendar mode="week" date={new Date()} events={events} />
+ * ```
  */
 export function Calendar<T = unknown>({
   mode = "week",

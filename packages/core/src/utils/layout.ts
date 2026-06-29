@@ -6,7 +6,9 @@ const MINUTES_PER_HOUR = 60;
 // span still occupies a sliver rather than collapsing to nothing.
 const MIN_DURATION_HOURS = 0.25;
 
+/** An event placed on a single day's time grid by {@link layoutDayEvents}, with its vertical span and overlap column. */
 export type PositionedEvent<T> = {
+  /** The source event for this segment. */
   event: CalendarEvent<T>;
   /** Hours from midnight to the event's segment start on this day (fractional). */
   startHours: number;

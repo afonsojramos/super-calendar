@@ -69,6 +69,7 @@ const noop = () => {};
 const defaultKeyExtractor: EventKeyExtractor<unknown> = (event) =>
   `${event.start.toISOString()}|${event.end.toISOString()}|${event.title ?? ""}`;
 
+/** Props for {@link MonthList}, the vertically scrolling list of months. */
 export type MonthListProps<T> = {
   /** The month scrolled to on mount. */
   date: Date;
@@ -553,6 +554,24 @@ function MonthBlock({
   );
 }
 
+/**
+ * A vertically scrolling, virtualized list of month grids. It doubles as the
+ * date picker: pass `selectedRange`/`selectedDates` and selection handlers to
+ * turn it into a single-date or range picker. Free of Reanimated, so the
+ * `/picker` entry point can ship it without the timetable views.
+ *
+ * @example
+ * ```tsx
+ * import { MonthList } from "react-native-super-calendar/picker";
+ *
+ * <MonthList
+ *   date={new Date()}
+ *   weekStartsOn={0}
+ *   selectedRange={range}
+ *   onPressDay={handlePressDay}
+ * />
+ * ```
+ */
 export const MonthList = memo(MonthListInner) as typeof MonthListInner;
 
 const styles = StyleSheet.create({

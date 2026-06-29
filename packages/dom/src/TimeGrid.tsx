@@ -37,25 +37,38 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 
 /** Props passed to a custom time-grid event renderer. */
 export interface DomRenderEventArgs<T = unknown> {
+  /** The event to render. */
   event: CalendarEvent<T>;
+  /** The current view mode. */
   mode: CalendarMode;
+  /** Whether the event is all-day. */
   isAllDay: boolean;
+  /** Pixel height of the event box (timed events only). */
   boxHeight?: number;
+  /** The event started before the visible day and continues into it. */
   continuesBefore?: boolean;
+  /** The event continues past the visible day. */
   continuesAfter?: boolean;
   /** Show the time range in 12-hour AM/PM. */
   ampm?: boolean;
+  /** Call to fire the view's `onPressEvent` for this event. */
   onPress: () => void;
 }
 
+/** A component that renders a single time-grid event box. */
 export type DomRenderEvent<T = unknown> = ComponentType<DomRenderEventArgs<T>>;
 
+/** Props for {@link TimeGrid}. */
 export interface TimeGridProps<T = unknown> {
+  /** Anchor date; the visible columns are derived from it and `mode`. */
   date: Date;
+  /** Events to lay out on the grid. */
   events?: CalendarEvent<T>[];
   /** "day" (default), "3days", "week", or "custom" (with `numberOfDays`). */
   mode?: TimeGridMode;
+  /** Column count for `mode="custom"`. */
   numberOfDays?: number;
+  /** First day of the week. Sunday = 0 (default) ... Saturday = 6. */
   weekStartsOn?: WeekStartsOn;
   /** Initial pixels per hour (default 48). */
   hourHeight?: number;
@@ -63,7 +76,9 @@ export interface TimeGridProps<T = unknown> {
   scrollOffsetMinutes?: number;
   /** Pinch / Ctrl-⌘-scroll to zoom the grid (default true). */
   zoomable?: boolean;
+  /** Lower bound for pixels per hour when zooming. */
   minHourHeight?: number;
+  /** Upper bound for pixels per hour when zooming. */
   maxHourHeight?: number;
   /** Snap dragged events to this many minutes (default 15). */
   dragStepMinutes?: number;
@@ -77,13 +92,19 @@ export interface TimeGridProps<T = unknown> {
   showNowIndicator?: boolean;
   /** Show the all-day lane above the grid (default true). */
   showAllDayEventCell?: boolean;
+  /** date-fns locale for the column headers and time labels. */
   locale?: Locale;
+  /** Theme overrides; falls back to the default light theme. */
   theme?: Partial<DomCalendarTheme>;
+  /** Height of the scroll viewport, in px. */
   height?: number | string;
+  /** Custom event renderer; falls back to the built-in event box. */
   renderEvent?: DomRenderEvent<T>;
-  /** Replace the hour-axis label. Receives the hour (0–23) and the `ampm` flag. */
+  /** Replace the hour-axis label. Receives the hour (0-23) and the `ampm` flag. */
   hourComponent?: (hour: number, ampm: boolean) => ReactNode;
+  /** Tap an event. */
   onPressEvent?: (event: CalendarEvent<T>) => void;
+  /** Tap a day's column header. */
   onPressDateHeader?: (day: Date) => void;
   /** Tap empty grid space; called with the date and time at the press. */
   onPressCell?: (date: Date) => void;
@@ -96,7 +117,9 @@ export interface TimeGridProps<T = unknown> {
    * Return `false` to reject the drop (the event snaps back).
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
+  /** Class applied to the root element. */
   className?: string;
+  /** Inline styles applied to the root element. */
   style?: CSSProperties;
 }
 
@@ -191,6 +214,11 @@ function DefaultDomEvent<T>({
  * positioned with the library's pure `layoutDayEvents`, so overlap columns and
  * multi-day clipping match the React Native renderer. Supports Ctrl/⌘-scroll and
  * two-finger pinch to zoom, and pointer drag to move / resize events.
+ *
+ * @example
+ * ```tsx
+ * <TimeGrid mode="week" date={new Date()} events={events} />
+ * ```
  */
 export function TimeGrid<T = unknown>({
   date,

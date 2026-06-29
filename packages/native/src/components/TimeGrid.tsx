@@ -90,6 +90,7 @@ const PAGE_WINDOW = 180;
 const PAGE_VIEWABILITY = { itemVisiblePercentThreshold: 90 };
 
 // Matches the dom renderer's default so both grids start at the same density.
+/** Default height in pixels of one hour row on the time grid. */
 export const DEFAULT_HOUR_HEIGHT = 48;
 const DEFAULT_MIN_HOUR_HEIGHT = 32;
 const DEFAULT_MAX_HOUR_HEIGHT = 160;
@@ -1150,6 +1151,7 @@ function TimetablePageInner<T>({
 
 const TimetablePage = memo(TimetablePageInner) as typeof TimetablePageInner;
 
+/** Props for {@link TimeGrid}, the day/week timetable view. */
 export type TimeGridProps<T> = {
   mode: TimeGridMode;
   /** Day columns to show in `custom` mode. Ignored by day/3days/week. Default 1. */
@@ -1706,6 +1708,25 @@ function TimeGridInner<T>({
   );
 }
 
+/**
+ * The timetable view used in day, 3days, week, and custom modes: an
+ * hour-by-hour grid with positioned event boxes, an all-day lane, pinch-to-zoom
+ * density, and optional drag-to-move/resize/create. Pages horizontally between
+ * date ranges, reporting the committed range through `onChangeDate`.
+ *
+ * @example
+ * ```tsx
+ * import { TimeGrid } from "react-native-super-calendar";
+ *
+ * <TimeGrid
+ *   mode="week"
+ *   date={date}
+ *   events={events}
+ *   onChangeDate={setDate}
+ *   onPressEvent={(e) => console.log(e.title)}
+ * />
+ * ```
+ */
 export const TimeGrid = memo(TimeGridInner) as typeof TimeGridInner;
 
 type DefaultHeaderProps = {
