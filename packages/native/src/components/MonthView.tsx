@@ -155,6 +155,9 @@ function MonthViewInner<T>({
   // Web-only hover highlight on the day badge (mouse pointers); stays null on
   // touch/native, so it never re-renders there. Mirrors the dom renderer.
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  // Picker: which day is being pressed, so the tap dims only its badge (the circle),
+  // not the whole cell background. Stays null in the events calendar.
+  const [pressedKey, setPressedKey] = useState<string | null>(null);
 
   const weeks = useMemo(
     () => buildMonthWeeks(date, weekStartsOn, { showSixWeeks, isRTL }),
@@ -288,6 +291,17 @@ function MonthViewInner<T>({
           isWeekend(day) && { backgroundColor: theme.colors.weekendBackground },
           calendarCellStyle?.(day),
         ]}
+        // In the picker, don't dim the whole cell on press: the tap should show on
+        // the badge (the circle) only, not the cell background. `onPressIn/Out` drive
+        // the badge's own opacity below. The events calendar keeps the default
+        // whole-cell press feedback (a tap there opens the day).
+        activeOpacity={showGrid ? 0.2 : 1}
+        {...(showGrid
+          ? null
+          : {
+              onPressIn: () => setPressedKey(dayKey),
+              onPressOut: () => setPressedKey((k) => (k === dayKey ? null : k)),
+            })}
         onPress={handlePressDay}
         onLongPress={handleLongPressDay}
         disabled={isDisabled || (!onPressDay && !onLongPressDay)}
@@ -365,6 +379,8 @@ function MonthViewInner<T>({
                   backgroundColor: theme.colors.hoverBackground,
                   borderRadius: theme.todayBadgeRadius,
                 },
+              // Tap feedback lives on the badge, not the cell (picker only).
+              !showGrid && pressedKey === dayKey && { opacity: 0.2 },
             ]}
           >
             <Text style={[theme.text.dateCell, { color: dateColor }]} allowFontScaling={false}>
