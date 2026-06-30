@@ -26,10 +26,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v4
       - run: pnpm install --frozen-lockfile
+      # Served at the root of the custom domain (demo.super-calendar.afonsojramos.me),
+      # so the export keeps the default root base path (no EXPO_BASE_URL).
       - run: pnpm --filter @super-calendar/example-native exec expo export --platform web
-        env:
-          # Served from https://<user>.github.io/react-native-super-calendar/
-          EXPO_BASE_URL: /react-native-super-calendar
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
