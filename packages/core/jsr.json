@@ -1,6 +1,6 @@
 {
   "name": "@super-calendar/core",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "description": "Render-agnostic core for super-calendar: date math, selection model, event layout, the month-grid builder, headless hooks, and neutral theme tokens. No renderer.",
   "license": "MIT",
   "exports": "./src/index.ts",
@@ -9,6 +9,9 @@
     "react": "npm:react@^19"
   },
   "publish": {
-    "exclude": ["**/__tests__/**", "tsdown.config.mts"]
+    "exclude": [
+      "**/__tests__/**",
+      "tsdown.config.mts"
+    ]
   }
 }
