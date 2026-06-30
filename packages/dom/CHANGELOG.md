@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.1.3](https://github.com/afonsojramos/super-calendar/compare/dom-v2.1.2...dom-v2.1.3) (2026-06-30)
+
+
+### Bug Fixes
+
+* sync jsr.json versions to the published release ([392ed22](https://github.com/afonsojramos/super-calendar/commit/392ed221a53e601c7966a01a0b78b06f548e8a5f))
+
+
+### Dependencies
+
+* The following workspace dependencies were updated
+  * dependencies
+    * @super-calendar/core bumped to 2.1.3
+
 ## [2.1.2](https://github.com/afonsojramos/super-calendar/compare/dom-v2.1.1...dom-v2.1.2) (2026-06-30)
 
 
