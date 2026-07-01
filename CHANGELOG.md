@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.5](https://github.com/afonsojramos/super-calendar/compare/v2.1.4...v2.1.5) (2026-07-01)
+
+
+### Bug Fixes
+
+* replace react-native-super-calendar references with super-calendar ([43e4eb1](https://github.com/afonsojramos/super-calendar/commit/43e4eb1f52d24a1f5123e0cd9ba742604ee2bba8))
+
 ## [1.0.0](https://github.com/afonsojramos/super-calendar/compare/v0.6.0...v1.0.0) (2026-06-25)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "super-calendar",
-  "version": "2.1.4",
+  "version": "2.1.5",
   "private": true,
   "description": "Monorepo for super-calendar: a render-agnostic core with React Native and react-dom renderers.",
   "homepage": "https://github.com/afonsojramos/super-calendar#readme",

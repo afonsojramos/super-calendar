@@ -1,6 +1,6 @@
 {
   "name": "@super-calendar/core",
-  "version": "2.1.4",
+  "version": "2.1.5",
   "description": "Render-agnostic core for super-calendar: date math, selection model, event layout, the month-grid builder, headless hooks, and neutral theme tokens. No renderer.",
   "keywords": [
     "calendar",
