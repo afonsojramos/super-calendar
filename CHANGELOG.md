@@ -7,6 +7,54 @@
 
 * replace react-native-super-calendar references with super-calendar ([43e4eb1](https://github.com/afonsojramos/super-calendar/commit/43e4eb1f52d24a1f5123e0cd9ba742604ee2bba8))
 
+## 2.1.4 (2026-07-01)
+
+
+### Bug Fixes
+
+* **core:** make README npm-first ([21518e6](https://github.com/afonsojramos/super-calendar/commit/21518e6ee07542adb452d9cd21a622e3d35b8ef6))
+* **dom:** make README npm-first ([cbcf2dd](https://github.com/afonsojramos/super-calendar/commit/cbcf2dd6104206450c790a555e51354ac949c28d))
+* **native:** make README npm-first ([32a7dc6](https://github.com/afonsojramos/super-calendar/commit/32a7dc6fe6f8a3b3a75f09accd0b50c978e1631d))
+* **core:** add npmx package link to README ([97dc8a6](https://github.com/afonsojramos/super-calendar/commit/97dc8a6870515960ccffb6b226608a7f0a64f372))
+* **dom:** add npmx package link to README ([4425697](https://github.com/afonsojramos/super-calendar/commit/4425697cae7ddee4cff3e502661fba19658b60af))
+* **native:** add npmx package link to README ([fcbc817](https://github.com/afonsojramos/super-calendar/commit/fcbc817900d45d2267dda43c7712e4b87798d905))
+
+## 2.1.3 (2026-06-30)
+
+
+### Bug Fixes
+
+* sync jsr.json versions to the published release ([392ed22](https://github.com/afonsojramos/super-calendar/commit/392ed221a53e601c7966a01a0b78b06f548e8a5f))
+
+## 2.1.2 (2026-06-30)
+
+
+### Bug Fixes
+
+* **native:** keep Date objects out of time-grid worklets ([7d797ad](https://github.com/afonsojramos/super-calendar/commit/7d797ad17009a00bedc91877b703a5c061e10efb))
+* **native:** keep the day array out of the create-event worklet ([3285597](https://github.com/afonsojramos/super-calendar/commit/3285597c1fad0b2d7d2c221ebb617d1fc5bb25ee))
+
+## 2.1.1 (2026-06-29)
+
+
+### Bug Fixes
+
+* correct package repository url to match renamed repo ([84ceb4b](https://github.com/afonsojramos/super-calendar/commit/84ceb4bebfd9d55ab2ed4d1ebd8fffa39deb2fe4))
+
+## 2.1.0 (2026-06-29)
+
+
+### Features
+
+* publish core, dom and native to JSR with explicit public-API types ([f508881](https://github.com/afonsojramos/super-calendar/commit/f508881a23d9be69e14af12ff6a8dbd38ff5b685))
+
+## 2.0.0 (2026-06-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* Split into a monorepo of three packages: `@super-calendar/core` (headless date logic and hooks), `@super-calendar/dom` (the react-dom renderer), and `@super-calendar/native` (the React Native renderer).
+
 ## [1.0.0](https://github.com/afonsojramos/super-calendar/compare/v0.6.0...v1.0.0) (2026-06-25)
 
 
