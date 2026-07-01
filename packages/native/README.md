@@ -1,6 +1,6 @@
 # @super-calendar/native
 
-[![JSR](https://jsr.io/badges/@super-calendar/native)](https://jsr.io/@super-calendar/native) [![JSR score](https://jsr.io/badges/@super-calendar/native/score)](https://jsr.io/@super-calendar/native)
+[![npm](https://img.shields.io/npm/v/@super-calendar/native?style=flat-square&color=1F6FEB)](https://www.npmjs.com/package/@super-calendar/native) [![JSR](https://img.shields.io/jsr/v/@super-calendar/native?style=flat-square&label=JSR&color=F7DF1E)](https://jsr.io/@super-calendar/native)
 
 The React Native renderer for [super-calendar](https://github.com/afonsojramos/react-native-super-calendar): a gesture-driven, virtualized **month / week / day** calendar and date picker. Runs on iOS, Android, and web (web via [react-native-web](https://necolas.github.io/react-native-web/)).
 
@@ -14,14 +14,10 @@ The React Native renderer for [super-calendar](https://github.com/afonsojramos/r
 ## Install
 
 ```sh
-# Deno
-deno add jsr:@super-calendar/native
-
-# npm / pnpm / yarn / bun
-npx jsr add @super-calendar/native
-pnpm dlx jsr add @super-calendar/native
-bunx jsr add @super-calendar/native
+npm install @super-calendar/native
 ```
+
+Also on [JSR](https://jsr.io/@super-calendar/native): `deno add jsr:@super-calendar/native`.
 
 Peer dependencies: `@legendapp/list` (>=3), `date-fns` (>=3), `react` (>=19), `react-native` (>=0.85), `react-native-gesture-handler` (>=2), `react-native-reanimated` (>=4), and `react-native-worklets` (>=0.8).
 
