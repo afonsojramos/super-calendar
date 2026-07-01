@@ -1727,7 +1727,7 @@ function TimeGridInner<T>({
  *
  * @example
  * ```tsx
- * import { TimeGrid } from "react-native-super-calendar";
+ * import { TimeGrid } from "@super-calendar/native";
  *
  * <TimeGrid
  *   mode="week"

@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/@super-calendar/core?style=flat-square&color=1F6FEB)](https://www.npmjs.com/package/@super-calendar/core) [![JSR](https://img.shields.io/jsr/v/@super-calendar/core?style=flat-square&label=JSR&color=F7DF1E)](https://jsr.io/@super-calendar/core) [![npmx](https://img.shields.io/badge/npmx-view-8A2BE2?style=flat-square)](https://npmx.dev/package/@super-calendar/core)
 
-The render-agnostic core of [super-calendar](https://github.com/afonsojramos/react-native-super-calendar): date math, the selection model, event layout, the month-grid builder, the headless hooks, and the neutral theme tokens.
+The render-agnostic core of [super-calendar](https://github.com/afonsojramos/super-calendar): date math, the selection model, event layout, the month-grid builder, the headless hooks, and the neutral theme tokens.
 
 It imports nothing from React Native, react-dom, Reanimated, Gesture Handler, or Legend List, so it bundles into any renderer. Use it to drive your own UI, or pair it with [`@super-calendar/dom`](https://www.npmjs.com/package/@super-calendar/dom) (react-dom) or [`@super-calendar/native`](https://www.npmjs.com/package/@super-calendar/native) (React Native).
 

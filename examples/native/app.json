@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Super Calendar Example",
-    "slug": "react-native-super-calendar-example",
+    "slug": "super-calendar-example",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

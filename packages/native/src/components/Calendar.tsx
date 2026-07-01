@@ -239,7 +239,7 @@ function visibleRange(
  *
  * @example
  * ```tsx
- * import { Calendar, type CalendarEvent } from "react-native-super-calendar";
+ * import { Calendar, type CalendarEvent } from "@super-calendar/native";
  *
  * function MyCalendar() {
  *   const [date, setDate] = useState(new Date());

@@ -462,7 +462,7 @@ function MonthViewInner<T>({
  *
  * @example
  * ```tsx
- * import { MonthView, type CalendarEvent } from "react-native-super-calendar";
+ * import { MonthView, type CalendarEvent } from "@super-calendar/native";
  *
  * <MonthView
  *   date={new Date()}

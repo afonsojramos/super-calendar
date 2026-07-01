@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/@super-calendar/native?style=flat-square&color=1F6FEB)](https://www.npmjs.com/package/@super-calendar/native) [![JSR](https://img.shields.io/jsr/v/@super-calendar/native?style=flat-square&label=JSR&color=F7DF1E)](https://jsr.io/@super-calendar/native) [![npmx](https://img.shields.io/badge/npmx-view-8A2BE2?style=flat-square)](https://npmx.dev/package/@super-calendar/native)
 
-The React Native renderer for [super-calendar](https://github.com/afonsojramos/react-native-super-calendar): a gesture-driven, virtualized **month / week / day** calendar and date picker. Runs on iOS, Android, and web (web via [react-native-web](https://necolas.github.io/react-native-web/)).
+The React Native renderer for [super-calendar](https://github.com/afonsojramos/super-calendar): a gesture-driven, virtualized **month / week / day** calendar and date picker. Runs on iOS, Android, and web (web via [react-native-web](https://necolas.github.io/react-native-web/)).
 
 - 📆 Month grid plus day / 3-day / week / custom-N time grids and an agenda
 - 🤏 Pinch-to-zoom week/day grid (UI thread, no re-renders)

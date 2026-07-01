@@ -1,4 +1,4 @@
-<h1 align="center">react-native-super-calendar</h1>
+<h1 align="center">super-calendar</h1>
 
 <p align="center">A generic, themeable <strong>month / week / day</strong> calendar for React Native.</p>
 
@@ -6,12 +6,12 @@
   <a href="https://www.npmjs.com/package/@super-calendar/native"><img alt="npm version" src="https://img.shields.io/npm/v/@super-calendar/native?style=flat-square&amp;color=1F6FEB" /></a>
   <a href="https://jsr.io/@super-calendar/native"><img alt="JSR version" src="https://img.shields.io/jsr/v/@super-calendar/native?style=flat-square&amp;label=JSR&amp;color=F7DF1E" /></a>
   <a href="https://npmx.dev/package/@super-calendar/native"><img alt="npmx" src="https://img.shields.io/badge/npmx-view-8A2BE2?style=flat-square" /></a>
-  <a href="https://github.com/afonsojramos/react-native-super-calendar/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/afonsojramos/react-native-super-calendar/ci.yml?branch=main&amp;style=flat-square&amp;label=CI" /></a>
+  <a href="https://github.com/afonsojramos/super-calendar/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/afonsojramos/super-calendar/ci.yml?branch=main&amp;style=flat-square&amp;label=CI" /></a>
   <a href="#license"><img alt="MIT license" src="https://img.shields.io/npm/l/@super-calendar/native?style=flat-square" /></a>
 </p>
 
 <p align="center">
-  <img alt="Month, week, 3-day, day and schedule views of react-native-super-calendar" src="./.github/assets/preview.png" />
+  <img alt="Month, week, 3-day, day and schedule views of super-calendar" src="./.github/assets/preview.png" />
 </p>
 
 <p align="center">
@@ -43,7 +43,7 @@ an homage. 🙇
 
 ### At a glance
 
-| Capability                                   | react-native-super-calendar                | react-native-big-calendar       |
+| Capability                                   | super-calendar                             | react-native-big-calendar       |
 | -------------------------------------------- | ------------------------------------------ | ------------------------------- |
 | Month / week / day / 3-day / custom / agenda | ✅                                         | ✅                              |
 | Generic event typing (`CalendarEvent<T>`)    | ✅                                         | ✅                              |
@@ -111,7 +111,7 @@ The date-picker surface (`MonthList`, `useDateRange`, and the headless
 [`flash-calendar`](https://github.com/MarceloPrado/flash-calendar), an excellent
 headless date picker for React Native. If you only need date selection,
 flash-calendar is the lighter, more focused choice: a dedicated, FlashList-based
-picker with no event model. react-native-super-calendar folds picking into a
+picker with no event model. super-calendar folds picking into a
 full gesture calendar, so one library covers events and date selection, at the
 cost of the Reanimated, Gesture Handler, and Legend List peers. Pick
 flash-calendar for a standalone picker; pick this when you also need the event

@@ -326,7 +326,7 @@ function MonthPagerInner<T>({
  *
  * @example
  * ```tsx
- * import { MonthPager } from "react-native-super-calendar";
+ * import { MonthPager } from "@super-calendar/native";
  *
  * <MonthPager
  *   date={date}

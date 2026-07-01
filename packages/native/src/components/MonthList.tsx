@@ -562,7 +562,7 @@ function MonthBlock({
  *
  * @example
  * ```tsx
- * import { MonthList } from "react-native-super-calendar/picker";
+ * import { MonthList } from "@super-calendar/native/picker";
  *
  * <MonthList
  *   date={new Date()}
