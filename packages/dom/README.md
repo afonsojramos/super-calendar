@@ -1,6 +1,6 @@
 # @super-calendar/dom
 
-[![npm](https://img.shields.io/npm/v/@super-calendar/dom?style=flat-square&color=1F6FEB)](https://www.npmjs.com/package/@super-calendar/dom) [![JSR](https://img.shields.io/jsr/v/@super-calendar/dom?style=flat-square&label=JSR&color=F7DF1E)](https://jsr.io/@super-calendar/dom)
+[![npm](https://img.shields.io/npm/v/@super-calendar/dom?style=flat-square&color=1F6FEB)](https://www.npmjs.com/package/@super-calendar/dom) [![JSR](https://img.shields.io/jsr/v/@super-calendar/dom?style=flat-square&label=JSR&color=F7DF1E)](https://jsr.io/@super-calendar/dom) [![npmx](https://img.shields.io/badge/npmx-view-8A2BE2?style=flat-square)](https://npmx.dev/package/@super-calendar/dom)
 
 The react-dom renderer for [super-calendar](https://github.com/afonsojramos/react-native-super-calendar): a virtualized **month / week / day** calendar and date picker built from real DOM components. No React Native, no react-native-web.
 
