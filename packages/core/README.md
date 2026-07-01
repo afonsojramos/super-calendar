@@ -1,22 +1,18 @@
 # @super-calendar/core
 
-[![JSR](https://jsr.io/badges/@super-calendar/core)](https://jsr.io/@super-calendar/core) [![JSR score](https://jsr.io/badges/@super-calendar/core/score)](https://jsr.io/@super-calendar/core)
+[![npm](https://img.shields.io/npm/v/@super-calendar/core?style=flat-square&color=1F6FEB)](https://www.npmjs.com/package/@super-calendar/core) [![JSR](https://img.shields.io/jsr/v/@super-calendar/core?style=flat-square&label=JSR&color=F7DF1E)](https://jsr.io/@super-calendar/core)
 
 The render-agnostic core of [super-calendar](https://github.com/afonsojramos/react-native-super-calendar): date math, the selection model, event layout, the month-grid builder, the headless hooks, and the neutral theme tokens.
 
-It imports nothing from React Native, react-dom, Reanimated, Gesture Handler, or Legend List, so it bundles into any renderer. Use it to drive your own UI, or pair it with [`@super-calendar/dom`](https://jsr.io/@super-calendar/dom) (react-dom) or [`@super-calendar/native`](https://jsr.io/@super-calendar/native) (React Native).
+It imports nothing from React Native, react-dom, Reanimated, Gesture Handler, or Legend List, so it bundles into any renderer. Use it to drive your own UI, or pair it with [`@super-calendar/dom`](https://www.npmjs.com/package/@super-calendar/dom) (react-dom) or [`@super-calendar/native`](https://www.npmjs.com/package/@super-calendar/native) (React Native).
 
 ## Install
 
 ```sh
-# Deno
-deno add jsr:@super-calendar/core
-
-# npm / pnpm / yarn / bun
-npx jsr add @super-calendar/core
-pnpm dlx jsr add @super-calendar/core
-bunx jsr add @super-calendar/core
+npm install @super-calendar/core
 ```
+
+Also on [JSR](https://jsr.io/@super-calendar/core): `deno add jsr:@super-calendar/core`.
 
 Peer dependencies: `date-fns` (>=3) and `react` (>=19).
 
