@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/@super-calendar/native"><img alt="npm version" src="https://img.shields.io/npm/v/@super-calendar/native?style=flat-square&amp;color=1F6FEB" /></a>
   <a href="https://jsr.io/@super-calendar/native"><img alt="JSR version" src="https://img.shields.io/jsr/v/@super-calendar/native?style=flat-square&amp;label=JSR&amp;color=F7DF1E" /></a>
-  <a href="https://www.npmjs.com/package/@super-calendar/native"><img alt="downloads per month" src="https://img.shields.io/npm/dm/@super-calendar/native?style=flat-square" /></a>
+  <a href="https://npmx.dev/package/@super-calendar/native"><img alt="npmx" src="https://img.shields.io/badge/npmx-view-8A2BE2?style=flat-square" /></a>
   <a href="https://github.com/afonsojramos/react-native-super-calendar/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/afonsojramos/react-native-super-calendar/ci.yml?branch=main&amp;style=flat-square&amp;label=CI" /></a>
   <a href="#license"><img alt="MIT license" src="https://img.shields.io/npm/l/@super-calendar/native?style=flat-square" /></a>
 </p>
