@@ -1,24 +1,20 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "release-type": "node",
-  "separate-pull-requests": false,
-  "plugins": [
-    "node-workspace",
-    {
-      "type": "linked-versions",
-      "groupName": "super-calendar",
-      "components": ["core", "native", "dom"]
-    }
-  ],
+  "include-component-in-tag": false,
+  "last-release-sha": "b2f02d1ecf9b88e66caa0fcb9e7f385218da6172",
   "packages": {
-    "packages/core": {
-      "extra-files": [{ "type": "json", "path": "jsr.json", "jsonpath": "$.version" }]
-    },
-    "packages/native": {
-      "extra-files": [{ "type": "json", "path": "jsr.json", "jsonpath": "$.version" }]
-    },
-    "packages/dom": {
-      "extra-files": [{ "type": "json", "path": "jsr.json", "jsonpath": "$.version" }]
+    ".": {
+      "component": "super-calendar",
+      "exclude-paths": ["examples", "docs", "scripts", ".github"],
+      "extra-files": [
+        { "type": "json", "path": "packages/core/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "packages/core/jsr.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "packages/dom/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "packages/dom/jsr.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "packages/native/package.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "packages/native/jsr.json", "jsonpath": "$.version" }
+      ]
     }
   }
 }
