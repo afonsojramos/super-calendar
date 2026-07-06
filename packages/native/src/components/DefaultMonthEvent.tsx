@@ -24,6 +24,7 @@ export function DefaultMonthEvent<T>({
   showTime = true,
   ellipsizeTitle = false,
   allDayLabel,
+  accessibilityLabel: accessibilityLabelProp,
   cellStyle,
   onPress,
   onLongPress,
@@ -40,14 +41,16 @@ export function DefaultMonthEvent<T>({
     allDayLabel,
   });
   const ellipsizeMode = titleEllipsizeMode(ellipsizeTitle);
-  const accessibilityLabel = eventAccessibilityLabel({
-    title: event.title,
-    isAllDay: isAllDayEvent,
-    start: event.start,
-    end: event.end,
-    ampm,
-    allDayLabel,
-  });
+  const accessibilityLabel =
+    accessibilityLabelProp ??
+    eventAccessibilityLabel({
+      title: event.title,
+      isAllDay: isAllDayEvent,
+      start: event.start,
+      end: event.end,
+      ampm,
+      allDayLabel,
+    });
 
   return (
     <TouchableOpacity

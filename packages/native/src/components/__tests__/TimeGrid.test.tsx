@@ -141,4 +141,20 @@ describe("TimeGrid business hours", () => {
     );
     expect(queryAllByTestId("business-hours-shade")).toHaveLength(0);
   });
+
+  it("uses eventAccessibilityLabel to override a timed event's label", () => {
+    const date = new Date(2026, 0, 6, 12, 0, 0);
+    const { getByLabelText, queryByLabelText } = render(
+      <Calendar
+        mode="day"
+        date={date}
+        events={[event]}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        eventAccessibilityLabel={(e, ctx) => `Custom: ${e.title} (${ctx.mode})`}
+      />,
+    );
+    expect(getByLabelText("Custom: Standup (day)")).toBeTruthy();
+    expect(queryByLabelText(/Standup, 09:00 to 10:00/)).toBeNull();
+  });
 });

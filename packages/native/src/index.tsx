@@ -48,6 +48,8 @@ export type {
   BusinessHours,
   CalendarEvent,
   CalendarMode,
+  EventAccessibilityLabelContext,
+  EventAccessibilityLabeler,
   EventKeyExtractor,
   ICalendarEvent,
   RecurrenceFrequency,

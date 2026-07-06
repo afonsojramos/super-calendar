@@ -9,6 +9,8 @@ export type {
   BusinessHours,
   CalendarEvent,
   CalendarMode,
+  EventAccessibilityLabelContext,
+  EventAccessibilityLabeler,
   EventKeyExtractor,
   ICalendarEvent,
   RecurrenceFrequency,
@@ -53,6 +55,12 @@ export type RenderEventArgs<T = unknown> = {
   allDayLabel?: string;
   /** Per-event style resolved from `eventCellStyle`; the built-in renderer merges it onto the box. */
   cellStyle?: StyleProp<ViewStyle>;
+  /**
+   * Screen-reader label to announce for the event, injected by a consumer's
+   * `eventAccessibilityLabel` override. The built-in renderers use it in place of
+   * their default label; `undefined` falls back to that default.
+   */
+  accessibilityLabel?: string;
   onPress: () => void;
   /** Wired when the consumer passes `onLongPressEvent`; otherwise undefined. */
   onLongPress?: () => void;

@@ -63,8 +63,10 @@ import {
   snapDeltaMinutes,
 } from "@super-calendar/core";
 import { formatHour, layoutDayEvents, type PositionedEvent } from "@super-calendar/core";
+import type { EventAccessibilityLabeler } from "@super-calendar/core";
 import { useWebGridZoom } from "../utils/useWebGridZoom";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
+import { withEventAccessibilityLabel } from "../utils/withEventAccessibilityLabel";
 import { AllDayLane } from "./AllDayLane";
 
 // Horizontal swipe paging doesn't translate to web; there we disable it and page
@@ -1180,6 +1182,12 @@ export type TimeGridProps<T> = {
   hourHeight?: number;
   weekStartsOn: WeekStartsOn;
   renderEvent: RenderEvent<T>;
+  /**
+   * Override the screen-reader label for each event. Receives the event and a
+   * `{ mode, isAllDay, ampm }` context; return the full text to announce. Defaults
+   * to the built-in title-and-time label.
+   */
+  eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
   keyExtractor: EventKeyExtractor<T>;
   scrollOffsetMinutes?: number;
   hourColumnWidth?: number;
@@ -1259,6 +1267,7 @@ function TimeGridInner<T>({
   hourHeight = DEFAULT_HOUR_HEIGHT,
   weekStartsOn,
   renderEvent,
+  eventAccessibilityLabel,
   keyExtractor,
   scrollOffsetMinutes = 0,
   hourColumnWidth: hourColumnWidthProp = DEFAULT_HOUR_COLUMN_WIDTH,
@@ -1303,6 +1312,14 @@ function TimeGridInner<T>({
   const clampedMaxHour = Math.max(clampedMinHour + 1, Math.min(maxHour, HOURS_PER_DAY));
   // Collapse the hour gutter to zero when hours are hidden.
   const hourColumnWidth = hideHours ? 0 : hourColumnWidthProp;
+
+  // Inject a consumer's `eventAccessibilityLabel` override into every event once,
+  // so the timed columns and the all-day lane share it without threading a prop
+  // through each. Passes the grid's `ampm` so the label can match the clock.
+  const labeledRenderEvent = useMemo(
+    () => withEventAccessibilityLabel(renderEvent, eventAccessibilityLabel, ampm),
+    [renderEvent, eventAccessibilityLabel, ampm],
+  );
 
   const { width, height } = useWindowDimensions();
   const listRef = useRef<LegendListRef>(null);
@@ -1590,7 +1607,7 @@ function TimeGridInner<T>({
           minHourHeight={minHourHeight}
           maxHourHeight={maxHourHeight}
           showNowIndicator={showNowIndicator}
-          renderEvent={renderEvent}
+          renderEvent={labeledRenderEvent}
           keyExtractor={keyExtractor}
           snapMinutes={Math.max(1, dragStepMinutes)}
           showDragHandle={showDragHandle}
@@ -1634,7 +1651,7 @@ function TimeGridInner<T>({
       minHourHeight,
       maxHourHeight,
       showNowIndicator,
-      renderEvent,
+      labeledRenderEvent,
       keyExtractor,
       dragStepMinutes,
       showDragHandle,

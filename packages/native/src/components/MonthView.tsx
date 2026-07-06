@@ -16,7 +16,13 @@ import {
 const isWeb = Platform.OS === "web";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent, WeekStartsOn } from "../types";
-import { type DateRange, daySelectionState, useCalendarSelection } from "@super-calendar/core";
+import { withEventAccessibilityLabel } from "../utils/withEventAccessibilityLabel";
+import {
+  type DateRange,
+  type EventAccessibilityLabeler,
+  daySelectionState,
+  useCalendarSelection,
+} from "@super-calendar/core";
 import { dayBadgeKind, rangeBandKind } from "@super-calendar/core";
 import {
   buildMonthWeeks,
@@ -95,6 +101,12 @@ export type MonthViewProps<T> = {
   /** Per-date style merged onto the day cell. */
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
   renderEvent: RenderEvent<T>;
+  /**
+   * Override the screen-reader label for each event chip. Receives the event and a
+   * `{ mode: "month", isAllDay, ampm: false }` context; return the full text to
+   * announce. Defaults to the built-in title-and-time label.
+   */
+  eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
   keyExtractor: EventKeyExtractor<T>;
   onPressDay?: (date: Date) => void;
   onLongPressDay?: (date: Date) => void;
@@ -131,6 +143,7 @@ function MonthViewInner<T>({
   isDateDisabled: isDateDisabledProp,
   calendarCellStyle,
   renderEvent,
+  eventAccessibilityLabel,
   keyExtractor,
   onPressDay,
   onLongPressDay,
@@ -150,7 +163,11 @@ function MonthViewInner<T>({
   const minDate = minDateProp ?? selection.minDate;
   const maxDate = maxDateProp ?? selection.maxDate;
   const isDateDisabled = isDateDisabledProp ?? selection.isDateDisabled;
-  const RenderEventComponent = renderEvent;
+  // Month cells never show a time, so the override context reports 24h (ampm:false).
+  const RenderEventComponent = useMemo(
+    () => withEventAccessibilityLabel(renderEvent, eventAccessibilityLabel, false),
+    [renderEvent, eventAccessibilityLabel],
+  );
   // Measured grid height, used to auto-fit the event chips per cell.
   const [gridHeight, setGridHeight] = useState(0);
   // Web-only hover highlight on the day badge (mouse pointers); stays null on

@@ -20,7 +20,7 @@ import type {
   RenderEventArgs,
   WeekStartsOn,
 } from "../types";
-import { getViewDays } from "@super-calendar/core";
+import { type EventAccessibilityLabeler, getViewDays } from "@super-calendar/core";
 import { Agenda } from "./Agenda";
 import { DefaultEvent } from "./DefaultEvent";
 import { MonthPager } from "./MonthPager";
@@ -114,6 +114,12 @@ export type CalendarProps<T> = {
   weekEndsOn?: WeekStartsOn;
   /** Replace the built-in event box. Return a `flex: 1` element. */
   renderEvent?: RenderEvent<T>;
+  /**
+   * Override the screen-reader label for each event. Receives the event and a
+   * `{ mode, isAllDay, ampm }` context; return the full text to announce. Applies
+   * across every view. Defaults to the built-in title-and-time label.
+   */
+  eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
   /** Per-event style merged onto the built-in event box (static or a function of the event). */
   eventCellStyle?: StyleProp<ViewStyle> | ((event: CalendarEvent<T>) => StyleProp<ViewStyle>);
   /** Per-date style for month cells and week/day columns (e.g. shade specific dates). */
@@ -287,6 +293,7 @@ export function Calendar<T>({
   numberOfDays,
   weekEndsOn,
   renderEvent = DefaultEvent,
+  eventAccessibilityLabel,
   eventCellStyle,
   calendarCellStyle,
   businessHours,
@@ -365,7 +372,8 @@ export function Calendar<T>({
       ampm == null &&
       showTime == null &&
       ellipsizeTitle == null &&
-      allDayLabel == null
+      allDayLabel == null &&
+      eventAccessibilityLabel == null
     )
       return renderEvent;
     const Base = renderEvent;
@@ -380,10 +388,27 @@ export function Calendar<T>({
           showTime={showTime}
           ellipsizeTitle={ellipsizeTitle}
           allDayLabel={allDayLabel}
+          accessibilityLabel={
+            eventAccessibilityLabel
+              ? eventAccessibilityLabel(props.event, {
+                  mode: props.mode,
+                  isAllDay: props.isAllDay ?? false,
+                  ampm: ampm ?? false,
+                })
+              : props.accessibilityLabel
+          }
         />
       );
     };
-  }, [renderEvent, eventCellStyle, ampm, showTime, ellipsizeTitle, allDayLabel]);
+  }, [
+    renderEvent,
+    eventCellStyle,
+    ampm,
+    showTime,
+    ellipsizeTitle,
+    allDayLabel,
+    eventAccessibilityLabel,
+  ]);
 
   return (
     <CalendarThemeProvider value={mergedTheme}>

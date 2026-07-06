@@ -38,6 +38,7 @@ export function DefaultEvent<T>({
   showTime = true,
   ellipsizeTitle = false,
   allDayLabel,
+  accessibilityLabel: accessibilityLabelProp,
   cellStyle,
   onPress,
   onLongPress,
@@ -60,15 +61,19 @@ export function DefaultEvent<T>({
   );
 
   // Announce the full event to screen readers: title plus the all-day label or
-  // the time range (which is otherwise only shown visually).
-  const accessibilityLabel = eventAccessibilityLabel({
-    title: event.title,
-    isAllDay: isAllDayEvent,
-    start: event.start,
-    end: event.end,
-    ampm,
-    allDayLabel,
-  });
+  // the time range (which is otherwise only shown visually). A consumer's
+  // `eventAccessibilityLabel` override, threaded in as `accessibilityLabelProp`,
+  // takes precedence.
+  const accessibilityLabel =
+    accessibilityLabelProp ??
+    eventAccessibilityLabel({
+      title: event.title,
+      isAllDay: isAllDayEvent,
+      start: event.start,
+      end: event.end,
+      ampm,
+      allDayLabel,
+    });
 
   // Month cells and the all-day lane get a single clipped line; the timed grid
   // (and the roomy schedule rows) wrap to fill the box. `titleNumberOfLines`

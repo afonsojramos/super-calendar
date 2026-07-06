@@ -31,6 +31,7 @@ import {
   type CalendarSelection,
   CalendarSelectionProvider,
   type DateRange,
+  type EventAccessibilityLabeler,
   isDateSelectable,
 } from "@super-calendar/core";
 import { buildMonthWeeks, getWeekDays } from "@super-calendar/core";
@@ -106,6 +107,12 @@ export type MonthListProps<T> = {
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
   /** Replace the built-in event box. Defaults to `DefaultEvent`. */
   renderEvent?: RenderEvent<T>;
+  /**
+   * Override the screen-reader label for each event chip. Receives the event and a
+   * `{ mode: "month", isAllDay, ampm: false }` context; return the full text to
+   * announce. Defaults to the built-in title-and-time label.
+   */
+  eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
   /** Stable key per event. Defaults to start-time + index. */
   keyExtractor?: EventKeyExtractor<T>;
   onPressDay?: (date: Date) => void;
@@ -147,6 +154,7 @@ function MonthListInner<T>({
   isDateDisabled,
   calendarCellStyle,
   renderEvent = DefaultMonthEvent,
+  eventAccessibilityLabel,
   keyExtractor = defaultKeyExtractor as EventKeyExtractor<T>,
   onPressDay,
   onLongPressDay,
@@ -430,6 +438,7 @@ function MonthListInner<T>({
             fillCellOnSelection={fillCellOnSelection}
             calendarCellStyle={calendarCellStyle}
             renderEvent={renderEvent}
+            eventAccessibilityLabel={eventAccessibilityLabel}
             keyExtractor={keyExtractor}
             onPressDay={dragEnabled ? handlePressDay : onPressDay}
             onLongPressDay={onLongPressDay}

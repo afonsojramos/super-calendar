@@ -130,4 +130,18 @@ describe("MonthView disabled days", () => {
     );
     expect(() => getByLabelText(/, 12 June 2026, selected/)).toThrow();
   });
+
+  it("uses eventAccessibilityLabel to override an event chip's label", () => {
+    const events: CalendarEvent[] = [
+      { title: "Standup", start: new Date(2026, 5, 15, 9, 0), end: new Date(2026, 5, 15, 9, 30) },
+    ];
+    const { getByLabelText } = render(
+      <MonthView
+        {...baseProps}
+        events={events}
+        eventAccessibilityLabel={(event) => `Custom: ${event.title}`}
+      />,
+    );
+    expect(getByLabelText("Custom: Standup")).toBeTruthy();
+  });
 });
