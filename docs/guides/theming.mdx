@@ -63,6 +63,13 @@ const scheme = useColorScheme();
 Inside a custom `renderEvent` (or any descendant), read the active theme with
 `useCalendarTheme()`.
 
+### Tailwind & per-part classes (web)
+
+The theme recolours everything at once. To hand a specific part of the **web**
+calendar to Tailwind or your own CSS (with `data-*` state variants like
+`data-[today]:`), use per-slot `classNames` / `styles` — see
+[Styling with Tailwind & CSS](/guides/styling).
+
 ## Business hours
 
 Pass `businessHours` to tint the closed hours on the week/day grid. It's a

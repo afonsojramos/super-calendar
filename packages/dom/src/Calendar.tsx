@@ -5,16 +5,26 @@ import type {
   CalendarEvent,
   DateRange,
   DateSelectionConstraints,
+  EventAccessibilityLabeler,
   TimeGridMode,
   WeekStartsOn,
 } from "@super-calendar/core";
-import { Agenda, type DomAgendaEvent } from "./Agenda";
-import { type DomMonthEvent, MonthView } from "./MonthView";
-import { type DomRenderEvent, TimeGrid } from "./TimeGrid";
+import { Agenda, type AgendaSlot, type DomAgendaEvent } from "./Agenda";
+import { type DomMonthEvent, MonthView, type MonthViewSlot } from "./MonthView";
+import type { SlotStyleProps } from "./slots";
+import { type DomRenderEvent, TimeGrid, type TimeGridSlot } from "./TimeGrid";
 import type { DomCalendarTheme } from "./theme";
 
+/**
+ * Styleable parts across every view {@link Calendar} can render. Only the slots
+ * for the active `mode` apply; the rest are ignored. See {@link MonthViewSlot},
+ * {@link TimeGridSlot}, and {@link AgendaSlot}.
+ */
+export type CalendarSlot = MonthViewSlot | TimeGridSlot | AgendaSlot;
+
 /** Props for {@link Calendar}. */
-export interface CalendarProps<T = unknown> extends DateSelectionConstraints {
+export interface CalendarProps<T = unknown>
+  extends DateSelectionConstraints, SlotStyleProps<CalendarSlot> {
   /**
    * The view to render (default "week"). `month` renders a month grid, `schedule`
    * a day-grouped agenda list, and the others a time grid.
@@ -41,6 +51,12 @@ export interface CalendarProps<T = unknown> extends DateSelectionConstraints {
 
   /** Tap an event (both layouts). */
   onPressEvent?: (event: CalendarEvent<T>) => void;
+  /**
+   * Override the screen-reader label for each event. Receives the event and a
+   * `{ mode, isAllDay, ampm }` context; return the full text to announce. Defaults
+   * to each view's built-in label.
+   */
+  eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
 
   // --- Time-grid modes (week / day / 3days / custom) ---
   /** 12-hour AM/PM time labels (default false). */
@@ -128,6 +144,7 @@ export function Calendar<T = unknown>({
   className,
   style,
   onPressEvent,
+  eventAccessibilityLabel,
   // time grid
   ampm,
   hourHeight,
@@ -160,6 +177,9 @@ export function Calendar<T = unknown>({
   renderMonthEvent,
   // schedule
   renderScheduleEvent,
+  // styling
+  classNames,
+  styles,
 }: CalendarProps<T>): ReactElement {
   if (mode === "schedule") {
     return (
@@ -172,7 +192,10 @@ export function Calendar<T = unknown>({
         activeDate={date}
         className={className}
         style={style}
+        classNames={classNames}
+        styles={styles}
         renderEvent={renderScheduleEvent}
+        eventAccessibilityLabel={eventAccessibilityLabel}
         onPressEvent={onPressEvent}
         onPressDay={onPressDay}
       />
@@ -189,6 +212,8 @@ export function Calendar<T = unknown>({
         theme={theme}
         className={className}
         style={style}
+        classNames={classNames}
+        styles={styles}
         maxVisibleEventCount={maxVisibleEventCount}
         moreLabel={moreLabel}
         showAdjacentMonths={showAdjacentMonths}
@@ -203,6 +228,7 @@ export function Calendar<T = unknown>({
         onPressEvent={onPressEvent}
         onPressMore={onPressMore}
         renderEvent={renderMonthEvent}
+        eventAccessibilityLabel={eventAccessibilityLabel}
       />
     );
   }
@@ -219,6 +245,8 @@ export function Calendar<T = unknown>({
       height={height}
       className={className}
       style={style}
+      classNames={classNames}
+      styles={styles}
       ampm={ampm}
       hourHeight={hourHeight}
       scrollOffsetMinutes={scrollOffsetMinutes}
@@ -234,6 +262,7 @@ export function Calendar<T = unknown>({
       onDragEvent={onDragEvent}
       onPressDateHeader={onPressDateHeader}
       renderEvent={renderTimeEvent}
+      eventAccessibilityLabel={eventAccessibilityLabel}
       hourComponent={hourComponent}
     />
   );

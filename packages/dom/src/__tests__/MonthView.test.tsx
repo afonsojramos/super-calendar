@@ -213,4 +213,90 @@ describe("dom MonthView", () => {
       expect(getAllByText("Trip").length).toBe(2);
     });
   });
+
+  describe("slot styling", () => {
+    it("exposes a data-slot hook and the default themed style when no class is given", () => {
+      const { getByText } = render(<MonthView date={new Date(2026, 6, 1)} weekStartsOn={1} />);
+      const title = getByText("July 2026");
+      expect(title.getAttribute("data-slot")).toBe("title");
+      // Zero-config keeps the built-in look.
+      expect(title.style.fontWeight).toBe("700");
+    });
+
+    it("drops the themed inline style for a slot when a class is supplied, so the class wins", () => {
+      const { getByText } = render(
+        <MonthView
+          date={new Date(2026, 6, 1)}
+          weekStartsOn={1}
+          classNames={{ title: "text-center font-normal" }}
+        />,
+      );
+      const title = getByText("July 2026");
+      expect(title.className).toBe("text-center font-normal");
+      // The default fontWeight/fontSize/padding are gone so the class controls them.
+      expect(title.style.fontWeight).toBe("");
+      expect(title.style.fontSize).toBe("");
+      expect(title.style.padding).toBe("");
+    });
+
+    it("keeps structural styles even when a class replaces the themed ones", () => {
+      const { container } = render(
+        <MonthView
+          date={new Date(2026, 6, 1)}
+          weekStartsOn={1}
+          classNames={{ weekdays: "border-0" }}
+        />,
+      );
+      const header = container.querySelector('[data-slot="weekdays"]') as HTMLElement;
+      expect(header.className).toBe("border-0");
+      // Structural grid layout is preserved; only the themed border/padding drop.
+      expect(header.style.display).toBe("grid");
+      expect(header.style.borderBottom).toBe("");
+    });
+
+    it("merges a per-slot inline style override last", () => {
+      const { getByText } = render(
+        <MonthView
+          date={new Date(2026, 6, 1)}
+          weekStartsOn={1}
+          styles={{ title: { color: "rgb(255, 0, 0)" } }}
+        />,
+      );
+      const title = getByText("July 2026");
+      // Override applied on top of the retained default themed styles.
+      expect(title.style.color).toBe("rgb(255, 0, 0)");
+      expect(title.style.fontWeight).toBe("700");
+    });
+
+    it("marks day state with present/absent data-* attributes for variant styling", () => {
+      const { container } = render(
+        <MonthView
+          date={new Date(2026, 6, 1)}
+          weekStartsOn={1}
+          selectedDates={[new Date(2026, 6, 15)]}
+        />,
+      );
+      const selected = container.querySelector('[data-day="2026-07-15"]') as HTMLElement;
+      expect(selected.hasAttribute("data-selected")).toBe(true);
+      const plain = container.querySelector('[data-day="2026-07-16"]') as HTMLElement;
+      expect(plain.hasAttribute("data-selected")).toBe(false);
+    });
+  });
+
+  it("uses eventAccessibilityLabel to override an event chip's aria-label", () => {
+    const events: CalendarEvent[] = [
+      { title: "Standup", start: new Date(2026, 6, 15, 9, 0), end: new Date(2026, 6, 15, 9, 30) },
+    ];
+    const { getByLabelText, queryByLabelText } = render(
+      <MonthView
+        date={new Date(2026, 6, 1)}
+        weekStartsOn={1}
+        events={events}
+        eventAccessibilityLabel={(event) => `Custom: ${event.title}`}
+      />,
+    );
+    expect(getByLabelText("Custom: Standup")).toBeTruthy();
+    // The built-in "title, day" label is replaced, not appended.
+    expect(queryByLabelText("Standup, 15 July")).toBeNull();
+  });
 });

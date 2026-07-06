@@ -16,7 +16,8 @@ import {
   type CalendarMode,
   cellRangeFromDrag,
   closedHourBands,
-  eventAccessibilityLabel,
+  eventAccessibilityLabel as defaultEventAccessibilityLabel,
+  type EventAccessibilityLabeler,
   eventChipLayout,
   eventTimeLabel,
   formatHour,
@@ -29,7 +30,31 @@ import {
   titleNumberOfLines,
   type WeekStartsOn,
 } from "@super-calendar/core";
+import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
+
+/**
+ * Styleable parts of {@link TimeGrid}. Pass a class or inline style per slot via
+ * the `classNames` / `styles` props.
+ */
+export type TimeGridSlot =
+  | "header"
+  | "columnHeader"
+  | "columnHeaderWeekday"
+  | "columnHeaderDate"
+  | "allDayLane"
+  | "allDayLabel"
+  | "allDayColumn"
+  | "allDayEvent"
+  | "hourGutter"
+  | "hourLabel"
+  | "dayColumn"
+  | "gridLines"
+  | "businessHours"
+  | "event"
+  | "eventBox"
+  | "nowIndicator"
+  | "createGhost";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const GUTTER_WIDTH = 56;
@@ -59,7 +84,7 @@ export interface DomRenderEventArgs<T = unknown> {
 export type DomRenderEvent<T = unknown> = ComponentType<DomRenderEventArgs<T>>;
 
 /** Props for {@link TimeGrid}. */
-export interface TimeGridProps<T = unknown> {
+export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot> {
   /** Anchor date; the visible columns are derived from it and `mode`. */
   date: Date;
   /** Events to lay out on the grid. */
@@ -100,6 +125,13 @@ export interface TimeGridProps<T = unknown> {
   height?: number | string;
   /** Custom event renderer; falls back to the built-in event box. */
   renderEvent?: DomRenderEvent<T>;
+  /**
+   * Override the screen-reader label for each event. Receives the event and a
+   * `{ mode, isAllDay, ampm }` context; return the full text to announce. Defaults
+   * to the title plus the time range (or "all day"), which the grid otherwise only
+   * conveys visually.
+   */
+  eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
   /** Replace the hour-axis label. Receives the hour (0-23) and the `ampm` flag. */
   hourComponent?: (hour: number, ampm: boolean) => ReactNode;
   /** Tap an event. */
@@ -146,7 +178,8 @@ function DefaultDomEvent<T>({
   boxHeight,
   ampm = false,
   theme,
-}: DomRenderEventArgs<T> & { theme: DomCalendarTheme }) {
+  boxProps,
+}: DomRenderEventArgs<T> & { theme: DomCalendarTheme; boxProps?: ResolvedSlot }) {
   const timeLabel = eventTimeLabel({
     mode,
     isAllDay,
@@ -168,19 +201,30 @@ function DefaultDomEvent<T>({
     paddingYPx: DOM_BOX_PADDING_V,
   });
   const oneLine = titleNumberOfLines(mode, isAllDay) === 1;
+  // Structural box metrics always apply; the card's look (colour, radius, type)
+  // is themed and yields to a `eventBox` class when one is supplied.
+  const boxBase: CSSProperties = {
+    height: "100%",
+    boxSizing: "border-box",
+    overflow: "hidden",
+    lineHeight: `${DOM_TITLE_LINE_HEIGHT}px`,
+  };
+  const boxThemed: CSSProperties = {
+    padding: `${DOM_BOX_PADDING_V}px 6px`,
+    borderRadius: 6,
+    background: theme.eventBackground,
+    color: theme.eventText,
+    fontSize: 12,
+  };
   return (
     <div
-      style={{
-        height: "100%",
-        boxSizing: "border-box",
-        overflow: "hidden",
-        padding: `${DOM_BOX_PADDING_V}px 6px`,
-        borderRadius: 6,
-        background: theme.eventBackground,
-        color: theme.eventText,
-        fontSize: 12,
-        lineHeight: `${DOM_TITLE_LINE_HEIGHT}px`,
-      }}
+      className={boxProps?.className}
+      data-slot={boxProps?.["data-slot"]}
+      style={
+        boxProps?.className
+          ? { ...boxBase, ...boxProps.style }
+          : { ...boxBase, ...boxThemed, ...boxProps?.style }
+      }
     >
       <div
         style={{
@@ -241,6 +285,7 @@ export function TimeGrid<T = unknown>({
   theme: themeOverrides,
   height = 600,
   renderEvent,
+  eventAccessibilityLabel,
   hourComponent,
   onPressEvent,
   onPressDateHeader,
@@ -250,8 +295,11 @@ export function TimeGrid<T = unknown>({
   onDragEvent,
   className,
   style,
+  classNames,
+  styles,
 }: TimeGridProps<T>): ReactElement {
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
+  const slot = createSlots<TimeGridSlot>({ classNames, styles });
   const scrollRef = useRef<HTMLDivElement>(null);
   const dfns = locale ? { locale } : undefined;
   const snapHours = dragStepMinutes / 60;
@@ -508,7 +556,12 @@ export function TimeGrid<T = unknown>({
       }}
     >
       {/* Header */}
-      <div style={{ display: "flex", borderBottom: `1px solid ${theme.gridLine}` }}>
+      <div
+        {...slot("header", {
+          base: { display: "flex" },
+          themed: { borderBottom: `1px solid ${theme.gridLine}` },
+        })}
+      >
         <div style={{ width: GUTTER_WIDTH, flex: "none" }} />
         {days.map((day) => {
           const today = getIsToday(day);
@@ -519,34 +572,43 @@ export function TimeGrid<T = unknown>({
               tabIndex={onPressDateHeader ? 0 : -1}
               aria-hidden={onPressDateHeader ? undefined : true}
               onClick={onPressDateHeader ? () => onPressDateHeader(day) : undefined}
-              style={{
-                flex: 1,
-                border: "none",
-                background: "transparent",
-                font: "inherit",
-                color: theme.textMuted,
-                cursor: onPressDateHeader ? "pointer" : "default",
-                padding: "6px 0",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 2,
-              }}
-            >
-              <span style={{ fontSize: 11, fontWeight: 600 }}>{format(day, "EEE", dfns)}</span>
-              <span
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: "50%",
+              {...dataState({ "data-today": today })}
+              {...slot("columnHeader", {
+                base: {
+                  flex: 1,
+                  border: "none",
+                  background: "transparent",
+                  font: "inherit",
+                  cursor: onPressDateHeader ? "pointer" : "default",
                   display: "flex",
+                  flexDirection: "column",
                   alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 15,
-                  fontWeight: 600,
-                  background: today ? theme.todayBackground : "transparent",
-                  color: today ? theme.todayText : theme.text,
-                }}
+                  gap: 2,
+                },
+                themed: { color: theme.textMuted, padding: "6px 0" },
+              })}
+            >
+              <span {...slot("columnHeaderWeekday", { themed: { fontSize: 11, fontWeight: 600 } })}>
+                {format(day, "EEE", dfns)}
+              </span>
+              <span
+                {...dataState({ "data-today": today })}
+                {...slot("columnHeaderDate", {
+                  base: {
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  },
+                  themed: {
+                    fontSize: 15,
+                    fontWeight: 600,
+                    background: today ? theme.todayBackground : "transparent",
+                    color: today ? theme.todayText : theme.text,
+                  },
+                })}
               >
                 {format(day, "d", dfns)}
               </span>
@@ -557,16 +619,17 @@ export function TimeGrid<T = unknown>({
 
       {/* All-day lane */}
       {showAllDayEventCell && hasAllDay ? (
-        <div style={{ display: "flex", borderBottom: `1px solid ${theme.gridLine}` }}>
+        <div
+          {...slot("allDayLane", {
+            base: { display: "flex" },
+            themed: { borderBottom: `1px solid ${theme.gridLine}` },
+          })}
+        >
           <div
-            style={{
-              width: GUTTER_WIDTH,
-              flex: "none",
-              fontSize: 10,
-              color: theme.textMuted,
-              textAlign: "right",
-              padding: "4px 6px 0 0",
-            }}
+            {...slot("allDayLabel", {
+              base: { width: GUTTER_WIDTH, flex: "none", textAlign: "right" },
+              themed: { fontSize: 10, color: theme.textMuted, padding: "4px 6px 0 0" },
+            })}
           >
             all-day
           </div>
@@ -576,18 +639,20 @@ export function TimeGrid<T = unknown>({
             return (
               <div
                 key={days[i].toISOString()}
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  // Mirror the day column's geometry so the all-day chip lines up
-                  // exactly with the timed events below it: a 1px left border (the
-                  // grid line, transparent here) plus a 1px horizontal inset.
-                  borderLeft: "1px solid transparent",
-                  padding: "2px 1px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 2,
-                }}
+                {...slot("allDayColumn", {
+                  base: {
+                    flex: 1,
+                    minWidth: 0,
+                    // Mirror the day column's geometry so the all-day chip lines up
+                    // exactly with the timed events below it: a 1px left border (the
+                    // grid line, transparent here) plus a 1px horizontal inset.
+                    borderLeft: "1px solid transparent",
+                    padding: "2px 1px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
+                  },
+                })}
               >
                 {list.map((event) => {
                   const args: DomRenderEventArgs<T> = {
@@ -606,26 +671,32 @@ export function TimeGrid<T = unknown>({
                       key={`${event.start.toISOString()}:${event.title}`}
                       type="button"
                       onClick={() => onPressEvent?.(event)}
-                      aria-label={eventAccessibilityLabel({
-                        title: event.title,
-                        isAllDay: true,
-                        start: event.start,
-                        end: event.end,
-                        ampm,
+                      aria-label={
+                        eventAccessibilityLabel
+                          ? eventAccessibilityLabel(event, { mode, isAllDay: true, ampm })
+                          : defaultEventAccessibilityLabel({
+                              title: event.title,
+                              isAllDay: true,
+                              start: event.start,
+                              end: event.end,
+                              ampm,
+                            })
+                      }
+                      {...slot("allDayEvent", {
+                        base: {
+                          border: "none",
+                          padding: 0,
+                          background: "transparent",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          height: 22,
+                        },
                       })}
-                      style={{
-                        border: "none",
-                        padding: 0,
-                        background: "transparent",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        height: 22,
-                      }}
                     >
                       {Renderer ? (
                         <Renderer {...args} />
                       ) : (
-                        <DefaultDomEvent {...args} theme={theme} />
+                        <DefaultDomEvent {...args} theme={theme} boxProps={slot("eventBox")} />
                       )}
                     </button>
                   );
@@ -652,17 +723,18 @@ export function TimeGrid<T = unknown>({
       >
         <div style={{ display: "flex", height: totalHeight, position: "relative" }}>
           {/* Hour gutter */}
-          <div style={{ width: GUTTER_WIDTH, flex: "none", position: "relative" }}>
+          <div
+            {...slot("hourGutter", {
+              base: { width: GUTTER_WIDTH, flex: "none", position: "relative" },
+            })}
+          >
             {HOURS.map((h) => (
               <div
                 key={h}
-                style={{
-                  position: "absolute",
-                  top: h * hourHeight - 6,
-                  right: 6,
-                  fontSize: 10,
-                  color: theme.textMuted,
-                }}
+                {...slot("hourLabel", {
+                  base: { position: "absolute", top: h * hourHeight - 6, right: 6 },
+                  themed: { fontSize: 10, color: theme.textMuted },
+                })}
               >
                 {hourComponent ? hourComponent(h, ampm) : h === 0 ? "" : formatHour(h, { ampm })}
               </div>
@@ -687,39 +759,38 @@ export function TimeGrid<T = unknown>({
                 onPointerMove={cellEnabled ? moveCreate : undefined}
                 onPointerUp={cellEnabled ? endCreate : undefined}
                 onPointerCancel={cellEnabled ? cancelCreate : undefined}
-                style={{
-                  flex: 1,
-                  position: "relative",
-                  borderLeft: `1px solid ${theme.gridLine}`,
-                }}
+                {...dataState({ "data-today": getIsToday(day) })}
+                {...slot("dayColumn", {
+                  base: { flex: 1, position: "relative" },
+                  themed: { borderLeft: `1px solid ${theme.gridLine}` },
+                })}
               >
                 {/* Business-hours shade, behind the grid lines and events. */}
                 {bands.map((b) => (
                   <div
                     key={b.start}
                     aria-hidden
-                    style={{
-                      position: "absolute",
-                      left: 0,
-                      right: 0,
-                      top: b.start * hourHeight,
-                      height: (b.end - b.start) * hourHeight,
-                      background: theme.outsideHoursBackground,
-                      pointerEvents: "none",
-                      zIndex: 0,
-                    }}
+                    {...slot("businessHours", {
+                      base: {
+                        position: "absolute",
+                        left: 0,
+                        right: 0,
+                        top: b.start * hourHeight,
+                        height: (b.end - b.start) * hourHeight,
+                        pointerEvents: "none",
+                        zIndex: 0,
+                      },
+                      themed: { background: theme.outsideHoursBackground },
+                    })}
                   />
                 ))}
                 {/* Grid lines, painted over the shade so they stay visible. */}
                 <div
                   aria-hidden
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    pointerEvents: "none",
-                    zIndex: 0,
-                    backgroundImage: gridLines,
-                  }}
+                  {...slot("gridLines", {
+                    base: { position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0 },
+                    themed: { backgroundImage: gridLines },
+                  })}
                 />
                 {positioned.map((pe, idx) => {
                   const key = `${dayIndex}:${idx}`;
@@ -746,13 +817,17 @@ export function TimeGrid<T = unknown>({
                       key={idx}
                       role="button"
                       tabIndex={0}
-                      aria-label={eventAccessibilityLabel({
-                        title: pe.event.title,
-                        isAllDay: false,
-                        start: pe.event.start,
-                        end: pe.event.end,
-                        ampm,
-                      })}
+                      aria-label={
+                        eventAccessibilityLabel
+                          ? eventAccessibilityLabel(pe.event, { mode, isAllDay: false, ampm })
+                          : defaultEventAccessibilityLabel({
+                              title: pe.event.title,
+                              isAllDay: false,
+                              start: pe.event.start,
+                              end: pe.event.end,
+                              ampm,
+                            })
+                      }
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
@@ -771,22 +846,25 @@ export function TimeGrid<T = unknown>({
                       }
                       onPointerCancel={draggable ? cancelDrag : undefined}
                       onClick={draggable ? undefined : onPress}
-                      style={{
-                        position: "absolute",
-                        top,
-                        height: boxHeight,
-                        left: `calc(${pe.column * widthPct}% + 1px)`,
-                        width: `calc(${widthPct}% - 2px)`,
-                        cursor: draggable ? "grab" : "pointer",
-                        touchAction: draggable ? "none" : "auto",
-                        zIndex: active ? 3 : 1,
-                        opacity: active ? 0.85 : 1,
-                      }}
+                      {...dataState({ "data-dragging": !!active })}
+                      {...slot("event", {
+                        base: {
+                          position: "absolute",
+                          top,
+                          height: boxHeight,
+                          left: `calc(${pe.column * widthPct}% + 1px)`,
+                          width: `calc(${widthPct}% - 2px)`,
+                          cursor: draggable ? "grab" : "pointer",
+                          touchAction: draggable ? "none" : "auto",
+                          zIndex: active ? 3 : 1,
+                          opacity: active ? 0.85 : 1,
+                        },
+                      })}
                     >
                       {Renderer ? (
                         <Renderer {...args} />
                       ) : (
-                        <DefaultDomEvent {...args} theme={theme} />
+                        <DefaultDomEvent {...args} theme={theme} boxProps={slot("eventBox")} />
                       )}
                       {draggable ? (
                         <div
@@ -810,15 +888,17 @@ export function TimeGrid<T = unknown>({
                 })}
                 {showNow ? (
                   <div
-                    style={{
-                      position: "absolute",
-                      top: nowTop,
-                      left: 0,
-                      right: 0,
-                      height: 0,
-                      zIndex: 2,
-                      pointerEvents: "none",
-                    }}
+                    {...slot("nowIndicator", {
+                      base: {
+                        position: "absolute",
+                        top: nowTop,
+                        left: 0,
+                        right: 0,
+                        height: 0,
+                        zIndex: 2,
+                        pointerEvents: "none",
+                      },
+                    })}
                   >
                     <div style={{ height: 2, background: theme.nowIndicator }} />
                     <div
@@ -837,19 +917,23 @@ export function TimeGrid<T = unknown>({
                 {ghost ? (
                   <div
                     aria-hidden
-                    style={{
-                      position: "absolute",
-                      left: 1,
-                      right: 1,
-                      top: ghost.topPx,
-                      height: Math.max(ghost.heightPx, 2),
-                      background: theme.rangeBackground,
-                      border: `1px solid ${theme.selectedBackground}`,
-                      borderRadius: 6,
-                      opacity: 0.7,
-                      pointerEvents: "none",
-                      zIndex: 2,
-                    }}
+                    {...slot("createGhost", {
+                      base: {
+                        position: "absolute",
+                        left: 1,
+                        right: 1,
+                        top: ghost.topPx,
+                        height: Math.max(ghost.heightPx, 2),
+                        opacity: 0.7,
+                        pointerEvents: "none",
+                        zIndex: 2,
+                      },
+                      themed: {
+                        background: theme.rangeBackground,
+                        border: `1px solid ${theme.selectedBackground}`,
+                        borderRadius: 6,
+                      },
+                    })}
                   />
                 ) : null}
               </div>

@@ -7,14 +7,24 @@ import {
   compareDayEvents,
   type DateRange,
   type DateSelectionConstraints,
+  type EventAccessibilityLabeler,
   groupEventsByDay,
   type WeekStartsOn,
 } from "@super-calendar/core";
-import { type DomMonthEvent, MonthView } from "./MonthView";
+import { type DomMonthEvent, MonthView, type MonthViewSlot } from "./MonthView";
+import { createSlots, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
+/**
+ * Styleable parts of {@link MonthList}. The shared weekday header uses `weekdays`
+ * / `weekday`; every other slot is forwarded to each month's {@link MonthView}
+ * (e.g. `title`, `day`, `chip`). See {@link MonthViewSlot}.
+ */
+export type MonthListSlot = MonthViewSlot;
+
 /** Props for {@link MonthList}. */
-export interface MonthListProps<T = unknown> extends DateSelectionConstraints {
+export interface MonthListProps<T = unknown>
+  extends DateSelectionConstraints, SlotStyleProps<MonthListSlot> {
   /** Anchor month; the list spans `pastMonths` before to `futureMonths` after. */
   date: Date;
   /** Months to render before the anchor (default 1). */
@@ -27,6 +37,12 @@ export interface MonthListProps<T = unknown> extends DateSelectionConstraints {
   events?: CalendarEvent<T>[];
   /** Custom chip renderer; falls back to the built-in titled chip. */
   renderEvent?: DomMonthEvent<T>;
+  /**
+   * Override the screen-reader label for each event chip. Receives the event and a
+   * `{ mode: "month", isAllDay, ampm: false }` context; return the full text to
+   * announce. Defaults to the event title and day (e.g. "Standup, 15 July").
+   */
+  eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
   /** Max chips shown per day before a "+N more" row (default 3). */
   maxVisibleEventCount?: number;
   /** Template for the overflow row; `{moreCount}` is replaced. */
@@ -73,6 +89,7 @@ export function MonthList<T = unknown>({
   weekStartsOn = 0,
   events,
   renderEvent,
+  eventAccessibilityLabel,
   maxVisibleEventCount,
   moreLabel,
   onPressEvent,
@@ -90,8 +107,11 @@ export function MonthList<T = unknown>({
   onPressDay,
   className,
   style,
+  classNames,
+  styles,
 }: MonthListProps<T>): ReactElement {
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
+  const slot = createSlots<MonthListSlot>({ classNames, styles });
 
   const months = useMemo(() => {
     const first = startOfMonth(addMonths(date, -pastMonths));
@@ -128,17 +148,22 @@ export function MonthList<T = unknown>({
       style={{ fontFamily: theme.fontFamily, color: theme.text, ...style }}
     >
       <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-          borderBottom: `1px solid ${theme.gridLine}`,
-          padding: "8px 0",
-        }}
+        {...slot("weekdays", {
+          base: { display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))" },
+          themed: { borderBottom: `1px solid ${theme.gridLine}`, padding: "8px 0" },
+        })}
       >
         {weekdays.map((wd) => (
           <span
             key={wd.label}
-            style={{ textAlign: "center", fontSize: 12, fontWeight: 600, color: theme.textMuted }}
+            {...slot("weekday", {
+              themed: {
+                textAlign: "center",
+                fontSize: 12,
+                fontWeight: 600,
+                color: theme.textMuted,
+              },
+            })}
           >
             {wd.label}
           </span>
@@ -161,6 +186,7 @@ export function MonthList<T = unknown>({
             events={events}
             eventsByDay={eventsByDay}
             renderEvent={renderEvent}
+            eventAccessibilityLabel={eventAccessibilityLabel}
             maxVisibleEventCount={maxVisibleEventCount}
             moreLabel={moreLabel}
             onPressEvent={onPressEvent}
@@ -177,6 +203,8 @@ export function MonthList<T = unknown>({
             isDateDisabled={isDateDisabled}
             keyboardDayNavigation={keyboardDayNavigation}
             onPressDay={onPressDay}
+            classNames={classNames}
+            styles={styles}
           />
         )}
       />

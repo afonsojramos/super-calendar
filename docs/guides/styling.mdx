@@ -1,0 +1,151 @@
+---
+title: Styling with Tailwind & CSS
+description: Restyle any part of the web calendar with per-slot classes, inline styles, and data-* state variants.
+---
+
+<Note>
+  This is the **web renderer** (`@super-calendar/dom`). For colours, typography, and metrics shared
+  by both renderers, see [Theming](/guides/theming). On React Native, style through the theme object
+  instead.
+</Note>
+
+The web components render with inline styles driven by the [theme](/guides/theming),
+so a zero-config `<Calendar />` looks complete with no stylesheet. But inline styles
+beat external CSS, which would leave a Tailwind class powerless to override them. To
+close that gap, every styleable part is a named **slot** you can target with a class,
+an inline style, or a `data-*` state variant.
+
+## Per-slot classes
+
+Pass `classNames` to hand a slot over to your own CSS or Tailwind:
+
+```tsx
+import { MonthView } from "@super-calendar/dom";
+
+<MonthView
+  date={new Date()}
+  classNames={{
+    title: "text-center text-2xl font-semibold text-slate-900",
+    weekday: "uppercase tracking-wide text-slate-400",
+    day: "hover:bg-slate-50",
+  }}
+/>;
+```
+
+The contract, per slot:
+
+- **Structural styles always apply** — the layout the component needs to hold together
+  (grid templates, flex, positioning). Your class is added on top; you never have to
+  re-implement the grid.
+- **Themed styles drop when you pass a class** — colour, typography, spacing, and
+  borders step aside so your class wins instead of losing to an inline style.
+
+So `classNames={{ title: "text-center" }}` genuinely centers the title: the built-in
+`font-weight`/`font-size`/`padding` are removed for that slot, leaving your class in
+full control.
+
+## Per-slot inline styles
+
+For one-off tweaks without a stylesheet, use `styles`. These merge **last**, on top of
+the retained defaults (and win over classes):
+
+```tsx
+import { MonthView } from "@super-calendar/dom";
+
+<MonthView styles={{ title: { textAlign: "center" }, day: { borderRadius: 8 } }} />;
+```
+
+## State variants with `data-*`
+
+Day cells expose their state as present/absent `data-*` attributes, so you can style
+selection, today, and more with Tailwind variants or plain CSS — no JS:
+
+```tsx
+import { MonthView } from "@super-calendar/dom";
+
+<MonthView
+  classNames={{
+    day: "data-[today]:bg-blue-600 data-[today]:text-white data-[selected]:ring-2",
+  }}
+/>;
+```
+
+| Attribute       | On              | Present when                          |
+| --------------- | --------------- | ------------------------------------- |
+| `data-today`    | day / column    | it is today                           |
+| `data-selected` | day             | the day is selected                   |
+| `data-range`    | day             | the day is inside a selected range    |
+| `data-weekend`  | day             | the day is a weekend                  |
+| `data-outside`  | day             | the day belongs to an adjacent month  |
+| `data-disabled` | day             | the day is disabled (`min`/`maxDate`) |
+| `data-dragging` | time-grid event | the event is being dragged            |
+
+Every slotted element also carries a stable `data-slot="<name>"` attribute, handy for
+CSS selectors (`[data-slot="title"] { … }`) and for tests.
+
+## Slots by component
+
+Each component keeps its own `className` / `style` props for the root element; the
+slots below target its inner parts. `Calendar` accepts every slot and forwards them
+to whichever view its `mode` renders. `MonthList` uses `weekdays` / `weekday` for its
+shared header and forwards the rest to each month's `MonthView`.
+
+### MonthView
+
+| Slot         | Element                                           |
+| ------------ | ------------------------------------------------- |
+| `title`      | The "Month yyyy" heading                          |
+| `weekdays`   | The weekday header row (grid container)           |
+| `weekday`    | Each weekday label                                |
+| `grid`       | The month grid container                          |
+| `week`       | Each week row                                     |
+| `day`        | Each day cell (picker button or events cell)      |
+| `dayBadge`   | The date badge/circle inside a day                |
+| `rangeBand`  | The selection band layer behind a day             |
+| `events`     | The event-chips column inside an events-mode cell |
+| `chipButton` | The button wrapping each event chip               |
+| `chip`       | The default event chip                            |
+| `more`       | The "+N more" overflow row                        |
+
+### TimeGrid (week / day / N-day)
+
+| Slot                  | Element                                   |
+| --------------------- | ----------------------------------------- |
+| `header`              | The column-header row                     |
+| `columnHeader`        | Each day's header button (`data-today`)   |
+| `columnHeaderWeekday` | The weekday label in a header             |
+| `columnHeaderDate`    | The date badge in a header (`data-today`) |
+| `allDayLane`          | The all-day row                           |
+| `allDayLabel`         | The "all-day" gutter label                |
+| `allDayColumn`        | Each day's all-day column                 |
+| `allDayEvent`         | An all-day event button                   |
+| `hourGutter`          | The hour-axis column                      |
+| `hourLabel`           | Each hour label                           |
+| `dayColumn`           | Each day column (`data-today`)            |
+| `gridLines`           | The hour/slot grid-line overlay           |
+| `businessHours`       | The closed-hours shade                    |
+| `event`               | A timed-event wrapper (`data-dragging`)   |
+| `eventBox`            | The default event box                     |
+| `nowIndicator`        | The current-time line                     |
+| `createGhost`         | The drag-to-create preview                |
+
+### Agenda (schedule)
+
+| Slot        | Element                        |
+| ----------- | ------------------------------ |
+| `dayHeader` | Each day's header              |
+| `eventRow`  | The button wrapping each event |
+| `event`     | The default event card         |
+| `empty`     | The "No events" placeholder    |
+
+### MonthList (scrolling picker)
+
+`weekdays` / `weekday` style the shared header; every `MonthView` slot above is
+forwarded to each rendered month.
+
+## Combining with the theme
+
+Slots and the [theme](/guides/theming) compose. Reach for the theme to recolour the
+whole calendar in one place; reach for slot classes when you want Tailwind (or your
+design system) to own a specific part. A common setup: theme for palette, `classNames`
+for typography and state variants.

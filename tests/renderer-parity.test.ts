@@ -26,23 +26,30 @@ const SHARED_COMPONENTS = ["MonthView", "MonthList", "TimeGrid"] as const;
 const DOM_PLATFORM_PROPS: Record<string, Set<string>> = {
   // DOM elements take className/style; the box scrolls inside an explicit height;
   // the dom theme is a flat object (vs native's context-provided CalendarTheme).
-  TimeGrid: new Set(["className", "style", "height", "theme", "zoomable"]),
+  // classNames/styles are the web per-slot styling maps (native styles via theme).
+  TimeGrid: new Set(["className", "style", "classNames", "styles", "height", "theme", "zoomable"]),
   // showTitle/showWeekdays toggle dom-only chrome; theme/className/style as above.
   // keyboardDayNavigation is a web keyboard-focus concern (roving tabindex); native
   // is touch/swipe with arrow-key paging, so it has no equivalent.
+  // classNames/styles are the web per-slot styling maps (native styles via theme).
   MonthView: new Set([
     "className",
     "style",
+    "classNames",
+    "styles",
     "theme",
     "showTitle",
     "showWeekdays",
     "keyboardDayNavigation",
   ]),
   // pastMonths/futureMonths size the dom scroll window (native virtualizes by date).
-  // keyboardDayNavigation is web-only (see MonthView).
+  // keyboardDayNavigation is web-only (see MonthView). classNames/styles are the web
+  // per-slot styling maps (native styles via theme).
   MonthList: new Set([
     "className",
     "style",
+    "classNames",
+    "styles",
     "height",
     "theme",
     "pastMonths",

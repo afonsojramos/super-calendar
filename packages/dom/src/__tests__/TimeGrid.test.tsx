@@ -184,4 +184,38 @@ describe("dom TimeGrid", () => {
     );
     expect(queryByText("all-day")).toBeNull();
   });
+
+  it("uses eventAccessibilityLabel to override an event's aria-label", () => {
+    const { getByLabelText, queryByLabelText } = render(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={events}
+        hourHeight={48}
+        eventAccessibilityLabel={(event, ctx) => `Custom: ${event.title} (${ctx.mode})`}
+      />,
+    );
+    expect(getByLabelText("Custom: Focus (day)")).toBeTruthy();
+    // The built-in "title, time range" label is replaced.
+    expect(queryByLabelText("Focus, 14:00 to 16:00")).toBeNull();
+  });
+
+  describe("slot styling", () => {
+    it("applies per-slot classes and drops the themed inline style so the class wins", () => {
+      const { container } = render(
+        <TimeGrid mode="day" date={day} events={events} classNames={{ hourLabel: "text-xs" }} />,
+      );
+      const label = container.querySelector('[data-slot="hourLabel"]') as HTMLElement;
+      expect(label.className).toBe("text-xs");
+      // Structural positioning kept; themed colour/size dropped for the class.
+      expect(label.style.position).toBe("absolute");
+      expect(label.style.fontSize).toBe("");
+    });
+
+    it("marks today's column header with data-today", () => {
+      const { container } = render(<TimeGrid mode="day" date={new Date()} />);
+      const header = container.querySelector('[data-slot="columnHeader"]') as HTMLElement;
+      expect(header.hasAttribute("data-today")).toBe(true);
+    });
+  });
 });

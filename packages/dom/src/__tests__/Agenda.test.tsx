@@ -61,4 +61,11 @@ describe("dom Agenda", () => {
     const { getByText } = render(<Agenda events={[]} />);
     expect(getByText("No events")).toBeTruthy();
   });
+
+  it("applies a per-slot class to the empty state and drops its themed inline style", () => {
+    const { getByText } = render(<Agenda events={[]} classNames={{ empty: "text-gray-400" }} />);
+    const empty = getByText("No events");
+    expect(empty.className).toBe("text-gray-400");
+    expect(empty.style.fontSize).toBe("");
+  });
 });

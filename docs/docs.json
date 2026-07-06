@@ -30,7 +30,7 @@
       },
       {
         "group": "Web",
-        "pages": ["guides/dom", "guides/web"]
+        "pages": ["guides/dom", "guides/web", "guides/styling"]
       },
       {
         "group": "Reference",

@@ -1,9 +1,16 @@
 import { LegendList } from "@legendapp/list/react";
 import { format, isSameDay, type Locale, startOfDay } from "date-fns";
 import { type ComponentType, type CSSProperties, type ReactElement, useMemo } from "react";
-import type { CalendarEvent } from "@super-calendar/core";
+import type { CalendarEvent, EventAccessibilityLabeler } from "@super-calendar/core";
 import { eventTimeLabel, getIsToday, isAllDayEvent } from "@super-calendar/core";
+import { createSlots, type ResolvedSlot, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
+
+/**
+ * Styleable parts of {@link Agenda}. Pass a class or inline style per slot via the
+ * `classNames` / `styles` props.
+ */
+export type AgendaSlot = "dayHeader" | "eventRow" | "event" | "empty";
 
 /** Props passed to a custom agenda (schedule) event renderer. */
 export interface DomAgendaEventArgs<T = unknown> {
@@ -23,7 +30,7 @@ export interface DomAgendaEventArgs<T = unknown> {
 export type DomAgendaEvent<T = unknown> = ComponentType<DomAgendaEventArgs<T>>;
 
 /** Props for {@link Agenda}. */
-export interface AgendaProps<T = unknown> {
+export interface AgendaProps<T = unknown> extends SlotStyleProps<AgendaSlot> {
   /** Events to list. The consumer controls which (and therefore the date range). */
   events: CalendarEvent<T>[];
   /** date-fns locale for the day headers and time labels. */
@@ -38,6 +45,12 @@ export interface AgendaProps<T = unknown> {
   height?: number | string;
   /** Replace the built-in event row. */
   renderEvent?: DomAgendaEvent<T>;
+  /**
+   * Override the screen-reader label for each event row. Receives the event and a
+   * `{ mode: "schedule", isAllDay, ampm }` context; return the full text to
+   * announce. Defaults to the row's own text content.
+   */
+  eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
   /** Tap an event row. */
   onPressEvent?: (event: CalendarEvent<T>) => void;
   /** Tap a day's header. */
@@ -56,8 +69,8 @@ function DefaultAgendaRow<T>({
   event,
   isAllDay,
   ampm = false,
-  theme,
-}: DomAgendaEventArgs<T> & { theme: DomCalendarTheme }) {
+  cardProps,
+}: DomAgendaEventArgs<T> & { cardProps: ResolvedSlot }) {
   const time =
     eventTimeLabel({
       mode: "schedule",
@@ -70,14 +83,7 @@ function DefaultAgendaRow<T>({
   // A filled card with the title on top and the time below, matching the native
   // schedule row.
   return (
-    <div
-      style={{
-        padding: "6px 10px",
-        borderRadius: 8,
-        background: theme.eventBackground,
-        color: theme.eventText,
-      }}
-    >
+    <div {...cardProps}>
       <div style={{ fontWeight: 600, fontSize: 14 }}>{event.title}</div>
       {time ? <div style={{ fontSize: 13, opacity: 0.75 }}>{time}</div> : null}
     </div>
@@ -103,12 +109,16 @@ export function Agenda<T = unknown>({
   theme: themeOverrides,
   height = 480,
   renderEvent,
+  eventAccessibilityLabel,
   onPressEvent,
   onPressDay,
   className,
   style,
+  classNames,
+  styles,
 }: AgendaProps<T>): ReactElement {
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
+  const slot = createSlots<AgendaSlot>({ classNames, styles });
   const Renderer = renderEvent;
 
   const rows = useMemo<Row<T>[]>(() => {
@@ -143,24 +153,26 @@ export function Agenda<T = unknown>({
               : getIsToday(item.date);
             const label = format(item.date, "EEEE, d LLLL", locale ? { locale } : undefined);
             const color = highlighted ? theme.todayBackground : theme.textMuted;
+            const headerProps = slot("dayHeader", {
+              base: onPressDay
+                ? {
+                    display: "block",
+                    width: "100%",
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    font: "inherit",
+                    textAlign: "left",
+                  }
+                : { display: "block", width: "100%" },
+              themed: { padding: "12px 12px 4px", fontSize: 13, fontWeight: 600, color },
+            });
             return onPressDay ? (
-              <button
-                type="button"
-                onClick={() => onPressDay(item.date)}
-                style={{
-                  ...headerStyle,
-                  color,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  font: "inherit",
-                  textAlign: "left",
-                }}
-              >
+              <button type="button" onClick={() => onPressDay(item.date)} {...headerProps}>
                 {label}
               </button>
             ) : (
-              <div style={{ ...headerStyle, color }}>{label}</div>
+              <div {...headerProps}>{label}</div>
             );
           }
           const event = item.event;
@@ -171,33 +183,52 @@ export function Agenda<T = unknown>({
             <button
               type="button"
               onClick={onPress}
-              style={{
-                display: "block",
-                width: "100%",
-                textAlign: "left",
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                font: "inherit",
-                padding: "2px 12px",
-              }}
+              aria-label={
+                eventAccessibilityLabel
+                  ? eventAccessibilityLabel(event, { mode: "schedule", isAllDay, ampm })
+                  : undefined
+              }
+              {...slot("eventRow", {
+                base: {
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  font: "inherit",
+                },
+                themed: { padding: "2px 12px" },
+              })}
             >
-              {Renderer ? <Renderer {...args} /> : <DefaultAgendaRow {...args} theme={theme} />}
+              {Renderer ? (
+                <Renderer {...args} />
+              ) : (
+                <DefaultAgendaRow
+                  {...args}
+                  cardProps={slot("event", {
+                    themed: {
+                      padding: "6px 10px",
+                      borderRadius: 8,
+                      background: theme.eventBackground,
+                      color: theme.eventText,
+                    },
+                  })}
+                />
+              )}
             </button>
           );
         }}
       />
       {rows.length === 0 ? (
-        <div style={{ padding: "16px 12px", color: theme.textMuted, fontSize: 14 }}>No events</div>
+        <div
+          {...slot("empty", {
+            themed: { padding: "16px 12px", color: theme.textMuted, fontSize: 14 },
+          })}
+        >
+          No events
+        </div>
       ) : null}
     </div>
   );
 }
-
-const headerStyle: CSSProperties = {
-  display: "block",
-  width: "100%",
-  padding: "12px 12px 4px",
-  fontSize: 13,
-  fontWeight: 600,
-};

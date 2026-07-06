@@ -19,21 +19,30 @@
  *
  * @module
  */
-export { Agenda, type AgendaProps, type DomAgendaEvent, type DomAgendaEventArgs } from "./Agenda";
-export { Calendar, type CalendarProps } from "./Calendar";
+export {
+  Agenda,
+  type AgendaProps,
+  type AgendaSlot,
+  type DomAgendaEvent,
+  type DomAgendaEventArgs,
+} from "./Agenda";
+export { Calendar, type CalendarProps, type CalendarSlot } from "./Calendar";
 export {
   type DomMonthEvent,
   type DomMonthEventArgs,
   MonthView,
   type MonthViewProps,
+  type MonthViewSlot,
 } from "./MonthView";
-export { MonthList, type MonthListProps } from "./MonthList";
+export { MonthList, type MonthListProps, type MonthListSlot } from "./MonthList";
 export {
   TimeGrid,
   type TimeGridProps,
+  type TimeGridSlot,
   type DomRenderEvent,
   type DomRenderEventArgs,
 } from "./TimeGrid";
+export { type ResolvedSlot, type SlotDefault, type SlotStyleProps } from "./slots";
 export { type DomCalendarTheme, darkDomTheme, defaultDomTheme, mergeDomTheme } from "./theme";
 export {
   type BusinessHours,
@@ -42,6 +51,8 @@ export {
   type DateRange,
   type DateSelectionConstraints,
   type DaySelectionState,
+  type EventAccessibilityLabelContext,
+  type EventAccessibilityLabeler,
   type ICalendarEvent,
   type PositionedEvent,
   type TimeGridMode,
