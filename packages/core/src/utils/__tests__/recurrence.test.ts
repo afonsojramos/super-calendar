@@ -185,6 +185,23 @@ describe("expandRecurringEvents", () => {
     expect(result.map((e) => e.start.getMonth())).toEqual([0, 2]);
   });
 
+  it("repeats yearly in the listed months (BYMONTH), keeping the day-of-month", () => {
+    const event: CalendarEvent = {
+      start: at(2026, 0, 15),
+      end: at(2026, 0, 15, 10),
+      title: "Review",
+      recurrence: { freq: "yearly", months: [3, 9], count: 4 },
+    };
+    const result = expandRecurringEvents([event], at(2026, 0, 1), at(2027, 11, 31));
+    // The 15th of March and September, two years running.
+    expect(result.map((e) => [e.start.getFullYear(), e.start.getMonth()])).toEqual([
+      [2026, 2],
+      [2026, 8],
+      [2027, 2],
+      [2027, 8],
+    ]);
+  });
+
   it("adds RDATE dates to the set, ordered and de-duplicated against the rule", () => {
     const event: CalendarEvent = {
       ...base, // Thu 1 Jan 2026, 09:00

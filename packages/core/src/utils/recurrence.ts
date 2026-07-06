@@ -122,6 +122,26 @@ function* occurrenceStarts(start: Date, rule: RecurrenceRule, rangeEnd: Date): G
     }
   }
 
+  if (rule.freq === "yearly" && rule.months?.length) {
+    const day = start.getDate();
+    const months = [...new Set(rule.months)].filter((m) => m >= 1 && m <= 12).sort((a, b) => a - b);
+    let year = start.getFullYear();
+    while (true) {
+      for (const m of months) {
+        const month = m - 1;
+        // Skip a year whose listed month lacks the start's day (e.g. Feb 29).
+        if (day > new Date(year, month + 1, 0).getDate()) continue;
+        const date = withTimeOf(new Date(year, month, day), start);
+        if (date.getTime() < start.getTime()) continue; // before the first occurrence
+        if (!within(date)) return;
+        produced += 1;
+        yield date;
+      }
+      year += interval;
+      if (new Date(year, 0, 1).getTime() > rangeEnd.getTime()) return;
+    }
+  }
+
   let cursor = start;
   while (within(cursor)) {
     produced += 1;

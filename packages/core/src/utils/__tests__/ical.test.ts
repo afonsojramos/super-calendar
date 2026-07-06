@@ -232,6 +232,21 @@ describe("toICalendar", () => {
     expect(round.recurrence).toEqual({ freq: "monthly", monthDays: [1, 15, -1] });
   });
 
+  it("round-trips a yearly BYMONTH recurrence", () => {
+    const events: ICalEvent[] = [
+      {
+        start: new Date(Date.UTC(2026, 0, 15, 9, 0, 0)),
+        end: new Date(Date.UTC(2026, 0, 15, 10, 0, 0)),
+        title: "Review",
+        recurrence: { freq: "yearly", months: [3, 9] },
+      },
+    ];
+    const ics = toICalendar(events, { now });
+    expect(ics).toContain("RRULE:FREQ=YEARLY;BYMONTH=3,9");
+    const [round] = parseICalendar(ics);
+    expect(round.recurrence).toEqual({ freq: "yearly", months: [3, 9] });
+  });
+
   it("round-trips RDATE additions", () => {
     const events: ICalEvent[] = [
       {

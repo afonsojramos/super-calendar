@@ -196,6 +196,14 @@ function parseRRule(value: string): RecurrenceRule | undefined {
       .filter((d) => Number.isInteger(d) && d !== 0);
     if (days.length) rule.monthDays = days;
   }
+  const bymonth = parts.get("BYMONTH");
+  if (bymonth) {
+    const months = bymonth
+      .split(",")
+      .map((m) => Number(m.trim()))
+      .filter((m) => Number.isInteger(m) && m >= 1 && m <= 12);
+    if (months.length) rule.months = months;
+  }
   return rule;
 }
 
@@ -210,6 +218,7 @@ function formatRRule(rule: RecurrenceRule): string {
     parts.push(`BYDAY=${rule.weekdays.map((d) => BYDAY[d]).join(",")}`);
   }
   if (rule.monthDays?.length) parts.push(`BYMONTHDAY=${rule.monthDays.join(",")}`);
+  if (rule.months?.length) parts.push(`BYMONTH=${rule.months.join(",")}`);
   return parts.join(";");
 }
 

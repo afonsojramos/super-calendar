@@ -38,13 +38,15 @@ weekday: 5 }` (the last Friday).
 - `monthDays` — for `monthly`, the day(s) of the month to repeat on, e.g. `[1, 15]`
   (the 1st and 15th) or `[-1]` (the last day; negatives count from the month's end).
   Days a month lacks (the 31st in February) are skipped.
+- `months` — for `yearly`, the month(s) to repeat in (1 = January … 12 = December),
+  keeping the start date's day-of-month, e.g. `[3, 9]` (every March and September).
 - `exdates` — dates to skip (exceptions).
 - `rdates` — extra one-off dates added to the set, even ones the rule wouldn't
   produce.
 
 Each occurrence keeps the original duration and fields; non-recurring events pass
 through unchanged. These rules map to and from iCal
-`RRULE`/`BYMONTHDAY`/`EXDATE`/`RDATE` — see [iCalendar](/guides/ical).
+`RRULE`/`BYMONTHDAY`/`BYMONTH`/`EXDATE`/`RDATE` — see [iCalendar](/guides/ical).
 
 <Tip>
   Compute the range from the visible window. `onChangeDateRange` gives you the `[start, end]` of

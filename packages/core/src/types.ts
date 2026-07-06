@@ -67,6 +67,12 @@ export interface RecurrenceRule {
    */
   monthDays?: number[];
   /**
+   * For `yearly`: the month(s) to repeat in (1 = January … 12 = December), keeping
+   * the start date's day-of-month. Years where a listed month lacks that day are
+   * skipped. Maps to iCal `BYMONTH`.
+   */
+  months?: number[];
+  /**
    * Dates to skip (exceptions). An occurrence whose day matches one of these is
    * dropped by `expandRecurringEvents`. Maps to iCal `EXDATE`.
    */
