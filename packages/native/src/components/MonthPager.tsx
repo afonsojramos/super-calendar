@@ -266,7 +266,7 @@ function MonthPagerInner<T>({
   );
 
   return (
-    <View ref={containerRef} style={styles.container}>
+    <View ref={containerRef} style={[styles.container, theme.containers.monthContainer]}>
       {/* The active month's title, above the (shared) weekday header — mirrors the
           dom MonthView's title. The grids below omit their own title/weekdays. */}
       <Text

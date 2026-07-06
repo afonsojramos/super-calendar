@@ -35,6 +35,12 @@ describe("mergeTheme", () => {
     expect(merged.text.weekday).toEqual(defaultTheme.text.weekday);
   });
 
+  it("overrides only the provided container styles and keeps the rest", () => {
+    const merged = mergeTheme({ containers: { agendaRow: { paddingHorizontal: 20 } } });
+    expect(merged.containers.agendaRow).toEqual({ paddingHorizontal: 20 });
+    expect(merged.containers.allDayLane).toEqual(defaultTheme.containers.allDayLane);
+  });
+
   it("overrides the today badge radius", () => {
     expect(mergeTheme({ todayBadgeRadius: 8 }).todayBadgeRadius).toBe(8);
     expect(mergeTheme({}).todayBadgeRadius).toBe(defaultTheme.todayBadgeRadius);

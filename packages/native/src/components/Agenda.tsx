@@ -78,7 +78,7 @@ export function Agenda<T>({
         );
       }
       return (
-        <View style={styles.eventRow}>
+        <View style={[styles.eventRow, theme.containers.agendaRow]}>
           <RenderEventComponent
             event={item.event}
             mode="schedule"
@@ -98,7 +98,7 @@ export function Agenda<T>({
 
   return (
     <LegendList
-      style={styles.list}
+      style={[styles.list, theme.containers.agendaList]}
       data={rows}
       keyExtractor={keyExtractorRow}
       renderItem={renderItem}

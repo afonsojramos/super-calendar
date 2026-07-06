@@ -46,7 +46,13 @@ export function AllDayLane<T>({
   if (perDay.every((list) => list.length === 0)) return null;
 
   return (
-    <View style={[styles.lane, { borderBottomColor: theme.colors.gridLine }]}>
+    <View
+      style={[
+        styles.lane,
+        { borderBottomColor: theme.colors.gridLine },
+        theme.containers.allDayLane,
+      ]}
+    >
       <View style={[styles.gutter, { width: hourColumnWidth }]}>
         {/* The "all-day" gutter label, mirroring the dom renderer: small, muted,
             and right-aligned against the timed columns. Centered vertically so it
@@ -56,7 +62,10 @@ export function AllDayLane<T>({
         </Text>
       </View>
       {days.map((day, dayIndex) => (
-        <View key={day.toISOString()} style={[styles.column, { width: dayWidth }]}>
+        <View
+          key={day.toISOString()}
+          style={[styles.column, { width: dayWidth }, theme.containers.allDayColumn]}
+        >
           {perDay[dayIndex].map((event, index) => (
             <View key={keyExtractor(event, index)} style={styles.chip}>
               <RenderEventComponent

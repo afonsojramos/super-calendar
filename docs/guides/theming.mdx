@@ -40,6 +40,22 @@ Metric tokens cover the sizes: `rangeBandHeight` (the pill strip's height; its
 corner radius is half this), the day-badge size/radius, and on dom `cellHeight`
 and `fontFamily`. See `CalendarTheme` / `DomCalendarTheme` for the exact types.
 
+### Container styles (React Native)
+
+Beyond text and colours, the React Native theme takes a `containers` map of
+`ViewStyle` overrides for the renderer's container elements — the native
+counterpart of the web renderer's per-slot [classes](/guides/styling). Each is
+merged onto the built-in style, so you set only what you need:
+
+```tsx
+<Calendar
+  theme={{ containers: { agendaRow: { paddingHorizontal: 20 }, allDayLane: { opacity: 0.9 } } }}
+/>
+```
+
+Available slots: `monthContainer`, `agendaList`, `agendaRow`, `allDayLane`,
+`allDayColumn` (more as they roll out across the views).
+
 The date selection in [`MonthList`](/guides/month-list) draws filled endpoint
 badges (`selectedBackground` / `selectedText`) and a rounded band across the span
 (`rangeBackground`, height `rangeBandHeight`). The band caps at the endpoint

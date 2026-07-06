@@ -1,6 +1,6 @@
 import { type CalendarColors, darkColors, lightColors } from "@super-calendar/core";
 import { type Context, createContext, useContext } from "react";
-import type { TextStyle } from "react-native";
+import type { TextStyle, ViewStyle } from "react-native";
 
 /**
  * The full set of colours, text styles and metrics the calendar paints with.
@@ -27,6 +27,24 @@ export interface CalendarTheme {
     /** Title inside the built-in default event box. */
     eventTitle: TextStyle;
   };
+  /**
+   * Per-part `ViewStyle` overrides for the renderer's container elements, the
+   * React Native counterpart of the web renderer's per-slot classes. Each is
+   * merged onto the built-in style, so you override only what you set. (Rolling
+   * out across the views; more slots as they land.)
+   */
+  containers: {
+    /** The month view's outer container (title + weekday header + grid). */
+    monthContainer: ViewStyle;
+    /** The schedule/agenda list's outer container. */
+    agendaList: ViewStyle;
+    /** Each event row in the agenda list. */
+    agendaRow: ViewStyle;
+    /** The all-day lane above the time grid. */
+    allDayLane: ViewStyle;
+    /** Each day's column within the all-day lane. */
+    allDayColumn: ViewStyle;
+  };
   /** Corner radius of the today badge. Use a large value for a circle. */
   todayBadgeRadius: number;
   /**
@@ -50,6 +68,13 @@ export const defaultTheme: CalendarTheme = {
     // whole number of lines (clipping on a line boundary, never mid-line).
     eventTitle: { fontSize: 12, fontWeight: "700", lineHeight: 16 },
   },
+  containers: {
+    monthContainer: {},
+    agendaList: {},
+    agendaRow: {},
+    allDayLane: {},
+    allDayColumn: {},
+  },
   todayBadgeRadius: 999,
   rangeBandHeight: 22,
 };
@@ -62,6 +87,7 @@ export const defaultTheme: CalendarTheme = {
 export const darkTheme: CalendarTheme = {
   colors: darkColors,
   text: defaultTheme.text,
+  containers: defaultTheme.containers,
   todayBadgeRadius: defaultTheme.todayBadgeRadius,
   rangeBandHeight: defaultTheme.rangeBandHeight,
 };
@@ -72,6 +98,7 @@ export function mergeTheme(theme?: PartialCalendarTheme): CalendarTheme {
   return {
     colors: { ...defaultTheme.colors, ...theme.colors },
     text: { ...defaultTheme.text, ...theme.text },
+    containers: { ...defaultTheme.containers, ...theme.containers },
     todayBadgeRadius: theme.todayBadgeRadius ?? defaultTheme.todayBadgeRadius,
     rangeBandHeight: theme.rangeBandHeight ?? defaultTheme.rangeBandHeight,
   };
@@ -85,6 +112,7 @@ export function mergeTheme(theme?: PartialCalendarTheme): CalendarTheme {
 export type PartialCalendarTheme = {
   colors?: Partial<CalendarTheme["colors"]>;
   text?: Partial<CalendarTheme["text"]>;
+  containers?: Partial<CalendarTheme["containers"]>;
   todayBadgeRadius?: number;
   rangeBandHeight?: number;
 };
