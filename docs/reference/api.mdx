@@ -32,14 +32,15 @@ your editor lists the full set with inline docs.
 
 ## Events & rendering
 
-| Prop                       | Type                               | Notes                                   |
-| -------------------------- | ---------------------------------- | --------------------------------------- |
-| `renderEvent`              | `RenderEvent<T>`                   | Render events your way, every mode.     |
-| `renderCustomDateForMonth` | `(date) => ReactNode`              | Month: replace the day-cell date badge. |
-| `eventCellStyle`           | `style \| (event) => style`        | Tweak the built-in box.                 |
-| `calendarCellStyle`        | `(date) => style`                  | Per-date column/cell shading.           |
-| `businessHours`            | `(date) => { start, end } \| null` | Shade closed hours.                     |
-| `keyExtractor`             | `(event, index) => string`         | Stable event keys.                      |
+| Prop                       | Type                               | Notes                                    |
+| -------------------------- | ---------------------------------- | ---------------------------------------- |
+| `renderEvent`              | `RenderEvent<T>`                   | Render events your way, every mode.      |
+| `eventAccessibilityLabel`  | `(event, ctx) => string`           | Override an event's screen-reader label. |
+| `renderCustomDateForMonth` | `(date) => ReactNode`              | Month: replace the day-cell date badge.  |
+| `eventCellStyle`           | `style \| (event) => style`        | Tweak the built-in box.                  |
+| `calendarCellStyle`        | `(date) => style`                  | Per-date column/cell shading.            |
+| `businessHours`            | `(date) => { start, end } \| null` | Shade closed hours.                      |
+| `keyExtractor`             | `(event, index) => string`         | Stable event keys.                       |
 
 ## Interactions
 

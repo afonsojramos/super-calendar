@@ -61,6 +61,12 @@ function MyEvent({ event, onPress }: RenderEventArgs<Meta>) {
   app's React root, not `document.body` — see the [Web guide](/guides/web#portaling-overlays).
 </Tip>
 
+On the day/week grid a timed event's box is sized to its duration and given to your
+renderer as `boxHeight`, so it tracks the grid's hour scale as the grid zooms or
+resizes. Fit your content to `boxHeight`: the built-in renderer clamps its own
+content, and a custom renderer should adapt (show less, or scroll) rather than
+assume a fixed size, since content taller than the slot is clipped.
+
 ## Lighter touches
 
 If you only want to tweak the built-in event box, you don't need a full
@@ -75,3 +81,26 @@ If you only want to tweak the built-in event box, you don't need a full
   beneath it.
 - `ellipsizeTitle` ends a single-line title (the all-day lane, month cells) with a
   trailing ellipsis when it overflows, instead of a hard clip (default false).
+
+## Screen-reader labels
+
+Each event announces a built-in label: its title plus the time range (or "all
+day"), which the grid otherwise only shows visually. Override it per event with
+`eventAccessibilityLabel`. It receives the event and a `{ mode, isAllDay, ampm }`
+context, and its return value replaces the default label across every view.
+
+```tsx
+<Calendar
+  mode="week"
+  date={date}
+  events={events}
+  eventAccessibilityLabel={(event, { isAllDay }) =>
+    isAllDay
+      ? `${event.title}, all day`
+      : `${event.title}, from ${format(event.start, "h:mm a")} to ${format(event.end, "h:mm a")}`
+  }
+/>
+```
+
+The same prop is on the standalone `MonthView`, `MonthList`, and `TimeGrid`, so a
+custom renderer and its label stay in sync.
