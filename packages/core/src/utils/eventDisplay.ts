@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import type { CalendarMode } from "../types";
+import type { CalendarEvent, CalendarMode } from "../types";
 
 /**
  * Minimum event-box height (px) before the built-in renderer shows the time line
@@ -31,6 +31,31 @@ export function eventAccessibilityLabel(args: {
     : `${format(args.start, timeFormat)} to ${format(args.end, timeFormat)}`;
   return [args.title, time].filter(Boolean).join(", ");
 }
+
+/**
+ * Context describing how an event is being rendered, passed to a consumer's
+ * {@link EventAccessibilityLabeler} so the label can adapt to the view (e.g. omit
+ * the time in month mode, or read the 12-hour clock when `ampm` is set).
+ */
+export interface EventAccessibilityLabelContext {
+  /** The view the event is rendered in. */
+  mode: CalendarMode;
+  /** Whether the event sits in the all-day lane (or is an all-day event in month view). */
+  isAllDay: boolean;
+  /** Whether times are formatted as 12-hour AM/PM. */
+  ampm: boolean;
+}
+
+/**
+ * Override for an event's screen-reader label. Return the full text to announce
+ * for `event`; each renderer uses it verbatim in place of the built-in
+ * {@link eventAccessibilityLabel}. Shared by both renderers, so a custom label
+ * reads the same on web and native.
+ */
+export type EventAccessibilityLabeler<T = unknown> = (
+  event: CalendarEvent<T>,
+  context: EventAccessibilityLabelContext,
+) => string;
 
 /**
  * Month cells and the all-day lane show a single clipped line; timed-grid titles
