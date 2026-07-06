@@ -1,0 +1,117 @@
+---
+title: Date & range picker
+description: Build a date or date-range input with a popover calendar, on the web.
+---
+
+<Note>
+  This recipe uses the **web renderer** (`@super-calendar/dom`). super-calendar stays a headless
+  calendar — you compose the input and popover around it — so you keep full control of the trigger,
+  positioning, and form integration.
+</Note>
+
+The building blocks ship with the library:
+
+- **`MonthList`** — a scrolling month grid that takes `selectedRange` / `selectedDates`
+  and reports clicks through `onPressDay`.
+- **`useDateRange`** — range-selection state: give it `minDate` / `maxDate`, spread the
+  returned `onPressDate` into `MonthList`, and read back `range`.
+- **[Per-slot `classNames`](/guides/styling)** — style the popover calendar to match
+  your field.
+
+## A date-range field
+
+Wrap `MonthList` in a popover and drive it with `useDateRange`. The two behaviours
+every popover needs — close on outside-click and on `Escape` — are a few lines:
+
+```tsx
+import { format } from "date-fns";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { MonthList, useDateRange } from "@super-calendar/dom";
+
+export function DateRangeField() {
+  const [open, setOpen] = useState(false);
+  const today = useMemo(() => new Date(), []);
+  const { range, onPressDate, reset } = useDateRange({ minDate: today });
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const label = !range
+    ? "Select dates"
+    : range.end
+      ? `${format(range.start, "d MMM")} → ${format(range.end, "d MMM")}`
+      : `${format(range.start, "d MMM")} → …`;
+
+  return (
+    <div ref={rootRef} style={{ position: "relative", display: "inline-block" }}>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        {label}
+      </button>
+      {open ? (
+        <div
+          role="dialog"
+          aria-label="Choose a date range"
+          style={{ position: "absolute", zIndex: 10 }}
+        >
+          <MonthList
+            date={today}
+            minDate={today}
+            weekStartsOn={1}
+            selectedRange={range ?? undefined}
+            onPressDay={onPressDate}
+            height={320}
+          />
+          <button type="button" onClick={reset}>
+            Clear
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+```
+
+That's a complete, controlled range field. Style the calendar inside with
+[`classNames`](/guides/styling) (e.g. `dayBadge: "data-[selected]:bg-indigo-600"`),
+and position the popover however your app prefers.
+
+## A single-date picker
+
+For one date instead of a range, skip `useDateRange` and pass `selectedDates`:
+
+```tsx
+import { MonthList } from "@super-calendar/dom";
+
+<MonthList
+  date={new Date()}
+  weekStartsOn={1}
+  selectedDates={value ? [value] : []}
+  onPressDay={(day) => {
+    setValue(day);
+    setOpen(false);
+  }}
+  height={320}
+/>;
+```
+
+## See it running
+
+The [live demo](/demo) has a **field** tab with exactly this pattern; the source is
+[`examples/web/src/DateRangeField.tsx`](https://github.com/afonsojramos/super-calendar/blob/main/examples/web/src/DateRangeField.tsx).
