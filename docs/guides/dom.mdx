@@ -218,6 +218,11 @@ const brand = mergeDomTheme({ selectedBackground: "#7c3aed", cellHeight: 56 });
 // or pass `theme={darkDomTheme}` for dark mode
 ```
 
+The theme recolours everything at once. To hand a **specific part** of a view to
+Tailwind or your own CSS — with `data-*` state variants like `data-[today]:` — use
+the per-slot `classNames` / `styles` props. See
+[Styling with Tailwind & CSS](/guides/styling).
+
 See it running on the [live demo](/demo) and in the
 [`examples/web`](https://github.com/afonsojramos/super-calendar/tree/main/examples/web)
 Vite app.
