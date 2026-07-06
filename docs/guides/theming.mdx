@@ -53,8 +53,21 @@ merged onto the built-in style, so you set only what you need:
 />
 ```
 
-Available slots: `monthContainer`, `agendaList`, `agendaRow`, `allDayLane`,
-`allDayColumn` (more as they roll out across the views).
+Available slots:
+
+| Slot                          | Element                                      |
+| ----------------------------- | -------------------------------------------- |
+| `monthContainer`              | The month view's outer container             |
+| `weekdayHeader`               | The weekday-label header row                 |
+| `weekRow`                     | Each week (row of 7 day cells)               |
+| `dayCell`                     | Each day cell in the month grid              |
+| `dayBadge`                    | The date badge (circle) inside a day         |
+| `monthEvent`                  | An event chip inside a month day cell        |
+| `columnHeader`                | Each day's column header in the time grid    |
+| `timeGridEvent`               | A timed event's positioned box               |
+| `nowIndicator`                | The current-time indicator line              |
+| `agendaList` / `agendaRow`    | The schedule list and each of its event rows |
+| `allDayLane` / `allDayColumn` | The all-day lane and each day's column in it |
 
 The date selection in [`MonthList`](/guides/month-list) draws filled endpoint
 badges (`selectedBackground` / `selectedText`) and a rounded band across the span

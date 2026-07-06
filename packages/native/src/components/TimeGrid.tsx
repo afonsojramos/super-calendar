@@ -372,7 +372,9 @@ function AnimatedEventBox<T>({
     !draggable && onLongPress ? () => onLongPress(positioned.event) : undefined;
 
   const box = (
-    <Animated.View style={[styles.eventBox, { left, width }, boxStyle]}>
+    <Animated.View
+      style={[styles.eventBox, { left, width }, boxStyle, theme.containers.timeGridEvent]}
+    >
       <RenderEventComponent
         event={positioned.event}
         mode={mode}
@@ -495,6 +497,7 @@ type NowIndicatorProps = {
 };
 
 const NowIndicator = ({ cellHeight, nowHours, minHour, left, width, color }: NowIndicatorProps) => {
+  const theme = useCalendarTheme();
   const animatedStyle = useAnimatedStyle(
     () => ({ top: (nowHours - minHour) * cellHeight.value }),
     [nowHours, minHour],
@@ -507,6 +510,7 @@ const NowIndicator = ({ cellHeight, nowHours, minHour, left, width, color }: Now
         styles.nonInteractive,
         { left, width, backgroundColor: color },
         animatedStyle,
+        theme.containers.nowIndicator,
       ]}
     />
   );
@@ -1828,7 +1832,7 @@ const DayHeader = ({ day, width, locale, activeDate, onPressDateHeader }: DayHea
 
   return (
     <Pressable
-      style={[styles.dayHeader, { width }]}
+      style={[styles.dayHeader, { width }, theme.containers.columnHeader]}
       onPress={onPressDateHeader ? () => onPressDateHeader(day) : undefined}
       disabled={!onPressDateHeader}
       accessibilityRole={onPressDateHeader ? "button" : undefined}

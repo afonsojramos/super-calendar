@@ -242,6 +242,7 @@ function MonthViewInner<T>({
             },
             // No weekend tint on blank placeholders, so the shading doesn't bleed
             // into the empty cells of non-existent days.
+            theme.containers.dayCell,
           ]}
         />
       );
@@ -308,6 +309,7 @@ function MonthViewInner<T>({
           },
           isWeekend(day) && { backgroundColor: theme.colors.weekendBackground },
           calendarCellStyle?.(day),
+          theme.containers.dayCell,
         ]}
         // In the picker, don't dim the whole cell on press: the tap should show on
         // the badge (the circle) only, not the cell background. `onPressIn/Out` drive
@@ -399,6 +401,7 @@ function MonthViewInner<T>({
                 },
               // Tap feedback lives on the badge, not the cell (picker only).
               !showGrid && pressedKey === dayKey && { opacity: 0.2 },
+              theme.containers.dayBadge,
             ]}
           >
             <Text style={[theme.text.dateCell, { color: dateColor }]} allowFontScaling={false}>
@@ -407,7 +410,10 @@ function MonthViewInner<T>({
           </View>
         )}
         {dayEvents.slice(0, visibleCount).map((event, index) => (
-          <View key={keyExtractor(event, index)} style={styles.monthEvent}>
+          <View
+            key={keyExtractor(event, index)}
+            style={[styles.monthEvent, theme.containers.monthEvent]}
+          >
             <RenderEventComponent
               event={event}
               mode="month"
@@ -452,7 +458,7 @@ function MonthViewInner<T>({
         </Text>
       ) : null}
       {showWeekdays ? (
-        <View style={styles.weekdayHeader}>
+        <View style={[styles.weekdayHeader, theme.containers.weekdayHeader]}>
           {weekdayLabels.map((day) => (
             <Text
               key={day.toISOString()}
@@ -466,7 +472,7 @@ function MonthViewInner<T>({
       ) : null}
       <View style={styles.container} onLayout={handleLayout}>
         {weeks.map((week) => (
-          <View style={styles.weekRow} key={week[0].toISOString()}>
+          <View style={[styles.weekRow, theme.containers.weekRow]} key={week[0].toISOString()}>
             {week.map((day) => renderDay(day))}
           </View>
         ))}

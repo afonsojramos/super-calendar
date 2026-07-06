@@ -1,6 +1,6 @@
 import { fireEvent, render, within } from "@testing-library/react-native";
 import { StyleSheet, Text, type ViewStyle } from "react-native";
-import { defaultTheme } from "../../theme";
+import { CalendarThemeProvider, defaultTheme, mergeTheme } from "../../theme";
 import type { CalendarEvent } from "../../types";
 import { DefaultEvent } from "../DefaultEvent";
 import { MonthView } from "../MonthView";
@@ -92,6 +92,23 @@ describe("MonthView renderCustomDateForMonth", () => {
     expect(getByText("day-15")).toBeTruthy();
     // The default bare day number is gone (replaced by the custom label).
     expect(queryByText("15")).toBeNull();
+  });
+});
+
+describe("MonthView container theming", () => {
+  const styleOf = (n: { props: { style?: unknown } }) =>
+    StyleSheet.flatten(n.props.style as ViewStyle) ?? {};
+
+  // Native components read the theme from context (as <Calendar> provides it).
+  const withTheme = (containers: Parameters<typeof mergeTheme>[0]) => (
+    <CalendarThemeProvider value={mergeTheme(containers)}>
+      <MonthView {...baseProps} />
+    </CalendarThemeProvider>
+  );
+
+  it("merges theme.containers.dayCell onto every day cell", () => {
+    const { getByLabelText } = render(withTheme({ containers: { dayCell: { opacity: 0.42 } } }));
+    expect(styleOf(getByLabelText(/15 June 2026/)).opacity).toBe(0.42);
   });
 });
 

@@ -36,6 +36,22 @@ export interface CalendarTheme {
   containers: {
     /** The month view's outer container (title + weekday header + grid). */
     monthContainer: ViewStyle;
+    /** The weekday-label header row above a month grid. */
+    weekdayHeader: ViewStyle;
+    /** Each week (row of 7 day cells) in the month grid. */
+    weekRow: ViewStyle;
+    /** Each day cell in the month grid. */
+    dayCell: ViewStyle;
+    /** The date badge (the circle) inside a month day cell. */
+    dayBadge: ViewStyle;
+    /** An event chip inside a month day cell. */
+    monthEvent: ViewStyle;
+    /** Each day's column header in the time grid. */
+    columnHeader: ViewStyle;
+    /** A timed event's positioned box in the time grid. */
+    timeGridEvent: ViewStyle;
+    /** The current-time indicator line. */
+    nowIndicator: ViewStyle;
     /** The schedule/agenda list's outer container. */
     agendaList: ViewStyle;
     /** Each event row in the agenda list. */
@@ -70,6 +86,14 @@ export const defaultTheme: CalendarTheme = {
   },
   containers: {
     monthContainer: {},
+    weekdayHeader: {},
+    weekRow: {},
+    dayCell: {},
+    dayBadge: {},
+    monthEvent: {},
+    columnHeader: {},
+    timeGridEvent: {},
+    nowIndicator: {},
     agendaList: {},
     agendaRow: {},
     allDayLane: {},

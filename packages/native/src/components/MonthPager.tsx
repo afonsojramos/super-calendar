@@ -352,7 +352,7 @@ type MonthWeekdayHeaderProps = {
 const MonthWeekdayHeader = ({ weekDays, locale }: MonthWeekdayHeaderProps) => {
   const theme = useCalendarTheme();
   return (
-    <View style={styles.weekdayHeader}>
+    <View style={[styles.weekdayHeader, theme.containers.weekdayHeader]}>
       {weekDays.map((day) => (
         <Text
           key={day.toISOString()}
