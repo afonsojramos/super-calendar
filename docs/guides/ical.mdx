@@ -1,0 +1,69 @@
+---
+title: iCalendar (.ics) import & export
+description: Read and write RFC 5545 .ics files so events interoperate with Google, Apple, and Outlook.
+---
+
+`@super-calendar/core` ships `parseICalendar` and `toICalendar` to convert between
+`.ics` text and the library's `CalendarEvent` shape — so a calendar built with
+super-calendar can import feeds from, and export to, Google Calendar, Apple
+Calendar, Outlook, and anything else that speaks iCal.
+
+```ts
+import { parseICalendar, toICalendar } from "@super-calendar/core";
+// also re-exported from "@super-calendar/dom"
+```
+
+## Import
+
+`parseICalendar(text)` returns an array of events you can pass straight to a
+`<Calendar>`:
+
+```ts
+const res = await fetch("/calendar.ics");
+const events = parseICalendar(await res.text());
+
+// -> [{ uid, title, start, end, allDay?, description?, location?, recurrence? }]
+```
+
+Each event carries the standard fields it round-trips: `uid`, `description`,
+`location`, plus `allDay` (from `VALUE=DATE`) and a `recurrence` parsed from
+`RRULE`. Recurring events are returned as a single event with a rule — expand them
+for a date range with [`expandRecurringEvents`](/guides/recurring-events):
+
+```ts
+import { expandRecurringEvents, parseICalendar } from "@super-calendar/core";
+
+const occurrences = expandRecurringEvents(parseICalendar(ics), rangeStart, rangeEnd);
+```
+
+## Export
+
+`toICalendar(events)` produces a complete `VCALENDAR` string. Timed events are
+written in UTC; set `allDay: true` for `VALUE=DATE` events; a `recurrence` becomes
+an `RRULE`.
+
+```ts
+const ics = toICalendar(events);
+
+// Offer it as a download in the browser:
+const url = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+```
+
+Pass `{ prodId, now }` to set the calendar's `PRODID` and the `DTSTAMP` written on
+each event. A stable `UID` is derived from the event when you don't supply one, so
+re-exports stay diff-friendly.
+
+## What's covered
+
+A pragmatic subset of RFC 5545, aimed at real-world event interchange:
+
+- **`VEVENT`** with `SUMMARY`, `DESCRIPTION`, `LOCATION`, `UID`, `DTSTART`, `DTEND`.
+- **All-day** events via `VALUE=DATE` (a missing `DTEND` becomes a one-day span).
+- **Dates** in UTC (`...Z`), floating local, or date-only; line folding and text
+  escaping per the spec.
+- **`RRULE`** round-tripped to a [`RecurrenceRule`](/guides/recurring-events)
+  (`FREQ`, `INTERVAL`, `COUNT`, `UNTIL`, and weekly `BYDAY`).
+
+Not (yet) handled: `VTODO` / `VJOURNAL`, `VALARM`, attendees, attachments, and
+per-event `TZID` zones (times without a `Z` are read as local). Contributions
+welcome.

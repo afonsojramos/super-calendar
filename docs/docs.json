@@ -25,6 +25,7 @@
           "guides/headless",
           "guides/recurring-events",
           "guides/time-zones",
+          "guides/ical",
           "guides/theming"
         ]
       },
