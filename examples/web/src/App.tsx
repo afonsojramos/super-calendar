@@ -6,6 +6,7 @@ import {
   type CalendarSlot,
   type DateRange,
   DateRangePicker,
+  expandRecurringEvents,
   getViewDays,
   MonthList,
   parseICalendar,
@@ -31,6 +32,7 @@ type DemoTab =
   | "tailwind"
   | "field"
   | "resource"
+  | "recurring"
   | "ics";
 const TABS: DemoTab[] = [
   ...MODES,
@@ -40,6 +42,7 @@ const TABS: DemoTab[] = [
   "tailwind",
   "field",
   "resource",
+  "recurring",
   "ics",
 ];
 
@@ -133,6 +136,33 @@ export function App() {
       return [];
     }
   }, [icsText]);
+  // Rules for the "recurring" tab, expanded to concrete occurrences around the
+  // visible month so paging re-materialises them. Shows BYMONTHDAY, weekly BYDAY,
+  // and yearly BYMONTH from the recurrence engine.
+  const recurringEvents = useMemo(() => {
+    const rules: CalendarEvent[] = [
+      {
+        title: "Payroll",
+        start: new Date(2026, 0, 1, 9),
+        end: new Date(2026, 0, 1, 10),
+        recurrence: { freq: "monthly", monthDays: [1, 15] },
+      },
+      {
+        title: "Team lunch",
+        start: new Date(2026, 0, 2, 12),
+        end: new Date(2026, 0, 2, 13),
+        recurrence: { freq: "weekly", weekdays: [5] },
+      },
+      {
+        title: "Quarterly review",
+        start: new Date(2026, 0, 15, 15),
+        end: new Date(2026, 0, 15, 16),
+        recurrence: { freq: "yearly", months: [1, 4, 7, 10] },
+      },
+    ];
+    return expandRecurringEvents(rules, addMonths(date, -1), addMonths(date, 1));
+  }, [date]);
+
   const exportIcs = () => {
     const blob = new Blob([toICalendar(events)], { type: "text/calendar" });
     const url = URL.createObjectURL(blob);
@@ -287,6 +317,16 @@ export function App() {
                 console.log("more:", day.toDateString(), dayEvents.length)
               }
               height={560}
+            />
+          </div>
+        ) : mode === "recurring" ? (
+          <div style={styles.card}>
+            <Calendar
+              mode="month"
+              date={date}
+              events={recurringEvents}
+              weekStartsOn={1}
+              onPressDay={setDate}
             />
           </div>
         ) : mode === "ics" ? (
