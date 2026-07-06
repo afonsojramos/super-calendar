@@ -63,7 +63,8 @@ A pragmatic subset of RFC 5545, aimed at real-world event interchange:
 - **Dates** in UTC (`...Z`), floating local, or date-only; line folding and text
   escaping per the spec.
 - **`RRULE`** round-tripped to a [`RecurrenceRule`](/guides/recurring-events)
-  (`FREQ`, `INTERVAL`, `COUNT`, `UNTIL`, and weekly `BYDAY`).
+  (`FREQ`, `INTERVAL`, `COUNT`, `UNTIL`, and weekly `BYDAY`), plus **`EXDATE`**
+  exception days (`recurrence.exdates`, honoured by `expandRecurringEvents`).
 
 Not (yet) handled: `VTODO` / `VJOURNAL`, `VALARM`, attendees, attachments, and
 per-event `TZID` zones (times without a `Z` are read as local). Contributions

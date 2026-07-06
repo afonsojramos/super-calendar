@@ -51,6 +51,11 @@ export interface RecurrenceRule {
    * the event's time of day. Omit to repeat on the start date's own weekday.
    */
   weekdays?: WeekStartsOn[];
+  /**
+   * Dates to skip (exceptions). An occurrence whose day matches one of these is
+   * dropped by `expandRecurringEvents`. Maps to iCal `EXDATE`.
+   */
+  exdates?: Date[];
 }
 
 /**

@@ -94,4 +94,14 @@ describe("expandRecurringEvents", () => {
     const result = expandRecurringEvents([event], at(2026, 0, 1), at(2026, 0, 2, 23));
     expect(result.every((e) => e.recurrence === undefined)).toBe(true);
   });
+
+  it("skips occurrences on EXDATE exception days", () => {
+    const event: CalendarEvent = {
+      ...base, // Thu 1 Jan 2026, 09:00, daily
+      recurrence: { freq: "daily", count: 5, exdates: [at(2026, 0, 2), at(2026, 0, 4)] },
+    };
+    const result = expandRecurringEvents([event], at(2026, 0, 1), at(2026, 0, 31));
+    // 1–5 Jan minus the 2nd and 4th.
+    expect(result.map((e) => e.start.getDate())).toEqual([1, 3, 5]);
+  });
 });

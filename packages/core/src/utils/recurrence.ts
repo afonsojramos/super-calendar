@@ -88,9 +88,13 @@ export function expandRecurringEvents<T>(
       continue;
     }
     const durationMs = event.end.getTime() - event.start.getTime();
+    // Exception days (EXDATE): an occurrence landing on one of these is dropped.
+    const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const excluded = new Set((event.recurrence.exdates ?? []).map(dayKey));
     for (const start of occurrenceStarts(event.start, event.recurrence, rangeEnd)) {
       // Skip occurrences that end before the range opens, but keep iterating.
       if (start.getTime() + durationMs < rangeStart.getTime()) continue;
+      if (excluded.has(dayKey(start))) continue;
       out.push(instanceAt(event, start, durationMs));
     }
   }

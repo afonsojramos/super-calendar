@@ -85,6 +85,22 @@ describe("parseICalendar", () => {
     });
   });
 
+  it("attaches EXDATE exception days to the recurrence", () => {
+    const ics = wrap(
+      [
+        "DTSTART:20260101T090000Z",
+        "SUMMARY:Standup",
+        "RRULE:FREQ=DAILY;COUNT=5",
+        "EXDATE:20260102T090000Z,20260104T090000Z",
+      ].join("\r\n"),
+    );
+    const [event] = parseICalendar(ics);
+    expect(event.recurrence?.exdates?.map((d) => d.toISOString())).toEqual([
+      "2026-01-02T09:00:00.000Z",
+      "2026-01-04T09:00:00.000Z",
+    ]);
+  });
+
   it("reads every VEVENT and skips other components", () => {
     const ics = [
       "BEGIN:VCALENDAR",

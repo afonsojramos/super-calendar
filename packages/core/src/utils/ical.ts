@@ -212,6 +212,8 @@ export function parseICalendar(ics: string): ICalEvent[] {
   let allDay = false;
   // A VEVENT may carry DURATION instead of DTEND; resolve it once DTSTART is known.
   let durationMs: number | null = null;
+  // EXDATE(s) may appear before or after RRULE; collect, then attach at END.
+  let exdates: Date[] = [];
 
   for (const raw of lines) {
     const line = parseLine(raw);
@@ -219,6 +221,7 @@ export function parseICalendar(ics: string): ICalEvent[] {
       current = {};
       allDay = false;
       durationMs = null;
+      exdates = [];
       continue;
     }
     if (line.name === "END" && line.value === "VEVENT") {
@@ -226,6 +229,7 @@ export function parseICalendar(ics: string): ICalEvent[] {
         if (!current.end && durationMs != null) {
           current.end = new Date(current.start.getTime() + durationMs);
         }
+        if (current.recurrence && exdates.length) current.recurrence.exdates = exdates;
         if (allDay) {
           current.allDay = true;
           // iCal all-day DTEND is exclusive; default to a one-day span.
@@ -263,6 +267,11 @@ export function parseICalendar(ics: string): ICalEvent[] {
         break;
       case "DURATION":
         durationMs = parseDuration(line.value);
+        break;
+      case "EXDATE":
+        for (const v of line.value.split(",")) {
+          if (v) exdates.push(parseIcalDate(v, dateOnly || !v.includes("T")));
+        }
         break;
       case "RRULE": {
         const rule = parseRRule(line.value);
@@ -320,6 +329,13 @@ export function toICalendar(events: ICalEvent[], options: ToICalendarOptions = {
     if (event.description) out.push(line("DESCRIPTION", escapeText(event.description)));
     if (event.location) out.push(line("LOCATION", escapeText(event.location)));
     if (event.recurrence) out.push(line("RRULE", formatRRule(event.recurrence)));
+    if (event.recurrence?.exdates?.length) {
+      out.push(
+        event.allDay
+          ? line("EXDATE;VALUE=DATE", event.recurrence.exdates.map(formatDateOnly).join(","))
+          : line("EXDATE", event.recurrence.exdates.map(formatUtc).join(",")),
+      );
+    }
     out.push("END:VEVENT");
   }
 
