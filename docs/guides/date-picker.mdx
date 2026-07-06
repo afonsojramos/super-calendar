@@ -1,117 +1,88 @@
 ---
 title: Date & range picker
-description: Build a date or date-range input with a popover calendar, on the web.
+description: Shipped DatePicker and DateRangePicker inputs, or compose your own on the web.
 ---
 
 <Note>
-  This recipe uses the **web renderer** (`@super-calendar/dom`). super-calendar stays a headless
-  calendar — you compose the input and popover around it — so you keep full control of the trigger,
-  positioning, and form integration.
+  These are **web renderer** (`@super-calendar/dom`) components. On React Native, compose a picker
+  from `MonthList` + `useDateRange` (the same primitives shown below).
 </Note>
 
-The building blocks ship with the library:
+super-calendar ships two controlled popover inputs, `DatePicker` and
+`DateRangePicker` — and, because both are just thin shells over `MonthList`, you can
+build your own if you need different chrome.
 
-- **`MonthList`** — a scrolling month grid that takes `selectedRange` / `selectedDates`
-  and reports clicks through `onPressDay`.
-- **`useDateRange`** — range-selection state: give it `minDate` / `maxDate`, spread the
-  returned `onPressDate` into `MonthList`, and read back `range`.
-- **[Per-slot `classNames`](/guides/styling)** — style the popover calendar to match
-  your field.
+## DatePicker
 
-## A date-range field
-
-Wrap `MonthList` in a popover and drive it with `useDateRange`. The two behaviours
-every popover needs — close on outside-click and on `Escape` — are a few lines:
+A single date, controlled by `value` / `onChange`:
 
 ```tsx
-import { format } from "date-fns";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
+import { DatePicker } from "@super-calendar/dom";
+
+function Field() {
+  const [value, setValue] = useState<Date | null>(null);
+  return <DatePicker value={value} onChange={setValue} weekStartsOn={1} />;
+}
+```
+
+## DateRangePicker
+
+A start/end range. Each pick advances the selection (start, then end), and the
+popover closes once both are set:
+
+```tsx
+import { useState } from "react";
+import { type DateRange, DateRangePicker } from "@super-calendar/dom";
+
+function Field() {
+  const [range, setRange] = useState<DateRange | null>(null);
+  return <DateRangePicker value={range} onChange={setRange} weekStartsOn={1} />;
+}
+```
+
+Both accept `minDate` / `maxDate` / `isDateDisabled`, a `placeholder`, `disabled`,
+a `formatLabel` for the trigger text, and the calendar `theme`. They close on
+outside-click and `Escape`, and return focus to the trigger.
+
+## Styling
+
+The picker chrome has its own slots (`trigger`, `popover`, `footer`, `clear`), and
+any [calendar slot](/guides/styling) you pass through `classNames` reaches the
+popover's `MonthList`:
+
+```tsx
+<DateRangePicker
+  value={range}
+  onChange={setRange}
+  classNames={{
+    trigger: "rounded-lg border px-3 py-2",
+    dayBadge: "data-[selected]:bg-indigo-600 data-[selected]:text-white",
+  }}
+/>
+```
+
+## Roll your own
+
+If you want fully custom chrome, wrap `MonthList` yourself and drive it with
+`useDateRange` (range) or `selectedDates` (single). The building blocks:
+
+```tsx
 import { MonthList, useDateRange } from "@super-calendar/dom";
 
-export function DateRangeField() {
-  const [open, setOpen] = useState(false);
-  const today = useMemo(() => new Date(), []);
-  const { range, onPressDate, reset } = useDateRange({ minDate: today });
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  const label = !range
-    ? "Select dates"
-    : range.end
-      ? `${format(range.start, "d MMM")} → ${format(range.end, "d MMM")}`
-      : `${format(range.start, "d MMM")} → …`;
-
+function CustomRange() {
+  const { range, onPressDate } = useDateRange();
   return (
-    <div ref={rootRef} style={{ position: "relative", display: "inline-block" }}>
-      <button
-        type="button"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {label}
-      </button>
-      {open ? (
-        <div
-          role="dialog"
-          aria-label="Choose a date range"
-          style={{ position: "absolute", zIndex: 10 }}
-        >
-          <MonthList
-            date={today}
-            minDate={today}
-            weekStartsOn={1}
-            selectedRange={range ?? undefined}
-            onPressDay={onPressDate}
-            height={320}
-          />
-          <button type="button" onClick={reset}>
-            Clear
-          </button>
-        </div>
-      ) : null}
-    </div>
+    <MonthList
+      weekStartsOn={1}
+      selectedRange={range ?? undefined}
+      onPressDay={onPressDate}
+      height={320}
+    />
   );
 }
 ```
 
-That's a complete, controlled range field. Style the calendar inside with
-[`classNames`](/guides/styling) (e.g. `dayBadge: "data-[selected]:bg-indigo-600"`),
-and position the popover however your app prefers.
-
-## A single-date picker
-
-For one date instead of a range, skip `useDateRange` and pass `selectedDates`:
-
-```tsx
-import { MonthList } from "@super-calendar/dom";
-
-<MonthList
-  date={new Date()}
-  weekStartsOn={1}
-  selectedDates={value ? [value] : []}
-  onPressDay={(day) => {
-    setValue(day);
-    setOpen(false);
-  }}
-  height={320}
-/>;
-```
-
-## See it running
-
-The [live demo](/demo) has a **field** tab with exactly this pattern; the source is
-[`examples/web/src/DateRangeField.tsx`](https://github.com/afonsojramos/super-calendar/blob/main/examples/web/src/DateRangeField.tsx).
+Add your own trigger/popover and the two behaviours every popover needs
+(outside-click and `Escape` to close). See the **field** tab on the
+[live demo](/demo).

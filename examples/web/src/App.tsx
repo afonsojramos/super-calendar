@@ -4,6 +4,8 @@ import {
   Calendar,
   type CalendarEvent,
   type CalendarSlot,
+  type DateRange,
+  DateRangePicker,
   getViewDays,
   MonthList,
   type Resource,
@@ -13,7 +15,6 @@ import {
 
 import { type EventMenuActions, EventMenuProvider } from "@super-calendar/example-shared";
 import { buildEvents, type EventMeta } from "@super-calendar/example-shared/events";
-import { DateRangeField } from "./DateRangeField";
 import { EventContextMenu } from "./EventContextMenu";
 
 // The grid views step by a fixed period (toolbar + letter keys). "schedule" is the
@@ -90,6 +91,7 @@ export function App() {
   const [events, setEvents] = useState<CalendarEvent<EventMeta>[]>(buildEvents);
   const pickerMinDate = useMemo(() => new Date(), []);
   const { range, onPressDate, reset } = useDateRange({ minDate: pickerMinDate });
+  const [rangeValue, setRangeValue] = useState<DateRange | null>(null);
 
   // Actions the right-click menu performs; matched back to events by id.
   const menuActions = useMemo<EventMenuActions>(
@@ -251,10 +253,15 @@ export function App() {
           </div>
         ) : mode === "field" ? (
           <div style={{ padding: "24px 0" }}>
-            <DateRangeField />
+            <DateRangePicker
+              value={rangeValue}
+              onChange={setRangeValue}
+              minDate={pickerMinDate}
+              weekStartsOn={1}
+            />
             <p style={{ marginTop: 12, color: "#6B7280", fontSize: 13 }}>
-              A date-range input with a popover, composed from <code>MonthList</code> +{" "}
-              <code>useDateRange</code> and styled with per-slot <code>classNames</code>.
+              The shipped <code>&lt;DateRangePicker&gt;</code>: a controlled date-range input with a
+              popover calendar.
             </p>
           </div>
         ) : mode === "tailwind" ? (

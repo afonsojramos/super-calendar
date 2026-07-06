@@ -28,6 +28,13 @@ export {
 } from "./Agenda";
 export { Calendar, type CalendarProps, type CalendarSlot } from "./Calendar";
 export {
+  DatePicker,
+  type DatePickerProps,
+  type DatePickerSlot,
+  DateRangePicker,
+  type DateRangePickerProps,
+} from "./DateRangePicker";
+export {
   type DomMonthEvent,
   type DomMonthEventArgs,
   MonthView,
