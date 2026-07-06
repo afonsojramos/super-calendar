@@ -269,7 +269,10 @@ function MonthPagerInner<T>({
     <View ref={containerRef} style={styles.container}>
       {/* The active month's title, above the (shared) weekday header — mirrors the
           dom MonthView's title. The grids below omit their own title/weekdays. */}
-      <Text style={[styles.monthTitle, { color: theme.colors.text }]} allowFontScaling={false}>
+      <Text
+        style={[styles.monthTitle, theme.text.monthTitle, { color: theme.colors.text }]}
+        allowFontScaling={false}
+      >
         {format(date, "MMMM yyyy", locale ? { locale } : undefined)}
       </Text>
       {renderHeaderForMonthView ? (
@@ -377,10 +380,8 @@ const styles = StyleSheet.create({
   webNoScroll: {
     overflow: "hidden",
   },
-  // Matches the dom MonthView title: "MMMM yyyy" above the weekday row.
+  // Layout only; the font is themeable via `theme.text.monthTitle`.
   monthTitle: {
-    fontSize: 17,
-    fontWeight: "700",
     paddingTop: 10,
     paddingHorizontal: 14,
     paddingBottom: 6,

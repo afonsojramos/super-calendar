@@ -427,7 +427,10 @@ function MonthViewInner<T>({
   return (
     <View style={styles.root}>
       {showTitle ? (
-        <Text style={[styles.title, { color: theme.colors.text }]} allowFontScaling={false}>
+        <Text
+          style={[styles.title, theme.text.monthTitle, { color: theme.colors.text }]}
+          allowFontScaling={false}
+        >
           {format(date, "MMMM yyyy", locale ? { locale } : undefined)}
         </Text>
       ) : null}
@@ -477,10 +480,8 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
-  // Matches the dom MonthView title: "MMMM yyyy" above the grid.
+  // Layout only; the font is themeable via `theme.text.monthTitle`.
   title: {
-    fontSize: 17,
-    fontWeight: "700",
     paddingTop: 10,
     paddingHorizontal: 14,
     paddingBottom: 6,

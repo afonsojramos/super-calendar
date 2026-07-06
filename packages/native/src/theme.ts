@@ -16,6 +16,8 @@ export interface CalendarTheme {
     dayNumber: TextStyle;
     /** Short weekday label ("Mon") in headers. */
     weekday: TextStyle;
+    /** The "MMMM yyyy" month title above the month grid. */
+    monthTitle: TextStyle;
     /** Date number inside a month cell. */
     dateCell: TextStyle;
     /** Hour labels down the left of the time grid. */
@@ -40,6 +42,7 @@ export const defaultTheme: CalendarTheme = {
   text: {
     dayNumber: { fontSize: 22, fontWeight: "700" },
     weekday: { fontSize: 13, fontWeight: "700" },
+    monthTitle: { fontSize: 17, fontWeight: "700" },
     dateCell: { fontSize: 13, fontWeight: "700" },
     hourLabel: { fontSize: 10 },
     more: { fontSize: 11, fontWeight: "700" },
