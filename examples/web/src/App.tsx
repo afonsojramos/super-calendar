@@ -8,8 +8,10 @@ import {
   DateRangePicker,
   getViewDays,
   MonthList,
+  parseICalendar,
   type Resource,
   ResourceTimeline,
+  toICalendar,
   useDateRange,
 } from "@super-calendar/dom";
 
@@ -21,8 +23,39 @@ import { EventContextMenu } from "./EventContextMenu";
 // agenda list, and picker/list are scrolling MonthLists, so they sit outside it.
 const MODES = ["month", "week", "3days", "day"] as const;
 type CalendarTab = (typeof MODES)[number];
-type DemoTab = CalendarTab | "schedule" | "picker" | "list" | "tailwind" | "field" | "resource";
-const TABS: DemoTab[] = [...MODES, "schedule", "picker", "list", "tailwind", "field", "resource"];
+type DemoTab =
+  | CalendarTab
+  | "schedule"
+  | "picker"
+  | "list"
+  | "tailwind"
+  | "field"
+  | "resource"
+  | "ics";
+const TABS: DemoTab[] = [
+  ...MODES,
+  "schedule",
+  "picker",
+  "list",
+  "tailwind",
+  "field",
+  "resource",
+  "ics",
+];
+
+const SAMPLE_ICS = `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART;TZID=America/New_York:20260619T090000
+DURATION:PT1H
+SUMMARY:Imported standup
+LOCATION:Room A
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20260620
+SUMMARY:Imported holiday
+END:VEVENT
+END:VCALENDAR`;
 
 // Rooms for the resource-timeline demo; events are spread across them by id.
 const ROOMS: Resource[] = [
@@ -92,6 +125,23 @@ export function App() {
   const pickerMinDate = useMemo(() => new Date(), []);
   const { range, onPressDate, reset } = useDateRange({ minDate: pickerMinDate });
   const [rangeValue, setRangeValue] = useState<DateRange | null>(null);
+  const [icsText, setIcsText] = useState(SAMPLE_ICS);
+  const importedIcs = useMemo(() => {
+    try {
+      return parseICalendar(icsText);
+    } catch {
+      return [];
+    }
+  }, [icsText]);
+  const exportIcs = () => {
+    const blob = new Blob([toICalendar(events)], { type: "text/calendar" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "super-calendar.ics";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Actions the right-click menu performs; matched back to events by id.
   const menuActions = useMemo<EventMenuActions>(
@@ -238,6 +288,44 @@ export function App() {
               }
               height={560}
             />
+          </div>
+        ) : mode === "ics" ? (
+          <div style={{ padding: "16px 0", display: "grid", gap: 16 }}>
+            <div>
+              <button type="button" style={styles.todayButton} onClick={exportIcs}>
+                Export {events.length} events → .ics
+              </button>
+            </div>
+            <div>
+              <p style={{ margin: "0 0 6px", color: "#6B7280", fontSize: 13 }}>
+                Paste an <code>.ics</code> feed to parse it (`DTEND`/`DURATION`, all-day,{" "}
+                <code>TZID</code>, <code>RRULE</code>/<code>EXDATE</code>):
+              </p>
+              <textarea
+                value={icsText}
+                onChange={(e) => setIcsText(e.target.value)}
+                spellCheck={false}
+                style={{
+                  width: "100%",
+                  height: 180,
+                  fontFamily: "ui-monospace, monospace",
+                  fontSize: 12,
+                  padding: 8,
+                  borderRadius: 8,
+                  border: "1px solid #E2E4E9",
+                }}
+              />
+              <p style={{ margin: "8px 0 4px", fontWeight: 600, fontSize: 14 }}>
+                Parsed {importedIcs.length} events:
+              </p>
+              <ul style={{ margin: 0, paddingLeft: 18, color: "#1A1B1E", fontSize: 13 }}>
+                {importedIcs.map((e, i) => (
+                  <li key={i}>
+                    {e.title} — {e.allDay ? e.start.toDateString() : e.start.toLocaleString()}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         ) : mode === "resource" ? (
           <div style={styles.card}>
