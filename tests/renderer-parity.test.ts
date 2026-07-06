@@ -41,6 +41,9 @@ const DOM_PLATFORM_PROPS: Record<string, Set<string>> = {
     "showTitle",
     "showWeekdays",
     "keyboardDayNavigation",
+    // Web-only for now: pointer drag-to-create a day span (native month drag lands
+    // with a gesture-handler pass).
+    "onCreateEvent",
   ]),
   // pastMonths/futureMonths size the dom scroll window (native virtualizes by date).
   // keyboardDayNavigation is web-only (see MonthView). classNames/styles are the web

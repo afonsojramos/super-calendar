@@ -122,6 +122,14 @@ export interface MonthViewProps<T = unknown>
   /** Fired when a selectable day is clicked. */
   onPressDay?: (date: Date) => void;
   /**
+   * In events mode, enables drag-to-create: press on a day and drag across others
+   * to sketch a span, then release to fire this with the all-day range (`start` at
+   * midnight of the first day, `end` at midnight after the last, exclusive). A plain
+   * click without dragging still fires `onPressDay`, not this. Days being sketched
+   * carry `data-creating` for styling.
+   */
+  onCreateEvent?: (start: Date, end: Date) => void;
+  /**
    * When events are shown, also make the day cells keyboard-navigable: a single
    * roving tab stop, arrow keys move the focus, Enter opens the day (`onPressDay`).
    * Default false, so keyboard focus moves through events only. The date picker
@@ -376,6 +384,7 @@ export function MonthView<T = unknown>({
   maxDate,
   isDateDisabled,
   onPressDay,
+  onCreateEvent,
   keyboardDayNavigation = false,
   className,
   style,
@@ -440,6 +449,45 @@ export function MonthView<T = unknown>({
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const focusKey = format(focusedDate, "yyyy-MM-dd");
+
+  // Drag-to-create (events mode): press a day and drag across others to sketch an
+  // all-day span, released on a window pointerup so a drop anywhere still commits.
+  const [creating, setCreating] = useState<{ anchor: number; hover: number } | null>(null);
+  const creatingRef = useRef(creating);
+  creatingRef.current = creating;
+  const movedRef = useRef(false);
+  // Set when a drag commits, so the click the browser fires next is swallowed
+  // (it must not also open the day via onPressDay).
+  const suppressClickRef = useRef(false);
+  const beginCreate = (day: Date) => {
+    if (!onCreateEvent) return;
+    const t = startOfDay(day).getTime();
+    movedRef.current = false;
+    setCreating({ anchor: t, hover: t });
+  };
+  const extendCreate = (day: Date) => {
+    if (!creatingRef.current) return;
+    const t = startOfDay(day).getTime();
+    if (t !== creatingRef.current.hover) {
+      movedRef.current = true;
+      setCreating((c) => (c ? { ...c, hover: t } : c));
+    }
+  };
+  const isCreating = creating !== null;
+  useEffect(() => {
+    if (!isCreating) return;
+    const finish = () => {
+      const c = creatingRef.current;
+      setCreating(null);
+      if (!c || !movedRef.current) return;
+      suppressClickRef.current = true;
+      const lo = Math.min(c.anchor, c.hover);
+      const hi = Math.max(c.anchor, c.hover);
+      onCreateEvent?.(new Date(lo), addDays(new Date(hi), 1));
+    };
+    window.addEventListener("pointerup", finish);
+    return () => window.removeEventListener("pointerup", finish);
+  }, [isCreating, onCreateEvent]);
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     let next: Date | null = null;
     if (e.key === "ArrowLeft") next = addDays(focusedDate, -1);
@@ -521,6 +569,11 @@ export function MonthView<T = unknown>({
               }
               const band = rangeBandDefault(day, theme, fillCellOnSelection);
               const label = format(day.date, "EEEE, d MMMM yyyy", locale ? { locale } : undefined);
+              const dayTime = startOfDay(day.date).getTime();
+              const inCreate =
+                creating != null &&
+                dayTime >= Math.min(creating.anchor, creating.hover) &&
+                dayTime <= Math.max(creating.anchor, creating.hover);
               // Present/absent data-* attributes so consumers can style day state
               // with CSS/Tailwind variants (e.g. `data-[today]:bg-blue-500`).
               const dayData = dataState({
@@ -530,6 +583,7 @@ export function MonthView<T = unknown>({
                 "data-weekend": day.isWeekend,
                 "data-outside": !day.isCurrentMonth,
                 "data-disabled": day.isDisabled,
+                "data-creating": inCreate,
               });
 
               if (eventsMode) {
@@ -544,6 +598,7 @@ export function MonthView<T = unknown>({
                 const rest = dayEvents.slice(visible);
                 const overflow = rest.length > 0;
                 const dayLabel = format(day.date, "d MMMM", locale ? { locale } : undefined);
+                const dayCellProps = slot("day", eventCellDefault(day, theme, cellHeight));
                 return (
                   // Events mode: by default the cell is not a tab stop, so keyboard
                   // focus moves through the event chips (real buttons) only, not
@@ -558,8 +613,33 @@ export function MonthView<T = unknown>({
                     tabIndex={keyboardDayNavigation ? (day.id === focusKey ? 0 : -1) : undefined}
                     aria-disabled={day.isDisabled || undefined}
                     aria-label={label}
-                    {...slot("day", eventCellDefault(day, theme, cellHeight))}
-                    onClick={day.isDisabled ? undefined : () => onPressDay?.(day.date)}
+                    {...dayCellProps}
+                    // Drag-to-create disables touch scroll on the cell so a swipe
+                    // sketches a span instead of scrolling the grid.
+                    style={
+                      onCreateEvent
+                        ? { ...dayCellProps.style, touchAction: "none" }
+                        : dayCellProps.style
+                    }
+                    onPointerDown={
+                      onCreateEvent && !day.isDisabled
+                        ? (e) => {
+                            if (e.button === 0) beginCreate(day.date);
+                          }
+                        : undefined
+                    }
+                    onPointerEnter={onCreateEvent ? () => extendCreate(day.date) : undefined}
+                    onClick={
+                      day.isDisabled
+                        ? undefined
+                        : () => {
+                            if (suppressClickRef.current) {
+                              suppressClickRef.current = false;
+                              return;
+                            }
+                            onPressDay?.(day.date);
+                          }
+                    }
                     onKeyDown={
                       keyboardDayNavigation && !day.isDisabled
                         ? (e) => {

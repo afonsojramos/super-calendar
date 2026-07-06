@@ -73,15 +73,16 @@ import { MonthView } from "@super-calendar/dom";
 On the month grid, day state sits on both the `day` cell and its `dayBadge`, so a
 variant works on either slot (e.g. `dayBadge: "data-[today]:bg-blue-600"`).
 
-| Attribute       | On                | Present when                          |
-| --------------- | ----------------- | ------------------------------------- |
-| `data-today`    | day / badge / col | it is today                           |
-| `data-selected` | day / badge       | the day is selected                   |
-| `data-range`    | day / badge       | the day is inside a selected range    |
-| `data-weekend`  | day / badge       | the day is a weekend                  |
-| `data-outside`  | day / badge       | the day belongs to an adjacent month  |
-| `data-disabled` | day / badge       | the day is disabled (`min`/`maxDate`) |
-| `data-dragging` | time-grid event   | the event is being dragged            |
+| Attribute       | On                | Present when                            |
+| --------------- | ----------------- | --------------------------------------- |
+| `data-today`    | day / badge / col | it is today                             |
+| `data-selected` | day / badge       | the day is selected                     |
+| `data-range`    | day / badge       | the day is inside a selected range      |
+| `data-weekend`  | day / badge       | the day is a weekend                    |
+| `data-outside`  | day / badge       | the day belongs to an adjacent month    |
+| `data-disabled` | day / badge       | the day is disabled (`min`/`maxDate`)   |
+| `data-creating` | day / badge       | the day is inside a drag-to-create span |
+| `data-dragging` | time-grid event   | the event is being dragged              |
 
 Every slotted element also carries a stable `data-slot="<name>"` attribute, handy for
 CSS selectors (`[data-slot="title"] { … }`) and for tests.

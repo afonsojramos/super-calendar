@@ -225,6 +225,7 @@ export function Calendar<T = unknown>({
         isDateDisabled={isDateDisabled}
         keyboardDayNavigation={keyboardDayNavigation}
         onPressDay={onPressDay}
+        onCreateEvent={onCreateEvent}
         onPressEvent={onPressEvent}
         onPressMore={onPressMore}
         renderEvent={renderMonthEvent}

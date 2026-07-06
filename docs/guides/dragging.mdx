@@ -93,6 +93,24 @@ in-progress sweep before it commits.
   "drag to create a range."
 </Note>
 
+### On the month grid
+
+`onCreateEvent` also works in `month` mode (web): press a day and drag across others
+to sketch an **all-day** span, then release. `start` is midnight of the first day and
+`end` is midnight after the last (exclusive). A plain click still fires `onPressDay`,
+and each day in the sweep carries `data-creating` for styling (see
+[Styling](/guides/styling)).
+
+```tsx
+<Calendar
+  mode="month"
+  /* ... */
+  onCreateEvent={(start, end) =>
+    setEvents((prev) => [...prev, { id: makeId(), title: "New", start, end, allDay: true }])
+  }
+/>
+```
+
 ## Tuning the snap
 
 `dragStepMinutes` (default 15) controls how move, resize, and create snap. Set it

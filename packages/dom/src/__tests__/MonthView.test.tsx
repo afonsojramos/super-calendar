@@ -299,4 +299,52 @@ describe("dom MonthView", () => {
     // The built-in "title, day" label is replaced, not appended.
     expect(queryByLabelText("Standup, 15 July")).toBeNull();
   });
+
+  describe("drag to create", () => {
+    const dayCell = (c: HTMLElement, id: string) =>
+      c.querySelector(`[data-day="${id}"]`) as HTMLElement;
+
+    it("fires onCreateEvent with the dragged all-day span and marks days data-creating", () => {
+      const onCreateEvent = jest.fn();
+      const { container } = render(
+        <MonthView
+          date={new Date(2026, 6, 1)}
+          weekStartsOn={1}
+          events={[]}
+          onCreateEvent={onCreateEvent}
+        />,
+      );
+      fireEvent.pointerDown(dayCell(container, "2026-07-06"), { button: 0 });
+      fireEvent.pointerEnter(dayCell(container, "2026-07-08"));
+      // Days across the sketched span are flagged for styling.
+      expect(dayCell(container, "2026-07-07").hasAttribute("data-creating")).toBe(true);
+      fireEvent.pointerUp(window);
+
+      expect(onCreateEvent).toHaveBeenCalledTimes(1);
+      const [start, end] = onCreateEvent.mock.calls[0] as [Date, Date];
+      expect(start).toEqual(new Date(2026, 6, 6));
+      // End is exclusive: midnight after the last dragged day.
+      expect(end).toEqual(new Date(2026, 6, 9));
+    });
+
+    it("does not fire on a plain click (no drag), leaving onPressDay to handle it", () => {
+      const onCreateEvent = jest.fn();
+      const onPressDay = jest.fn();
+      const { container } = render(
+        <MonthView
+          date={new Date(2026, 6, 1)}
+          weekStartsOn={1}
+          events={[]}
+          onCreateEvent={onCreateEvent}
+          onPressDay={onPressDay}
+        />,
+      );
+      const cell = dayCell(container, "2026-07-06");
+      fireEvent.pointerDown(cell, { button: 0 });
+      fireEvent.pointerUp(window);
+      fireEvent.click(cell);
+      expect(onCreateEvent).not.toHaveBeenCalled();
+      expect(onPressDay).toHaveBeenCalledTimes(1);
+    });
+  });
 });
