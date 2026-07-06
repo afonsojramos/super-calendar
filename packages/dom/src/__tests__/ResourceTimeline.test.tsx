@@ -1,0 +1,129 @@
+import { fireEvent, render } from "@testing-library/react";
+import type { CalendarEvent } from "@super-calendar/core";
+import { ResourceTimeline } from "../ResourceTimeline";
+
+const date = new Date(2026, 5, 26);
+const resources = [
+  { id: "a", title: "Room A" },
+  { id: "b", title: "Room B" },
+];
+type WithResource = { id: string; resourceId: string };
+const events: CalendarEvent<WithResource>[] = [
+  {
+    id: "1",
+    resourceId: "a",
+    title: "Standup",
+    start: new Date(2026, 5, 26, 9),
+    end: new Date(2026, 5, 26, 10),
+  },
+  {
+    id: "2",
+    resourceId: "b",
+    title: "Review",
+    start: new Date(2026, 5, 26, 11),
+    end: new Date(2026, 5, 26, 12),
+  },
+];
+
+describe("dom ResourceTimeline", () => {
+  it("renders a row per resource with its label", () => {
+    const { getByText } = render(
+      <ResourceTimeline date={date} resources={resources} events={events} />,
+    );
+    expect(getByText("Room A")).toBeTruthy();
+    expect(getByText("Room B")).toBeTruthy();
+  });
+
+  it("places each event in its resource's row", () => {
+    const { container } = render(
+      <ResourceTimeline date={date} resources={resources} events={events} hourWidth={80} />,
+    );
+    const rows = container.querySelectorAll('[data-slot="row"]');
+    expect(rows).toHaveLength(2);
+    // Room A's row (first) has the Standup event; Room B's has Review.
+    expect(rows[0].textContent).toContain("Standup");
+    expect(rows[1].textContent).toContain("Review");
+  });
+
+  it("positions an event by its start hour and duration", () => {
+    const { getByText } = render(
+      <ResourceTimeline
+        date={date}
+        resources={resources}
+        events={events}
+        startHour={8}
+        hourWidth={80}
+      />,
+    );
+    // Standup: 09:00–10:00, startHour 8 → left = (9-8)*80 = 80px, width = 1h*80 = 80px.
+    const bar = getByText("Standup").closest("button") as HTMLElement;
+    expect(bar.style.left).toBe("80px");
+    expect(bar.style.width).toBe("80px");
+  });
+
+  it("stacks overlapping events in the same row into sub-lanes", () => {
+    const overlap: CalendarEvent<WithResource>[] = [
+      {
+        id: "1",
+        resourceId: "a",
+        title: "One",
+        start: new Date(2026, 5, 26, 9),
+        end: new Date(2026, 5, 26, 11),
+      },
+      {
+        id: "2",
+        resourceId: "a",
+        title: "Two",
+        start: new Date(2026, 5, 26, 10),
+        end: new Date(2026, 5, 26, 12),
+      },
+    ];
+    const { getByText } = render(
+      <ResourceTimeline date={date} resources={resources} events={overlap} rowHeight={56} />,
+    );
+    const one = getByText("One").closest("button") as HTMLElement;
+    const two = getByText("Two").closest("button") as HTMLElement;
+    // Two overlapping events → two sub-lanes of half height at different tops.
+    expect(one.style.height).toBe("28px");
+    expect(two.style.height).toBe("28px");
+    expect(one.style.top).not.toBe(two.style.top);
+  });
+
+  it("fires onPressEvent when a bar is clicked", () => {
+    const onPressEvent = jest.fn();
+    const { getByText } = render(
+      <ResourceTimeline
+        date={date}
+        resources={resources}
+        events={events}
+        onPressEvent={onPressEvent}
+      />,
+    );
+    fireEvent.click(getByText("Standup"));
+    expect(onPressEvent).toHaveBeenCalledTimes(1);
+    expect(onPressEvent.mock.calls[0][0].title).toBe("Standup");
+  });
+
+  it("supports a custom resourceId accessor", () => {
+    const custom: CalendarEvent<{ id: string; room: string }>[] = [
+      {
+        id: "1",
+        room: "b",
+        title: "Custom",
+        start: new Date(2026, 5, 26, 9),
+        end: new Date(2026, 5, 26, 10),
+      },
+    ];
+    const { container } = render(
+      <ResourceTimeline
+        date={date}
+        resources={resources}
+        events={custom}
+        resourceId={(e) => (e as { room?: string }).room}
+      />,
+    );
+    const rows = container.querySelectorAll('[data-slot="row"]');
+    expect(rows[1].textContent).toContain("Custom"); // Room B row
+    expect(rows[0].textContent).not.toContain("Custom");
+  });
+});

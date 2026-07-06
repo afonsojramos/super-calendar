@@ -36,6 +36,13 @@ export {
 } from "./MonthView";
 export { MonthList, type MonthListProps, type MonthListSlot } from "./MonthList";
 export {
+  type Resource,
+  type ResourceEventArgs,
+  ResourceTimeline,
+  type ResourceTimelineProps,
+  type ResourceTimelineSlot,
+} from "./ResourceTimeline";
+export {
   TimeGrid,
   type TimeGridProps,
   type TimeGridSlot,

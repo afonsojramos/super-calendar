@@ -6,6 +6,8 @@ import {
   type CalendarSlot,
   getViewDays,
   MonthList,
+  type Resource,
+  ResourceTimeline,
   useDateRange,
 } from "@super-calendar/dom";
 
@@ -18,8 +20,15 @@ import { EventContextMenu } from "./EventContextMenu";
 // agenda list, and picker/list are scrolling MonthLists, so they sit outside it.
 const MODES = ["month", "week", "3days", "day"] as const;
 type CalendarTab = (typeof MODES)[number];
-type DemoTab = CalendarTab | "schedule" | "picker" | "list" | "tailwind" | "field";
-const TABS: DemoTab[] = [...MODES, "schedule", "picker", "list", "tailwind", "field"];
+type DemoTab = CalendarTab | "schedule" | "picker" | "list" | "tailwind" | "field" | "resource";
+const TABS: DemoTab[] = [...MODES, "schedule", "picker", "list", "tailwind", "field", "resource"];
+
+// Rooms for the resource-timeline demo; events are spread across them by id.
+const ROOMS: Resource[] = [
+  { id: "room-a", title: "Room A" },
+  { id: "room-b", title: "Room B" },
+  { id: "room-c", title: "Room C" },
+];
 const WEEK_STARTS_ON = 1;
 
 // A fully Tailwind-styled month, restyled entirely through per-slot `classNames`
@@ -226,6 +235,18 @@ export function App() {
                 console.log("more:", day.toDateString(), dayEvents.length)
               }
               height={560}
+            />
+          </div>
+        ) : mode === "resource" ? (
+          <div style={styles.card}>
+            <ResourceTimeline
+              date={date}
+              resources={ROOMS}
+              events={events}
+              resourceId={(event) => ROOMS[Number(event.id) % ROOMS.length].id}
+              startHour={7}
+              endHour={20}
+              onPressEvent={(event) => console.log("press event:", event.title)}
             />
           </div>
         ) : mode === "field" ? (

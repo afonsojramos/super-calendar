@@ -31,7 +31,13 @@
       },
       {
         "group": "Web",
-        "pages": ["guides/dom", "guides/web", "guides/styling", "guides/date-picker"]
+        "pages": [
+          "guides/dom",
+          "guides/web",
+          "guides/styling",
+          "guides/date-picker",
+          "guides/resource-timeline"
+        ]
       },
       {
         "group": "Reference",

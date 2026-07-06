@@ -1,0 +1,76 @@
+---
+title: Resource timeline
+description: A horizontal, one-day timeline with a row per resource (room, person, machine).
+---
+
+<Note>
+  This is a **web renderer** (`@super-calendar/dom`) view. It's a static v1 — no drag or zoom yet —
+  aimed at read-heavy scheduling boards.
+</Note>
+
+`ResourceTimeline` lays a single day out horizontally: each **resource** is a row,
+the x-axis is the day's hours, and every event sits in its resource's row at its
+start time. It's the classic scheduling board — rooms, people, or machines down the
+side, time across the top — and the MIT answer to the "resource timeline" views
+other libraries gate behind a paid tier.
+
+```tsx
+import { type CalendarEvent, ResourceTimeline } from "@super-calendar/dom";
+
+const resources = [
+  { id: "room-a", title: "Room A" },
+  { id: "room-b", title: "Room B" },
+];
+
+const events: CalendarEvent<{ resourceId: string }>[] = [
+  {
+    resourceId: "room-a",
+    title: "Standup",
+    start: new Date(2026, 5, 26, 9),
+    end: new Date(2026, 5, 26, 10),
+  },
+  {
+    resourceId: "room-b",
+    title: "Review",
+    start: new Date(2026, 5, 26, 11),
+    end: new Date(2026, 5, 26, 12),
+  },
+];
+
+<ResourceTimeline date={new Date(2026, 5, 26)} resources={resources} events={events} />;
+```
+
+## How events map to rows
+
+Each event is placed in the row whose `id` matches its resource. By default that's
+read from `event.resourceId`; pass a `resourceId` accessor for a different shape:
+
+```tsx
+<ResourceTimeline
+  date={date}
+  resources={resources}
+  events={events}
+  resourceId={(event) => event.room}
+/>
+```
+
+Overlapping events **in the same row** stack into sub-lanes (via the shared
+`layoutDayEvents`), so nothing is hidden behind anything else.
+
+## Sizing & window
+
+- `startHour` / `endHour` — the visible hour window (default 0–24).
+- `hourWidth` — pixels per hour along the axis (default 80); the track scrolls
+  horizontally when it overflows.
+- `rowHeight` — height of each resource row (default 56).
+- `labelWidth` — width of the left resource-label column (default 140).
+- `ampm` — 12-hour axis labels.
+
+## Styling
+
+Like the other views, every part is a [slot](/guides/styling): `header`, `timeAxis`,
+`hourTick`, `resourceLabel`, `row`, `track`, `gridLines`, `event`, `eventBox`. Pass
+`classNames` / `styles`, or a `renderEvent` for a fully custom bar. It also takes the
+shared [theme](/guides/theming).
+
+See the **resource** tab on the [live demo](/demo).
