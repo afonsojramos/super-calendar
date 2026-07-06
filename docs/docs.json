@@ -12,7 +12,7 @@
     "groups": [
       {
         "group": "Getting started",
-        "pages": ["index", "quickstart", "demo", "migrating-from-big-calendar"]
+        "pages": ["index", "why", "quickstart", "demo", "migrating-from-big-calendar"]
       },
       {
         "group": "Guides",

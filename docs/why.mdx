@@ -1,0 +1,71 @@
+---
+title: Why super-calendar
+description: What super-calendar is for, and how it compares to other React and React Native calendars.
+---
+
+Most calendar libraries pick a side: a web-only event calendar, or a React Native
+one, or a standalone date picker. super-calendar is built the other way around —
+a render-agnostic [core](/guides/headless) with two renderers on top, so the same
+calendar model runs in **React DOM and React Native**, from a picker to a
+drag-and-drop event grid.
+
+## What you get
+
+- **One model, two renderers.** `@super-calendar/dom` is a pure react-dom
+  renderer (no React Native runtime); `@super-calendar/native` is the Reanimated /
+  Gesture Handler renderer. Both consume the same headless `@super-calendar/core`.
+- **A full calendar, not just a picker.** Month, week, day, N-day, and schedule
+  views — plus a scrolling date picker (`MonthList` + `useDateRange`).
+- **Interaction built in.** Drag to move, resize, and create; pinch / Ctrl-scroll
+  zoom; virtualized, snap-paged views that stay cheap far into the past and future.
+- **Styleable two ways.** A shared [theme](/guides/theming) for palette and
+  metrics, and — on the web — per-slot [Tailwind / CSS classes](/guides/styling)
+  with `data-*` state variants.
+- **The hard parts handled.** [Recurring events](/guides/recurring-events),
+  [time-zone display](/guides/time-zones), [business hours](/guides/theming#business-hours),
+  overlapping-event layout, disabled days, and screen-reader labels.
+
+## How it compares
+
+Every library here is good at what it targets; the axis that sets super-calendar
+apart is spanning web **and** native from one API. This is a high-level map, not a
+feature-by-feature scorecard — check each project for the current details.
+
+|                                   | super-calendar                | react-day-picker | FullCalendar                   | react-big-calendar | react-native-calendars   |
+| --------------------------------- | ----------------------------- | ---------------- | ------------------------------ | ------------------ | ------------------------ |
+| Platforms                         | Web + React Native            | Web              | Web                            | Web                | React Native             |
+| Scope                             | Picker **and** event calendar | Date picker      | Event calendar                 | Event calendar     | Picker + agenda/timeline |
+| Time-grid views (week/day)        | ✅                            | ❌               | ✅                             | ✅                 | ✅                       |
+| Drag move / resize / create       | ✅                            | ❌               | ✅ (drop/resize)               | ➕ addon           | ⚠️ limited               |
+| Virtualized / paged               | ✅                            | ❌               | ⚠️                             | ❌                 | ⚠️                       |
+| Tailwind / per-slot classes (web) | ✅                            | ✅               | ⚠️ CSS                         | ⚠️ CSS             | n/a                      |
+| Headless core you can reuse       | ✅                            | ✅ (hooks)       | ❌                             | ❌                 | ❌                       |
+| License                           | MIT                           | MIT              | MIT core; paid Premium add-ons | MIT                | MIT                      |
+
+Legend: ✅ built in · ➕ official add-on · ⚠️ partial / via CSS · ❌ not available.
+
+## When to reach for something else
+
+Honesty helps you pick the right tool:
+
+- **You only need a date picker on the web.** [react-day-picker](https://daypicker.dev)
+  is focused and excellent at exactly that.
+- **You're web-only and want a large, battle-tested ecosystem** with resource
+  timelines and scheduler add-ons — [FullCalendar](https://fullcalendar.io) is
+  hard to beat (some views are paid).
+- **You want a standalone, headless React Native picker** rather than a full
+  calendar — [flash-calendar](https://github.com/MarceloPrado/flash-calendar)
+  inspired ours and does that well.
+
+Reach for super-calendar when you want **one calendar that works the same across
+web and native**, with events, drag-and-drop, and styling that bends to your
+design system.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Render your first calendar in a couple of minutes.
+  </Card>
+  <Card title="Styling with Tailwind" icon="palette" href="/guides/styling">
+    Restyle any part with per-slot classes and `data-*` variants.
+  </Card>
+</CardGroup>
