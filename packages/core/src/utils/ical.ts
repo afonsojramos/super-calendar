@@ -6,6 +6,7 @@
 // round-trippable RRULE that maps onto the library's `RecurrenceRule`.
 
 import type { ICalendarEvent, RecurrenceFrequency, RecurrenceRule, WeekStartsOn } from "../types";
+import { zonedTimeToUtc } from "./timezone";
 
 /** An event parsed from iCal, carrying the standard fields it also round-trips. */
 export interface ICalEvent extends ICalendarEvent {
@@ -110,8 +111,12 @@ function formatDateOnly(d: Date): string {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
 }
 
-/** Parse an iCal DATE / DATE-TIME value. `dateOnly` marks all-day (`VALUE=DATE`). */
-function parseIcalDate(value: string, dateOnly: boolean): Date {
+/**
+ * Parse an iCal DATE / DATE-TIME value. `dateOnly` marks all-day (`VALUE=DATE`);
+ * `tzid` is the IANA zone from a `TZID=` param, used to resolve the local time to
+ * the correct UTC instant.
+ */
+function parseIcalDate(value: string, dateOnly: boolean, tzid?: string): Date {
   const y = Number(value.slice(0, 4));
   const mo = Number(value.slice(4, 6)) - 1;
   const d = Number(value.slice(6, 8));
@@ -119,8 +124,17 @@ function parseIcalDate(value: string, dateOnly: boolean): Date {
   const h = Number(value.slice(9, 11));
   const mi = Number(value.slice(11, 13));
   const s = Number(value.slice(13, 15));
-  // Trailing Z → UTC; otherwise a floating/local time (TZID is treated as local).
+  // Trailing Z → UTC.
   if (value.endsWith("Z")) return new Date(Date.UTC(y, mo, d, h, mi, s));
+  // TZID → resolve the wall-clock time in that IANA zone to a real instant.
+  if (tzid) {
+    try {
+      return zonedTimeToUtc(new Date(Date.UTC(y, mo, d, h, mi, s)), tzid);
+    } catch {
+      // Unknown zone id: fall through to a floating/local time.
+    }
+  }
+  // No zone → a floating/local time.
   return new Date(y, mo, d, h, mi, s);
 }
 
@@ -245,6 +259,7 @@ export function parseICalendar(ics: string): ICalEvent[] {
     if (!current) continue;
 
     const dateOnly = line.params.get("VALUE") === "DATE";
+    const tzid = line.params.get("TZID");
     switch (line.name) {
       case "SUMMARY":
         current.title = unescapeText(line.value);
@@ -259,18 +274,18 @@ export function parseICalendar(ics: string): ICalEvent[] {
         current.uid = line.value;
         break;
       case "DTSTART":
-        current.start = parseIcalDate(line.value, dateOnly);
+        current.start = parseIcalDate(line.value, dateOnly, tzid);
         if (dateOnly) allDay = true;
         break;
       case "DTEND":
-        current.end = parseIcalDate(line.value, dateOnly);
+        current.end = parseIcalDate(line.value, dateOnly, tzid);
         break;
       case "DURATION":
         durationMs = parseDuration(line.value);
         break;
       case "EXDATE":
         for (const v of line.value.split(",")) {
-          if (v) exdates.push(parseIcalDate(v, dateOnly || !v.includes("T")));
+          if (v) exdates.push(parseIcalDate(v, dateOnly || !v.includes("T"), tzid));
         }
         break;
       case "RRULE": {

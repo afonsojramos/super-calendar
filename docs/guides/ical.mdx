@@ -60,12 +60,13 @@ A pragmatic subset of RFC 5545, aimed at real-world event interchange:
 - **`VEVENT`** with `SUMMARY`, `DESCRIPTION`, `LOCATION`, `UID`, `DTSTART`, and either
   `DTEND` or `DURATION` (e.g. `PT1H30M`, `P1D`).
 - **All-day** events via `VALUE=DATE` (a missing end becomes a one-day span).
-- **Dates** in UTC (`...Z`), floating local, or date-only; line folding and text
+- **Dates** in UTC (`...Z`), a named IANA zone (`TZID=Europe/London`, resolved to
+  the correct instant), floating local, or date-only; line folding and text
   escaping per the spec.
 - **`RRULE`** round-tripped to a [`RecurrenceRule`](/guides/recurring-events)
   (`FREQ`, `INTERVAL`, `COUNT`, `UNTIL`, and weekly `BYDAY`), plus **`EXDATE`**
   exception days (`recurrence.exdates`, honoured by `expandRecurringEvents`).
 
 Not (yet) handled: `VTODO` / `VJOURNAL`, `VALARM`, attendees, attachments, and
-per-event `TZID` zones (times without a `Z` are read as local). Contributions
-welcome.
+embedded `VTIMEZONE` definitions (a `TZID` must be a valid IANA name for the
+runtime's `Intl`). Contributions welcome.

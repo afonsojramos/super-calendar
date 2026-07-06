@@ -1,5 +1,5 @@
 import type { CalendarEvent } from "../../types";
-import { eventsInTimeZone, toZonedTime } from "../timezone";
+import { eventsInTimeZone, toZonedTime, zonedTimeToUtc } from "../timezone";
 
 // 1 June 2026, 12:00 UTC. June avoids the US/EU DST transition dates, so the
 // offsets below are stable regardless of the machine running the test.
@@ -32,6 +32,43 @@ describe("toZonedTime", () => {
   it("preserves milliseconds", () => {
     const withMs = new Date(Date.UTC(2026, 5, 1, 12, 0, 0, 123));
     expect(toZonedTime(withMs, "UTC").getMilliseconds()).toBe(123);
+  });
+});
+
+describe("zonedTimeToUtc", () => {
+  // Pass wall-clock components as UTC fields; get back the true instant.
+  const wall = (y: number, m: number, d: number, h: number) => new Date(Date.UTC(y, m, d, h, 0, 0));
+
+  it("resolves a summer (DST) wall time to UTC", () => {
+    // 09:00 New York in June is EDT (UTC-4) → 13:00 UTC.
+    expect(zonedTimeToUtc(wall(2026, 5, 19, 9), "America/New_York").toISOString()).toBe(
+      "2026-06-19T13:00:00.000Z",
+    );
+  });
+
+  it("resolves a winter (standard) wall time to UTC", () => {
+    // 09:00 New York in January is EST (UTC-5) → 14:00 UTC.
+    expect(zonedTimeToUtc(wall(2026, 0, 15, 9), "America/New_York").toISOString()).toBe(
+      "2026-01-15T14:00:00.000Z",
+    );
+  });
+
+  it("round-trips through toZonedTime", () => {
+    const instant2 = new Date(Date.UTC(2026, 5, 1, 12, 34, 0));
+    const zoned = toZonedTime(instant2, "Asia/Tokyo");
+    const back = zonedTimeToUtc(
+      new Date(
+        Date.UTC(
+          zoned.getFullYear(),
+          zoned.getMonth(),
+          zoned.getDate(),
+          zoned.getHours(),
+          zoned.getMinutes(),
+        ),
+      ),
+      "Asia/Tokyo",
+    );
+    expect(back.toISOString()).toBe(instant2.toISOString());
   });
 });
 

@@ -40,6 +40,36 @@ export function toZonedTime(date: Date, timeZone: string): Date {
   );
 }
 
+// `timeZone`'s offset from UTC (ms) at `instant`: the zone's wall clock read as
+// if it were UTC, minus the real instant.
+function zoneOffsetMs(instant: Date, timeZone: string): number {
+  const z = toZonedTime(instant, timeZone);
+  const wallAsUtc = Date.UTC(
+    z.getFullYear(),
+    z.getMonth(),
+    z.getDate(),
+    z.getHours(),
+    z.getMinutes(),
+    z.getSeconds(),
+    z.getMilliseconds(),
+  );
+  return wallAsUtc - instant.getTime();
+}
+
+/**
+ * The inverse of {@link toZonedTime}: given a wall-clock time in `timeZone`,
+ * return the absolute UTC instant. Pass the wall clock as a `Date` whose **UTC**
+ * fields hold the components (e.g. `new Date(Date.UTC(y, m, d, h, min))`). Used to
+ * resolve iCal `TZID` times; DST-correct via a two-pass offset (ambiguous
+ * fall-back times resolve to the post-transition offset).
+ */
+export function zonedTimeToUtc(wallClock: Date, timeZone: string): Date {
+  const guess = wallClock.getTime();
+  const firstPass = zoneOffsetMs(new Date(guess), timeZone);
+  const secondPass = zoneOffsetMs(new Date(guess - firstPass), timeZone);
+  return new Date(guess - secondPass);
+}
+
 /**
  * Map every event's `start`/`end` through {@link toZonedTime} so the calendar
  * displays them in `timeZone`. Other fields are preserved. Memoize the result

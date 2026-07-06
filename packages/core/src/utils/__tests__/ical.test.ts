@@ -52,6 +52,15 @@ describe("parseICalendar", () => {
     expect(event.end.toISOString()).toBe("2026-06-19T12:00:00.000Z");
   });
 
+  it("resolves a TZID local time to the correct UTC instant", () => {
+    // 09:00 on 19 Jun 2026 in New York is EDT (UTC-4) → 13:00 UTC.
+    const ics = wrap(
+      ["DTSTART;TZID=America/New_York:20260619T090000", "SUMMARY:Call"].join("\r\n"),
+    );
+    const [event] = parseICalendar(ics);
+    expect(event.start.toISOString()).toBe("2026-06-19T13:00:00.000Z");
+  });
+
   it("unescapes text and unfolds long lines", () => {
     const ics = wrap(
       [
