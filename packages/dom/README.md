@@ -52,6 +52,23 @@ export function MyCalendar() {
 
 For a custom picker, pair the headless hooks (`useDateRange`, `useMonthGrid`) with `MonthList` and `TimeGrid`, all re-exported from this package.
 
+## Styling
+
+Out of the box the calendar is fully styled from the theme, no stylesheet required. To restyle a specific part with **Tailwind** or your own CSS, every element is a named slot: pass `classNames` (or `styles`) per slot, and use `data-*` state variants like `data-[today]:`.
+
+```tsx
+<Calendar
+  mode="month"
+  date={date}
+  classNames={{
+    title: "text-center text-xl font-bold",
+    dayBadge: "rounded-full data-[today]:bg-indigo-600 data-[today]:text-white",
+  }}
+/>
+```
+
+A slot's structural layout is always kept; only its themed look steps aside for your class, so the class wins over the inline default. See the [styling guide](https://super-calendar.afonsojramos.me/guides/styling).
+
 ## Documentation
 
 See the [full documentation](https://super-calendar.afonsojramos.me), the [quickstart](https://super-calendar.afonsojramos.me/quickstart), and the [API reference](https://super-calendar.afonsojramos.me/reference/api).
