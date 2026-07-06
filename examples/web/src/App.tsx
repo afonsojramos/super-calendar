@@ -249,6 +249,12 @@ export function App() {
               startHour={7}
               endHour={20}
               onPressEvent={(event) => console.log("press event:", event.title)}
+              onDragEvent={(event, start, end) => {
+                if (event.kind === "exam") return false; // exams are locked
+                setEvents((prev) =>
+                  prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)),
+                );
+              }}
             />
           </div>
         ) : mode === "field" ? (

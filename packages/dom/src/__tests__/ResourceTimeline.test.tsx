@@ -104,6 +104,48 @@ describe("dom ResourceTimeline", () => {
     expect(onPressEvent.mock.calls[0][0].title).toBe("Standup");
   });
 
+  it("drags an event along the axis and reports the new start/end", () => {
+    const onDragEvent = jest.fn();
+    const { getByText } = render(
+      <ResourceTimeline
+        date={date}
+        resources={resources}
+        events={events}
+        startHour={0}
+        hourWidth={80}
+        onDragEvent={onDragEvent}
+      />,
+    );
+    const bar = getByText("Standup").closest("button") as HTMLElement;
+    // Standup 09:00–10:00; drag +80px = +1h → 10:00–11:00.
+    fireEvent.pointerDown(bar, { clientX: 100, pointerId: 1 });
+    fireEvent.pointerMove(bar, { clientX: 180, pointerId: 1 });
+    fireEvent.pointerUp(bar, { clientX: 180, pointerId: 1 });
+    expect(onDragEvent).toHaveBeenCalledTimes(1);
+    const [, start, end] = onDragEvent.mock.calls[0];
+    expect((start as Date).getHours()).toBe(10);
+    expect((end as Date).getHours()).toBe(11);
+  });
+
+  it("treats a click without movement as a press, not a drag", () => {
+    const onDragEvent = jest.fn();
+    const onPressEvent = jest.fn();
+    const { getByText } = render(
+      <ResourceTimeline
+        date={date}
+        resources={resources}
+        events={events}
+        onDragEvent={onDragEvent}
+        onPressEvent={onPressEvent}
+      />,
+    );
+    const bar = getByText("Standup").closest("button") as HTMLElement;
+    fireEvent.pointerDown(bar, { clientX: 100, pointerId: 1 });
+    fireEvent.pointerUp(bar, { clientX: 100, pointerId: 1 });
+    expect(onDragEvent).not.toHaveBeenCalled();
+    expect(onPressEvent).toHaveBeenCalledTimes(1);
+  });
+
   it("supports a custom resourceId accessor", () => {
     const custom: CalendarEvent<{ id: string; room: string }>[] = [
       {

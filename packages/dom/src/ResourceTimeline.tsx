@@ -1,12 +1,18 @@
-import type { ComponentType, CSSProperties, ReactElement } from "react";
-import { useMemo } from "react";
+import { addMinutes, startOfDay } from "date-fns";
+import type {
+  ComponentType,
+  CSSProperties,
+  PointerEvent as ReactPointerEvent,
+  ReactElement,
+} from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   type CalendarEvent,
   eventTimeLabel,
   formatHour,
   layoutDayEvents,
 } from "@super-calendar/core";
-import { createSlots, type ResolvedSlot, type SlotStyleProps } from "./slots";
+import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
 /**
@@ -69,6 +75,13 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
   renderEvent?: ComponentType<ResourceEventArgs<T>>;
   /** Tap an event. */
   onPressEvent?: (event: CalendarEvent<T>) => void;
+  /**
+   * Enables drag-to-move and edge-resize along the time axis; called with the
+   * proposed new start/end. Return `false` to reject the drop (it snaps back).
+   */
+  onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
+  /** Snap dragged events to this many minutes (default 15). */
+  dragStepMinutes?: number;
   /** Class applied to the root element. */
   className?: string;
   /** Inline styles applied to the root element. */
@@ -76,6 +89,14 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+type DragState = {
+  key: string;
+  kind: "move" | "resize";
+  startHours: number;
+  durationHours: number;
+  moved: boolean;
+};
 
 function DefaultBar<T>({
   event,
@@ -127,7 +148,8 @@ function DefaultBar<T>({
  * A horizontal resource timeline: rows are resources (rooms, people, machines)
  * and the x-axis is one day's hours. Events sit in their resource's row, and
  * overlapping events in the same row stack into sub-lanes (via the shared
- * `layoutDayEvents`). A static v1 — no drag or zoom yet.
+ * `layoutDayEvents`). Pass `onDragEvent` to enable drag-to-move and edge-resize
+ * along the axis.
  *
  * @example
  * ```tsx
@@ -152,6 +174,8 @@ export function ResourceTimeline<T = unknown>({
   theme: themeOverrides,
   renderEvent,
   onPressEvent,
+  onDragEvent,
+  dragStepMinutes = 15,
   className,
   style,
   classNames,
@@ -160,6 +184,80 @@ export function ResourceTimeline<T = unknown>({
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
   const slot = createSlots<ResourceTimelineSlot>({ classNames, styles });
   const Renderer = renderEvent;
+  const snapHours = dragStepMinutes / 60;
+
+  // `drag` drives the visual; `dragRef` is the source of truth the pointer
+  // handlers read so they never see a stale closure between events.
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const dragRef = useRef<DragState | null>(null);
+  const origin = useRef<{ x: number; startHours: number; durationHours: number } | null>(null);
+  const applyDrag = (next: DragState | null) => {
+    dragRef.current = next;
+    setDrag(next);
+  };
+
+  const beginDrag = (
+    e: ReactPointerEvent,
+    key: string,
+    kind: "move" | "resize",
+    startHours: number,
+    durationHours: number,
+  ) => {
+    if (!onDragEvent) return;
+    e.stopPropagation();
+    try {
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    } catch {
+      // Pointer capture is best-effort.
+    }
+    origin.current = { x: e.clientX, startHours, durationHours };
+    applyDrag({ key, kind, startHours, durationHours, moved: false });
+  };
+  const moveDrag = (e: ReactPointerEvent) => {
+    const d = dragRef.current;
+    if (!d || !origin.current) return;
+    const dHours = (e.clientX - origin.current.x) / hourWidth;
+    const snap = (v: number) => Math.round(v / snapHours) * snapHours;
+    if (d.kind === "move") {
+      const startHours = clamp(
+        snap(origin.current.startHours + dHours),
+        startHour,
+        endHour - d.durationHours,
+      );
+      applyDrag({ ...d, startHours, moved: true });
+    } else {
+      const durationHours = clamp(
+        snap(origin.current.durationHours + dHours),
+        snapHours,
+        endHour - d.startHours,
+      );
+      applyDrag({ ...d, durationHours, moved: true });
+    }
+  };
+  const endDrag = (e: ReactPointerEvent, event: CalendarEvent<T>, onPress: () => void) => {
+    const d = dragRef.current;
+    if (!d) return;
+    try {
+      (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+    } catch {
+      // Best-effort release.
+    }
+    if (!d.moved) {
+      applyDrag(null);
+      onPress();
+      return;
+    }
+    const base = startOfDay(date);
+    const start = addMinutes(base, Math.round(d.startHours * 60));
+    const end = addMinutes(base, Math.round((d.startHours + d.durationHours) * 60));
+    onDragEvent?.(event, start, end);
+    applyDrag(null);
+    origin.current = null;
+  };
+  const cancelDrag = () => {
+    applyDrag(null);
+    origin.current = null;
+  };
 
   const hours = useMemo(
     () => Array.from({ length: Math.max(0, endHour - startHour) }, (_, i) => startHour + i),
@@ -249,21 +347,34 @@ export function ResourceTimeline<T = unknown>({
                   })}
                 />
                 {positioned.map((pe, idx) => {
-                  const left = clamp(pe.startHours - startHour, 0, endHour - startHour) * hourWidth;
+                  const key = `${resource.id}:${idx}`;
+                  const active = drag?.key === key ? drag : null;
+                  const startH = active ? active.startHours : pe.startHours;
+                  const durH = active ? active.durationHours : pe.durationHours;
+                  const left = clamp(startH - startHour, 0, endHour - startHour) * hourWidth;
                   const right =
-                    clamp(pe.startHours + pe.durationHours - startHour, 0, endHour - startHour) *
-                    hourWidth;
+                    clamp(startH + durH - startHour, 0, endHour - startHour) * hourWidth;
                   const width = Math.max(right - left, 2);
                   // Overlapping events in a row share the height as stacked sub-lanes.
                   const laneHeight = rowHeight / pe.columns;
                   const onPress = () => onPressEvent?.(pe.event);
                   const args: ResourceEventArgs<T> = { event: pe.event, width, onPress };
+                  const draggable = !!onDragEvent;
                   return (
                     <button
                       key={idx}
                       type="button"
-                      onClick={onPress}
+                      onClick={draggable ? undefined : onPress}
                       aria-label={pe.event.title}
+                      {...dataState({ "data-dragging": !!active })}
+                      onPointerDown={
+                        draggable
+                          ? (e) => beginDrag(e, key, "move", pe.startHours, pe.durationHours)
+                          : undefined
+                      }
+                      onPointerMove={draggable ? moveDrag : undefined}
+                      onPointerUp={draggable ? (e) => endDrag(e, pe.event, onPress) : undefined}
+                      onPointerCancel={draggable ? cancelDrag : undefined}
                       {...slot("event", {
                         base: {
                           position: "absolute",
@@ -274,10 +385,13 @@ export function ResourceTimeline<T = unknown>({
                           padding: 1,
                           border: "none",
                           background: "transparent",
-                          cursor: "pointer",
+                          cursor: draggable ? "grab" : "pointer",
+                          touchAction: draggable ? "none" : "auto",
                           font: "inherit",
                           textAlign: "left",
                           boxSizing: "border-box",
+                          zIndex: active ? 3 : 1,
+                          opacity: active ? 0.85 : 1,
                         },
                       })}
                     >
@@ -286,6 +400,24 @@ export function ResourceTimeline<T = unknown>({
                       ) : (
                         <DefaultBar {...args} theme={theme} boxProps={slot("eventBox")} />
                       )}
+                      {draggable ? (
+                        <span
+                          aria-hidden
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            beginDrag(e, key, "resize", pe.startHours, pe.durationHours);
+                          }}
+                          style={{
+                            position: "absolute",
+                            top: 0,
+                            bottom: 0,
+                            right: 0,
+                            width: 8,
+                            cursor: "ew-resize",
+                            touchAction: "none",
+                          }}
+                        />
+                      ) : null}
                     </button>
                   );
                 })}
