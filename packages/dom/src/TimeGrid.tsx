@@ -851,6 +851,10 @@ export function TimeGrid<T = unknown>({
                         base: {
                           position: "absolute",
                           top,
+                          // Height is the event's duration, so it always tracks the
+                          // grid's hour scale (zoom/resize). Content that doesn't fit
+                          // is the renderer's concern: the built-in one clamps, and a
+                          // custom renderer should adapt to the `boxHeight` it's given.
                           height: boxHeight,
                           left: `calc(${pe.column * widthPct}% + 1px)`,
                           width: `calc(${widthPct}% - 2px)`,
