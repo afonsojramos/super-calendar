@@ -36,6 +36,12 @@ export {
 export { DefaultEvent } from "./components/DefaultEvent";
 export { DefaultMonthEvent } from "./components/DefaultMonthEvent";
 export {
+  ResourceTimeline,
+  type ResourceTimelineProps,
+  type Resource,
+  type ResourceEventArgs,
+} from "./components/ResourceTimeline";
+export {
   type CalendarTheme,
   type PartialCalendarTheme,
   defaultTheme,

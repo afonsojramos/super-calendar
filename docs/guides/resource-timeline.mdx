@@ -4,8 +4,9 @@ description: A horizontal, one-day timeline with a row per resource (room, perso
 ---
 
 <Note>
-  This is a **web renderer** (`@super-calendar/dom`) view — a scheduling board with optional
-  drag-to-move and edge-resize.
+  Available on **both renderers**. The web renderer (`@super-calendar/dom`) adds drag-to-move,
+  edge-resize, and per-slot styling; the React Native renderer (`@super-calendar/native`) ships the
+  read-only board. Import from the package you're using.
 </Note>
 
 `ResourceTimeline` lays a single day out horizontally: each **resource** is a row,
@@ -66,15 +67,17 @@ Overlapping events **in the same row** stack into sub-lanes (via the shared
 - `labelWidth` — width of the left resource-label column (default 140).
 - `ampm` — 12-hour axis labels.
 
-## Moving & resizing
+## Moving & resizing (web)
 
-Pass `onDragEvent` to make the board interactive: drag a bar to move it along the
-axis, or drag its right edge to resize. It's called with the proposed new
-start/end; return `false` to reject the drop (the bar snaps back). Movement snaps
-to `dragStepMinutes` (default 15). A bar being dragged carries `data-dragging` for
-styling.
+On the web renderer, pass `onDragEvent` to make the board interactive: drag a bar to
+move it along the axis, or drag its right edge to resize. It's called with the
+proposed new start/end; return `false` to reject the drop (the bar snaps back).
+Movement snaps to `dragStepMinutes` (default 15). A bar being dragged carries
+`data-dragging` for styling.
 
 ```tsx
+import { ResourceTimeline } from "@super-calendar/dom";
+
 <ResourceTimeline
   date={date}
   resources={resources}
@@ -83,7 +86,20 @@ styling.
     if (event.locked) return false;
     setEvents((prev) => prev.map((e) => (e === event ? { ...e, start, end } : e)));
   }}
-/>
+/>;
+```
+
+## React Native
+
+The native renderer exposes the same read-only board and props (`date`, `resources`,
+`events`, `resourceId`, `startHour`/`endHour`, `hourWidth`, `rowHeight`, `labelWidth`,
+`ampm`, `renderEvent`, `onPressEvent`). It reads the theme from context, so restyle
+via `theme.containers` (see [Theming](/guides/theming)):
+
+```tsx
+import { ResourceTimeline } from "@super-calendar/native";
+
+<ResourceTimeline date={date} resources={resources} events={events} onPressEvent={setSelected} />;
 ```
 
 ## Styling

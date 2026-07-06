@@ -48,10 +48,14 @@ export interface CalendarTheme {
     monthEvent: ViewStyle;
     /** Each day's column header in the time grid. */
     columnHeader: ViewStyle;
-    /** A timed event's positioned box in the time grid. */
+    /** A timed event's positioned box in the time grid (and resource timeline). */
     timeGridEvent: ViewStyle;
     /** The current-time indicator line. */
     nowIndicator: ViewStyle;
+    /** Each resource row in the resource timeline. */
+    resourceRow: ViewStyle;
+    /** The left-hand resource-label cell in the resource timeline. */
+    resourceLabel: ViewStyle;
     /** The schedule/agenda list's outer container. */
     agendaList: ViewStyle;
     /** Each event row in the agenda list. */
@@ -94,6 +98,8 @@ export const defaultTheme: CalendarTheme = {
     columnHeader: {},
     timeGridEvent: {},
     nowIndicator: {},
+    resourceRow: {},
+    resourceLabel: {},
     agendaList: {},
     agendaRow: {},
     allDayLane: {},
