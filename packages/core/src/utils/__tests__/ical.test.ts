@@ -33,6 +33,25 @@ describe("parseICalendar", () => {
     expect(event.end).toEqual(new Date(2026, 5, 21));
   });
 
+  it("derives the end from DURATION when DTEND is absent", () => {
+    const ics = wrap(
+      ["DTSTART:20260619T100000Z", "DURATION:PT1H30M", "SUMMARY:Workshop"].join("\r\n"),
+    );
+    const [event] = parseICalendar(ics);
+    expect(event.start.toISOString()).toBe("2026-06-19T10:00:00.000Z");
+    expect(event.end.toISOString()).toBe("2026-06-19T11:30:00.000Z");
+  });
+
+  it("prefers DTEND over DURATION when both are present", () => {
+    const ics = wrap(
+      ["DTSTART:20260619T100000Z", "DTEND:20260619T120000Z", "DURATION:PT1H", "SUMMARY:Both"].join(
+        "\r\n",
+      ),
+    );
+    const [event] = parseICalendar(ics);
+    expect(event.end.toISOString()).toBe("2026-06-19T12:00:00.000Z");
+  });
+
   it("unescapes text and unfolds long lines", () => {
     const ics = wrap(
       [

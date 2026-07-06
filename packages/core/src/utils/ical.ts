@@ -124,6 +124,17 @@ function parseIcalDate(value: string, dateOnly: boolean): Date {
   return new Date(y, mo, d, h, mi, s);
 }
 
+/** Parse an iCal/ISO-8601 DURATION (e.g. `PT1H30M`, `P1D`, `P1W`) to milliseconds. */
+function parseDuration(value: string): number | null {
+  const m = /^([+-]?)P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(
+    value.trim(),
+  );
+  if (!m || (!m[2] && !m[3] && !m[4] && !m[5] && !m[6])) return null;
+  const sign = m[1] === "-" ? -1 : 1;
+  const [w, d, h, mi, s] = [m[2], m[3], m[4], m[5], m[6]].map((x) => Number(x ?? 0));
+  return sign * ((((w * 7 + d) * 24 + h) * 60 + mi) * 60 + s) * 1000;
+}
+
 // --- RRULE ---------------------------------------------------------------
 
 function parseRRule(value: string): RecurrenceRule | undefined {
@@ -199,16 +210,22 @@ export function parseICalendar(ics: string): ICalEvent[] {
   const events: ICalEvent[] = [];
   let current: Partial<ICalEvent> | null = null;
   let allDay = false;
+  // A VEVENT may carry DURATION instead of DTEND; resolve it once DTSTART is known.
+  let durationMs: number | null = null;
 
   for (const raw of lines) {
     const line = parseLine(raw);
     if (line.name === "BEGIN" && line.value === "VEVENT") {
       current = {};
       allDay = false;
+      durationMs = null;
       continue;
     }
     if (line.name === "END" && line.value === "VEVENT") {
       if (current?.start) {
+        if (!current.end && durationMs != null) {
+          current.end = new Date(current.start.getTime() + durationMs);
+        }
         if (allDay) {
           current.allDay = true;
           // iCal all-day DTEND is exclusive; default to a one-day span.
@@ -243,6 +260,9 @@ export function parseICalendar(ics: string): ICalEvent[] {
         break;
       case "DTEND":
         current.end = parseIcalDate(line.value, dateOnly);
+        break;
+      case "DURATION":
+        durationMs = parseDuration(line.value);
         break;
       case "RRULE": {
         const rule = parseRRule(line.value);

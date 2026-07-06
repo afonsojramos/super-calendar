@@ -57,8 +57,9 @@ re-exports stay diff-friendly.
 
 A pragmatic subset of RFC 5545, aimed at real-world event interchange:
 
-- **`VEVENT`** with `SUMMARY`, `DESCRIPTION`, `LOCATION`, `UID`, `DTSTART`, `DTEND`.
-- **All-day** events via `VALUE=DATE` (a missing `DTEND` becomes a one-day span).
+- **`VEVENT`** with `SUMMARY`, `DESCRIPTION`, `LOCATION`, `UID`, `DTSTART`, and either
+  `DTEND` or `DURATION` (e.g. `PT1H30M`, `P1D`).
+- **All-day** events via `VALUE=DATE` (a missing end becomes a one-day span).
 - **Dates** in UTC (`...Z`), floating local, or date-only; line folding and text
   escaping per the spec.
 - **`RRULE`** round-tripped to a [`RecurrenceRule`](/guides/recurring-events)
