@@ -4,9 +4,9 @@ description: A horizontal, one-day timeline with a row per resource (room, perso
 ---
 
 <Note>
-  Available on **both renderers**. The web renderer (`@super-calendar/dom`) adds drag-to-move,
-  edge-resize, and per-slot styling; the React Native renderer (`@super-calendar/native`) ships the
-  read-only board. Import from the package you're using.
+  Available on **both renderers**, including drag-to-move and edge-resize via `onDragEvent`. The web
+  renderer (`@super-calendar/dom`) adds per-slot class styling; the React Native renderer
+  (`@super-calendar/native`) styles via `theme.containers`. Import from the package you're using.
 </Note>
 
 `ResourceTimeline` lays a single day out horizontally: each **resource** is a row,
@@ -91,15 +91,24 @@ import { ResourceTimeline } from "@super-calendar/dom";
 
 ## React Native
 
-The native renderer exposes the same read-only board and props (`date`, `resources`,
-`events`, `resourceId`, `startHour`/`endHour`, `hourWidth`, `rowHeight`, `labelWidth`,
-`ampm`, `renderEvent`, `onPressEvent`). It reads the theme from context, so restyle
-via `theme.containers` (see [Theming](/guides/theming)):
+The native renderer exposes the same board and props (`date`, `resources`, `events`,
+`resourceId`, `startHour`/`endHour`, `hourWidth`, `rowHeight`, `labelWidth`, `ampm`,
+`renderEvent`, `onPressEvent`), plus `onDragEvent` / `dragStepMinutes` for
+**long-press drag-to-move and edge-resize**. It reads the theme from context, so
+restyle via `theme.containers` (see [Theming](/guides/theming)):
 
 ```tsx
 import { ResourceTimeline } from "@super-calendar/native";
 
-<ResourceTimeline date={date} resources={resources} events={events} onPressEvent={setSelected} />;
+<ResourceTimeline
+  date={date}
+  resources={resources}
+  events={events}
+  onPressEvent={setSelected}
+  onDragEvent={(event, start, end) => {
+    setEvents((prev) => prev.map((e) => (e === event ? { ...e, start, end } : e)));
+  }}
+/>;
 ```
 
 ## Styling

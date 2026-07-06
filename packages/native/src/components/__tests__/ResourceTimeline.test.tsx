@@ -49,6 +49,25 @@ describe("ResourceTimeline", () => {
     expect(onPressEvent.mock.calls[0][0].title).toBe("Interview");
   });
 
+  it("renders a resize grip per event and still taps when onDragEvent is set", () => {
+    const onDragEvent = jest.fn();
+    const onPressEvent = jest.fn();
+    const { getByLabelText, getAllByLabelText } = render(
+      <ResourceTimeline
+        date={at(0)}
+        resources={resources}
+        events={events}
+        onDragEvent={onDragEvent}
+        onPressEvent={onPressEvent}
+      />,
+    );
+    // Each bar exposes a resize handle for the edge-resize gesture.
+    expect(getAllByLabelText(/^Resize /)).toHaveLength(events.length);
+    // Tapping the bar still fires onPressEvent (long-press is what starts a drag).
+    fireEvent.press(getByLabelText("Standup"));
+    expect(onPressEvent).toHaveBeenCalledTimes(1);
+  });
+
   it("renders the hour axis with the configured window", () => {
     const { getByText, queryByText } = render(
       <ResourceTimeline

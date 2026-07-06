@@ -1,13 +1,22 @@
 import type { ComponentType, ReactElement } from "react";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import {
   type CalendarEvent,
   eventTimeLabel,
   formatHour,
   layoutDayEvents,
+  type PositionedEvent,
+  resolveDraggedBounds,
+  snapDeltaMinutes,
 } from "@super-calendar/core";
 import { useCalendarTheme } from "../theme";
+
+// Native long-press duration (ms) before a bar is picked up to move.
+const MOVE_ACTIVATE_MS = 250;
+const MINUTES_PER_HOUR = 60;
 
 /** A schedulable lane (room, person, machine) events are grouped under. */
 export interface Resource {
@@ -51,6 +60,14 @@ export interface ResourceTimelineProps<T = unknown> {
   renderEvent?: ComponentType<ResourceEventArgs<T>>;
   /** Tap an event. */
   onPressEvent?: (event: CalendarEvent<T>) => void;
+  /**
+   * Enables drag-to-move and edge-resize along the time axis: long-press a bar to
+   * move it, or drag its right edge to resize. Called with the proposed new
+   * start/end; return `false` to reject the drop (it snaps back).
+   */
+  onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
+  /** Snap dragged events to this many minutes (default 15). */
+  dragStepMinutes?: number;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -93,13 +110,150 @@ function DefaultBar<T>({ event, width }: ResourceEventArgs<T>): ReactElement {
   );
 }
 
+type ResourceBarProps<T> = {
+  pe: PositionedEvent<T>;
+  left: number;
+  width: number;
+  laneHeight: number;
+  hourWidth: number;
+  snapMinutes: number;
+  Renderer: ComponentType<ResourceEventArgs<T>>;
+  onPress: () => void;
+  onDragEvent: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
+  theme: ReturnType<typeof useCalendarTheme>;
+};
+
+// A bar with drag-to-move (long-press) and right-edge resize along the time axis.
+// The pure snap/commit math is shared with the time grid (`snapDeltaMinutes`,
+// `resolveDraggedBounds`); this only wires the horizontal gestures.
+function ResourceBar<T>({
+  pe,
+  left,
+  width,
+  laneHeight,
+  hourWidth,
+  snapMinutes,
+  Renderer,
+  onPress,
+  onDragEvent,
+  theme,
+}: ResourceBarProps<T>): ReactElement {
+  const moveX = useSharedValue(0);
+  const resizeW = useSharedValue(0);
+  const latest = useRef({ event: pe.event, onDragEvent });
+  latest.current = { event: pe.event, onDragEvent };
+  const draggable = !(pe.event as { disabled?: boolean }).disabled;
+
+  // Clear the live preview once the committed change re-renders the bar.
+  useEffect(() => {
+    moveX.value = 0;
+    resizeW.value = 0;
+  }, [pe.startHours, pe.durationHours, moveX, resizeW]);
+
+  const snapBack = useCallback(() => {
+    moveX.value = 0;
+    resizeW.value = 0;
+  }, [moveX, resizeW]);
+
+  const commit = useCallback(
+    (deltaStartMin: number, deltaEndMin: number) => {
+      const { event, onDragEvent: handler } = latest.current;
+      const next = resolveDraggedBounds(
+        event.start,
+        event.end,
+        deltaStartMin,
+        deltaEndMin,
+        snapMinutes,
+      );
+      if (!next) {
+        snapBack();
+        return;
+      }
+      if (handler(event, next.start, next.end) === false) snapBack();
+    },
+    [snapMinutes, snapBack],
+  );
+
+  const barStyle = useAnimatedStyle(
+    () => ({ transform: [{ translateX: moveX.value }], width: Math.max(width + resizeW.value, 2) }),
+    [width],
+  );
+
+  const moveGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(draggable)
+        .activateAfterLongPress(MOVE_ACTIVATE_MS)
+        .onUpdate((e) => {
+          moveX.value = e.translationX;
+        })
+        .onEnd((e) => {
+          const delta = snapDeltaMinutes(e.translationX, hourWidth, snapMinutes);
+          if (delta === 0) {
+            moveX.value = 0;
+            return;
+          }
+          moveX.value = (delta / MINUTES_PER_HOUR) * hourWidth;
+          runOnJS(commit)(delta, delta);
+        }),
+    [draggable, hourWidth, snapMinutes, moveX, commit],
+  );
+
+  const resizeGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(draggable)
+        .onUpdate((e) => {
+          resizeW.value = e.translationX;
+        })
+        .onEnd((e) => {
+          const delta = snapDeltaMinutes(e.translationX, hourWidth, snapMinutes);
+          if (delta === 0) {
+            resizeW.value = 0;
+            return;
+          }
+          resizeW.value = (delta / MINUTES_PER_HOUR) * hourWidth;
+          runOnJS(commit)(0, delta);
+        }),
+    [draggable, hourWidth, snapMinutes, resizeW, commit],
+  );
+
+  return (
+    <Animated.View
+      style={[
+        { position: "absolute", left, top: pe.column * laneHeight, height: laneHeight, padding: 1 },
+        barStyle,
+      ]}
+    >
+      <GestureDetector gesture={moveGesture}>
+        <Pressable
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={pe.event.title}
+          style={styles.fill}
+        >
+          <Renderer event={pe.event} width={width} onPress={onPress} />
+        </Pressable>
+      </GestureDetector>
+      <GestureDetector gesture={resizeGesture}>
+        <View
+          style={[styles.resizeGrip, { backgroundColor: theme.colors.eventText }]}
+          accessibilityRole="adjustable"
+          accessibilityLabel={`Resize ${pe.event.title}`}
+        />
+      </GestureDetector>
+    </Animated.View>
+  );
+}
+
 /**
  * A horizontal resource timeline: rows are resources (rooms, people, machines)
  * and the x-axis is one day's hours. Events sit in their resource's row, and
  * overlapping events in the same row stack into sub-lanes (via the shared
  * `layoutDayEvents`). The grid scrolls horizontally when the axis is wider than
- * the screen. Read the theme from context — wrap in `CalendarThemeProvider` (or
- * render inside `<Calendar>`) to restyle.
+ * the screen. Pass `onDragEvent` to enable long-press drag-to-move and edge
+ * resize along the time axis. Read the theme from context — wrap in
+ * `CalendarThemeProvider` (or render inside `<Calendar>`) to restyle.
  *
  * @example
  * ```tsx
@@ -123,6 +277,8 @@ export function ResourceTimeline<T = unknown>({
   ampm = false,
   renderEvent,
   onPressEvent,
+  onDragEvent,
+  dragStepMinutes = 15,
 }: ResourceTimelineProps<T>): ReactElement {
   const theme = useCalendarTheme();
   const Renderer = renderEvent ?? DefaultBar;
@@ -213,6 +369,23 @@ export function ResourceTimeline<T = unknown>({
                   // Overlapping events share the row height as stacked sub-lanes.
                   const laneHeight = rowHeight / pe.columns;
                   const onPress = () => onPressEvent?.(pe.event);
+                  if (onDragEvent) {
+                    return (
+                      <ResourceBar
+                        key={idx}
+                        pe={pe}
+                        left={left}
+                        width={width}
+                        laneHeight={laneHeight}
+                        hourWidth={hourWidth}
+                        snapMinutes={dragStepMinutes}
+                        Renderer={Renderer}
+                        onPress={onPress}
+                        onDragEvent={onDragEvent}
+                        theme={theme}
+                      />
+                    );
+                  }
                   return (
                     <Pressable
                       key={idx}
@@ -254,4 +427,15 @@ const styles = StyleSheet.create({
   gridLine: { position: "absolute", top: 0, bottom: 0, width: StyleSheet.hairlineWidth },
   bar: { flex: 1, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, overflow: "hidden" },
   barTime: { fontSize: 11, opacity: 0.75 },
+  fill: { flex: 1 },
+  // A slim right-edge handle for resizing along the time axis.
+  resizeGrip: {
+    position: "absolute",
+    right: 1,
+    top: "30%",
+    bottom: "30%",
+    width: 4,
+    borderRadius: 2,
+    opacity: 0.5,
+  },
 });
