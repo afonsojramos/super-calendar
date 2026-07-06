@@ -32,9 +32,14 @@ Rules support:
 - `count` — stop after N occurrences.
 - `until` — stop on or before a date.
 - `weekdays` — which days, for `weekly` rules (0 = Sunday).
+- `nthWeekday` — for `monthly`/`yearly`, repeat on the Nth weekday instead of the
+  day-of-month, e.g. `{ week: 3, weekday: 1 }` (the 3rd Monday) or `{ week: -1,
+weekday: 5 }` (the last Friday).
+- `exdates` — dates to skip (exceptions).
 
 Each occurrence keeps the original duration and fields; non-recurring events pass
-through unchanged.
+through unchanged. These rules map to and from iCal `RRULE`/`EXDATE` — see
+[iCalendar](/guides/ical).
 
 <Tip>
   Compute the range from the visible window. `onChangeDateRange` gives you the `[start, end]` of

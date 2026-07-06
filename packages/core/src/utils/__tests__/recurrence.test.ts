@@ -95,6 +95,38 @@ describe("expandRecurringEvents", () => {
     expect(result.every((e) => e.recurrence === undefined)).toBe(true);
   });
 
+  it("repeats on the Nth weekday of each month", () => {
+    const event: CalendarEvent = {
+      start: at(2026, 0, 1),
+      end: at(2026, 0, 1, 10),
+      title: "Board",
+      recurrence: { freq: "monthly", count: 3, nthWeekday: { week: 3, weekday: 1 } },
+    };
+    const result = expandRecurringEvents([event], at(2026, 0, 1), at(2026, 11, 31));
+    // 3rd Monday of Jan/Feb/Mar 2026.
+    expect(result.map((e) => [e.start.getMonth(), e.start.getDate()])).toEqual([
+      [0, 19],
+      [1, 16],
+      [2, 16],
+    ]);
+    expect(result.every((e) => e.start.getHours() === 9)).toBe(true);
+  });
+
+  it("supports the last weekday of the month (week -1)", () => {
+    const event: CalendarEvent = {
+      start: at(2026, 0, 1),
+      end: at(2026, 0, 1, 10),
+      title: "Payday",
+      recurrence: { freq: "monthly", count: 2, nthWeekday: { week: -1, weekday: 5 } },
+    };
+    const result = expandRecurringEvents([event], at(2026, 0, 1), at(2026, 11, 31));
+    // Last Friday of Jan (30th) and Feb (27th) 2026.
+    expect(result.map((e) => [e.start.getMonth(), e.start.getDate()])).toEqual([
+      [0, 30],
+      [1, 27],
+    ]);
+  });
+
   it("skips occurrences on EXDATE exception days", () => {
     const event: CalendarEvent = {
       ...base, // Thu 1 Jan 2026, 09:00, daily

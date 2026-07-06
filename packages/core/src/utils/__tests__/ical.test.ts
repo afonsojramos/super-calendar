@@ -94,6 +94,14 @@ describe("parseICalendar", () => {
     });
   });
 
+  it("parses an ordinal BYDAY into an nthWeekday recurrence", () => {
+    const ics = wrap(
+      ["DTSTART:20260101T090000Z", "SUMMARY:Board", "RRULE:FREQ=MONTHLY;BYDAY=3MO"].join("\r\n"),
+    );
+    const [event] = parseICalendar(ics);
+    expect(event.recurrence).toEqual({ freq: "monthly", nthWeekday: { week: 3, weekday: 1 } });
+  });
+
   it("attaches EXDATE exception days to the recurrence", () => {
     const ics = wrap(
       [
@@ -192,5 +200,20 @@ describe("toICalendar", () => {
     expect(round.start.toISOString()).toBe(events[0].start.toISOString());
     expect(round.end.toISOString()).toBe(events[0].end.toISOString());
     expect(round.recurrence).toEqual({ freq: "weekly", weekdays: [1, 3] });
+  });
+
+  it("round-trips an ordinal-weekday (last Friday) recurrence", () => {
+    const events: ICalEvent[] = [
+      {
+        start: new Date(Date.UTC(2026, 0, 30, 9, 0, 0)),
+        end: new Date(Date.UTC(2026, 0, 30, 10, 0, 0)),
+        title: "Payday",
+        recurrence: { freq: "monthly", nthWeekday: { week: -1, weekday: 5 } },
+      },
+    ];
+    const ics = toICalendar(events, { now });
+    expect(ics).toContain("RRULE:FREQ=MONTHLY;BYDAY=-1FR");
+    const [round] = parseICalendar(ics);
+    expect(round.recurrence).toEqual({ freq: "monthly", nthWeekday: { week: -1, weekday: 5 } });
   });
 });

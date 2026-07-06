@@ -52,6 +52,13 @@ export interface RecurrenceRule {
    */
   weekdays?: WeekStartsOn[];
   /**
+   * For `monthly`/`yearly`: repeat on the Nth weekday of the period instead of the
+   * start date's day-of-month — e.g. `{ week: 3, weekday: 1 }` is the 3rd Monday.
+   * `week` is 1–5, or -1 for the last such weekday. Maps to an ordinal iCal `BYDAY`
+   * (e.g. `3MO`, `-1FR`).
+   */
+  nthWeekday?: { week: number; weekday: WeekStartsOn };
+  /**
    * Dates to skip (exceptions). An occurrence whose day matches one of these is
    * dropped by `expandRecurringEvents`. Maps to iCal `EXDATE`.
    */

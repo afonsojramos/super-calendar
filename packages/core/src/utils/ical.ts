@@ -168,12 +168,25 @@ function parseRRule(value: string): RecurrenceRule | undefined {
   if (until) rule.until = parseIcalDate(until, !until.includes("T"));
   const byday = parts.get("BYDAY");
   if (byday) {
-    const days = byday
-      .split(",")
-      // Keep only plain weekday tokens (ignore ordinals like 2MO for now).
-      .map((token) => BYDAY.indexOf(token.trim().toUpperCase() as (typeof BYDAY)[number]))
-      .filter((index): index is WeekStartsOn => index >= 0);
-    if (days.length) rule.weekdays = days;
+    const tokens = byday.split(",").map((t) => t.trim().toUpperCase());
+    const monthly = rule.freq === "monthly" || rule.freq === "yearly";
+    // An ordinal token (e.g. `3MO`, `-1FR`) on a monthly/yearly rule is an "Nth
+    // weekday" repeat; plain tokens (`MO`, `WE`) are the weekly weekday set.
+    const ordinal = /^([+-]?\d+)(SU|MO|TU|WE|TH|FR|SA)$/;
+    const plain: WeekStartsOn[] = [];
+    for (const token of tokens) {
+      const m = monthly ? ordinal.exec(token) : null;
+      if (m) {
+        const weekday = BYDAY.indexOf(m[2] as (typeof BYDAY)[number]);
+        if (weekday >= 0 && !rule.nthWeekday) {
+          rule.nthWeekday = { week: Number(m[1]), weekday: weekday as WeekStartsOn };
+        }
+        continue;
+      }
+      const index = BYDAY.indexOf(token as (typeof BYDAY)[number]);
+      if (index >= 0) plain.push(index as WeekStartsOn);
+    }
+    if (plain.length) rule.weekdays = plain;
   }
   return rule;
 }
@@ -183,7 +196,11 @@ function formatRRule(rule: RecurrenceRule): string {
   if (rule.interval && rule.interval !== 1) parts.push(`INTERVAL=${rule.interval}`);
   if (rule.count != null) parts.push(`COUNT=${rule.count}`);
   if (rule.until) parts.push(`UNTIL=${formatUtc(rule.until)}`);
-  if (rule.weekdays?.length) parts.push(`BYDAY=${rule.weekdays.map((d) => BYDAY[d]).join(",")}`);
+  if (rule.nthWeekday) {
+    parts.push(`BYDAY=${rule.nthWeekday.week}${BYDAY[rule.nthWeekday.weekday]}`);
+  } else if (rule.weekdays?.length) {
+    parts.push(`BYDAY=${rule.weekdays.map((d) => BYDAY[d]).join(",")}`);
+  }
   return parts.join(";");
 }
 

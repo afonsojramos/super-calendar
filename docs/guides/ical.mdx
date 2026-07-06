@@ -64,8 +64,9 @@ A pragmatic subset of RFC 5545, aimed at real-world event interchange:
   the correct instant), floating local, or date-only; line folding and text
   escaping per the spec.
 - **`RRULE`** round-tripped to a [`RecurrenceRule`](/guides/recurring-events)
-  (`FREQ`, `INTERVAL`, `COUNT`, `UNTIL`, and weekly `BYDAY`), plus **`EXDATE`**
-  exception days (`recurrence.exdates`, honoured by `expandRecurringEvents`).
+  (`FREQ`, `INTERVAL`, `COUNT`, `UNTIL`, weekly `BYDAY`, and ordinal `BYDAY` like
+  `3MO`/`-1FR` → `nthWeekday`), plus **`EXDATE`** exception days
+  (`recurrence.exdates`, honoured by `expandRecurringEvents`).
 
 Not (yet) handled: `VTODO` / `VJOURNAL`, `VALARM`, attendees, attachments, and
 embedded `VTIMEZONE` definitions (a `TZID` must be a valid IANA name for the

@@ -24,6 +24,25 @@ function withTimeOf(date: Date, source: Date): Date {
   return next;
 }
 
+// The date of the `week`th `weekday` in a given month (`week` 1–5, or -1 for the
+// last). Returns null when that week doesn't exist (e.g. a 5th Monday it lacks).
+function nthWeekdayOfMonth(
+  year: number,
+  month: number,
+  week: number,
+  weekday: number,
+): Date | null {
+  if (week === -1) {
+    const lastDay = new Date(year, month + 1, 0);
+    const back = (lastDay.getDay() - weekday + 7) % 7;
+    return new Date(year, month, lastDay.getDate() - back);
+  }
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const day = 1 + ((weekday - firstWeekday + 7) % 7) + (week - 1) * 7;
+  const date = new Date(year, month, day);
+  return date.getMonth() === month ? date : null;
+}
+
 // Occurrence start dates from `event.start` forward, in chronological order, up
 // to `rangeEnd` (and the rule's own `count`/`until`).
 function* occurrenceStarts(start: Date, rule: RecurrenceRule, rangeEnd: Date): Generator<Date> {
@@ -52,6 +71,29 @@ function* occurrenceStarts(start: Date, rule: RecurrenceRule, rangeEnd: Date): G
       // Guard against a week that yielded nothing yet hasn't reached the range.
       if (!advanced && nextWeek.getTime() > rangeEnd.getTime()) return;
       weekStart = nextWeek;
+    }
+  }
+
+  if ((rule.freq === "monthly" || rule.freq === "yearly") && rule.nthWeekday) {
+    const { week, weekday } = rule.nthWeekday;
+    const stepMonths = rule.freq === "monthly" ? interval : 12 * interval;
+    let year = start.getFullYear();
+    let month = start.getMonth();
+    while (true) {
+      const day = nthWeekdayOfMonth(year, month, week, weekday);
+      if (day) {
+        const date = withTimeOf(day, start);
+        if (date.getTime() >= start.getTime()) {
+          if (!within(date)) return;
+          produced += 1;
+          yield date;
+        }
+      }
+      month += stepMonths;
+      year += Math.floor(month / 12);
+      month = ((month % 12) + 12) % 12;
+      // No occurrence yielded yet but we've run past the range: stop.
+      if (new Date(year, month, 1).getTime() > rangeEnd.getTime()) return;
     }
   }
 
