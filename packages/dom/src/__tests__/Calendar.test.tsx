@@ -30,4 +30,19 @@ describe("dom Calendar", () => {
     const { getByText } = render(<Calendar date={date} events={events} hourHeight={48} />);
     expect(getByText("09:00 - 11:00")).toBeTruthy();
   });
+
+  it("forwards per-slot classNames to the active view", () => {
+    // Month mode → MonthView's `title` slot.
+    const month = render(
+      <Calendar mode="month" date={date} weekStartsOn={1} classNames={{ title: "text-center" }} />,
+    );
+    expect((month.getByText("July 2026") as HTMLElement).className).toBe("text-center");
+
+    // Week mode → TimeGrid's `hourLabel` slot.
+    const week = render(
+      <Calendar mode="week" date={date} weekStartsOn={1} classNames={{ hourLabel: "text-xs" }} />,
+    );
+    const label = week.container.querySelector('[data-slot="hourLabel"]') as HTMLElement;
+    expect(label.className).toBe("text-xs");
+  });
 });
