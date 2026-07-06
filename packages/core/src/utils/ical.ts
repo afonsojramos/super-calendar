@@ -188,6 +188,14 @@ function parseRRule(value: string): RecurrenceRule | undefined {
     }
     if (plain.length) rule.weekdays = plain;
   }
+  const bymonthday = parts.get("BYMONTHDAY");
+  if (bymonthday) {
+    const days = bymonthday
+      .split(",")
+      .map((d) => Number(d.trim()))
+      .filter((d) => Number.isInteger(d) && d !== 0);
+    if (days.length) rule.monthDays = days;
+  }
   return rule;
 }
 
@@ -201,6 +209,7 @@ function formatRRule(rule: RecurrenceRule): string {
   } else if (rule.weekdays?.length) {
     parts.push(`BYDAY=${rule.weekdays.map((d) => BYDAY[d]).join(",")}`);
   }
+  if (rule.monthDays?.length) parts.push(`BYMONTHDAY=${rule.monthDays.join(",")}`);
   return parts.join(";");
 }
 
@@ -243,8 +252,9 @@ export function parseICalendar(ics: string): ICalEvent[] {
   let allDay = false;
   // A VEVENT may carry DURATION instead of DTEND; resolve it once DTSTART is known.
   let durationMs: number | null = null;
-  // EXDATE(s) may appear before or after RRULE; collect, then attach at END.
+  // EXDATE/RDATE(s) may appear before or after RRULE; collect, then attach at END.
   let exdates: Date[] = [];
+  let rdates: Date[] = [];
 
   for (const raw of lines) {
     const line = parseLine(raw);
@@ -253,6 +263,7 @@ export function parseICalendar(ics: string): ICalEvent[] {
       allDay = false;
       durationMs = null;
       exdates = [];
+      rdates = [];
       continue;
     }
     if (line.name === "END" && line.value === "VEVENT") {
@@ -261,6 +272,7 @@ export function parseICalendar(ics: string): ICalEvent[] {
           current.end = new Date(current.start.getTime() + durationMs);
         }
         if (current.recurrence && exdates.length) current.recurrence.exdates = exdates;
+        if (current.recurrence && rdates.length) current.recurrence.rdates = rdates;
         if (allDay) {
           current.allDay = true;
           // iCal all-day DTEND is exclusive; default to a one-day span.
@@ -303,6 +315,11 @@ export function parseICalendar(ics: string): ICalEvent[] {
       case "EXDATE":
         for (const v of line.value.split(",")) {
           if (v) exdates.push(parseIcalDate(v, dateOnly || !v.includes("T"), tzid));
+        }
+        break;
+      case "RDATE":
+        for (const v of line.value.split(",")) {
+          if (v) rdates.push(parseIcalDate(v, dateOnly || !v.includes("T"), tzid));
         }
         break;
       case "RRULE": {
@@ -366,6 +383,13 @@ export function toICalendar(events: ICalEvent[], options: ToICalendarOptions = {
         event.allDay
           ? line("EXDATE;VALUE=DATE", event.recurrence.exdates.map(formatDateOnly).join(","))
           : line("EXDATE", event.recurrence.exdates.map(formatUtc).join(",")),
+      );
+    }
+    if (event.recurrence?.rdates?.length) {
+      out.push(
+        event.allDay
+          ? line("RDATE;VALUE=DATE", event.recurrence.rdates.map(formatDateOnly).join(","))
+          : line("RDATE", event.recurrence.rdates.map(formatUtc).join(",")),
       );
     }
     out.push("END:VEVENT");

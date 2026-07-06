@@ -136,4 +136,79 @@ describe("expandRecurringEvents", () => {
     // 1–5 Jan minus the 2nd and 4th.
     expect(result.map((e) => e.start.getDate())).toEqual([1, 3, 5]);
   });
+
+  it("repeats on specific days of the month (BYMONTHDAY), in order", () => {
+    const event: CalendarEvent = {
+      start: at(2026, 0, 1),
+      end: at(2026, 0, 1, 10),
+      title: "Payroll",
+      recurrence: { freq: "monthly", monthDays: [15, 1] },
+    };
+    const result = expandRecurringEvents([event], at(2026, 0, 1), at(2026, 2, 31));
+    // Emits the 1st then the 15th each month, chronologically.
+    expect(result.map((e) => [e.start.getMonth(), e.start.getDate()])).toEqual([
+      [0, 1],
+      [0, 15],
+      [1, 1],
+      [1, 15],
+      [2, 1],
+      [2, 15],
+    ]);
+    expect(result.every((e) => e.start.getHours() === 9)).toBe(true);
+  });
+
+  it("resolves a negative BYMONTHDAY as the last day, per month length", () => {
+    const event: CalendarEvent = {
+      start: at(2026, 0, 1),
+      end: at(2026, 0, 1, 10),
+      title: "Month end",
+      recurrence: { freq: "monthly", monthDays: [-1] },
+    };
+    const result = expandRecurringEvents([event], at(2026, 0, 1), at(2026, 2, 31));
+    // Jan 31, Feb 28 (2026 is not a leap year), Mar 31.
+    expect(result.map((e) => [e.start.getMonth(), e.start.getDate()])).toEqual([
+      [0, 31],
+      [1, 28],
+      [2, 31],
+    ]);
+  });
+
+  it("skips months that lack the requested day-of-month", () => {
+    const event: CalendarEvent = {
+      start: at(2026, 0, 31),
+      end: at(2026, 0, 31, 10),
+      title: "31st only",
+      recurrence: { freq: "monthly", monthDays: [31] },
+    };
+    const result = expandRecurringEvents([event], at(2026, 0, 1), at(2026, 3, 30));
+    // Jan and Mar have a 31st; Feb and Apr don't.
+    expect(result.map((e) => e.start.getMonth())).toEqual([0, 2]);
+  });
+
+  it("adds RDATE dates to the set, ordered and de-duplicated against the rule", () => {
+    const event: CalendarEvent = {
+      ...base, // Thu 1 Jan 2026, 09:00
+      recurrence: {
+        freq: "weekly",
+        count: 2, // 1 Jan, 8 Jan
+        rdates: [at(2026, 0, 5), at(2026, 0, 8)], // 5th is extra; 8th duplicates the rule
+      },
+    };
+    const result = expandRecurringEvents([event], at(2026, 0, 1), at(2026, 0, 31));
+    expect(result.map((e) => e.start.getDate())).toEqual([1, 5, 8]);
+  });
+
+  it("still applies EXDATE to an RDATE-augmented set", () => {
+    const event: CalendarEvent = {
+      ...base,
+      recurrence: {
+        freq: "weekly",
+        count: 1, // just 1 Jan
+        rdates: [at(2026, 0, 5)],
+        exdates: [at(2026, 0, 5)],
+      },
+    };
+    const result = expandRecurringEvents([event], at(2026, 0, 1), at(2026, 0, 31));
+    expect(result.map((e) => e.start.getDate())).toEqual([1]);
+  });
 });

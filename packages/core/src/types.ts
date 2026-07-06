@@ -59,10 +59,24 @@ export interface RecurrenceRule {
    */
   nthWeekday?: { week: number; weekday: WeekStartsOn };
   /**
+   * For `monthly`: the day(s) of the month to repeat on — 1–31, or negative to
+   * count from the month's end (-1 is the last day, -2 the second-to-last). Days
+   * that don't exist in a given month (e.g. the 31st in February) are skipped.
+   * Takes precedence over the start date's own day-of-month. Maps to iCal
+   * `BYMONTHDAY`.
+   */
+  monthDays?: number[];
+  /**
    * Dates to skip (exceptions). An occurrence whose day matches one of these is
    * dropped by `expandRecurringEvents`. Maps to iCal `EXDATE`.
    */
   exdates?: Date[];
+  /**
+   * Extra one-off start dates added to the set, even ones the rule wouldn't
+   * produce. Merged in chronological order and de-duplicated against rule
+   * occurrences; `exdates` still apply. Maps to iCal `RDATE`.
+   */
+  rdates?: Date[];
 }
 
 /**

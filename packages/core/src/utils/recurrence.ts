@@ -74,6 +74,31 @@ function* occurrenceStarts(start: Date, rule: RecurrenceRule, rangeEnd: Date): G
     }
   }
 
+  if (rule.freq === "monthly" && rule.monthDays?.length) {
+    let year = start.getFullYear();
+    let month = start.getMonth();
+    while (true) {
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      // Resolve each configured day to a concrete date-of-month (negatives count
+      // from the end), drop days this month lacks, and emit in chronological order.
+      const days = [...new Set(rule.monthDays.map((d) => (d < 0 ? daysInMonth + d + 1 : d)))]
+        .filter((d) => d >= 1 && d <= daysInMonth)
+        .sort((a, b) => a - b);
+      for (const d of days) {
+        const date = withTimeOf(new Date(year, month, d), start);
+        if (date.getTime() < start.getTime()) continue; // before the first occurrence
+        if (!within(date)) return;
+        produced += 1;
+        yield date;
+      }
+      month += interval;
+      year += Math.floor(month / 12);
+      month = ((month % 12) + 12) % 12;
+      // No occurrence yielded yet but we've run past the range: stop.
+      if (new Date(year, month, 1).getTime() > rangeEnd.getTime()) return;
+    }
+  }
+
   if ((rule.freq === "monthly" || rule.freq === "yearly") && rule.nthWeekday) {
     const { week, weekday } = rule.nthWeekday;
     const stepMonths = rule.freq === "monthly" ? interval : 12 * interval;
@@ -133,7 +158,17 @@ export function expandRecurringEvents<T>(
     // Exception days (EXDATE): an occurrence landing on one of these is dropped.
     const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
     const excluded = new Set((event.recurrence.exdates ?? []).map(dayKey));
+    // Union the rule's occurrences with any explicit RDATE additions, keyed by
+    // exact start time so a date the rule already produces isn't duplicated.
+    const starts = new Map<number, Date>();
     for (const start of occurrenceStarts(event.start, event.recurrence, rangeEnd)) {
+      starts.set(start.getTime(), start);
+    }
+    for (const rdate of event.recurrence.rdates ?? []) {
+      if (rdate.getTime() <= rangeEnd.getTime()) starts.set(rdate.getTime(), rdate);
+    }
+    const ordered = [...starts.values()].sort((a, b) => a.getTime() - b.getTime());
+    for (const start of ordered) {
       // Skip occurrences that end before the range opens, but keep iterating.
       if (start.getTime() + durationMs < rangeStart.getTime()) continue;
       if (excluded.has(dayKey(start))) continue;

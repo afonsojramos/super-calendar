@@ -216,4 +216,36 @@ describe("toICalendar", () => {
     const [round] = parseICalendar(ics);
     expect(round.recurrence).toEqual({ freq: "monthly", nthWeekday: { week: -1, weekday: 5 } });
   });
+
+  it("round-trips a BYMONTHDAY recurrence (including a negative last-day)", () => {
+    const events: ICalEvent[] = [
+      {
+        start: new Date(Date.UTC(2026, 0, 1, 9, 0, 0)),
+        end: new Date(Date.UTC(2026, 0, 1, 10, 0, 0)),
+        title: "Payroll",
+        recurrence: { freq: "monthly", monthDays: [1, 15, -1] },
+      },
+    ];
+    const ics = toICalendar(events, { now });
+    expect(ics).toContain("RRULE:FREQ=MONTHLY;BYMONTHDAY=1,15,-1");
+    const [round] = parseICalendar(ics);
+    expect(round.recurrence).toEqual({ freq: "monthly", monthDays: [1, 15, -1] });
+  });
+
+  it("round-trips RDATE additions", () => {
+    const events: ICalEvent[] = [
+      {
+        start: new Date(Date.UTC(2026, 0, 1, 9, 0, 0)),
+        end: new Date(Date.UTC(2026, 0, 1, 10, 0, 0)),
+        title: "Standup",
+        recurrence: { freq: "weekly", count: 2, rdates: [new Date(Date.UTC(2026, 0, 5, 9, 0, 0))] },
+      },
+    ];
+    const ics = toICalendar(events, { now });
+    expect(ics).toContain("RDATE:20260105T090000Z");
+    const [round] = parseICalendar(ics);
+    expect(round.recurrence?.rdates?.[0]?.toISOString()).toBe(
+      new Date(Date.UTC(2026, 0, 5, 9, 0, 0)).toISOString(),
+    );
+  });
 });
