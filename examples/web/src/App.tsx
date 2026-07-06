@@ -11,14 +11,15 @@ import {
 
 import { type EventMenuActions, EventMenuProvider } from "@super-calendar/example-shared";
 import { buildEvents, type EventMeta } from "@super-calendar/example-shared/events";
+import { DateRangeField } from "./DateRangeField";
 import { EventContextMenu } from "./EventContextMenu";
 
 // The grid views step by a fixed period (toolbar + letter keys). "schedule" is the
 // agenda list, and picker/list are scrolling MonthLists, so they sit outside it.
 const MODES = ["month", "week", "3days", "day"] as const;
 type CalendarTab = (typeof MODES)[number];
-type DemoTab = CalendarTab | "schedule" | "picker" | "list" | "tailwind";
-const TABS: DemoTab[] = [...MODES, "schedule", "picker", "list", "tailwind"];
+type DemoTab = CalendarTab | "schedule" | "picker" | "list" | "tailwind" | "field";
+const TABS: DemoTab[] = [...MODES, "schedule", "picker", "list", "tailwind", "field"];
 const WEEK_STARTS_ON = 1;
 
 // A fully Tailwind-styled month, restyled entirely through per-slot `classNames`
@@ -226,6 +227,14 @@ export function App() {
               }
               height={560}
             />
+          </div>
+        ) : mode === "field" ? (
+          <div style={{ padding: "24px 0" }}>
+            <DateRangeField />
+            <p style={{ marginTop: 12, color: "#6B7280", fontSize: 13 }}>
+              A date-range input with a popover, composed from <code>MonthList</code> +{" "}
+              <code>useDateRange</code> and styled with per-slot <code>classNames</code>.
+            </p>
           </div>
         ) : mode === "tailwind" ? (
           <div className="overflow-hidden rounded-2xl border border-indigo-100 shadow-sm">
