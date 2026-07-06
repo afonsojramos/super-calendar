@@ -3,6 +3,7 @@ import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import {
   Calendar,
   type CalendarEvent,
+  type CalendarSlot,
   getViewDays,
   MonthList,
   useDateRange,
@@ -16,9 +17,23 @@ import { EventContextMenu } from "./EventContextMenu";
 // agenda list, and picker/list are scrolling MonthLists, so they sit outside it.
 const MODES = ["month", "week", "3days", "day"] as const;
 type CalendarTab = (typeof MODES)[number];
-type DemoTab = CalendarTab | "schedule" | "picker" | "list";
-const TABS: DemoTab[] = [...MODES, "schedule", "picker", "list"];
+type DemoTab = CalendarTab | "schedule" | "picker" | "list" | "tailwind";
+const TABS: DemoTab[] = [...MODES, "schedule", "picker", "list", "tailwind"];
 const WEEK_STARTS_ON = 1;
+
+// A fully Tailwind-styled month, restyled entirely through per-slot `classNames`
+// and `data-*` state variants — no theme object, no inline styles. Structural
+// layout (the grid) is kept by the library; these classes own the look.
+const TAILWIND_SLOTS: Partial<Record<CalendarSlot, string>> = {
+  title: "text-center text-xl font-bold text-indigo-900 py-3",
+  weekdays: "border-b border-indigo-100",
+  weekday: "text-center text-[11px] font-semibold uppercase tracking-wider text-indigo-400 py-1.5",
+  day: "transition-colors hover:bg-indigo-50/70",
+  dayBadge:
+    "text-sm rounded-full data-[today]:bg-indigo-600 data-[today]:text-white data-[outside]:text-slate-300",
+  chip: "block truncate rounded bg-indigo-100 px-1.5 text-[11px] font-semibold leading-[18px] text-indigo-800",
+  more: "px-1.5 text-[11px] font-semibold text-indigo-400",
+};
 
 // The dom Calendar is fully controlled by `date`, so the example owns navigation.
 // Step the anchor by the period the current mode shows.
@@ -210,6 +225,22 @@ export function App() {
                 console.log("more:", day.toDateString(), dayEvents.length)
               }
               height={560}
+            />
+          </div>
+        ) : mode === "tailwind" ? (
+          <div className="overflow-hidden rounded-2xl border border-indigo-100 shadow-sm">
+            <Calendar
+              mode="month"
+              date={date}
+              events={events}
+              weekStartsOn={1}
+              height={560}
+              classNames={TAILWIND_SLOTS}
+              onPressEvent={(event) => console.log("press event:", event.title)}
+              onPressDay={(day) => {
+                setDate(day);
+                setMode("day");
+              }}
             />
           </div>
         ) : (
