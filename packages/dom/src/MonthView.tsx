@@ -574,7 +574,9 @@ export function MonthView<T = unknown>({
                     }
                   >
                     {band ? <span data-band aria-hidden {...slot("rangeBand", band)} /> : null}
-                    <span {...slot("dayBadge", compactBadgeDefault(day, theme))}>{day.label}</span>
+                    <span {...dayData} {...slot("dayBadge", compactBadgeDefault(day, theme))}>
+                      {day.label}
+                    </span>
                     <div
                       {...slot("events", {
                         base: { display: "flex", flexDirection: "column", gap: CHIP_GAP },
@@ -645,7 +647,10 @@ export function MonthView<T = unknown>({
                   onMouseLeave={() => setHoveredKey((k) => (k === day.id ? null : k))}
                 >
                   {band ? <span data-band aria-hidden {...slot("rangeBand", band)} /> : null}
-                  <span {...slot("dayBadge", badgeDefault(day, theme, hoveredKey === day.id))}>
+                  <span
+                    {...dayData}
+                    {...slot("dayBadge", badgeDefault(day, theme, hoveredKey === day.id))}
+                  >
                     {day.label}
                   </span>
                 </button>
