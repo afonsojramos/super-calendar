@@ -158,3 +158,54 @@ describe("TimeGrid business hours", () => {
     expect(queryByLabelText(/Standup, 09:00 to 10:00/)).toBeNull();
   });
 });
+
+describe("TimeGrid column header", () => {
+  const date = new Date(2026, 0, 6, 12, 0, 0); // Tue 6 Jan 2026
+
+  it("themes the header weekday, day number, and badge", () => {
+    const { getByText, getAllByTestId } = render(
+      <Calendar
+        mode="week"
+        date={date}
+        events={[]}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        theme={{
+          text: {
+            dayNumber: { fontSize: 19 },
+            columnHeaderWeekday: { fontSize: 12, color: "#101010" },
+          },
+          containers: { columnHeaderBadge: { width: 40, height: 40 } },
+        }}
+      />,
+    );
+    const { StyleSheet } = require("react-native");
+    const number = getByText("6");
+    expect(StyleSheet.flatten(number.props.style).fontSize).toBe(19);
+    const weekday = getByText("Tue");
+    const weekdayStyle = StyleSheet.flatten(weekday.props.style);
+    expect(weekdayStyle.fontSize).toBe(12);
+    // A themed colour wins over the built-in muted colour.
+    expect(weekdayStyle.color).toBe("#101010");
+    const [badge] = getAllByTestId("column-header-badge");
+    expect(StyleSheet.flatten(badge.props.style).width).toBe(40);
+  });
+
+  it("announces the full date on a pressable header and fires onPressDateHeader", () => {
+    const onPressDateHeader = jest.fn();
+    const { getByLabelText } = render(
+      <Calendar
+        mode="week"
+        date={date}
+        events={[]}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        onPressDateHeader={onPressDateHeader}
+      />,
+    );
+    const { fireEvent } = require("@testing-library/react-native");
+    fireEvent.press(getByLabelText("Tuesday 6 January"));
+    expect(onPressDateHeader).toHaveBeenCalledTimes(1);
+    expect((onPressDateHeader.mock.calls[0][0] as Date).getDate()).toBe(6);
+  });
+});

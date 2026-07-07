@@ -1852,24 +1852,32 @@ const DayHeader = ({
       onPress={onPressDateHeader ? () => onPressDateHeader(day) : undefined}
       disabled={!onPressDateHeader}
       accessibilityRole={onPressDateHeader ? "button" : undefined}
+      // A pressable header announces the full date it opens; a static one lets
+      // the child labels speak for themselves.
+      accessibilityLabel={onPressDateHeader ? format(day, "EEEE d MMMM", { locale }) : undefined}
     >
       {/* Mirrors the dom renderer's header: the muted weekday label sits above the
-          day number, and the number's circle fills for today / the active date. */}
+          day number, and the number's circle fills for today / the active date.
+          Theme text merges after the muted colour so a themed colour wins. */}
       <Text
-        style={[styles.dayHeaderWeekday, { color: theme.colors.textMuted }]}
+        style={[{ color: theme.colors.textMuted }, theme.text.columnHeaderWeekday]}
         allowFontScaling={false}
       >
         {format(day, weekdayFormatToken(weekdayFormat), { locale })}
       </Text>
       <View
+        testID="column-header-badge"
         style={[
           styles.dayHeaderBadge,
+          theme.containers.columnHeaderBadge,
           isHighlighted && { backgroundColor: theme.colors.todayBackground },
         ]}
       >
         <Text
           style={[
-            styles.dayHeaderNumber,
+            theme.text.dayNumber,
+            // The state colour stays last so a themed dayNumber can't break the
+            // today/active contrast.
             { color: isHighlighted ? theme.colors.todayText : theme.colors.text },
           ]}
           allowFontScaling={false}
@@ -1909,10 +1917,6 @@ const styles = StyleSheet.create({
     gap: 2,
     paddingVertical: 6,
   },
-  dayHeaderWeekday: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
   dayHeaderBadge: {
     // A fixed circle so the today/active fill never shifts the header's height.
     width: 28,
@@ -1920,10 +1924,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     justifyContent: "center",
     alignItems: "center",
-  },
-  dayHeaderNumber: {
-    fontSize: 15,
-    fontWeight: "600",
   },
   content: {
     width: "100%",

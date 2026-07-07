@@ -12,9 +12,11 @@ export interface CalendarTheme {
   colors: CalendarColors;
   /** Text styles for the calendar's labels and the built-in event box. */
   text: {
-    /** Large day number in the week/day header. */
+    /** The day number in a time-grid (week/day) column header. */
     dayNumber: TextStyle;
-    /** Short weekday label ("Mon") in headers. */
+    /** The weekday label ("Mon") in a time-grid column header. */
+    columnHeaderWeekday: TextStyle;
+    /** Short weekday label ("Mon") in the month grid's header row. */
     weekday: TextStyle;
     /** The "MMMM yyyy" month title above the month grid. */
     monthTitle: TextStyle;
@@ -48,6 +50,8 @@ export interface CalendarTheme {
     monthEvent: ViewStyle;
     /** Each day's column header in the time grid. */
     columnHeader: ViewStyle;
+    /** The day-number badge (the circle) inside a time-grid column header. */
+    columnHeaderBadge: ViewStyle;
     /** A timed event's positioned box in the time grid (and resource timeline). */
     timeGridEvent: ViewStyle;
     /** The current-time indicator line. */
@@ -78,7 +82,11 @@ export interface CalendarTheme {
 export const defaultTheme: CalendarTheme = {
   colors: lightColors,
   text: {
-    dayNumber: { fontSize: 22, fontWeight: "700" },
+    // Match the header's shipped look: these two previously lived as hardcoded
+    // styles in the time-grid header, so honouring the theme changes nothing
+    // until a consumer overrides them.
+    dayNumber: { fontSize: 15, fontWeight: "600" },
+    columnHeaderWeekday: { fontSize: 11, fontWeight: "600" },
     weekday: { fontSize: 13, fontWeight: "700" },
     monthTitle: { fontSize: 17, fontWeight: "700" },
     dateCell: { fontSize: 13, fontWeight: "700" },
@@ -96,6 +104,7 @@ export const defaultTheme: CalendarTheme = {
     dayBadge: {},
     monthEvent: {},
     columnHeader: {},
+    columnHeaderBadge: {},
     timeGridEvent: {},
     nowIndicator: {},
     resourceRow: {},
