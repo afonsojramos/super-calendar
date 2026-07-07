@@ -1,20 +1,45 @@
 ---
 title: Live demo
-description: The example app, running on the web.
+description: Both renderers, running live on the web.
 ---
 
-This is the [`examples/native`](https://github.com/afonsojramos/super-calendar/tree/main/examples/native)
-app exported for the web and hosted on GitHub Pages. Everything here runs the
-real library.
+One example app per renderer, hosted on GitHub Pages. Everything here runs the
+real library, no mocks.
 
-<Frame>
-  <iframe
-    src="https://demo.super-calendar.afonsojramos.me/"
-    title="super-calendar web demo"
-    style={{ width: "100%", height: "720px", border: "0", borderRadius: "12px" }}
-    loading="lazy"
-  />
-</Frame>
+<Tabs>
+  <Tab title="React Native">
+    The [`examples/native`](https://github.com/afonsojramos/super-calendar/tree/main/examples/native)
+    app, exported for the web with react-native-web. This is the same code that
+    runs on iOS and Android.
+
+    <Frame>
+      <iframe
+        src="https://demo.super-calendar.afonsojramos.me/"
+        title="super-calendar React Native web demo"
+        style={{ width: "100%", height: "720px", border: "0", borderRadius: "12px" }}
+        loading="lazy"
+      />
+    </Frame>
+
+  </Tab>
+  <Tab title="react-dom">
+    The [`examples/web`](https://github.com/afonsojramos/super-calendar/tree/main/examples/web)
+    app: the [`@super-calendar/dom`](/guides/dom) renderer with no React Native
+    runtime. It adds web-only surfaces to try, including the date picker,
+    `MonthList`, a fully Tailwind-styled month, the resource timeline, and
+    iCalendar import/export.
+
+    <Frame>
+      <iframe
+        src="https://demo.super-calendar.afonsojramos.me/dom/"
+        title="super-calendar react-dom web demo"
+        style={{ width: "100%", height: "720px", border: "0", borderRadius: "12px" }}
+        loading="lazy"
+      />
+    </Frame>
+
+  </Tab>
+</Tabs>
 
 ## Things to try
 
