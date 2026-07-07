@@ -54,10 +54,34 @@ export interface MonthGrid {
   weekdays: MonthGridWeekday[];
 }
 
+/**
+ * Weekday header label width: `narrow` ("M"), `short` ("Mon", the default), or
+ * `long` ("Monday").
+ */
+export type WeekdayFormat = "narrow" | "short" | "long";
+
+/** date-fns tokens for each {@link WeekdayFormat}. */
+const WEEKDAY_TOKENS: Record<WeekdayFormat, string> = {
+  narrow: "EEEEE",
+  short: "EEE",
+  long: "EEEE",
+};
+
+/**
+ * The date-fns format token for a {@link WeekdayFormat}. Exposed so a renderer
+ * that formats its own weekday header (rather than reading {@link buildMonthGrid})
+ * keeps the same mapping.
+ */
+export function weekdayFormatToken(format: WeekdayFormat): string {
+  return WEEKDAY_TOKENS[format];
+}
+
 /** Options for {@link buildMonthGrid} and {@link useMonthGrid}. */
 export interface UseMonthGridOptions extends DateSelectionConstraints {
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */
   weekStartsOn?: WeekStartsOn;
+  /** Weekday header label width. Default `short` ("Mon"). */
+  weekdayFormat?: WeekdayFormat;
   /** Always return six week rows for a fixed-height grid. Default false. */
   showSixWeeks?: boolean;
   /** Reverse each week's day order (right-to-left). Default false. */
@@ -78,6 +102,7 @@ export interface UseMonthGridOptions extends DateSelectionConstraints {
 export function buildMonthGrid(month: Date, options: UseMonthGridOptions = {}): MonthGrid {
   const {
     weekStartsOn = 0,
+    weekdayFormat = "short",
     showSixWeeks = false,
     isRTL = false,
     selectedDates,
@@ -113,7 +138,7 @@ export function buildMonthGrid(month: Date, options: UseMonthGridOptions = {}): 
   // Weekday labels depend only on the first row's dates (already ordered).
   const weekdays: MonthGridWeekday[] = rows[0].map((date) => ({
     date,
-    label: format(date, "EEE", { locale }),
+    label: format(date, WEEKDAY_TOKENS[weekdayFormat], { locale }),
   }));
 
   return { weeks, weekdays };
