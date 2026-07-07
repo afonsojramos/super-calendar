@@ -34,6 +34,19 @@ describe("dom TimeGrid", () => {
     expect(queryByText("09:00 - 09:30")).toBeNull();
   });
 
+  it("centers a lone title line vertically and keeps taller chips top-aligned", () => {
+    const mixed: CalendarEvent[] = [
+      { title: "Quick", start: new Date(2026, 5, 26, 9, 0), end: new Date(2026, 5, 26, 9, 30) },
+      ...events, // Focus, 2h: title + time fit, stays top-aligned
+    ];
+    const { getByText } = render(<TimeGrid date={day} mode="day" events={mixed} hourHeight={48} />);
+    // The 24px box fits exactly one title line and no time: centered.
+    const quickBox = getByText("Quick").parentElement as HTMLElement;
+    expect(quickBox.style.justifyContent).toBe("center");
+    const focusBox = getByText("Focus").parentElement as HTMLElement;
+    expect(focusBox.style.justifyContent).toBe("");
+  });
+
   it("drag-moves an event and reports the snapped new times", () => {
     const onDragEvent = jest.fn();
     const { getByText } = render(

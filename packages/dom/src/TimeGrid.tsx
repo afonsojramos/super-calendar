@@ -205,6 +205,9 @@ function DefaultDomEvent<T>({
     paddingYPx: DOM_BOX_PADDING_V,
   });
   const oneLine = titleNumberOfLines(mode, isAllDay) === 1;
+  // A chip reduced to a single title line (no time) centers it vertically, so a
+  // very short event reads balanced instead of hugging the top edge.
+  const centerLoneTitle = titleMaxLines === 1 && !showTime;
   // Structural box metrics always apply; the card's look (colour, radius, type)
   // is themed and yields to a `eventBox` class when one is supplied.
   const boxBase: CSSProperties = {
@@ -212,6 +215,9 @@ function DefaultDomEvent<T>({
     boxSizing: "border-box",
     overflow: "hidden",
     lineHeight: `${DOM_TITLE_LINE_HEIGHT}px`,
+    ...(centerLoneTitle
+      ? { display: "flex", flexDirection: "column", justifyContent: "center" }
+      : null),
   };
   const boxThemed: CSSProperties = {
     padding: `${DOM_BOX_PADDING_V}px 6px`,
