@@ -1,5 +1,39 @@
 # Changelog
 
+## [2.2.0](https://github.com/afonsojramos/super-calendar/compare/v2.1.5...v2.2.0) (2026-07-07)
+
+
+### Features
+
+* **core:** add EventAccessibilityLabeler for event label overrides ([a89b623](https://github.com/afonsojramos/super-calendar/commit/a89b623a0308535125f6a994b2cc2a677512f593))
+* **core:** add iCalendar (.ics) import and export ([445cdee](https://github.com/afonsojramos/super-calendar/commit/445cdee4961160b3562e9c726eeb807dc37a2650))
+* **core:** add weekdayFormat option for month weekday headers ([c1d62eb](https://github.com/afonsojramos/super-calendar/commit/c1d62eb625f0dca8328c5ecdc6ffdfbead5e106a))
+* **core:** recurrence by ordinal weekday (nth/last weekday, iCal BYDAY) ([dd7f984](https://github.com/afonsojramos/super-calendar/commit/dd7f984ecaea85b70244341b950bc8366976f5e4))
+* **core:** resolve iCal TZID times via zonedTimeToUtc ([3025624](https://github.com/afonsojramos/super-calendar/commit/30256249c9c0e68c4873fd627a1d55ac37d88646))
+* **core:** support iCal DURATION when DTEND is absent ([9efcf9d](https://github.com/afonsojramos/super-calendar/commit/9efcf9dfac4057af1e36c8177de6dd9bc7c86f39))
+* **core:** support monthly BYMONTHDAY and RDATE recurrence ([855bf69](https://github.com/afonsojramos/super-calendar/commit/855bf699b82655d273e762c61d88ed0d905d261d))
+* **core:** support recurrence exceptions (EXDATE / exdates) ([5d0bc94](https://github.com/afonsojramos/super-calendar/commit/5d0bc943a7e52ac24ec1fd81c4ec6226c736a438))
+* **core:** support yearly BYMONTH recurrence ([f3e240c](https://github.com/afonsojramos/super-calendar/commit/f3e240c218d2b918538a568d5143105c73f9db11))
+* **dom:** add a resource timeline view ([f164444](https://github.com/afonsojramos/super-calendar/commit/f1644441a452040ab23d9a9d095aeff69db8da0c))
+* **dom:** add drag-to-move and resize to the resource timeline ([4977c02](https://github.com/afonsojramos/super-calendar/commit/4977c02cf428a80ae83309590ce87e53144b895f))
+* **dom:** add per-slot classNames/styles and data-* state for Tailwind styling ([788ba95](https://github.com/afonsojramos/super-calendar/commit/788ba9502d9664f94e02a61b354d36f3789748cc))
+* **dom:** add shipped DatePicker and DateRangePicker components ([fdb9212](https://github.com/afonsojramos/super-calendar/commit/fdb92120c973486e1b799e614986009d628a5504))
+* **dom:** center a lone title line in the default event chip ([ee75c75](https://github.com/afonsojramos/super-calendar/commit/ee75c758c40f948fd3a08f070d84af78cb6d6634))
+* **dom:** drag-to-create an all-day span on the month grid ([5863f18](https://github.com/afonsojramos/super-calendar/commit/5863f182a9cec5975bbe769e09d4ac9b12b87fde))
+* **dom:** mirror day state data-* onto the date badge ([2cb772d](https://github.com/afonsojramos/super-calendar/commit/2cb772dc5df4aef98cca3d64b9b2faa38f613309))
+* **dom:** re-export expandRecurringEvents and add a recurring demo tab ([21f790f](https://github.com/afonsojramos/super-calendar/commit/21f790fbd05cb7723b860b3793da21c658c6c2e7))
+* **dom:** support weekdayFormat on MonthView, MonthList and Calendar ([96309d8](https://github.com/afonsojramos/super-calendar/commit/96309d86f308edf982784b534884c80d26ca09d6))
+* **dom:** support weekdayFormat on the TimeGrid column headers ([9af3513](https://github.com/afonsojramos/super-calendar/commit/9af35139814ffb32b64af32e4415b686050cf43e))
+* **native:** add a read-only resource timeline view ([825bf03](https://github.com/afonsojramos/super-calendar/commit/825bf03e3864d1c0a607acb95687fc69aa4d1dc3))
+* **native:** add eventAccessibilityLabel override ([9dcf1c6](https://github.com/afonsojramos/super-calendar/commit/9dcf1c6d4c12348741ff7e9c0779ac7f335875d1))
+* **native:** center a lone title line in the default event chip ([e96448e](https://github.com/afonsojramos/super-calendar/commit/e96448ea1e96cadce9593a59fc1a9711cd5ba90e))
+* **native:** drag-to-move and edge-resize on the resource timeline ([fcec599](https://github.com/afonsojramos/super-calendar/commit/fcec599bd557b1d26f5d7659a9952bc4bb6ae1f4))
+* **native:** make the month title themeable via text.monthTitle ([c8b1323](https://github.com/afonsojramos/super-calendar/commit/c8b13235e054c27630f8be3613763b73d081687b))
+* **native:** support weekdayFormat on MonthView, MonthList and Calendar ([81a1523](https://github.com/afonsojramos/super-calendar/commit/81a152327194e65dbbb0996d873051c591ec66b6))
+* **native:** support weekdayFormat on the TimeGrid column headers ([30f2b41](https://github.com/afonsojramos/super-calendar/commit/30f2b4113ebfbceacece73a88292e216049d1aa7))
+* **native:** themeable container ViewStyles (begin native styling parity) ([b93c155](https://github.com/afonsojramos/super-calendar/commit/b93c155a9e8eb6b93e19c20487e052dab98ca83f))
+* **native:** themeable containers for month and time-grid parts ([cd0af22](https://github.com/afonsojramos/super-calendar/commit/cd0af22ab56aea6da712ff7c531356907a7224e8))
+
 ## [2.1.5](https://github.com/afonsojramos/super-calendar/compare/v2.1.4...v2.1.5) (2026-07-01)
 
 
