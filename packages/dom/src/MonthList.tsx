@@ -9,6 +9,7 @@ import {
   type DateSelectionConstraints,
   type EventAccessibilityLabeler,
   groupEventsByDay,
+  type WeekdayFormat,
   type WeekStartsOn,
 } from "@super-calendar/core";
 import { type DomMonthEvent, MonthView, type MonthViewSlot } from "./MonthView";
@@ -33,6 +34,8 @@ export interface MonthListProps<T = unknown>
   futureMonths?: number;
   /** First day of the week. Sunday = 0 (default) ... Saturday = 6. */
   weekStartsOn?: WeekStartsOn;
+  /** Weekday header label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
+  weekdayFormat?: WeekdayFormat;
   /** Events to render as chips in each day cell (calendar layout when provided). */
   events?: CalendarEvent<T>[];
   /** Custom chip renderer; falls back to the built-in titled chip. */
@@ -86,6 +89,7 @@ export function MonthList<T = unknown>({
   date,
   pastMonths = 1,
   futureMonths = 12,
+  weekdayFormat = "short",
   weekStartsOn = 0,
   events,
   renderEvent,
@@ -122,8 +126,8 @@ export function MonthList<T = unknown>({
   // The weekday header only depends on the week start and locale, not the
   // rendered month window.
   const weekdays = useMemo(
-    () => buildMonthGrid(date, { weekStartsOn, locale }).weekdays,
-    [date, weekStartsOn, locale],
+    () => buildMonthGrid(date, { weekStartsOn, weekdayFormat, locale }).weekdays,
+    [date, weekStartsOn, weekdayFormat, locale],
   );
 
   // Build the day→events index once for the whole list rather than per month.

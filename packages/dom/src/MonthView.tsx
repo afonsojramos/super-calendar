@@ -31,6 +31,7 @@ import {
   type MonthGridDay,
   monthVisibleCount,
   rangeBandKind,
+  type WeekdayFormat,
   type WeekStartsOn,
 } from "@super-calendar/core";
 import { createSlots, dataState, type SlotDefault, type SlotStyleProps } from "./slots";
@@ -78,6 +79,8 @@ export interface MonthViewProps<T = unknown>
   date: Date;
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */
   weekStartsOn?: WeekStartsOn;
+  /** Weekday header label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
+  weekdayFormat?: WeekdayFormat;
   /**
    * Events to render as chips in each day cell. Passing this (even `[]`) switches
    * the grid to the calendar layout (date in the corner, chips below); omit it for
@@ -364,6 +367,7 @@ interface MonthViewInternalProps<T = unknown> extends MonthViewProps<T> {
 export function MonthView<T = unknown>({
   date,
   weekStartsOn = 0,
+  weekdayFormat = "short",
   events,
   eventsByDay: eventsByDayProp,
   renderEvent,
@@ -419,6 +423,7 @@ export function MonthView<T = unknown>({
     () =>
       buildMonthGrid(date, {
         weekStartsOn,
+        weekdayFormat,
         selectedRange,
         selectedDates,
         minDate,
@@ -426,7 +431,17 @@ export function MonthView<T = unknown>({
         isDateDisabled,
         locale,
       }),
-    [date, weekStartsOn, selectedRange, selectedDates, minDate, maxDate, isDateDisabled, locale],
+    [
+      date,
+      weekStartsOn,
+      weekdayFormat,
+      selectedRange,
+      selectedDates,
+      minDate,
+      maxDate,
+      isDateDisabled,
+      locale,
+    ],
   );
 
   // Roving tabindex: only one day is in the tab order; arrow keys move focus

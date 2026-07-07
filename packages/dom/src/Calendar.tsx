@@ -7,6 +7,7 @@ import type {
   DateSelectionConstraints,
   EventAccessibilityLabeler,
   TimeGridMode,
+  WeekdayFormat,
   WeekStartsOn,
 } from "@super-calendar/core";
 import { Agenda, type AgendaSlot, type DomAgendaEvent } from "./Agenda";
@@ -97,6 +98,8 @@ export interface CalendarProps<T = unknown>
   moreLabel?: string;
   /** Render neighbouring months' days in the leading/trailing cells (default true). */
   showAdjacentMonths?: boolean;
+  /** Weekday header label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
+  weekdayFormat?: WeekdayFormat;
   /** Fill the cell with the range background instead of the pill band. */
   fillCellOnSelection?: boolean;
   /** Selected span. */
@@ -165,6 +168,7 @@ export function Calendar<T = unknown>({
   maxVisibleEventCount,
   moreLabel,
   showAdjacentMonths,
+  weekdayFormat,
   fillCellOnSelection,
   selectedRange,
   selectedDates,
@@ -208,6 +212,7 @@ export function Calendar<T = unknown>({
         date={date}
         events={events ?? []}
         weekStartsOn={weekStartsOn}
+        weekdayFormat={weekdayFormat}
         locale={locale}
         theme={theme}
         className={className}

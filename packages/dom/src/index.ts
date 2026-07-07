@@ -90,9 +90,11 @@ export {
   useDateRange,
   useMonthGrid,
   buildMonthGrid,
+  weekdayFormatToken,
   type MonthGrid,
   type MonthGridDay,
   type MonthGridWeek,
   type MonthGridWeekday,
   type UseMonthGridOptions,
+  type WeekdayFormat,
 } from "@super-calendar/core";
