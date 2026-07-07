@@ -25,6 +25,7 @@ import {
   getViewDays,
   isAllDayEvent,
   isSameCalendarDay,
+  isWeekend,
   layoutDayEvents,
   type TimeGridMode,
   titleNumberOfLines,
@@ -770,10 +771,15 @@ export function TimeGrid<T = unknown>({
                 onPointerMove={cellEnabled ? moveCreate : undefined}
                 onPointerUp={cellEnabled ? endCreate : undefined}
                 onPointerCancel={cellEnabled ? cancelCreate : undefined}
-                {...dataState({ "data-today": getIsToday(day) })}
+                {...dataState({ "data-today": getIsToday(day), "data-weekend": isWeekend(day) })}
                 {...slot("dayColumn", {
                   base: { flex: 1, position: "relative" },
-                  themed: { borderLeft: `1px solid ${theme.gridLine}` },
+                  // Weekend columns are tinted (matching the native renderer); the
+                  // tint sits behind the grid lines, business-hours shade and events.
+                  themed: {
+                    borderLeft: `1px solid ${theme.gridLine}`,
+                    ...(isWeekend(day) ? { background: theme.weekendBackground } : null),
+                  },
                 })}
               >
                 {/* Business-hours shade, behind the grid lines and events. */}

@@ -231,4 +231,22 @@ describe("dom TimeGrid", () => {
       expect(header.hasAttribute("data-today")).toBe(true);
     });
   });
+
+  it("tints the weekend columns with the weekend background", () => {
+    // Week of Mon 6 – Sun 12 July 2026; Sat 11 and Sun 12 are the weekend.
+    const { container } = render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 6, 8)}
+        weekStartsOn={1}
+        theme={{ weekendBackground: "#F6F7F9" }}
+      />,
+    );
+    const weekend = [...container.querySelectorAll('[data-slot="dayColumn"][data-weekend]')];
+    expect(weekend).toHaveLength(2);
+    expect((weekend[0] as HTMLElement).style.background).toBe("rgb(246, 247, 249)");
+    // Weekdays carry no weekend tint.
+    const weekdays = container.querySelectorAll('[data-slot="dayColumn"]:not([data-weekend])');
+    expect(weekdays).toHaveLength(5);
+  });
 });
