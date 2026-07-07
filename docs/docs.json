@@ -52,7 +52,9 @@
   "navbar": {
     "links": [
       {
-        "label": "npm",
+        "label": "",
+        "icon": "npm",
+        "iconType": "brands",
         "href": "https://www.npmjs.com/package/@super-calendar/native"
       }
     ],
