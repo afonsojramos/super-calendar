@@ -28,6 +28,8 @@ import {
   layoutDayEvents,
   type TimeGridMode,
   titleNumberOfLines,
+  type WeekdayFormat,
+  weekdayFormatToken,
   type WeekStartsOn,
 } from "@super-calendar/core";
 import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
@@ -95,6 +97,8 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   numberOfDays?: number;
   /** First day of the week. Sunday = 0 (default) ... Saturday = 6. */
   weekStartsOn?: WeekStartsOn;
+  /** Column-header weekday label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
+  weekdayFormat?: WeekdayFormat;
   /** Initial pixels per hour (default 48). */
   hourHeight?: number;
   /** Initial scroll position, in minutes from midnight (default 8:00). */
@@ -270,6 +274,7 @@ export function TimeGrid<T = unknown>({
   mode = "day",
   numberOfDays = 1,
   weekStartsOn = 0,
+  weekdayFormat = "short",
   hourHeight: initialHourHeight = 48,
   scrollOffsetMinutes = 8 * 60,
   zoomable = true,
@@ -589,7 +594,7 @@ export function TimeGrid<T = unknown>({
               })}
             >
               <span {...slot("columnHeaderWeekday", { themed: { fontSize: 11, fontWeight: 600 } })}>
-                {format(day, "EEE", dfns)}
+                {format(day, weekdayFormatToken(weekdayFormat), dfns)}
               </span>
               <span
                 {...dataState({ "data-today": today })}

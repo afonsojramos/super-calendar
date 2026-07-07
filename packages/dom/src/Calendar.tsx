@@ -245,6 +245,7 @@ export function Calendar<T = unknown>({
       mode={mode}
       events={events}
       weekStartsOn={weekStartsOn}
+      weekdayFormat={weekdayFormat}
       numberOfDays={numberOfDays}
       locale={locale}
       theme={theme}
