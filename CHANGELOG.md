@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.0](https://github.com/afonsojramos/super-calendar/compare/v2.2.0...v2.3.0) (2026-07-07)
+
+
+### Features
+
+* **dom:** shade weekend columns on the TimeGrid ([3635901](https://github.com/afonsojramos/super-calendar/commit/36359017b0155cc72cfce6def13f85323327b899))
+* **native:** themeable time-grid column header ([eb150c7](https://github.com/afonsojramos/super-calendar/commit/eb150c7ac6cdc531f52951df34fba8d2fb056180))
+
 ## [2.2.0](https://github.com/afonsojramos/super-calendar/compare/v2.1.5...v2.2.0) (2026-07-07)
 
 
