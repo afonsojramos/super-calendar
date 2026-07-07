@@ -16,6 +16,7 @@ export type {
   RecurrenceFrequency,
   RecurrenceRule,
   TimeGridMode,
+  WeekdayFormat,
   WeekStartsOn,
 } from "@super-calendar/core";
 

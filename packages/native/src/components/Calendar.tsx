@@ -20,7 +20,11 @@ import type {
   RenderEventArgs,
   WeekStartsOn,
 } from "../types";
-import { type EventAccessibilityLabeler, getViewDays } from "@super-calendar/core";
+import {
+  type EventAccessibilityLabeler,
+  type WeekdayFormat,
+  getViewDays,
+} from "@super-calendar/core";
 import { Agenda } from "./Agenda";
 import { DefaultEvent } from "./DefaultEvent";
 import { MonthPager } from "./MonthPager";
@@ -104,6 +108,8 @@ export type CalendarProps<T> = {
   disableMonthEventCellPress?: boolean;
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */
   weekStartsOn?: WeekStartsOn;
+  /** Weekday header label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
+  weekdayFormat?: WeekdayFormat;
   /** Number of day columns when `mode="custom"`. Ignored by other modes. Default 1. */
   numberOfDays?: number;
   /**
@@ -290,6 +296,7 @@ export function Calendar<T>({
   showAdjacentMonths,
   disableMonthEventCellPress,
   weekStartsOn = 0,
+  weekdayFormat,
   numberOfDays,
   weekEndsOn,
   renderEvent = DefaultEvent,
@@ -418,6 +425,7 @@ export function Calendar<T>({
           events={events}
           maxVisibleEventCount={maxVisibleEventCount}
           weekStartsOn={weekStartsOn}
+          weekdayFormat={weekdayFormat}
           locale={locale}
           sortedMonthView={sortedMonthView}
           moreLabel={moreLabel}

@@ -20,8 +20,10 @@ import { withEventAccessibilityLabel } from "../utils/withEventAccessibilityLabe
 import {
   type DateRange,
   type EventAccessibilityLabeler,
+  type WeekdayFormat,
   daySelectionState,
   useCalendarSelection,
+  weekdayFormatToken,
 } from "@super-calendar/core";
 import { dayBadgeKind, rangeBandKind } from "@super-calendar/core";
 import {
@@ -60,6 +62,8 @@ export type MonthViewProps<T> = {
    */
   maxVisibleEventCount?: number;
   weekStartsOn: WeekStartsOn;
+  /** Weekday header label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
+  weekdayFormat?: WeekdayFormat;
   locale?: Locale;
   /** Sort each day's events by start time before slicing. Default true. */
   sortedMonthView?: boolean;
@@ -125,6 +129,7 @@ function MonthViewInner<T>({
   events,
   maxVisibleEventCount,
   weekStartsOn,
+  weekdayFormat = "short",
   locale,
   sortedMonthView = true,
   moreLabel = "{moreCount} More",
@@ -465,7 +470,7 @@ function MonthViewInner<T>({
               style={[theme.text.weekday, styles.weekdayLabel, { color: theme.colors.textMuted }]}
               allowFontScaling={false}
             >
-              {format(day, "EEE", { locale })}
+              {format(day, weekdayFormatToken(weekdayFormat), { locale })}
             </Text>
           ))}
         </View>

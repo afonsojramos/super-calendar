@@ -63,6 +63,7 @@ export type {
   RenderEvent,
   RenderEventArgs,
   TimeGridMode,
+  WeekdayFormat,
   WeekStartsOn,
 } from "./types";
 export {
@@ -85,6 +86,7 @@ export {
   type MonthGridWeekday,
   type UseMonthGridOptions,
   useMonthGrid,
+  weekdayFormatToken,
 } from "@super-calendar/core";
 export { expandRecurringEvents } from "@super-calendar/core";
 export { eventsInTimeZone, toZonedTime } from "@super-calendar/core";

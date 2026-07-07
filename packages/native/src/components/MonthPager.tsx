@@ -17,7 +17,7 @@ import {
 } from "react-native";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent, WeekStartsOn } from "../types";
-import { getWeekDays } from "@super-calendar/core";
+import { type WeekdayFormat, getWeekDays, weekdayFormatToken } from "@super-calendar/core";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { MonthView } from "./MonthView";
 
@@ -40,6 +40,7 @@ export type MonthPagerProps<T> = {
   events: CalendarEvent<T>[];
   maxVisibleEventCount?: number;
   weekStartsOn: WeekStartsOn;
+  weekdayFormat?: WeekdayFormat;
   locale?: Locale;
   sortedMonthView?: boolean;
   moreLabel?: string;
@@ -70,6 +71,7 @@ function MonthPagerInner<T>({
   events,
   maxVisibleEventCount,
   weekStartsOn,
+  weekdayFormat = "short",
   locale,
   sortedMonthView,
   moreLabel,
@@ -278,7 +280,7 @@ function MonthPagerInner<T>({
       {renderHeaderForMonthView ? (
         renderHeaderForMonthView(weekDays)
       ) : (
-        <MonthWeekdayHeader weekDays={weekDays} locale={locale} />
+        <MonthWeekdayHeader weekDays={weekDays} weekdayFormat={weekdayFormat} locale={locale} />
       )}
       <View
         style={styles.pager}
@@ -344,12 +346,17 @@ export const MonthPager = memo(MonthPagerInner) as typeof MonthPagerInner;
 
 type MonthWeekdayHeaderProps = {
   weekDays: Date[];
+  weekdayFormat?: WeekdayFormat;
   locale?: Locale;
 };
 
 // The default weekday-label row above the month grid (e.g. "Mon Tue Wed…"),
 // one flex column per day to line up with the grid cells below.
-const MonthWeekdayHeader = ({ weekDays, locale }: MonthWeekdayHeaderProps) => {
+const MonthWeekdayHeader = ({
+  weekDays,
+  weekdayFormat = "short",
+  locale,
+}: MonthWeekdayHeaderProps) => {
   const theme = useCalendarTheme();
   return (
     <View style={[styles.weekdayHeader, theme.containers.weekdayHeader]}>
@@ -359,7 +366,7 @@ const MonthWeekdayHeader = ({ weekDays, locale }: MonthWeekdayHeaderProps) => {
           style={[theme.text.weekday, styles.weekdayLabel, { color: theme.colors.textMuted }]}
           allowFontScaling={false}
         >
-          {format(day, "EEE", { locale })}
+          {format(day, weekdayFormatToken(weekdayFormat), { locale })}
         </Text>
       ))}
     </View>

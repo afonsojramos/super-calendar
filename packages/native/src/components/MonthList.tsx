@@ -32,9 +32,10 @@ import {
   CalendarSelectionProvider,
   type DateRange,
   type EventAccessibilityLabeler,
+  type WeekdayFormat,
   isDateSelectable,
 } from "@super-calendar/core";
-import { buildMonthWeeks, getWeekDays } from "@super-calendar/core";
+import { buildMonthWeeks, getWeekDays, weekdayFormatToken } from "@super-calendar/core";
 import { DefaultMonthEvent } from "./DefaultMonthEvent";
 import { MonthView } from "./MonthView";
 
@@ -77,6 +78,8 @@ export type MonthListProps<T> = {
   /** Events to render in the grids. Omit for an events-free date picker. */
   events?: CalendarEvent<T>[];
   weekStartsOn: WeekStartsOn;
+  /** Weekday header label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
+  weekdayFormat?: WeekdayFormat;
   /**
    * Height of each week row (px). The month block sizes to its row count. Defaults
    * to a taller row when `events` are shown (so a day fits ~3 chips) and a compact
@@ -136,6 +139,7 @@ function MonthListInner<T>({
   date,
   events = NO_EVENTS as CalendarEvent<T>[],
   weekStartsOn,
+  weekdayFormat = "short",
   weekRowHeight: weekRowHeightProp,
   monthHeaderHeight = DEFAULT_MONTH_HEADER_HEIGHT,
   maxVisibleEventCount,
@@ -520,7 +524,7 @@ function MonthListInner<T>({
               style={[styles.weekdayLabel, { color: theme.colors.textMuted }]}
               allowFontScaling={false}
             >
-              {format(day, "EEE", { locale })}
+              {format(day, weekdayFormatToken(weekdayFormat), { locale })}
             </Text>
           ))}
         </View>
