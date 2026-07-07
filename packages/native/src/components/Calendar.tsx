@@ -470,6 +470,7 @@ export function Calendar<T>({
           cellHeight={cellHeight}
           hourHeight={hourHeight}
           weekStartsOn={weekStartsOn}
+          weekdayFormat={weekdayFormat}
           renderEvent={resolvedRenderEvent}
           keyExtractor={keyExtractor}
           scrollOffsetMinutes={scrollOffsetMinutes}

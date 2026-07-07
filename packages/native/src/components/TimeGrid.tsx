@@ -64,6 +64,7 @@ import {
 } from "@super-calendar/core";
 import { formatHour, layoutDayEvents, type PositionedEvent } from "@super-calendar/core";
 import type { EventAccessibilityLabeler } from "@super-calendar/core";
+import { type WeekdayFormat, weekdayFormatToken } from "@super-calendar/core";
 import { useWebGridZoom } from "../utils/useWebGridZoom";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { withEventAccessibilityLabel } from "../utils/withEventAccessibilityLabel";
@@ -1185,6 +1186,8 @@ export type TimeGridProps<T> = {
   /** Initial per-hour row height in px; seeds scroll/zoom without reading the shared value during render. */
   hourHeight?: number;
   weekStartsOn: WeekStartsOn;
+  /** Column-header weekday label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
+  weekdayFormat?: WeekdayFormat;
   renderEvent: RenderEvent<T>;
   /**
    * Override the screen-reader label for each event. Receives the event and a
@@ -1270,6 +1273,7 @@ function TimeGridInner<T>({
   cellHeight,
   hourHeight = DEFAULT_HOUR_HEIGHT,
   weekStartsOn,
+  weekdayFormat = "short",
   renderEvent,
   eventAccessibilityLabel,
   keyExtractor,
@@ -1688,6 +1692,7 @@ function TimeGridInner<T>({
           hourColumnWidth={hourColumnWidth}
           showWeekNumber={showWeekNumber}
           weekNumberPrefix={weekNumberPrefix}
+          weekdayFormat={weekdayFormat}
           locale={locale}
           activeDate={activeDate}
           onPressDateHeader={onPressDateHeader}
@@ -1768,6 +1773,7 @@ type DefaultHeaderProps = {
   hourColumnWidth: number;
   showWeekNumber?: boolean;
   weekNumberPrefix?: string;
+  weekdayFormat?: WeekdayFormat;
   locale?: Locale;
   activeDate?: Date;
   onPressDateHeader?: (date: Date) => void;
@@ -1780,6 +1786,7 @@ const DefaultHeader = ({
   hourColumnWidth,
   showWeekNumber,
   weekNumberPrefix = "W",
+  weekdayFormat,
   locale,
   activeDate,
   onPressDateHeader,
@@ -1806,6 +1813,7 @@ const DefaultHeader = ({
           day={day}
           mode={mode}
           width={dayWidth}
+          weekdayFormat={weekdayFormat}
           locale={locale}
           activeDate={activeDate}
           onPressDateHeader={onPressDateHeader}
@@ -1819,12 +1827,20 @@ type DayHeaderProps = {
   day: Date;
   mode: CalendarMode;
   width: number;
+  weekdayFormat?: WeekdayFormat;
   locale?: Locale;
   activeDate?: Date;
   onPressDateHeader?: (date: Date) => void;
 };
 
-const DayHeader = ({ day, width, locale, activeDate, onPressDateHeader }: DayHeaderProps) => {
+const DayHeader = ({
+  day,
+  width,
+  weekdayFormat = "short",
+  locale,
+  activeDate,
+  onPressDateHeader,
+}: DayHeaderProps) => {
   const theme = useCalendarTheme();
   const isToday = getIsToday(day);
   // Highlight the chosen `activeDate` when supplied, else the real today.
@@ -1843,7 +1859,7 @@ const DayHeader = ({ day, width, locale, activeDate, onPressDateHeader }: DayHea
         style={[styles.dayHeaderWeekday, { color: theme.colors.textMuted }]}
         allowFontScaling={false}
       >
-        {format(day, "EEE", { locale })}
+        {format(day, weekdayFormatToken(weekdayFormat), { locale })}
       </Text>
       <View
         style={[
