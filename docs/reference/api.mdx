@@ -14,13 +14,14 @@ your editor lists the full set with inline docs.
 
 ## Data
 
-| Prop           | Type                 | Notes                                             |
-| -------------- | -------------------- | ------------------------------------------------- |
-| `events`       | `CalendarEvent<T>[]` | Your events. The generic `T` is your own data.    |
-| `date`         | `Date`               | The controlled anchor date.                       |
-| `mode`         | `CalendarMode`       | `month` `week` `day` `3days` `custom` `schedule`. |
-| `numberOfDays` | `number`             | Column count for `custom`.                        |
-| `weekStartsOn` | `0–6`                | 0 = Sunday, 1 = Monday.                           |
+| Prop            | Type                      | Notes                                             |
+| --------------- | ------------------------- | ------------------------------------------------- |
+| `events`        | `CalendarEvent<T>[]`      | Your events. The generic `T` is your own data.    |
+| `date`          | `Date`                    | The controlled anchor date.                       |
+| `mode`          | `CalendarMode`            | `month` `week` `day` `3days` `custom` `schedule`. |
+| `numberOfDays`  | `number`                  | Column count for `custom`.                        |
+| `weekStartsOn`  | `0–6`                     | 0 = Sunday, 1 = Monday.                           |
+| `weekdayFormat` | `narrow \| short \| long` | Month weekday header width (default `short`).     |
 
 ## Navigation
 
@@ -92,7 +93,7 @@ and `minDate` / `maxDate` / `isDateDisabled` for disabled days. See the
     `expandRecurringEvents`, `eventsInTimeZone`, `toZonedTime`, `layoutDayEvents`, `isAllDayEvent`,
     `buildMonthGrid`, `buildMonthWeeks`, `nextDateRange`, `isDateSelectable`, `isRangeEndpoint`,
     `isWithinDateRange`, `daySelectionState`, `getViewDays`, `getWeekDays`, `getIsToday`,
-    `isWeekend`, `isSameCalendarDay`, `minutesIntoDay`, `DEFAULT_HOUR_HEIGHT`
+    `isWeekend`, `isSameCalendarDay`, `minutesIntoDay`, `weekdayFormatToken`, `DEFAULT_HOUR_HEIGHT`
   </Card>
   <Card title="Types">
     `CalendarEvent`, `CalendarMode`, `RenderEventArgs`, `RecurrenceRule`, `BusinessHours`,
