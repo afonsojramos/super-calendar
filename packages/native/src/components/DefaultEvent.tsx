@@ -111,6 +111,14 @@ export function DefaultEvent<T>({
     return { display: layout.value.showTime ? "flex" : "none" };
   }, [layout]);
 
+  // A chip reduced to a single title line (no time) centers it vertically, so a
+  // very short event reads balanced instead of hugging the top edge. Layout is
+  // recomputed on the UI thread, so the alignment tracks pinch-zoom live.
+  const contentStyle = useAnimatedStyle(() => {
+    const { titleMaxLines, showTime } = layout.value;
+    return { justifyContent: titleMaxLines === 1 && !showTime ? "center" : "flex-start" };
+  }, [layout]);
+
   return (
     <TouchableOpacity
       style={[
@@ -127,56 +135,58 @@ export function DefaultEvent<T>({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: event.disabled ?? false }}
     >
-      {event.title ? (
-        fixedTitleLines == null ? (
-          <Animated.View style={[styles.titleClip, titleClipStyle]}>
+      <Animated.View testID="event-chip-content" style={[styles.content, contentStyle]}>
+        {event.title ? (
+          fixedTitleLines == null ? (
+            <Animated.View style={[styles.titleClip, titleClipStyle]}>
+              <Text
+                style={[
+                  theme.text.eventTitle,
+                  isSchedule && styles.scheduleTitle,
+                  { color: theme.colors.eventText },
+                ]}
+                ellipsizeMode={ellipsizeMode}
+                allowFontScaling={false}
+              >
+                {event.title}
+              </Text>
+            </Animated.View>
+          ) : (
             <Text
               style={[
                 theme.text.eventTitle,
+                styles.title,
                 isSchedule && styles.scheduleTitle,
                 { color: theme.colors.eventText },
               ]}
+              // Month cells and the all-day lane are compact: a single clipped line.
+              numberOfLines={fixedTitleLines}
               ellipsizeMode={ellipsizeMode}
               allowFontScaling={false}
             >
               {event.title}
             </Text>
+          )
+        ) : null}
+        {timeLabel ? (
+          <Animated.View style={timeStyle}>
+            <Text
+              style={[
+                styles.time,
+                isSchedule && styles.scheduleTime,
+                { color: theme.colors.eventText },
+              ]}
+              // Wrap rather than clip horizontally: a narrow column shows the full
+              // range across two lines instead of a cut-off "11:00 - 1".
+              numberOfLines={2}
+              ellipsizeMode={ellipsizeMode}
+              allowFontScaling={false}
+            >
+              {timeLabel}
+            </Text>
           </Animated.View>
-        ) : (
-          <Text
-            style={[
-              theme.text.eventTitle,
-              styles.title,
-              isSchedule && styles.scheduleTitle,
-              { color: theme.colors.eventText },
-            ]}
-            // Month cells and the all-day lane are compact: a single clipped line.
-            numberOfLines={fixedTitleLines}
-            ellipsizeMode={ellipsizeMode}
-            allowFontScaling={false}
-          >
-            {event.title}
-          </Text>
-        )
-      ) : null}
-      {timeLabel ? (
-        <Animated.View style={timeStyle}>
-          <Text
-            style={[
-              styles.time,
-              isSchedule && styles.scheduleTime,
-              { color: theme.colors.eventText },
-            ]}
-            // Wrap rather than clip horizontally: a narrow column shows the full
-            // range across two lines instead of a cut-off "11:00 - 1".
-            numberOfLines={2}
-            ellipsizeMode={ellipsizeMode}
-            allowFontScaling={false}
-          >
-            {timeLabel}
-          </Text>
-        </Animated.View>
-      ) : null}
+        ) : null}
+      </Animated.View>
     </TouchableOpacity>
   );
 }
@@ -209,6 +219,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     opacity: 0.75,
+  },
+  // The title/time column; grows into the grid's sized box so a lone title line
+  // can center vertically, and shrinks with it (content-sized chips unaffected).
+  content: {
+    flexGrow: 1,
+    flexShrink: 1,
   },
   // Clips the wrapped title to the animated whole-line max-height.
   titleClip: {

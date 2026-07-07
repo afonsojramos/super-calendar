@@ -1,6 +1,12 @@
 import { render } from "@testing-library/react-native";
+import { StyleSheet, type ViewStyle } from "react-native";
+import type { SharedValue } from "react-native-reanimated";
 import type { CalendarEvent } from "../../types";
 import { DefaultEvent } from "../DefaultEvent";
+
+// A plain object stands in for the shared value; the reanimated jest mock
+// evaluates worklets once with its current `.value`.
+const boxHeightOf = (value: number) => ({ value }) as SharedValue<number>;
 
 const event: CalendarEvent = {
   start: new Date(2026, 0, 1, 9, 0, 0),
@@ -54,5 +60,19 @@ describe("DefaultEvent", () => {
     );
     expect(getByText("Ganztägig")).toBeTruthy();
     expect(getByLabelText("Standup, Ganztägig")).toBeTruthy();
+  });
+
+  it("centers a lone title line vertically and keeps taller chips top-aligned", () => {
+    const justifyOf = (boxHeight: SharedValue<number>) => {
+      const { getByTestId } = render(
+        <DefaultEvent event={event} mode="day" boxHeight={boxHeight} onPress={() => {}} />,
+      );
+      const style = StyleSheet.flatten(getByTestId("event-chip-content").props.style) as ViewStyle;
+      return style.justifyContent;
+    };
+    // A 24px box fits exactly one title line and no time line: centered.
+    expect(justifyOf(boxHeightOf(24))).toBe("center");
+    // A 96px box fits the title and the time: top-aligned as before.
+    expect(justifyOf(boxHeightOf(96))).toBe("flex-start");
   });
 });
