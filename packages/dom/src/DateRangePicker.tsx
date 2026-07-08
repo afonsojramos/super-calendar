@@ -150,7 +150,7 @@ function PickerShell({
           base: triggerDefault,
           themed: {
             border: `1px solid ${theme.gridLine}`,
-            background: theme.eventBackground,
+            background: theme.surface,
             color: hasValue ? theme.text : theme.textMuted,
             opacity: disabled ? 0.5 : 1,
           },
@@ -166,7 +166,7 @@ function PickerShell({
           aria-label={ariaLabel}
           {...slot("popover", {
             base: popoverDefault,
-            themed: { background: theme.eventBackground, border: `1px solid ${theme.gridLine}` },
+            themed: { background: theme.surface, border: `1px solid ${theme.gridLine}` },
           })}
         >
           {children}

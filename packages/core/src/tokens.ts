@@ -5,6 +5,8 @@
 
 /** The shared colour palette both renderers derive their themes from. */
 export interface CalendarColors {
+  /** Opaque surface behind floating chrome (e.g. the date-picker field and popover). */
+  surface: string;
   /** Hour lines, day separators and month-cell borders. */
   gridLine: string;
   /** Background tint behind weekend columns/cells. */
@@ -39,6 +41,7 @@ export interface CalendarColors {
 
 /** The default light-theme colour palette. */
 export const lightColors: CalendarColors = {
+  surface: "#FFFFFF",
   gridLine: "#E2E4E9",
   weekendBackground: "#F6F7F9",
   outsideHoursBackground: "#F1F2F4",
@@ -58,6 +61,7 @@ export const lightColors: CalendarColors = {
 
 /** The default dark-theme colour palette. */
 export const darkColors: CalendarColors = {
+  surface: "#1A1B1E",
   gridLine: "#2A2E37",
   weekendBackground: "#15171C",
   outsideHoursBackground: "#101216",
