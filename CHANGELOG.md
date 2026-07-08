@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.1](https://github.com/afonsojramos/super-calendar/compare/v2.3.0...v2.3.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **dom:** give the date picker a neutral surface instead of the event color ([2a5e27d](https://github.com/afonsojramos/super-calendar/commit/2a5e27d5ba2e0c808a8af79830fe02089cabb623))
+* **native:** unpin react-native and worklets in jsr.json so JSR publish resolves ([8a753d8](https://github.com/afonsojramos/super-calendar/commit/8a753d8e3523205bf1de8406e7346d107b36737e))
+
 ## [2.3.0](https://github.com/afonsojramos/super-calendar/compare/v2.2.0...v2.3.0) (2026-07-07)
 
 
