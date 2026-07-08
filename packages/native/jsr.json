@@ -12,10 +12,10 @@
     "@legendapp/list": "npm:@legendapp/list@^3",
     "date-fns": "npm:date-fns@^4",
     "react": "npm:react@^19",
-    "react-native": "npm:react-native@*",
+    "react-native": "npm:react-native@^0.86",
     "react-native-gesture-handler": "npm:react-native-gesture-handler@^2",
     "react-native-reanimated": "npm:react-native-reanimated@^4",
-    "react-native-worklets": "npm:react-native-worklets@*"
+    "react-native-worklets": "npm:react-native-worklets@^0.10"
   },
   "publish": {
     "exclude": [
