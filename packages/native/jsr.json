@@ -1,6 +1,6 @@
 {
   "name": "@super-calendar/native",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Gesture-driven, virtualized month / week / day calendar and date picker for React Native (and web via react-native-web).",
   "license": "MIT",
   "exports": {

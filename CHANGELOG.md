@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.2](https://github.com/afonsojramos/super-calendar/compare/v2.3.1...v2.3.2) (2026-07-08)
+
+
+### Bug Fixes
+
+* **native:** pin jsr.json react-native and worklets to caret ranges JSR accepts ([0a3f522](https://github.com/afonsojramos/super-calendar/commit/0a3f5226c3ae85241d4e9f8468bb50830f65a74f))
+
 ## [2.3.1](https://github.com/afonsojramos/super-calendar/compare/v2.3.0...v2.3.1) (2026-07-08)
 
 
