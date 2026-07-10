@@ -1803,7 +1803,10 @@ const DefaultHeader = ({
             style={[theme.text.hourLabel, { color: theme.colors.textMuted }]}
             allowFontScaling={false}
           >
-            {`${weekNumberPrefix}${getISOWeek(days[0])}`}
+            {/* Reference the visible Thursday: an ISO week is defined by its Thursday,
+                so a Sunday-start week still shows the week number its Mon–Sat body
+                belongs to. */}
+            {`${weekNumberPrefix}${getISOWeek(days.find((d) => d.getDay() === 4) ?? days[0])}`}
           </Text>
         ) : null}
       </View>

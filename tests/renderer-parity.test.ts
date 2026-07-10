@@ -27,7 +27,18 @@ const DOM_PLATFORM_PROPS: Record<string, Set<string>> = {
   // DOM elements take className/style; the box scrolls inside an explicit height;
   // the dom theme is a flat object (vs native's context-provided CalendarTheme).
   // classNames/styles are the web per-slot styling maps (native styles via theme).
-  TimeGrid: new Set(["className", "style", "classNames", "styles", "height", "theme", "zoomable"]),
+  // keyboardEventNavigation is a web keyboard-focus concern (roving tabindex over
+  // event chips); native is touch-driven, so it has no equivalent.
+  TimeGrid: new Set([
+    "className",
+    "style",
+    "classNames",
+    "styles",
+    "height",
+    "theme",
+    "zoomable",
+    "keyboardEventNavigation",
+  ]),
   // showTitle/showWeekdays toggle dom-only chrome; theme/className/style as above.
   // keyboardDayNavigation is a web keyboard-focus concern (roving tabindex); native
   // is touch/swipe with arrow-key paging, so it has no equivalent.

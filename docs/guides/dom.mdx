@@ -48,8 +48,10 @@ core, so you import everything from one place.
 The month views take an optional `events` prop: pass it (even `[]`) and the grid
 switches from the compact picker look to a calendar layout with event chips and a
 "+N more" overflow; omit it for the picker. `TimeGrid` supports `businessHours`
-shading, `timeslots`, `onPressCell`, drag-to-create (`onCreateEvent`), and
-drag-to-move/resize (`onDragEvent`, which can return `false` to reject a drop).
+shading, `timeslots`, a bounded hour window (`minHour`/`maxHour`, plus `hideHours`
+to drop the hour axis), `showWeekNumber` (with `weekNumberPrefix`), `onPressCell`,
+drag-to-create (`onCreateEvent`), and drag-to-move/resize (`onDragEvent`, which
+can return `false` to reject a drop).
 Creating on empty space is pointer-only (drag to sweep out a range); see
 [Keyboard navigation](#keyboard-navigation) for how focus moves.
 
@@ -170,7 +172,7 @@ turns a week into seven tab stops before the first event and a month into dozens
 Creating on empty space stays pointer-only (drag to sweep out a range); if you
 want a keyboard way to add an event, render your own "New event" button.
 
-Two cases keep full day-cell navigation:
+Three cases add richer keyboard navigation:
 
 - The **date picker** (`MonthList` or `MonthView` rendered without `events`) is
   always keyboard-navigable: one roving tab stop per month, arrow keys move the
@@ -178,6 +180,21 @@ Two cases keep full day-cell navigation:
 - **Month with events**, opt in with `keyboardDayNavigation` to add the same
   roving day focus on top of the event chips, so Enter on a focused day opens it
   (`onPressDay`). It is off by default.
+- **Time grid with events**, opt in with `keyboardEventNavigation` to add arrow-key
+  movement between events: Up/Down step through a day by time, Left/Right jump to
+  the nearest event in the adjacent day, Home/End go to the day's first/last event,
+  and Enter/Space activate. This is additive: every event stays individually
+  tabbable, so screen-reader users keep full access and the arrow keys are a
+  convenience for sighted keyboard users. Off by default. The day-column headers
+  always carry a full-date label for screen readers, whether or not they're
+  interactive.
+
+```tsx
+import { Calendar } from "@super-calendar/dom";
+
+// Time grid where arrow keys move a roving focus between events.
+<Calendar mode="week" date={new Date()} events={events} keyboardEventNavigation />;
+```
 
 ```tsx
 import { Calendar, type CalendarEvent } from "@super-calendar/dom";
@@ -196,9 +213,9 @@ const events: CalendarEvent[] = [
 />;
 ```
 
-`keyboardDayNavigation` is a web-only concern, so it exists on the react-dom
-`Calendar`, `MonthView`, and `MonthList` only. The React Native renderer pages
-with the arrow keys on react-native-web instead.
+`keyboardDayNavigation` and `keyboardEventNavigation` are web-only concerns, so
+they exist on the react-dom renderer only. The React Native renderer pages with
+the arrow keys on react-native-web instead.
 
 ## Theming
 

@@ -1,7 +1,8 @@
-import { addDays, addMinutes, format, type Locale, startOfDay } from "date-fns";
+import { addDays, addMinutes, format, getISOWeek, type Locale, startOfDay } from "date-fns";
 import {
   type ComponentType,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
   type ReactNode,
@@ -42,6 +43,7 @@ import { type DomCalendarTheme, mergeDomTheme } from "./theme";
  */
 export type TimeGridSlot =
   | "header"
+  | "weekNumber"
   | "columnHeader"
   | "columnHeaderWeekday"
   | "columnHeaderDate"
@@ -59,9 +61,23 @@ export type TimeGridSlot =
   | "nowIndicator"
   | "createGhost";
 
-const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const GUTTER_WIDTH = 56;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+// Off-screen but readable by assistive tech: gives an element an accessible name
+// without changing the visible layout.
+const VISUALLY_HIDDEN: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  clipPath: "inset(50%)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
 
 /** Props passed to a custom time-grid event renderer. */
 export interface DomRenderEventArgs<T = unknown> {
@@ -116,6 +132,16 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   ampm?: boolean;
   /** Sub-divisions per hour for the grid lines, e.g. 2 for half-hour (default 1). */
   timeslots?: number;
+  /** First hour shown (0–23). Default 0. */
+  minHour?: number;
+  /** Last hour shown, exclusive (1–24). Default 24. */
+  maxHour?: number;
+  /** Hide the left hour-axis column (lines stay, labels/gutter go). Default false. */
+  hideHours?: boolean;
+  /** Show the ISO week number in the header gutter. Default false. */
+  showWeekNumber?: boolean;
+  /** Prefix for the week number, e.g. "W" → "W28". Default "W". */
+  weekNumberPrefix?: string;
   /** Shade the hours outside business hours; `null` shades the whole day. */
   businessHours?: BusinessHours;
   /** Show the current-time indicator on today's column (default true). */
@@ -139,6 +165,14 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
   /** Replace the hour-axis label. Receives the hour (0-23) and the `ampm` flag. */
   hourComponent?: (hour: number, ampm: boolean) => ReactNode;
+  /**
+   * Add arrow-key navigation between events. Up/Down move between a day's events by
+   * time, Left/Right jump to the nearest event in the adjacent day, Home/End go to
+   * the day's first/last event; Enter/Space activate. Additive: every event stays
+   * individually tabbable (so screen-reader users keep full access), so this is a
+   * convenience for sighted keyboard users. Default false.
+   */
+  keyboardEventNavigation?: boolean;
   /** Tap an event. */
   onPressEvent?: (event: CalendarEvent<T>) => void;
   /** Tap a day's column header. */
@@ -264,6 +298,22 @@ function DefaultDomEvent<T>({
   );
 }
 
+const NOW_TICK_MS = 60_000;
+
+// A `Date` that advances every minute while `enabled`, so the now-indicator
+// tracks the wall clock instead of freezing at the last render. Mirrors the
+// native renderer's `useNow`.
+function useNow(enabled: boolean): Date {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    if (!enabled) return;
+    setNow(new Date());
+    const id = setInterval(() => setNow(new Date()), NOW_TICK_MS);
+    return () => clearInterval(id);
+  }, [enabled]);
+  return now;
+}
+
 /**
  * A day / week / N-day time grid rendered with plain DOM elements. Events are
  * positioned with the library's pure `layoutDayEvents`, so overlap columns and
@@ -290,6 +340,12 @@ export function TimeGrid<T = unknown>({
   dragStepMinutes = 15,
   ampm = false,
   timeslots = 1,
+  minHour = 0,
+  maxHour = 24,
+  hideHours = false,
+  showWeekNumber = false,
+  weekNumberPrefix = "W",
+  keyboardEventNavigation = false,
   businessHours,
   showNowIndicator = true,
   showAllDayEventCell = true,
@@ -315,6 +371,20 @@ export function TimeGrid<T = unknown>({
   const scrollRef = useRef<HTMLDivElement>(null);
   const dfns = locale ? { locale } : undefined;
   const snapHours = dragStepMinutes / 60;
+
+  // The visible hour window [windowStart, windowEnd). Clamped the same way as the
+  // native renderer so out-of-range props can't invert or overflow the day.
+  const windowStart = Math.max(0, Math.min(minHour, 23));
+  const windowEnd = Math.max(windowStart + 1, Math.min(maxHour, 24));
+  const windowHours = windowEnd - windowStart;
+  const gutterWidth = hideHours ? 0 : GUTTER_WIDTH;
+  const visibleHours = useMemo(
+    () => Array.from({ length: windowHours }, (_, i) => windowStart + i),
+    [windowStart, windowHours],
+  );
+
+  // Ticks every minute so the red now-line follows the wall clock.
+  const now = useNow(showNowIndicator);
 
   const [hourHeight, setHourHeight] = useState(initialHourHeight);
   useEffect(() => setHourHeight(initialHourHeight), [initialHourHeight]);
@@ -363,9 +433,13 @@ export function TimeGrid<T = unknown>({
 
   useEffect(() => {
     // On mount / when the offset prop changes, not on every zoom (hence the ref).
+    // The offset is measured from midnight, so subtract the window's start hour.
     if (scrollRef.current)
-      scrollRef.current.scrollTop = (scrollOffsetMinutes / 60) * hourHeightRef.current;
-  }, [scrollOffsetMinutes]);
+      scrollRef.current.scrollTop = Math.max(
+        0,
+        (scrollOffsetMinutes / 60 - windowStart) * hourHeightRef.current,
+      );
+  }, [scrollOffsetMinutes, windowStart]);
 
   // Zoom: Ctrl/⌘ + wheel (native listener so we can preventDefault), plus
   // two-pointer pinch. Both scale hourHeight about the current view.
@@ -407,7 +481,7 @@ export function TimeGrid<T = unknown>({
   };
 
   const Renderer = renderEvent;
-  const totalHeight = 24 * hourHeight;
+  const totalHeight = windowHours * hourHeight;
 
   const beginDrag = (
     e: ReactPointerEvent,
@@ -440,17 +514,19 @@ export function TimeGrid<T = unknown>({
     const dHours = (e.clientY - dragOrigin.current.pointerY) / hourHeightRef.current;
     const snap = (v: number) => Math.round(v / snapHours) * snapHours;
     if (d.kind === "move") {
+      // Guard the upper bound: an event taller than the window would otherwise
+      // invert the clamp (`windowEnd - duration < windowStart`) and teleport.
       const startHours = clamp(
         snap(dragOrigin.current.startHours + dHours),
-        0,
-        24 - d.durationHours,
+        windowStart,
+        Math.max(windowStart, windowEnd - d.durationHours),
       );
       applyDrag({ ...d, startHours, moved: true });
     } else {
       const durationHours = clamp(
         snap(dragOrigin.current.durationHours + dHours),
         snapHours,
-        24 - d.startHours,
+        Math.max(snapHours, windowEnd - d.startHours),
       );
       applyDrag({ ...d, durationHours, moved: true });
     }
@@ -520,10 +596,10 @@ export function TimeGrid<T = unknown>({
     const moved = Math.abs(endPx - o.startPx) > 4;
     const h = hourHeightRef.current;
     if (moved && onCreateEvent) {
-      const range = cellRangeFromDrag(day, o.startPx, endPx, h, 0, dragStepMinutes);
+      const range = cellRangeFromDrag(day, o.startPx, endPx, h, windowStart, dragStepMinutes);
       if (range) onCreateEvent(range.start, range.end);
     } else if (onPressCell) {
-      const at = cellRangeFromDrag(day, o.startPx, o.startPx, h, 0, dragStepMinutes);
+      const at = cellRangeFromDrag(day, o.startPx, o.startPx, h, windowStart, dragStepMinutes);
       if (at) onPressCell(at.start);
     }
     createOrigin.current = null;
@@ -543,11 +619,88 @@ export function TimeGrid<T = unknown>({
     () => days.map((day) => layoutDayEvents(events, day)),
     [days, events],
   );
-  // The dom grid always renders a full 0–24 window (no minHour/maxHour props), so
-  // closedHourBands uses its 0/24 defaults.
+
+  // Arrow-key navigation across events (`keyboardEventNavigation`). This is purely
+  // additive: every event stays a tab stop (so screen-reader users keep full
+  // access), and the arrow keys are a convenience for sighted keyboard users. It's
+  // deliberately NOT a roving tabindex — that needs a composite container role
+  // (grid/listbox), which this overlapping, absolutely-positioned layout can't
+  // honestly claim, and without one it would strip events from the tab order for
+  // exactly the screen-reader users it's meant to help. Events are keyed `day:idx`
+  // to match the rendered chips and sorted by start time so Up/Down step through a
+  // day chronologically.
+  const navByDay = useMemo(
+    () =>
+      positionedByDay.map((list, day) =>
+        list
+          .map((pe, idx) => ({ key: `${day}:${idx}`, start: pe.startHours, dur: pe.durationHours }))
+          .filter((n) => !(n.start >= windowEnd || n.start + n.dur <= windowStart))
+          .sort((a, b) => a.start - b.start),
+      ),
+    [positionedByDay, windowStart, windowEnd],
+  );
+  // The event to move focus to for an arrow/Home/End key, or null to stay put.
+  const nextEventKey = (currentKey: string, arrowKey: string): string | null => {
+    let day = -1;
+    let pos = -1;
+    for (let d = 0; d < navByDay.length; d++) {
+      const p = navByDay[d].findIndex((n) => n.key === currentKey);
+      if (p !== -1) {
+        day = d;
+        pos = p;
+        break;
+      }
+    }
+    if (day === -1) return null;
+    const start = navByDay[day][pos].start;
+    // The event in day `d` whose start time is closest to the current one.
+    const nearestInDay = (d: number): string | null => {
+      let best: string | null = null;
+      let bestDiff = Number.POSITIVE_INFINITY;
+      for (const n of navByDay[d]) {
+        const diff = Math.abs(n.start - start);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          best = n.key;
+        }
+      }
+      return best;
+    };
+    switch (arrowKey) {
+      case "ArrowDown":
+        return navByDay[day][Math.min(pos + 1, navByDay[day].length - 1)].key;
+      case "ArrowUp":
+        return navByDay[day][Math.max(pos - 1, 0)].key;
+      case "ArrowRight":
+        for (let d = day + 1; d < navByDay.length; d++) {
+          const k = nearestInDay(d);
+          if (k) return k;
+        }
+        return null;
+      case "ArrowLeft":
+        for (let d = day - 1; d >= 0; d--) {
+          const k = nearestInDay(d);
+          if (k) return k;
+        }
+        return null;
+      case "Home":
+        return navByDay[day][0].key;
+      case "End":
+        return navByDay[day][navByDay[day].length - 1].key;
+      default:
+        return null;
+    }
+  };
+  const onEventKeyDown = (currentKey: string, e: ReactKeyboardEvent) => {
+    const next = nextEventKey(currentKey, e.key);
+    if (!next) return;
+    e.preventDefault();
+    scrollRef.current?.querySelector<HTMLElement>(`[data-event-key="${next}"]`)?.focus();
+  };
+  // Shade only the closed hours inside the visible window.
   const bandsByDay = useMemo(
-    () => days.map((day) => closedHourBands(day, businessHours)),
-    [days, businessHours],
+    () => days.map((day) => closedHourBands(day, businessHours, windowStart, windowEnd)),
+    [days, businessHours, windowStart, windowEnd],
   );
   const gridLines = useMemo(() => {
     const hourLines = `repeating-linear-gradient(to bottom, transparent 0, transparent ${hourHeight - 1}px, ${theme.gridLine} ${hourHeight - 1}px, ${theme.gridLine} ${hourHeight}px)`;
@@ -574,36 +727,56 @@ export function TimeGrid<T = unknown>({
           themed: { borderBottom: `1px solid ${theme.gridLine}` },
         })}
       >
-        <div style={{ width: GUTTER_WIDTH, flex: "none" }} />
+        <div
+          {...slot("weekNumber", {
+            base: {
+              width: gutterWidth,
+              flex: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+            },
+            themed: { fontSize: 10, color: theme.textMuted },
+          })}
+        >
+          {showWeekNumber && gutterWidth > 0 && days[0]
+            ? // Reference the visible Thursday: an ISO week is defined by its Thursday,
+              // so a Sunday-start week (days[0] is Sunday, the previous ISO week's last
+              // day) still shows the week number its Mon–Sat body belongs to.
+              `${weekNumberPrefix}${getISOWeek(days.find((d) => d.getDay() === 4) ?? days[0])}`
+            : null}
+        </div>
         {days.map((day) => {
           const today = getIsToday(day);
-          return (
-            <button
-              key={day.toISOString()}
-              type="button"
-              tabIndex={onPressDateHeader ? 0 : -1}
-              aria-hidden={onPressDateHeader ? undefined : true}
-              onClick={onPressDateHeader ? () => onPressDateHeader(day) : undefined}
-              {...dataState({ "data-today": today })}
-              {...slot("columnHeader", {
-                base: {
-                  flex: 1,
-                  border: "none",
-                  background: "transparent",
-                  font: "inherit",
-                  cursor: onPressDateHeader ? "pointer" : "default",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 2,
-                },
-                themed: { color: theme.textMuted, padding: "6px 0" },
-              })}
-            >
-              <span {...slot("columnHeaderWeekday", { themed: { fontSize: 11, fontWeight: 600 } })}>
+          // Full, unambiguous date for assistive tech; the visible weekday + day
+          // number below are decorative (aria-hidden) so it isn't read twice.
+          const dateLabel = format(day, "EEEE, d MMMM yyyy", dfns);
+          const headerProps = slot("columnHeader", {
+            base: {
+              flex: 1,
+              border: "none",
+              background: "transparent",
+              font: "inherit",
+              cursor: onPressDateHeader ? "pointer" : "default",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 2,
+            },
+            themed: { color: theme.textMuted, padding: "6px 0" },
+          });
+          const inner = (
+            <>
+              <span style={VISUALLY_HIDDEN}>{dateLabel}</span>
+              <span
+                aria-hidden
+                {...slot("columnHeaderWeekday", { themed: { fontSize: 11, fontWeight: 600 } })}
+              >
                 {format(day, weekdayFormatToken(weekdayFormat), dfns)}
               </span>
               <span
+                aria-hidden
                 {...dataState({ "data-today": today })}
                 {...slot("columnHeaderDate", {
                   base: {
@@ -624,7 +797,25 @@ export function TimeGrid<T = unknown>({
               >
                 {format(day, "d", dfns)}
               </span>
+            </>
+          );
+          // Interactive → a real, labeled button. Otherwise a labeled, non-focusable
+          // element that screen readers can still announce (never `aria-hidden`, so
+          // the day columns aren't invisible to assistive tech).
+          return onPressDateHeader ? (
+            <button
+              key={day.toISOString()}
+              type="button"
+              onClick={() => onPressDateHeader(day)}
+              {...dataState({ "data-today": today })}
+              {...headerProps}
+            >
+              {inner}
             </button>
+          ) : (
+            <div key={day.toISOString()} {...dataState({ "data-today": today })} {...headerProps}>
+              {inner}
+            </div>
           );
         })}
       </div>
@@ -639,7 +830,15 @@ export function TimeGrid<T = unknown>({
         >
           <div
             {...slot("allDayLabel", {
-              base: { width: GUTTER_WIDTH, flex: "none", textAlign: "right" },
+              // `minWidth: 0` + `overflow: hidden` so the text doesn't spill when
+              // `hideHours` collapses the gutter to zero width.
+              base: {
+                width: gutterWidth,
+                flex: "none",
+                minWidth: 0,
+                overflow: "hidden",
+                textAlign: "right",
+              },
               themed: { fontSize: 10, color: theme.textMuted, padding: "4px 6px 0 0" },
             })}
           >
@@ -734,31 +933,43 @@ export function TimeGrid<T = unknown>({
         }}
       >
         <div style={{ display: "flex", height: totalHeight, position: "relative" }}>
-          {/* Hour gutter */}
-          <div
-            {...slot("hourGutter", {
-              base: { width: GUTTER_WIDTH, flex: "none", position: "relative" },
-            })}
-          >
-            {HOURS.map((h) => (
-              <div
-                key={h}
-                {...slot("hourLabel", {
-                  base: { position: "absolute", top: h * hourHeight - 6, right: 6 },
-                  themed: { fontSize: 10, color: theme.textMuted },
-                })}
-              >
-                {hourComponent ? hourComponent(h, ampm) : h === 0 ? "" : formatHour(h, { ampm })}
-              </div>
-            ))}
-          </div>
+          {/* Hour gutter (hidden when hideHours; the grid lines stay). */}
+          {hideHours ? null : (
+            <div
+              {...slot("hourGutter", {
+                base: { width: gutterWidth, flex: "none", position: "relative" },
+              })}
+            >
+              {visibleHours.map((h) => (
+                <div
+                  key={h}
+                  {...slot("hourLabel", {
+                    base: {
+                      position: "absolute",
+                      // Clamp so the top-of-grid label (`h === windowStart`) sits at
+                      // the edge instead of clipping 6px above it.
+                      top: Math.max(0, (h - windowStart) * hourHeight - 6),
+                      right: 6,
+                    },
+                    themed: { fontSize: 10, color: theme.textMuted },
+                  })}
+                >
+                  {hourComponent ? hourComponent(h, ampm) : h === 0 ? "" : formatHour(h, { ampm })}
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Day columns */}
           {days.map((day, dayIndex) => {
             const positioned = positionedByDay[dayIndex];
-            const showNow = showNowIndicator && isSameCalendarDay(day, new Date());
-            const nowDate = new Date();
-            const nowTop = ((nowDate.getHours() * 60 + nowDate.getMinutes()) / 60) * hourHeight;
+            const nowHours = (now.getHours() * 60 + now.getMinutes()) / 60;
+            const showNow =
+              showNowIndicator &&
+              isSameCalendarDay(day, now) &&
+              nowHours >= windowStart &&
+              nowHours <= windowEnd;
+            const nowTop = (nowHours - windowStart) * hourHeight;
             const bands = bandsByDay[dayIndex];
             const ghost = createBox?.dayIndex === dayIndex ? createBox : null;
             return (
@@ -792,7 +1003,7 @@ export function TimeGrid<T = unknown>({
                         position: "absolute",
                         left: 0,
                         right: 0,
-                        top: b.start * hourHeight,
+                        top: (b.start - windowStart) * hourHeight,
                         height: (b.end - b.start) * hourHeight,
                         pointerEvents: "none",
                         zIndex: 0,
@@ -814,7 +1025,14 @@ export function TimeGrid<T = unknown>({
                   const active = drag?.key === key ? drag : null;
                   const startHours = active ? active.startHours : pe.startHours;
                   const durationHours = active ? active.durationHours : pe.durationHours;
-                  const top = startHours * hourHeight;
+                  // Drop events that fall entirely outside the visible window; those
+                  // that straddle an edge render clipped by the scroll container.
+                  if (
+                    !active &&
+                    (pe.startHours >= windowEnd || pe.startHours + pe.durationHours <= windowStart)
+                  )
+                    return null;
+                  const top = (startHours - windowStart) * hourHeight;
                   const boxHeight = Math.max(durationHours * hourHeight, 14);
                   const widthPct = 100 / pe.columns;
                   const onPress = () => onPressEvent?.(pe.event);
@@ -833,7 +1051,10 @@ export function TimeGrid<T = unknown>({
                     <div
                       key={idx}
                       role="button"
+                      // Always a tab stop: keyboard nav is additive, arrows only add a
+                      // faster path between events without removing any from Tab order.
                       tabIndex={0}
+                      data-event-key={keyboardEventNavigation ? key : undefined}
                       aria-label={
                         eventAccessibilityLabel
                           ? eventAccessibilityLabel(pe.event, { mode, isAllDay: false, ampm })
@@ -849,7 +1070,9 @@ export function TimeGrid<T = unknown>({
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
                           onPress();
+                          return;
                         }
+                        if (keyboardEventNavigation) onEventKeyDown(key, e);
                       }}
                       onPointerDown={
                         draggable
