@@ -1849,19 +1849,16 @@ const DayHeader = ({
   // Highlight the chosen `activeDate` when supplied, else the real today.
   const isHighlighted = activeDate ? isSameCalendarDay(day, activeDate) : isToday;
 
-  return (
-    <Pressable
-      style={[styles.dayHeader, { width }, theme.containers.columnHeader]}
-      onPress={onPressDateHeader ? () => onPressDateHeader(day) : undefined}
-      disabled={!onPressDateHeader}
-      accessibilityRole={onPressDateHeader ? "button" : undefined}
-      // A pressable header announces the full date it opens; a static one lets
-      // the child labels speak for themselves.
-      accessibilityLabel={onPressDateHeader ? format(day, "EEEE d MMMM", { locale }) : undefined}
-    >
-      {/* Mirrors the dom renderer's header: the muted weekday label sits above the
-          day number, and the number's circle fills for today / the active date.
-          Theme text merges after the muted colour so a themed colour wins. */}
+  // One accessible name for the whole header (the weekday + number below are
+  // decorative). `accessible` groups the children so a screen reader announces
+  // this once, not label-by-label.
+  const accessibilityLabel = `${format(day, "EEEE d MMMM", { locale })}${isToday ? ", today" : ""}`;
+  const style = [styles.dayHeader, { width }, theme.containers.columnHeader];
+  // Mirrors the dom renderer's header: the muted weekday label sits above the day
+  // number, and the number's circle fills for today / the active date. Theme text
+  // merges after the muted colour so a themed colour wins.
+  const content = (
+    <>
       <Text
         style={[{ color: theme.colors.textMuted }, theme.text.columnHeaderWeekday]}
         allowFontScaling={false}
@@ -1884,12 +1881,32 @@ const DayHeader = ({
             { color: isHighlighted ? theme.colors.todayText : theme.colors.text },
           ]}
           allowFontScaling={false}
-          {...(isToday && { accessibilityLabel: `Today, ${day.getDate()}` })}
         >
           {day.getDate()}
         </Text>
       </View>
+    </>
+  );
+  // Interactive → a labelled button. Otherwise a labelled `header`, so screen
+  // readers still perceive (and announce) which day each column is.
+  return onPressDateHeader ? (
+    <Pressable
+      style={style}
+      onPress={() => onPressDateHeader(day)}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
+      {content}
     </Pressable>
+  ) : (
+    <View
+      style={style}
+      accessible
+      accessibilityRole="header"
+      accessibilityLabel={accessibilityLabel}
+    >
+      {content}
+    </View>
   );
 };
 

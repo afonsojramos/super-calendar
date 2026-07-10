@@ -208,4 +208,13 @@ describe("TimeGrid column header", () => {
     expect(onPressDateHeader).toHaveBeenCalledTimes(1);
     expect((onPressDateHeader.mock.calls[0][0] as Date).getDate()).toBe(6);
   });
+
+  it("exposes each day column as a labelled header when not interactive", () => {
+    const { getByRole } = render(
+      <Calendar mode="week" date={date} events={[]} onChangeDate={noop} onPressEvent={noop} />,
+    );
+    // A screen reader still perceives the column's date (previously the static
+    // header let only the terse "Tue"/"6" child labels speak).
+    expect(getByRole("header", { name: "Tuesday 6 January" })).toBeTruthy();
+  });
 });

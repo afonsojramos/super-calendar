@@ -1,0 +1,67 @@
+---
+title: dom vs native
+description: How the react-dom and React Native renderers compare, feature by feature.
+---
+
+super-calendar ships two renderers over one shared core (`@super-calendar/core`):
+
+- **`@super-calendar/native`** — React Native (iOS, Android, and web via
+  react-native-web). The reference renderer; gesture-driven and virtualized.
+- **`@super-calendar/dom`** — plain react-dom, for web-only or web-first apps that
+  don't want to pull in React Native.
+
+Both expose the same views and the same core types, so the mental model carries
+across. The tables below list where they line up and where they intentionally
+differ. Most differences are platform concerns (touch vs pointer, RN styling vs
+CSS), not missing functionality.
+
+## Views and components
+
+| Component / view                     | native | dom | Notes                                                               |
+| ------------------------------------ | :----: | :-: | ------------------------------------------------------------------- |
+| Month, week, day, 3-day, custom      |   ✅   | ✅  | Same modes on both.                                                 |
+| Schedule / agenda                    |   ✅   | ✅  | `mode="schedule"`.                                                  |
+| `TimeGrid`, `MonthView`, `MonthList` |   ✅   | ✅  | Shared components, matching prop names.                             |
+| `Agenda`, `ResourceTimeline`         |   ✅   | ✅  |                                                                     |
+| `MonthPager` (paged month swipe)     |   ✅   | ❌  | dom `Calendar` is a single window; use `MonthList` to scroll.       |
+| `DatePicker` / `DateRangePicker`     |   ❌   | ✅  | native exposes the headless picker parts via the `/picker` subpath. |
+
+## Interaction
+
+| Capability                     | native | dom | Notes                                                                                                       |
+| ------------------------------ | :----: | :-: | ----------------------------------------------------------------------------------------------------------- |
+| Drag to move / resize / create |   ✅   | ✅  | native: long-press + gesture; dom: pointer.                                                                 |
+| Pinch / scroll to zoom         |   ✅   | ✅  | native: pinch; dom: pinch + Ctrl/⌘-scroll (`zoomable`).                                                     |
+| Controlled navigation          |   ✅   | ✅  | native pages internally and fires `onChangeDate`; dom has no internal paging, so you drive `date` yourself. |
+| RTL layout                     |   ✅   | ❌  | native `isRTL` (cosmetic).                                                                                  |
+
+## Time grid
+
+| Feature                             | native | dom | Notes                             |
+| ----------------------------------- | :----: | :-: | --------------------------------- |
+| `minHour` / `maxHour` / `hideHours` |   ✅   | ✅  |                                   |
+| Week numbers (`showWeekNumber`)     |   ✅   | ✅  | ISO week of the visible Thursday. |
+| Now indicator (ticking)             |   ✅   | ✅  |                                   |
+| Business hours shading, `timeslots` |   ✅   | ✅  |                                   |
+
+## Data
+
+| Feature                                 | native | dom | Notes                                                    |
+| --------------------------------------- | :----: | :-: | -------------------------------------------------------- |
+| Recurrence auto-expansion in `Calendar` |   ✅   | ✅  | Plus `expandRecurringEvents` for manual control.         |
+| `timeZone` prop                         |   ✅   | ✅  | Display-only, via `eventsInTimeZone`.                    |
+| iCalendar import / export               |   ✅   | ✅  | `parseICalendar` / `toICalendar`, re-exported from both. |
+
+## Styling and accessibility
+
+| Feature                        | native | dom | Notes                                                                                                                                                        |
+| ------------------------------ | :----: | :-: | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Theming                        |   ✅   | ✅  | native: `CalendarTheme` + context + `mergeTheme`; dom: flat `DomCalendarTheme` + per-slot `classNames`/`styles` + `data-slot`/`data-state`.                  |
+| Screen-reader labels and roles |   ✅   | ✅  | Events, month cells, and day headers are labelled on both.                                                                                                   |
+| Keyboard navigation            |   ❌   | ✅  | dom `keyboardDayNavigation` (month) and `keyboardEventNavigation` (time grid). A web concern; native is touch-driven (arrow-key paging on react-native-web). |
+
+<Note>
+  The shared components (`MonthView`, `MonthList`, `TimeGrid`) keep the same prop names across
+  renderers, guarded by an automated parity test. A genuinely platform-specific prop (web keyboard
+  nav, RN styling) is the only allowed exception.
+</Note>

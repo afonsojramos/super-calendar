@@ -41,7 +41,7 @@
       },
       {
         "group": "Reference",
-        "pages": ["reference/api"]
+        "pages": ["reference/api", "reference/renderers"]
       }
     ]
   },
