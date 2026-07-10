@@ -215,6 +215,93 @@ describe("expandRecurringEvents", () => {
     expect(result.map((e) => e.start.getDate())).toEqual([1, 5, 8]);
   });
 
+  it("finds a long-lived daily event in a far-future window (no runaway-guard exhaustion)", () => {
+    // Regression: a daily event started in 2015 with no count/until must still
+    // surface when queried a decade and a half later — the generator has to
+    // fast-forward to the window instead of iterating (and exhausting its guard)
+    // from the original start.
+    const event: CalendarEvent = {
+      start: at(2015, 0, 1),
+      end: at(2015, 0, 1, 10),
+      title: "Daily since 2015",
+      recurrence: { freq: "daily" },
+    };
+    const result = expandRecurringEvents([event], at(2030, 0, 1), at(2030, 0, 3, 23));
+    expect(result.map((e) => e.start.getDate())).toEqual([1, 2, 3]);
+    expect(result.every((e) => e.start.getFullYear() === 2030)).toBe(true);
+    expect(result.every((e) => e.start.getHours() === 9)).toBe(true);
+  });
+
+  it("does not drift a monthly rule that starts on the 31st", () => {
+    // Regression: computing each occurrence from the previous one let date-fns'
+    // month clamp compound (Jan 31 → Feb 28 → Mar 28…). Each occurrence must be
+    // computed from the origin so long months keep the 31st.
+    const event: CalendarEvent = {
+      start: at(2026, 0, 31), // Sat 31 Jan 2026
+      end: at(2026, 0, 31, 10),
+      title: "Month-end",
+      recurrence: { freq: "monthly", count: 5 },
+    };
+    const result = expandRecurringEvents([event], at(2026, 0, 1), at(2026, 11, 31));
+    // Jan 31, Feb 28 (clamped), Mar 31, Apr 30 (clamped), May 31.
+    expect(result.map((e) => [e.start.getMonth(), e.start.getDate()])).toEqual([
+      [0, 31],
+      [1, 28],
+      [2, 31],
+      [3, 30],
+      [4, 31],
+    ]);
+  });
+
+  it("does not collapse a yearly Feb-29 rule to Feb 28 after the first leap year", () => {
+    // Regression: a leap-day start computed from the previous occurrence sticks
+    // on Feb 28 forever; computed from the origin it returns to Feb 29 each leap year.
+    const event: CalendarEvent = {
+      start: at(2024, 1, 29), // Thu 29 Feb 2024 (leap)
+      end: at(2024, 1, 29, 10),
+      title: "Leap day",
+      recurrence: { freq: "yearly" },
+    };
+    const result = expandRecurringEvents([event], at(2024, 0, 1), at(2028, 11, 31));
+    // 2024 (leap) and 2028 (leap) have a 29th; the non-leap years in between clamp to the 28th.
+    expect(
+      result.map((e) => [e.start.getFullYear(), e.start.getMonth(), e.start.getDate()]),
+    ).toEqual([
+      [2024, 1, 29],
+      [2025, 1, 28],
+      [2026, 1, 28],
+      [2027, 1, 28],
+      [2028, 1, 29],
+    ]);
+  });
+
+  it("keeps count semantics when the whole count precedes a far-future window", () => {
+    // A capped daily event whose occurrences all fall before the window yields nothing.
+    const event: CalendarEvent = {
+      start: at(2026, 0, 1),
+      end: at(2026, 0, 1, 10),
+      title: "Ten mornings",
+      recurrence: { freq: "daily", count: 10 },
+    };
+    const result = expandRecurringEvents([event], at(2030, 0, 1), at(2030, 0, 31));
+    expect(result).toEqual([]);
+  });
+
+  it("surfaces a long-lived weekly-by-weekday event in a far-future window", () => {
+    // The by-weekday branch must also fast-forward rather than spend its guard on
+    // the years of throwaway occurrences before the window.
+    const event: CalendarEvent = {
+      start: at(2015, 0, 5), // Mon 5 Jan 2015
+      end: at(2015, 0, 5, 10),
+      title: "Weekdays since 2015",
+      recurrence: { freq: "weekly", weekdays: [1, 2, 3, 4, 5] },
+    };
+    const result = expandRecurringEvents([event], at(2030, 0, 7), at(2030, 0, 11, 23));
+    // Mon 7 – Fri 11 Jan 2030.
+    expect(result.map((e) => e.start.getDate())).toEqual([7, 8, 9, 10, 11]);
+    expect(result.every((e) => e.start.getFullYear() === 2030)).toBe(true);
+  });
+
   it("still applies EXDATE to an RDATE-augmented set", () => {
     const event: CalendarEvent = {
       ...base,

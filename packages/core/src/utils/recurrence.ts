@@ -8,9 +8,19 @@ const STEP: Record<RecurrenceFrequency, (date: Date, amount: number) => Date> = 
   yearly: addYears,
 };
 
-// Runaway guard. Generous enough for realistic ranges (e.g. ~13 years of a daily
-// event); set `count`/`until`, or query a tighter range, for anything larger.
+// Runaway guard on in-range occurrences. Generous enough for realistic windows
+// (e.g. ~13 years of a daily event); set `count`/`until`, or query a tighter
+// range, for anything larger.
 const MAX_OCCURRENCES = 5000;
+
+// Average length of each frequency's step, used only to estimate how far to
+// fast-forward before iterating; the estimate is then corrected exactly.
+const APPROX_STEP_MS: Record<RecurrenceFrequency, number> = {
+  daily: 864e5,
+  weekly: 6048e5,
+  monthly: 2629746e3,
+  yearly: 31556952e3,
+};
 
 // Copy `source`'s time of day onto `date`.
 function withTimeOf(date: Date, source: Date): Date {
@@ -44,15 +54,32 @@ function nthWeekdayOfMonth(
 }
 
 // Occurrence start dates from `event.start` forward, in chronological order, up
-// to `rangeEnd` (and the rule's own `count`/`until`).
-function* occurrenceStarts(start: Date, rule: RecurrenceRule, rangeEnd: Date): Generator<Date> {
+// to `rangeEnd` (and the rule's own `count`/`until`). `earliestStart` is the
+// earliest occurrence-start that can still overlap the query window
+// (`rangeStart - duration`); the plain fallback rule fast-forwards to it.
+function* occurrenceStarts(
+  start: Date,
+  rule: RecurrenceRule,
+  earliestStart: Date,
+  rangeEnd: Date,
+): Generator<Date> {
   const interval = Math.max(1, Math.trunc(rule.interval ?? 1));
+  // `produced` counts occurrences from the origin, honouring `count`; `emitted`
+  // counts only in-window yields, so the runaway guard isn't spent on the
+  // throwaway occurrences that precede a far-future query window.
   let produced = 0;
-  const within = (date: Date) =>
-    date.getTime() <= rangeEnd.getTime() &&
-    (rule.until == null || date.getTime() <= rule.until.getTime()) &&
-    (rule.count == null || produced < rule.count) &&
-    produced < MAX_OCCURRENCES;
+  let emitted = 0;
+  const consider = (date: Date): "skip" | "stop" | "emit" => {
+    if (date.getTime() < start.getTime()) return "skip"; // before the first occurrence
+    if (date.getTime() > rangeEnd.getTime()) return "stop";
+    if (rule.until != null && date.getTime() > rule.until.getTime()) return "stop";
+    if (rule.count != null && produced >= rule.count) return "stop";
+    produced += 1;
+    if (date.getTime() < earliestStart.getTime()) return "skip"; // before the window
+    if (emitted >= MAX_OCCURRENCES) return "stop";
+    emitted += 1;
+    return "emit";
+  };
 
   if (rule.freq === "weekly" && rule.weekdays?.length) {
     const weekdays = [...new Set(rule.weekdays)].sort((a, b) => a - b);
@@ -61,9 +88,9 @@ function* occurrenceStarts(start: Date, rule: RecurrenceRule, rangeEnd: Date): G
       let advanced = false;
       for (const weekday of weekdays) {
         const date = withTimeOf(addDays(weekStart, weekday), start);
-        if (date.getTime() < start.getTime()) continue; // before the first occurrence
-        if (!within(date)) return;
-        produced += 1;
+        const verdict = consider(date);
+        if (verdict === "stop") return;
+        if (verdict === "skip") continue;
         advanced = true;
         yield date;
       }
@@ -86,9 +113,9 @@ function* occurrenceStarts(start: Date, rule: RecurrenceRule, rangeEnd: Date): G
         .sort((a, b) => a - b);
       for (const d of days) {
         const date = withTimeOf(new Date(year, month, d), start);
-        if (date.getTime() < start.getTime()) continue; // before the first occurrence
-        if (!within(date)) return;
-        produced += 1;
+        const verdict = consider(date);
+        if (verdict === "stop") return;
+        if (verdict === "skip") continue;
         yield date;
       }
       month += interval;
@@ -108,11 +135,9 @@ function* occurrenceStarts(start: Date, rule: RecurrenceRule, rangeEnd: Date): G
       const day = nthWeekdayOfMonth(year, month, week, weekday);
       if (day) {
         const date = withTimeOf(day, start);
-        if (date.getTime() >= start.getTime()) {
-          if (!within(date)) return;
-          produced += 1;
-          yield date;
-        }
+        const verdict = consider(date);
+        if (verdict === "stop") return;
+        if (verdict === "emit") yield date;
       }
       month += stepMonths;
       year += Math.floor(month / 12);
@@ -132,9 +157,9 @@ function* occurrenceStarts(start: Date, rule: RecurrenceRule, rangeEnd: Date): G
         // Skip a year whose listed month lacks the start's day (e.g. Feb 29).
         if (day > new Date(year, month + 1, 0).getDate()) continue;
         const date = withTimeOf(new Date(year, month, day), start);
-        if (date.getTime() < start.getTime()) continue; // before the first occurrence
-        if (!within(date)) return;
-        produced += 1;
+        const verdict = consider(date);
+        if (verdict === "stop") return;
+        if (verdict === "skip") continue;
         yield date;
       }
       year += interval;
@@ -142,11 +167,32 @@ function* occurrenceStarts(start: Date, rule: RecurrenceRule, rangeEnd: Date): G
     }
   }
 
-  let cursor = start;
-  while (within(cursor)) {
-    produced += 1;
-    yield cursor;
-    cursor = STEP[rule.freq](cursor, interval);
+  // Fallback: plain daily/weekly/monthly/yearly stepping. Each occurrence is
+  // computed from the original `start` (never the previous occurrence), so a
+  // month-end or Feb-29 start doesn't drift as date-fns clamps shorter months.
+  const occAt = (n: number) => STEP[rule.freq](start, n * interval);
+  const lowerBound = earliestStart.getTime();
+  // Fast-forward to the first occurrence that can overlap the window so a
+  // far-future query doesn't iterate (and exhaust the guard) from `start`.
+  let n = 0;
+  if (occAt(0).getTime() < lowerBound) {
+    n = Math.max(
+      0,
+      Math.floor((lowerBound - start.getTime()) / (APPROX_STEP_MS[rule.freq] * interval)),
+    );
+    // Correct the estimate exactly for calendar/DST wobble.
+    while (n > 0 && occAt(n - 1).getTime() >= lowerBound) n -= 1;
+    while (occAt(n).getTime() < lowerBound) n += 1;
+  }
+  while (true) {
+    if (rule.count != null && n >= rule.count) return;
+    if (emitted >= MAX_OCCURRENCES) return;
+    const date = occAt(n);
+    if (date.getTime() > rangeEnd.getTime()) return;
+    if (rule.until != null && date.getTime() > rule.until.getTime()) return;
+    emitted += 1;
+    n += 1;
+    yield date;
   }
 }
 
@@ -181,7 +227,9 @@ export function expandRecurringEvents<T>(
     // Union the rule's occurrences with any explicit RDATE additions, keyed by
     // exact start time so a date the rule already produces isn't duplicated.
     const starts = new Map<number, Date>();
-    for (const start of occurrenceStarts(event.start, event.recurrence, rangeEnd)) {
+    // Occurrences starting up to one duration before the range can still overlap it.
+    const earliestStart = new Date(rangeStart.getTime() - durationMs);
+    for (const start of occurrenceStarts(event.start, event.recurrence, earliestStart, rangeEnd)) {
       starts.set(start.getTime(), start);
     }
     for (const rdate of event.recurrence.rdates ?? []) {
