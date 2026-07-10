@@ -22,6 +22,7 @@ your editor lists the full set with inline docs.
 | `numberOfDays`  | `number`                  | Column count for `custom`.                        |
 | `weekStartsOn`  | `0–6`                     | 0 = Sunday, 1 = Monday.                           |
 | `weekdayFormat` | `narrow \| short \| long` | Weekday header width (default `short`).           |
+| `timeZone`      | `string`                  | Display events in this IANA zone (DST-correct).   |
 
 ## Navigation
 
@@ -90,10 +91,11 @@ and `minDate` / `maxDate` / `isDateDisabled` for disabled days. See the
     `defaultTheme`, `darkTheme`, `mergeTheme`, `CalendarThemeProvider`, `useCalendarTheme`
   </Card>
   <Card title="Helpers">
-    `expandRecurringEvents`, `eventsInTimeZone`, `toZonedTime`, `layoutDayEvents`, `isAllDayEvent`,
-    `buildMonthGrid`, `buildMonthWeeks`, `nextDateRange`, `isDateSelectable`, `isRangeEndpoint`,
-    `isWithinDateRange`, `daySelectionState`, `getViewDays`, `getWeekDays`, `getIsToday`,
-    `isWeekend`, `isSameCalendarDay`, `minutesIntoDay`, `weekdayFormatToken`, `DEFAULT_HOUR_HEIGHT`
+    `expandRecurringEvents`, `parseICalendar`, `toICalendar`, `eventsInTimeZone`, `toZonedTime`,
+    `layoutDayEvents`, `isAllDayEvent`, `buildMonthGrid`, `buildMonthWeeks`, `nextDateRange`,
+    `isDateSelectable`, `isRangeEndpoint`, `isWithinDateRange`, `daySelectionState`, `getViewDays`,
+    `getWeekDays`, `getIsToday`, `isWeekend`, `isSameCalendarDay`, `minutesIntoDay`,
+    `weekdayFormatToken`, `DEFAULT_HOUR_HEIGHT`
   </Card>
   <Card title="Types">
     `CalendarEvent`, `CalendarMode`, `RenderEventArgs`, `RecurrenceRule`, `BusinessHours`,

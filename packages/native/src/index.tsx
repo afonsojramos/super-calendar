@@ -89,6 +89,12 @@ export {
   weekdayFormatToken,
 } from "@super-calendar/core";
 export { expandRecurringEvents } from "@super-calendar/core";
+export {
+  type ICalEvent,
+  parseICalendar,
+  toICalendar,
+  type ToICalendarOptions,
+} from "@super-calendar/core";
 export { eventsInTimeZone, toZonedTime } from "@super-calendar/core";
 export {
   buildMonthWeeks,

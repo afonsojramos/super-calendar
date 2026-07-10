@@ -4,14 +4,24 @@ description: Display events in a specific time zone, DST-correct.
 ---
 
 Events lay out from their local wall-clock time. To display them in a specific
-IANA zone regardless of the device, run them through `eventsInTimeZone` (or a
-single date through `toZonedTime`). It's DST-correct via `Intl`.
+IANA zone regardless of the device, pass `Calendar` a `timeZone`. It's DST-correct
+via `Intl`.
 
 ```tsx
-import { Calendar, eventsInTimeZone } from "@super-calendar/native";
+import { Calendar } from "@super-calendar/native";
 
 // Render every event at its New York wall-clock time.
-<Calendar /* ... */ events={eventsInTimeZone(events, "America/New_York")} />;
+<Calendar /* ... */ timeZone="America/New_York" events={events} />;
+```
+
+Under the hood this runs your events through `eventsInTimeZone`. Call it (or
+`toZonedTime` for a single date) yourself if you need the shifted events outside
+`Calendar`:
+
+```tsx
+import { eventsInTimeZone } from "@super-calendar/native";
+
+const zoned = eventsInTimeZone(events, "America/New_York");
 ```
 
 <Warning>

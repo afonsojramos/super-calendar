@@ -1,4 +1,7 @@
 import {
+  addDays,
+  addMonths,
+  addWeeks,
   endOfDay,
   endOfMonth,
   endOfWeek,
@@ -22,6 +25,8 @@ import type {
 } from "../types";
 import {
   type EventAccessibilityLabeler,
+  eventsInTimeZone,
+  expandRecurringEvents,
   type WeekdayFormat,
   getViewDays,
 } from "@super-calendar/core";
@@ -191,6 +196,12 @@ export type CalendarProps<T> = {
   showNowIndicator?: boolean;
   /** A date-fns `Locale` for weekday/date labels. Defaults to English. */
   locale?: Locale;
+  /**
+   * Display events in this IANA time zone (e.g. `"America/New_York"`), DST-correct
+   * and independent of the device zone. Display-only: it shifts the wall-clock the
+   * grid lays out from, it doesn't change your `Date`s. Uses `eventsInTimeZone`.
+   */
+  timeZone?: string;
   /** Highlight this date (header/cell/agenda) instead of the real "today". */
   activeDate?: Date;
   /**
@@ -242,6 +253,34 @@ function visibleRange(
   }
   const days = getViewDays(mode, date, weekStartsOn, numberOfDays, false, weekEndsOn);
   return [startOfDay(days[0]), endOfDay(days[days.length - 1])];
+}
+
+// The range to materialise recurring occurrences over. Wider than `visibleRange`
+// by one page on each side, because the pager pre-renders the neighbour pages;
+// without the pad, recurring events would blink out for a page mid-swipe.
+function expansionRange(
+  mode: CalendarMode,
+  date: Date,
+  weekStartsOn: WeekStartsOn,
+  numberOfDays: number,
+  weekEndsOn?: WeekStartsOn,
+): [Date, Date] {
+  if (mode === "month") {
+    return [
+      startOfWeek(startOfMonth(addMonths(date, -1)), { weekStartsOn }),
+      // The extra week covers a `showSixWeeks` neighbour page whose own month
+      // fits in five weeks but is padded to six (the 6th row trails the month).
+      addWeeks(endOfWeek(endOfMonth(addMonths(date, 1)), { weekStartsOn }), 1),
+    ];
+  }
+  if (mode === "schedule") {
+    // The agenda lists forward from the anchor date; three months is a sensible
+    // default look-ahead. Pre-expand for a different window.
+    return [startOfDay(date), endOfDay(addMonths(date, 3))];
+  }
+  const days = getViewDays(mode, date, weekStartsOn, numberOfDays, false, weekEndsOn);
+  const span = days.length;
+  return [startOfDay(addDays(days[0], -span)), endOfDay(addDays(days[days.length - 1], span))];
 }
 
 /**
@@ -331,6 +370,7 @@ export function Calendar<T>({
   scrollOffsetMinutes,
   showNowIndicator,
   locale,
+  timeZone,
   activeDate,
   isRTL,
   freeSwipe,
@@ -342,6 +382,27 @@ export function Calendar<T>({
   const mergedTheme = useMemo(() => mergeTheme(theme), [theme]);
   const internalCellHeight = useSharedValue(hourHeight);
   const cellHeight = cellHeightProp ?? internalCellHeight;
+
+  // Materialise recurring events over the range this mode renders (plus a one-page
+  // buffer so occurrences survive the pager's pre-rendered neighbours), then apply
+  // the display zone. Non-recurring and already-expanded events pass through, so
+  // identity is preserved for the common (no-recurrence) case.
+  const displayEvents = useMemo(() => {
+    let out = events;
+    if (out.some((e) => e.recurrence)) {
+      let [start, end] = expansionRange(mode, date, weekStartsOn, numberOfDays ?? 1, weekEndsOn);
+      // A display zone shifts each occurrence's wall-clock by up to ~a day, which
+      // can move an edge occurrence into a visible column; widen so it's generated.
+      if (timeZone) {
+        start = addDays(start, -1);
+        end = addDays(end, 1);
+      }
+      out = expandRecurringEvents(out, start, end);
+    }
+    if (timeZone) out = eventsInTimeZone(out, timeZone);
+    return out;
+    // `date.getTime()`: recompute on the instant, not a re-created Date identity.
+  }, [events, mode, date.getTime(), weekStartsOn, numberOfDays, weekEndsOn, timeZone]);
 
   // Swallow presses on disabled events once, so every view inherits the guard.
   const handlePressEvent = useCallback(
@@ -422,7 +483,7 @@ export function Calendar<T>({
       {mode === "month" ? (
         <MonthPager
           date={date}
-          events={events}
+          events={displayEvents}
           maxVisibleEventCount={maxVisibleEventCount}
           weekStartsOn={weekStartsOn}
           weekdayFormat={weekdayFormat}
@@ -450,7 +511,7 @@ export function Calendar<T>({
         />
       ) : mode === "schedule" ? (
         <Agenda
-          events={events}
+          events={displayEvents}
           locale={locale}
           renderEvent={resolvedRenderEvent}
           keyExtractor={keyExtractor}
@@ -466,7 +527,7 @@ export function Calendar<T>({
           numberOfDays={numberOfDays}
           weekEndsOn={weekEndsOn}
           date={date}
-          events={events}
+          events={displayEvents}
           cellHeight={cellHeight}
           hourHeight={hourHeight}
           weekStartsOn={weekStartsOn}

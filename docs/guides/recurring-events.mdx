@@ -3,9 +3,25 @@ title: Recurring events
 description: Expand recurrence rules into concrete occurrences.
 ---
 
-Give an event a `recurrence` rule and expand it into concrete occurrences for the
-range you're showing with `expandRecurringEvents`. The calendar doesn't expand
-recurrences itself, so you control the window (and can memoize it).
+Give an event a `recurrence` rule and `Calendar` expands it into concrete
+occurrences automatically: over the visible range in the `month`, `week`, `day`,
+`3days`, and `custom` modes, and over a rolling three-month window in `schedule`
+(the agenda has no bounded viewport of its own). Non-recurring events pass through
+untouched, so you can mix both freely.
+
+```tsx
+import { Calendar } from "@super-calendar/native";
+
+const events = [
+  { title: "Standup", start, end, recurrence: { freq: "weekly", weekdays: [1, 2, 3, 4, 5] } },
+];
+
+<Calendar mode="week" date={date} events={events} onChangeDate={setDate} />;
+```
+
+When you want the occurrences yourself (to save, export to iCal, or list them over
+a window of your own), expand them with `expandRecurringEvents` and pass the
+result as `events`:
 
 ```tsx
 import { Calendar, expandRecurringEvents } from "@super-calendar/native";
@@ -53,3 +69,8 @@ through unchanged. These rules map to and from iCal
   what's on screen each time the user pages — a good trigger to re-expand (and to fetch from a
   server).
 </Tip>
+
+Expansion fast-forwards to the range you ask for, so a long-lived rule (a daily
+event started years ago) stays cheap to query far in the future. A single
+`expandRecurringEvents` call emits at most 5000 occurrences within the range;
+pass a `count`/`until`, or query a tighter window, if you need more.
