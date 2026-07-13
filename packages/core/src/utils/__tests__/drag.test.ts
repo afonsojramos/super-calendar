@@ -98,6 +98,22 @@ describe("resolveDraggedBounds", () => {
     // Both edges shift together, so the duration is preserved.
     expect(resolveDraggedBounds(start, end, -600, -600, 15)).not.toBeNull();
   });
+
+  it("moves an event already shorter than one step without rejecting it", () => {
+    // A 10-minute event (under the 15-min step) can still be moved: a move keeps
+    // the duration, so the collapse guard (which is for shrinking resizes) must
+    // not fire. Previously this was wrongly rejected.
+    const short = new Date(2026, 0, 1, 9, 10, 0); // 9:00–9:10, 10 min
+    const moved = resolveDraggedBounds(start, short, 30, 30, 15);
+    if (!moved) throw new Error("expected the move to be accepted");
+    expect(moved.start.getMinutes()).toBe(30);
+    expect(moved.end.getTime() - moved.start.getTime()).toBe(10 * 60_000);
+  });
+
+  it("still rejects shrinking a sub-step event further", () => {
+    const short = new Date(2026, 0, 1, 9, 10, 0);
+    expect(resolveDraggedBounds(start, short, 0, -5, 15)).toBeNull();
+  });
 });
 
 describe("cellRangeFromDrag", () => {
