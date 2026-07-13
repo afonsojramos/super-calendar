@@ -69,6 +69,18 @@ import * as Haptics from "expo-haptics";
 />;
 ```
 
+### Screen-reader rescheduling
+
+Dragging is a gesture, so on the React Native renderer draggable events also carry
+**accessibility actions** for VoiceOver / TalkBack users: _move earlier_, _move
+later_, and (when the event owns its end) _extend_ / _shorten_, each stepping by
+`dragStepMinutes`. They run through the same commit path as a drag, so
+`onDragEvent` fires exactly as it would from a gesture (and can still return
+`false` to reject). The built-in event renderer wires these up automatically; a
+custom `renderEvent` should spread the `accessibilityActions` and
+`onAccessibilityAction` it receives onto its pressable to keep the event operable
+by assistive tech.
+
 ## Drag to create
 
 Pass `onCreateEvent` to sweep out a new event on empty grid space:

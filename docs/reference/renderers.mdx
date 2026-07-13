@@ -58,6 +58,7 @@ CSS), not missing functionality.
 | ------------------------------ | :----: | :-: | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Theming                        |   ✅   | ✅  | native: `CalendarTheme` + context + `mergeTheme`; dom: flat `DomCalendarTheme` + per-slot `classNames`/`styles` + `data-slot`/`data-state`.                  |
 | Screen-reader labels and roles |   ✅   | ✅  | Events, month cells, and day headers are labelled on both.                                                                                                   |
+| Screen-reader event actions    |   ✅   | ❌  | native exposes move / resize as `accessibilityActions` so VoiceOver/TalkBack can reschedule without a gesture; dom uses keyboard nav instead.                |
 | Keyboard navigation            |   ❌   | ✅  | dom `keyboardDayNavigation` (month) and `keyboardEventNavigation` (time grid). A web concern; native is touch-driven (arrow-key paging on react-native-web). |
 
 <Note>

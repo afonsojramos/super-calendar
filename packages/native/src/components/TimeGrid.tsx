@@ -17,6 +17,7 @@ import {
 } from "date-fns";
 import { memo, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  type AccessibilityActionEvent,
   type GestureResponderEvent,
   Platform,
   Pressable,
@@ -372,6 +373,41 @@ function AnimatedEventBox<T>({
   const handleLongPress =
     !draggable && onLongPress ? () => onLongPress(positioned.event) : undefined;
 
+  // Dragging is gesture-only, so expose the same move/resize commit path as
+  // discrete screen-reader actions (VoiceOver/TalkBack invoke them from the
+  // actions menu). Steps are one `snapMinutes` unit, matching a drag snap.
+  const unit = (n: number) => `${n} minute${n === 1 ? "" : "s"}`;
+  const accessibilityActions = draggable
+    ? [
+        { name: "move-later", label: `Move ${unit(snapMinutes)} later` },
+        { name: "move-earlier", label: `Move ${unit(snapMinutes)} earlier` },
+        ...(resizable
+          ? [
+              { name: "extend", label: `Extend by ${unit(snapMinutes)}` },
+              { name: "shrink", label: `Shorten by ${unit(snapMinutes)}` },
+            ]
+          : []),
+      ]
+    : undefined;
+  const handleAccessibilityAction = draggable
+    ? (e: AccessibilityActionEvent) => {
+        switch (e.nativeEvent.actionName) {
+          case "move-later":
+            commitDrag(snapMinutes, snapMinutes);
+            break;
+          case "move-earlier":
+            commitDrag(-snapMinutes, -snapMinutes);
+            break;
+          case "extend":
+            commitDrag(0, snapMinutes);
+            break;
+          case "shrink":
+            commitDrag(0, -snapMinutes);
+            break;
+        }
+      }
+    : undefined;
+
   const box = (
     <Animated.View
       style={[styles.eventBox, { left, width }, boxStyle, theme.containers.timeGridEvent]}
@@ -382,6 +418,8 @@ function AnimatedEventBox<T>({
         boxHeight={boxHeight}
         continuesBefore={positioned.continuesBefore}
         continuesAfter={positioned.continuesAfter}
+        accessibilityActions={accessibilityActions}
+        onAccessibilityAction={handleAccessibilityAction}
         onPress={handlePress}
         onLongPress={handleLongPress}
       />

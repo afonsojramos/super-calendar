@@ -39,6 +39,8 @@ export function DefaultEvent<T>({
   ellipsizeTitle = false,
   allDayLabel,
   accessibilityLabel: accessibilityLabelProp,
+  accessibilityActions,
+  onAccessibilityAction,
   cellStyle,
   onPress,
   onLongPress,
@@ -134,6 +136,8 @@ export function DefaultEvent<T>({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: event.disabled ?? false }}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={onAccessibilityAction}
     >
       <Animated.View testID="event-chip-content" style={[styles.content, contentStyle]}>
         {event.title ? (

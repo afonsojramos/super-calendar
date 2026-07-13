@@ -1,5 +1,10 @@
 import type { ComponentType } from "react";
-import type { StyleProp, ViewStyle } from "react-native";
+import type {
+  AccessibilityActionEvent,
+  AccessibilityActionInfo,
+  StyleProp,
+  ViewStyle,
+} from "react-native";
 import type { SharedValue } from "react-native-reanimated";
 import type { CalendarEvent, CalendarMode } from "@super-calendar/core";
 
@@ -62,6 +67,16 @@ export type RenderEventArgs<T = unknown> = {
    * their default label; `undefined` falls back to that default.
    */
   accessibilityLabel?: string;
+  /**
+   * Screen-reader actions the built-in renderer places on the event, so
+   * VoiceOver/TalkBack users can act on it without a gesture. On a draggable
+   * time-grid event these are move / resize steps; wired to the same commit path
+   * as dragging. A custom renderer should spread these (plus `onAccessibilityAction`)
+   * onto its pressable to keep the event operable by assistive tech.
+   */
+  accessibilityActions?: ReadonlyArray<AccessibilityActionInfo>;
+  /** Handles an `accessibilityActions` invocation; pair it with `accessibilityActions`. */
+  onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
   onPress: () => void;
   /** Wired when the consumer passes `onLongPressEvent`; otherwise undefined. */
   onLongPress?: () => void;

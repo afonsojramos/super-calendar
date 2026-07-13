@@ -62,3 +62,57 @@ describe("Calendar recurrence + timeZone", () => {
     expect(getByLabelText(/Call, 11:30 to 13:30/)).toBeTruthy();
   });
 });
+
+describe("Calendar screen-reader event actions", () => {
+  const { fireEvent } = require("@testing-library/react-native");
+  const events: CalendarEvent[] = [
+    { title: "Standup", start: new Date(2026, 0, 6, 9, 0), end: new Date(2026, 0, 6, 10, 0) },
+  ];
+
+  it("exposes move/resize actions on a draggable event and reschedules via them", () => {
+    const onDragEvent = jest.fn();
+    const { getByLabelText } = render(
+      <Calendar
+        mode="day"
+        date={new Date(2026, 0, 6)}
+        events={events}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        onDragEvent={onDragEvent}
+      />,
+    );
+    const el = getByLabelText(/Standup, 09:00 to 10:00/);
+    expect((el.props.accessibilityActions ?? []).map((a: { name: string }) => a.name)).toEqual([
+      "move-later",
+      "move-earlier",
+      "extend",
+      "shrink",
+    ]);
+
+    // "Move later" shifts both edges by one snap step, preserving the duration.
+    fireEvent(el, "accessibilityAction", { nativeEvent: { actionName: "move-later" } });
+    expect(onDragEvent).toHaveBeenCalledTimes(1);
+    const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent, Date, Date];
+    expect(start.getTime()).toBeGreaterThan(new Date(2026, 0, 6, 9, 0).getTime());
+    expect(end.getTime() - start.getTime()).toBe(60 * 60 * 1000);
+
+    // "Extend" grows the end only, so the event gets longer.
+    fireEvent(el, "accessibilityAction", { nativeEvent: { actionName: "extend" } });
+    const [, extStart, extEnd] = onDragEvent.mock.calls[1] as [CalendarEvent, Date, Date];
+    expect(extStart.getTime()).toBe(new Date(2026, 0, 6, 9, 0).getTime());
+    expect(extEnd.getTime()).toBeGreaterThan(new Date(2026, 0, 6, 10, 0).getTime());
+  });
+
+  it("omits the actions on a non-draggable event", () => {
+    const { getByLabelText } = render(
+      <Calendar
+        mode="day"
+        date={new Date(2026, 0, 6)}
+        events={events}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    expect(getByLabelText(/Standup, 09:00 to 10:00/).props.accessibilityActions).toBeUndefined();
+  });
+});
