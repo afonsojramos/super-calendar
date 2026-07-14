@@ -4,11 +4,18 @@ import { type ComponentType, type ReactElement, useCallback, useMemo } from "rea
 import { StyleSheet, Text, View } from "react-native";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent } from "../types";
+import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { getIsToday } from "@super-calendar/core";
 import { isAllDayEvent } from "@super-calendar/core";
 
+/**
+ * The styleable parts of {@link Agenda}. Mirrors the dom renderer's slot names;
+ * the event itself is styled by `renderEvent` (or the theme), not a slot.
+ */
+export type AgendaSlot = "dayHeader" | "eventRow" | "empty";
+
 /** Props for {@link Agenda}, the day-grouped list view of events. */
-export type AgendaProps<T> = {
+export type AgendaProps<T> = SlotStyleProps<AgendaSlot> & {
   events: CalendarEvent<T>[];
   locale?: Locale;
   renderEvent: RenderEvent<T>;
@@ -41,8 +48,15 @@ export function Agenda<T>({
   onPressDay,
   activeDate,
   itemSeparatorComponent,
+  classNames,
+  styles: styleOverrides,
 }: AgendaProps<T>): ReactElement {
   const theme = useCalendarTheme();
+  // Stable across renders (it feeds the memoized renderItem below).
+  const slot = useMemo(
+    () => createSlots<AgendaSlot>({ classNames, styles: styleOverrides }),
+    [classNames, styleOverrides],
+  );
   const RenderEventComponent = renderEvent;
 
   const rows = useMemo<Row<T>[]>(() => {
@@ -66,10 +80,13 @@ export function Agenda<T>({
         const isHighlighted = activeDate ? isSameDay(item.date, activeDate) : getIsToday(item.date);
         return (
           <Text
-            style={[
-              styles.header,
-              { color: isHighlighted ? theme.colors.todayBackground : theme.colors.textMuted },
-            ]}
+            {...slot("dayHeader", {
+              base: styles.header,
+              themed: [
+                styles.headerText,
+                { color: isHighlighted ? theme.colors.todayBackground : theme.colors.textMuted },
+              ],
+            })}
             onPress={onPressDay ? () => onPressDay(item.date) : undefined}
             accessibilityRole={onPressDay ? "button" : "header"}
           >
@@ -78,7 +95,7 @@ export function Agenda<T>({
         );
       }
       return (
-        <View style={[styles.eventRow, theme.containers.agendaRow]}>
+        <View {...slot("eventRow", { base: styles.eventRow, themed: theme.containers.agendaRow })}>
           <RenderEventComponent
             event={item.event}
             mode="schedule"
@@ -89,11 +106,29 @@ export function Agenda<T>({
         </View>
       );
     },
-    [theme, locale, activeDate, onPressDay, onPressEvent, onLongPressEvent, RenderEventComponent],
+    [
+      theme,
+      locale,
+      activeDate,
+      onPressDay,
+      onPressEvent,
+      onLongPressEvent,
+      RenderEventComponent,
+      slot,
+    ],
   );
 
   if (rows.length === 0) {
-    return <Text style={[styles.empty, { color: theme.colors.textMuted }]}>No events</Text>;
+    return (
+      <Text
+        {...slot("empty", {
+          base: styles.empty,
+          themed: [styles.emptyText, { color: theme.colors.textMuted }],
+        })}
+      >
+        No events
+      </Text>
+    );
   }
 
   return (
@@ -115,20 +150,26 @@ const styles = StyleSheet.create({
   list: {
     flex: 1,
   },
+  // Structural layout / themed typography split per slot, so a slot class can
+  // replace the look without breaking the layout.
   header: {
-    fontSize: 13,
-    fontWeight: "600",
     paddingTop: 12,
     paddingBottom: 4,
     paddingHorizontal: 12,
+  },
+  headerText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   eventRow: {
     paddingHorizontal: 12,
     paddingVertical: 2,
   },
   empty: {
-    fontSize: 14,
     paddingVertical: 16,
     paddingHorizontal: 12,
+  },
+  emptyText: {
+    fontSize: 14,
   },
 });

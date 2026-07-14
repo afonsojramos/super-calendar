@@ -116,3 +116,44 @@ describe("Calendar screen-reader event actions", () => {
     expect(getByLabelText(/Standup, 09:00 to 10:00/).props.accessibilityActions).toBeUndefined();
   });
 });
+
+describe("Calendar slot styling", () => {
+  it("forwards classNames to the month view's slots", () => {
+    const { UNSAFE_getAllByProps } = render(
+      <Calendar
+        mode="month"
+        date={new Date(2026, 5, 15)}
+        events={[]}
+        classNames={{ weekday: "uppercase text-indigo-400" }}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    // Both the composite and host element match per label; 7 weekday labels.
+    expect(
+      UNSAFE_getAllByProps({ className: "uppercase text-indigo-400" }).length,
+    ).toBeGreaterThanOrEqual(7);
+  });
+
+  it("forwards classNames to the agenda's slots in schedule mode", () => {
+    const { UNSAFE_getAllByProps } = render(
+      <Calendar
+        mode="schedule"
+        date={new Date(2026, 0, 6)}
+        events={[
+          {
+            title: "Standup",
+            start: new Date(2026, 0, 6, 9, 0),
+            end: new Date(2026, 0, 6, 9, 30),
+          },
+        ]}
+        classNames={{ dayHeader: "text-lg font-bold" }}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    expect(UNSAFE_getAllByProps({ className: "text-lg font-bold" }).length).toBeGreaterThanOrEqual(
+      1,
+    );
+  });
+});

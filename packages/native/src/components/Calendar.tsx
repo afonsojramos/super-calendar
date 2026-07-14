@@ -30,19 +30,29 @@ import {
   type WeekdayFormat,
   getViewDays,
 } from "@super-calendar/core";
-import { Agenda } from "./Agenda";
+import { type SlotStyleProps } from "../utils/slots";
+import { Agenda, type AgendaSlot } from "./Agenda";
 import { DefaultEvent } from "./DefaultEvent";
 import { MonthPager } from "./MonthPager";
+import type { MonthViewSlot } from "./MonthView";
 import {
   DEFAULT_HOUR_HEIGHT,
   type EventDragHandler,
   type EventDragStartHandler,
   type HourRenderer,
   TimeGrid,
+  type TimeGridSlot,
 } from "./TimeGrid";
 
+/**
+ * Every styleable slot across the Calendar's views. The month slots reach the
+ * month pager, the grid slots reach the time grid, and the agenda slots reach
+ * the schedule view; slots for views that aren't rendered are ignored.
+ */
+export type CalendarSlot = MonthViewSlot | TimeGridSlot | AgendaSlot;
+
 /** Props for the {@link Calendar} component. */
-export type CalendarProps<T> = {
+export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   events: CalendarEvent<T>[];
   mode: CalendarMode;
   date: Date;
@@ -378,6 +388,8 @@ export function Calendar<T>({
   renderHeaderForMonthView,
   renderCustomDateForMonth,
   itemSeparatorComponent,
+  classNames,
+  styles: styleOverrides,
 }: CalendarProps<T>): ReactElement {
   const mergedTheme = useMemo(() => mergeTheme(theme), [theme]);
   const internalCellHeight = useSharedValue(hourHeight);
@@ -508,6 +520,8 @@ export function Calendar<T>({
           onChangeDate={handleChangeDate}
           freeSwipe={freeSwipe}
           swipeEnabled={swipeEnabled}
+          classNames={classNames}
+          styles={styleOverrides}
         />
       ) : mode === "schedule" ? (
         <Agenda
@@ -520,6 +534,8 @@ export function Calendar<T>({
           onPressDay={onPressDay}
           activeDate={activeDate}
           itemSeparatorComponent={itemSeparatorComponent}
+          classNames={classNames}
+          styles={styleOverrides}
         />
       ) : (
         <TimeGrid
@@ -571,6 +587,8 @@ export function Calendar<T>({
           onPressDateHeader={onPressDateHeader}
           onChangeDate={handleChangeDate}
           renderHeader={renderTimeGridHeader}
+          classNames={classNames}
+          styles={styleOverrides}
         />
       )}
     </CalendarThemeProvider>
