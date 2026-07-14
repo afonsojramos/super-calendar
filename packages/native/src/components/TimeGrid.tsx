@@ -67,6 +67,7 @@ import {
 import { formatHour, layoutDayEvents, type PositionedEvent } from "@super-calendar/core";
 import type { EventAccessibilityLabeler } from "@super-calendar/core";
 import { type WeekdayFormat, weekdayFormatToken } from "@super-calendar/core";
+import { SlotStylesProvider, type SlotStyleProps, useSlots } from "../utils/slots";
 import { useWebGridZoom } from "../utils/useWebGridZoom";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { withEventAccessibilityLabel } from "../utils/withEventAccessibilityLabel";
@@ -199,6 +200,7 @@ function AnimatedEventBox<T>({
 }: AnimatedEventBoxProps<T>) {
   const RenderEventComponent = renderEvent;
   const theme = useCalendarTheme();
+  const slot = useSlots<TimeGridSlot>();
   // Drag-to-move/resize. Native picks the event up on long-press (so a tap or
   // scroll isn't hijacked); web activates after a small drag threshold, so a
   // plain click still selects and a right-click still opens a context menu.
@@ -409,10 +411,12 @@ function AnimatedEventBox<T>({
       }
     : undefined;
 
+  const eventSlot = slot("event", {
+    base: [styles.eventBox, { left, width }],
+    themed: theme.containers.timeGridEvent,
+  });
   const box = (
-    <Animated.View
-      style={[styles.eventBox, { left, width }, boxStyle, theme.containers.timeGridEvent]}
-    >
+    <Animated.View {...eventSlot} style={[eventSlot.style, boxStyle]}>
       <RenderEventComponent
         event={positioned.event}
         mode={mode}
@@ -465,6 +469,7 @@ const HourRow = ({
   hourComponent,
 }: HourRowProps) => {
   const theme = useCalendarTheme();
+  const slot = useSlots<TimeGridSlot>();
   // Position via `top` (a layout prop), not a transform. The per-row layout pass
   // as cellHeight animates keeps the ScrollView's content size in sync while
   // zooming; a transform is composited and leaves the scroll range stale.
@@ -479,17 +484,21 @@ const HourRow = ({
         <View style={{ width: hourColumnWidth }}>{hourComponent(hour, ampm)}</View>
       ) : (
         <Text
-          style={[
-            theme.text.hourLabel,
-            styles.hourLabel,
-            { width: hourColumnWidth, color: theme.colors.textMuted },
-          ]}
+          {...slot("hourLabel", {
+            base: [styles.hourLabel, { width: hourColumnWidth }],
+            themed: [theme.text.hourLabel, { color: theme.colors.textMuted }],
+          })}
           allowFontScaling={false}
         >
           {label}
         </Text>
       )}
-      <View style={[styles.hourLine, { backgroundColor: theme.colors.gridLine }]} />
+      <View
+        {...slot("gridLines", {
+          base: styles.hourLine,
+          themed: { backgroundColor: theme.colors.gridLine },
+        })}
+      />
     </Animated.View>
   );
 };
@@ -511,20 +520,16 @@ const TimeslotLine = ({
   hourColumnWidth,
 }: TimeslotLineProps) => {
   const theme = useCalendarTheme();
+  const slot = useSlots<TimeGridSlot>();
   const animatedStyle = useAnimatedStyle(
     () => ({ top: (hour - minHour + fraction) * cellHeight.value }),
     [hour, minHour, fraction],
   );
-  return (
-    <Animated.View
-      style={[
-        styles.timeslotLine,
-        styles.nonInteractive,
-        { left: hourColumnWidth, backgroundColor: theme.colors.gridLine },
-        animatedStyle,
-      ]}
-    />
-  );
+  const lineSlot = slot("gridLines", {
+    base: [styles.timeslotLine, styles.nonInteractive, { left: hourColumnWidth }],
+    themed: { backgroundColor: theme.colors.gridLine },
+  });
+  return <Animated.View {...lineSlot} style={[lineSlot.style, animatedStyle]} />;
 };
 
 type NowIndicatorProps = {
@@ -538,22 +543,17 @@ type NowIndicatorProps = {
 
 const NowIndicator = ({ cellHeight, nowHours, minHour, left, width, color }: NowIndicatorProps) => {
   const theme = useCalendarTheme();
+  const slot = useSlots<TimeGridSlot>();
   const animatedStyle = useAnimatedStyle(
     () => ({ top: (nowHours - minHour) * cellHeight.value }),
     [nowHours, minHour],
   );
 
-  return (
-    <Animated.View
-      style={[
-        styles.nowIndicator,
-        styles.nonInteractive,
-        { left, width, backgroundColor: color },
-        animatedStyle,
-        theme.containers.nowIndicator,
-      ]}
-    />
-  );
+  const lineSlot = slot("nowIndicator", {
+    base: [styles.nowIndicator, styles.nonInteractive, { left, width }],
+    themed: [{ backgroundColor: color }, theme.containers.nowIndicator],
+  });
+  return <Animated.View {...lineSlot} style={[lineSlot.style, animatedStyle]} />;
 };
 
 type ShadeBandProps = {
@@ -577,6 +577,7 @@ const ShadeBand = ({
   width,
   color,
 }: ShadeBandProps) => {
+  const slot = useSlots<TimeGridSlot>();
   const animatedStyle = useAnimatedStyle(
     () => ({
       top: (startHour - minHour) * cellHeight.value,
@@ -584,15 +585,15 @@ const ShadeBand = ({
     }),
     [startHour, endHour, minHour],
   );
+  const bandSlot = slot("businessHours", {
+    base: [styles.shadeBand, styles.nonInteractive, { left, width }],
+    themed: { backgroundColor: color },
+  });
   return (
     <Animated.View
       testID="business-hours-shade"
-      style={[
-        styles.shadeBand,
-        styles.nonInteractive,
-        { left, width, backgroundColor: color },
-        animatedStyle,
-      ]}
+      {...bandSlot}
+      style={[bandSlot.style, animatedStyle]}
     />
   );
 };
@@ -693,6 +694,7 @@ function TimetablePageInner<T>({
   onCreateEvent,
 }: TimetablePageProps<T>) {
   const theme = useCalendarTheme();
+  const slot = useSlots<TimeGridSlot>();
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
 
   // The visible page tracks the live cellHeight (animates every pinch frame);
@@ -998,6 +1000,14 @@ function TimetablePageInner<T>({
     opacity: createActive.value,
   }));
 
+  const ghostSlot = slot("createGhost", {
+    base: [styles.createGhost, { pointerEvents: "none" }],
+    themed: {
+      backgroundColor: theme.colors.eventBackground,
+      borderColor: theme.colors.todayBackground,
+    },
+  });
+
   // The tap/long-press layer behind events; wrapped in the create gesture when
   // drag-to-create is on. Hidden from screen readers (a convenience gesture).
   const cellLayer =
@@ -1051,20 +1061,24 @@ function TimetablePageInner<T>({
               cellLayer
             )}
 
-            {days.map((day, dayIndex) =>
-              isWeekend(day) ? (
+            {days.map((day, dayIndex) => {
+              if (!isWeekend(day)) return null;
+              const shadeSlot = slot("weekendShade", {
+                base: [
+                  styles.weekendColumn,
+                  styles.nonInteractive,
+                  { left: dayLeft(dayIndex), width: dayWidth },
+                ],
+                themed: { backgroundColor: theme.colors.weekendBackground },
+              });
+              return (
                 <Animated.View
                   key={`weekend-${day.toISOString()}`}
-                  style={[
-                    styles.weekendColumn,
-                    styles.nonInteractive,
-                    { backgroundColor: theme.colors.weekendBackground },
-                    { left: dayLeft(dayIndex), width: dayWidth },
-                    fullHeightStyle,
-                  ]}
+                  {...shadeSlot}
+                  style={[shadeSlot.style, fullHeightStyle]}
                 />
-              ) : null,
-            )}
+              );
+            })}
 
             {calendarCellStyle
               ? days.map((day, dayIndex) => {
@@ -1101,18 +1115,19 @@ function TimetablePageInner<T>({
                 )
               : null}
 
-            {days.map((day, dayIndex) => (
-              <Animated.View
-                key={`separator-${day.toISOString()}`}
-                style={[
-                  styles.daySeparator,
-                  styles.nonInteractive,
-                  { backgroundColor: theme.colors.gridLine },
-                  { left: dayLeft(dayIndex) },
-                  fullHeightStyle,
-                ]}
-              />
-            ))}
+            {days.map((day, dayIndex) => {
+              const separatorSlot = slot("daySeparator", {
+                base: [styles.daySeparator, styles.nonInteractive, { left: dayLeft(dayIndex) }],
+                themed: { backgroundColor: theme.colors.gridLine },
+              });
+              return (
+                <Animated.View
+                  key={`separator-${day.toISOString()}`}
+                  {...separatorSlot}
+                  style={[separatorSlot.style, fullHeightStyle]}
+                />
+              );
+            })}
 
             {hoursRange.map((hour) => (
               <HourRow
@@ -1187,17 +1202,7 @@ function TimetablePageInner<T>({
             ) : null}
 
             {createEnabled ? (
-              <Animated.View
-                style={[
-                  styles.createGhost,
-                  { pointerEvents: "none" },
-                  {
-                    backgroundColor: theme.colors.eventBackground,
-                    borderColor: theme.colors.todayBackground,
-                  },
-                  createGhostStyle,
-                ]}
-              />
+              <Animated.View {...ghostSlot} style={[ghostSlot.style, createGhostStyle]} />
             ) : null}
           </Animated.View>
         </Animated.ScrollView>
@@ -1208,8 +1213,38 @@ function TimetablePageInner<T>({
 
 const TimetablePage = memo(TimetablePageInner) as typeof TimetablePageInner;
 
+/**
+ * The styleable parts of {@link TimeGrid}. Mirrors the dom renderer's slot names
+ * where the structure matches; `columnHeaderDateText`, `weekendShade` and
+ * `daySeparator` are native-only (the dom grid styles those through its
+ * `dayColumn`/`columnHeaderDate` elements). Slots rendered as Reanimated views
+ * (`gridLines` sub-hour dividers, `businessHours`, `weekendShade`,
+ * `daySeparator`, `event`, `nowIndicator`, `createGhost`) always honour the
+ * `styles` map; their `className` reaches the element but needs a Tailwind
+ * runtime that styles Animated components.
+ */
+export type TimeGridSlot =
+  | "header"
+  | "weekNumber"
+  | "columnHeader"
+  | "columnHeaderWeekday"
+  | "columnHeaderDate"
+  | "columnHeaderDateText"
+  | "allDayLane"
+  | "allDayLabel"
+  | "allDayColumn"
+  | "allDayEvent"
+  | "hourLabel"
+  | "gridLines"
+  | "businessHours"
+  | "weekendShade"
+  | "daySeparator"
+  | "event"
+  | "nowIndicator"
+  | "createGhost";
+
 /** Props for {@link TimeGrid}, the day/week timetable view. */
-export type TimeGridProps<T> = {
+export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   mode: TimeGridMode;
   /** Day columns to show in `custom` mode. Ignored by day/3days/week. Default 1. */
   numberOfDays?: number;
@@ -1353,6 +1388,8 @@ function TimeGridInner<T>({
   onPressDateHeader,
   onChangeDate,
   renderHeader,
+  classNames,
+  styles: styleOverrides,
 }: TimeGridProps<T>): ReactElement {
   // Guard against an inverted/out-of-range window so the grid never collapses.
   const clampedMinHour = Math.max(0, Math.min(minHour, HOURS_PER_DAY - 1));
@@ -1724,67 +1761,69 @@ function TimeGridInner<T>({
   const listExtraData = useMemo(() => ({ events, activeIndex }), [events, activeIndex]);
 
   return (
-    <View ref={containerRef} style={styles.container}>
-      {renderHeader ? (
-        renderHeader(headerDays)
-      ) : (
-        <DefaultHeader
-          days={headerDays}
-          mode={mode}
-          width={containerWidth}
-          hourColumnWidth={hourColumnWidth}
-          showWeekNumber={showWeekNumber}
-          weekNumberPrefix={weekNumberPrefix}
-          weekdayFormat={weekdayFormat}
-          locale={locale}
-          activeDate={activeDate}
-          onPressDateHeader={onPressDateHeader}
-        />
-      )}
+    <SlotStylesProvider classNames={classNames} styles={styleOverrides}>
+      <View ref={containerRef} style={styles.container}>
+        {renderHeader ? (
+          renderHeader(headerDays)
+        ) : (
+          <DefaultHeader
+            days={headerDays}
+            mode={mode}
+            width={containerWidth}
+            hourColumnWidth={hourColumnWidth}
+            showWeekNumber={showWeekNumber}
+            weekNumberPrefix={weekNumberPrefix}
+            weekdayFormat={weekdayFormat}
+            locale={locale}
+            activeDate={activeDate}
+            onPressDateHeader={onPressDateHeader}
+          />
+        )}
 
-      {headerComponent}
+        {headerComponent}
 
-      <View
-        style={styles.pager}
-        onLayout={(event) => {
-          setPageHeight(event.nativeEvent.layout.height);
-          setContainerWidth(event.nativeEvent.layout.width);
-          setMeasured(true);
-        }}
-      >
-        <LegendList
-          // Remount only on the seed→measured transition (see `measured`), not on
-          // every height change, so a day↔week header-height difference resizes the
-          // items in place instead of remounting and blanking the page.
-          key={measured ? "grid" : "grid-seed"}
-          ref={listRef}
-          style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
-          data={pageDates}
-          extraData={listExtraData}
-          horizontal
-          recycleItems={false}
-          keyExtractor={keyExtractorList}
-          getFixedItemSize={getFixedItemSize}
-          // On web LegendList ignores these RN scroll props (it leaks them to the
-          // DOM as unknown attributes), so omit them there and disable horizontal
-          // scroll via `webNoScroll`; paging is driven by the arrow keys instead.
-          // Native: paging makes each swipe hard-stop at the adjacent page, while
-          // `freeSwipe` lets momentum carry across pages and snap to a boundary.
-          {...(isWeb
-            ? null
-            : {
-                scrollEnabled: swipeEnabled,
-                pagingEnabled: !freeSwipe,
-                snapToIndices: freeSwipe ? snapToIndices : undefined,
-              })}
-          initialScrollIndex={activeIndex}
-          showsHorizontalScrollIndicator={false}
-          viewabilityConfig={PAGE_VIEWABILITY}
-          onViewableItemsChanged={handleViewableItemsChanged}
-          renderItem={renderItem}
-        />
+        <View
+          style={styles.pager}
+          onLayout={(event) => {
+            setPageHeight(event.nativeEvent.layout.height);
+            setContainerWidth(event.nativeEvent.layout.width);
+            setMeasured(true);
+          }}
+        >
+          <LegendList
+            // Remount only on the seed→measured transition (see `measured`), not on
+            // every height change, so a day↔week header-height difference resizes the
+            // items in place instead of remounting and blanking the page.
+            key={measured ? "grid" : "grid-seed"}
+            ref={listRef}
+            style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
+            data={pageDates}
+            extraData={listExtraData}
+            horizontal
+            recycleItems={false}
+            keyExtractor={keyExtractorList}
+            getFixedItemSize={getFixedItemSize}
+            // On web LegendList ignores these RN scroll props (it leaks them to the
+            // DOM as unknown attributes), so omit them there and disable horizontal
+            // scroll via `webNoScroll`; paging is driven by the arrow keys instead.
+            // Native: paging makes each swipe hard-stop at the adjacent page, while
+            // `freeSwipe` lets momentum carry across pages and snap to a boundary.
+            {...(isWeb
+              ? null
+              : {
+                  scrollEnabled: swipeEnabled,
+                  pagingEnabled: !freeSwipe,
+                  snapToIndices: freeSwipe ? snapToIndices : undefined,
+                })}
+            initialScrollIndex={activeIndex}
+            showsHorizontalScrollIndicator={false}
+            viewabilityConfig={PAGE_VIEWABILITY}
+            onViewableItemsChanged={handleViewableItemsChanged}
+            renderItem={renderItem}
+          />
+        </View>
       </View>
-    </View>
+    </SlotStylesProvider>
   );
 }
 
@@ -1835,15 +1874,23 @@ const DefaultHeader = ({
   onPressDateHeader,
 }: DefaultHeaderProps) => {
   const theme = useCalendarTheme();
+  const slot = useSlots<TimeGridSlot>();
   // Match the grid below: an hour-column spacer, then one column per day.
   const dayWidth = (width - hourColumnWidth) / days.length;
 
   return (
-    <View style={[styles.headerRow, { borderBottomColor: theme.colors.gridLine }]}>
+    <View
+      {...slot("header", {
+        base: styles.headerRow,
+        themed: { borderBottomColor: theme.colors.gridLine },
+      })}
+    >
       <View style={[styles.weekNumberGutter, { width: hourColumnWidth }]}>
         {showWeekNumber && hourColumnWidth > 0 && days[0] ? (
           <Text
-            style={[theme.text.hourLabel, { color: theme.colors.textMuted }]}
+            {...slot("weekNumber", {
+              themed: [theme.text.hourLabel, { color: theme.colors.textMuted }],
+            })}
             allowFontScaling={false}
           >
             {/* Reference the visible Thursday: an ISO week is defined by its Thursday,
@@ -1888,6 +1935,7 @@ const DayHeader = ({
   onPressDateHeader,
 }: DayHeaderProps) => {
   const theme = useCalendarTheme();
+  const slot = useSlots<TimeGridSlot>();
   const isToday = getIsToday(day);
   // Highlight the chosen `activeDate` when supplied, else the real today.
   const isHighlighted = activeDate ? isSameCalendarDay(day, activeDate) : isToday;
@@ -1896,33 +1944,42 @@ const DayHeader = ({
   // decorative). `accessible` groups the children so a screen reader announces
   // this once, not label-by-label.
   const accessibilityLabel = `${format(day, "EEEE d MMMM", { locale })}${isToday ? ", today" : ""}`;
-  const style = [styles.dayHeader, { width }, theme.containers.columnHeader];
+  const headerSlot = slot("columnHeader", {
+    base: [styles.dayHeader, { width }],
+    themed: theme.containers.columnHeader,
+  });
   // Mirrors the dom renderer's header: the muted weekday label sits above the day
   // number, and the number's circle fills for today / the active date. Theme text
   // merges after the muted colour so a themed colour wins.
   const content = (
     <>
       <Text
-        style={[{ color: theme.colors.textMuted }, theme.text.columnHeaderWeekday]}
+        {...slot("columnHeaderWeekday", {
+          themed: [{ color: theme.colors.textMuted }, theme.text.columnHeaderWeekday],
+        })}
         allowFontScaling={false}
       >
         {format(day, weekdayFormatToken(weekdayFormat), { locale })}
       </Text>
       <View
         testID="column-header-badge"
-        style={[
-          styles.dayHeaderBadge,
-          theme.containers.columnHeaderBadge,
-          isHighlighted && { backgroundColor: theme.colors.todayBackground },
-        ]}
+        {...slot("columnHeaderDate", {
+          base: styles.dayHeaderBadge,
+          themed: [
+            theme.containers.columnHeaderBadge,
+            isHighlighted && { backgroundColor: theme.colors.todayBackground },
+          ],
+        })}
       >
         <Text
-          style={[
-            theme.text.dayNumber,
-            // The state colour stays last so a themed dayNumber can't break the
-            // today/active contrast.
-            { color: isHighlighted ? theme.colors.todayText : theme.colors.text },
-          ]}
+          {...slot("columnHeaderDateText", {
+            themed: [
+              theme.text.dayNumber,
+              // The state colour stays last so a themed dayNumber can't break the
+              // today/active contrast.
+              { color: isHighlighted ? theme.colors.todayText : theme.colors.text },
+            ],
+          })}
           allowFontScaling={false}
         >
           {day.getDate()}
@@ -1934,7 +1991,7 @@ const DayHeader = ({
   // readers still perceive (and announce) which day each column is.
   return onPressDateHeader ? (
     <Pressable
-      style={style}
+      {...headerSlot}
       onPress={() => onPressDateHeader(day)}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -1943,7 +2000,7 @@ const DayHeader = ({
     </Pressable>
   ) : (
     <View
-      style={style}
+      {...headerSlot}
       accessible
       accessibilityRole="header"
       accessibilityLabel={accessibilityLabel}

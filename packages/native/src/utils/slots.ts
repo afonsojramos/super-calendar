@@ -14,6 +14,7 @@
 // always merges last. Without a Tailwind runtime, `className` is an unknown
 // prop React Native silently ignores, so the props are safe to pass everywhere.
 
+import { createContext, createElement, type ReactNode, useContext, useMemo } from "react";
 import type { StyleProp, TextStyle } from "react-native";
 
 /**
@@ -59,4 +60,24 @@ export function createSlots<Slot extends string>({ classNames, styles }: SlotSty
       ...(slotClass ? { className: slotClass } : null),
     };
   };
+}
+
+// Deeply componentized views (the time grid) distribute their slot maps through
+// context, like the theme, instead of threading two props through every layer.
+const SlotStylesContext = createContext<SlotStyleProps<string>>({});
+
+/** Provide a component's `classNames`/`styles` maps to its internal slots. */
+export function SlotStylesProvider({
+  classNames,
+  styles,
+  children,
+}: SlotStyleProps<string> & { children: ReactNode }) {
+  const value = useMemo(() => ({ classNames, styles }), [classNames, styles]);
+  return createElement(SlotStylesContext.Provider, { value }, children);
+}
+
+/** Resolve slots against the nearest {@link SlotStylesProvider}'s maps. */
+export function useSlots<Slot extends string>() {
+  const maps = useContext(SlotStylesContext) as SlotStyleProps<Slot>;
+  return useMemo(() => createSlots<Slot>(maps), [maps]);
 }

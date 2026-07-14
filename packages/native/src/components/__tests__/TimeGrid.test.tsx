@@ -218,3 +218,46 @@ describe("TimeGrid column header", () => {
     expect(getByRole("header", { name: "Tuesday 6 January" })).toBeTruthy();
   });
 });
+
+describe("TimeGrid slot styling", () => {
+  const { StyleSheet } = require("react-native");
+  const { TimeGrid } = require("../TimeGrid");
+  const { DefaultEvent } = require("../DefaultEvent");
+  const date = new Date(2026, 0, 6, 12, 0, 0);
+  const gridProps = () => ({
+    mode: "day" as const,
+    date,
+    events: [event],
+    cellHeight: { value: 48 } as never,
+    weekStartsOn: 1 as const,
+    renderEvent: DefaultEvent,
+    keyExtractor: (_e: CalendarEvent<WithId>, i: number) => String(i),
+    onChangeDate: noop,
+  });
+
+  it("passes slot classes to the header and hour labels, dropping their themed styles", () => {
+    const { UNSAFE_getAllByProps, getAllByText } = render(
+      <TimeGrid
+        {...gridProps()}
+        classNames={{ hourLabel: "text-slate-400", columnHeaderWeekday: "uppercase" }}
+      />,
+    );
+    const hourLabel = getAllByText("06:00")[0];
+    expect(hourLabel.props.className).toBe("text-slate-400");
+    // Themed muted colour dropped; structural width kept.
+    const flat = StyleSheet.flatten(hourLabel.props.style) as Record<string, unknown>;
+    expect(flat.color).toBeUndefined();
+    expect(flat.width).toBeGreaterThan(0);
+    expect(UNSAFE_getAllByProps({ className: "uppercase" }).length).toBeGreaterThan(0);
+  });
+
+  it("merges per-slot style overrides over the themed look", () => {
+    const { getAllByText } = render(
+      <TimeGrid {...gridProps()} styles={{ hourLabel: { color: "tomato" } }} />,
+    );
+    const hourLabel = getAllByText("06:00")[0];
+    expect(hourLabel.props.className).toBeUndefined();
+    const flat = StyleSheet.flatten(hourLabel.props.style) as Record<string, unknown>;
+    expect(flat.color).toBe("tomato");
+  });
+});

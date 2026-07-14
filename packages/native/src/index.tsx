@@ -29,6 +29,7 @@ export { MonthList, type MonthListProps, type MonthListSlot } from "./components
 export {
   TimeGrid,
   type TimeGridProps,
+  type TimeGridSlot,
   type EventDragHandler,
   type EventDragStartHandler,
   type HourRenderer,

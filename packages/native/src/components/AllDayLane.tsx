@@ -2,7 +2,12 @@ import { addDays, startOfDay } from "date-fns";
 import { StyleSheet, Text, View } from "react-native";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, CalendarMode, EventKeyExtractor, RenderEvent } from "../types";
+import { useSlots } from "../utils/slots";
 import { isAllDayEvent } from "@super-calendar/core";
+
+// The lane's slots are a subset of the TimeGrid slot union; typed locally so
+// this file doesn't import the full TimeGrid type.
+type AllDayLaneSlot = "allDayLane" | "allDayLabel" | "allDayColumn" | "allDayEvent";
 
 type AllDayLaneProps<T> = {
   days: Date[];
@@ -34,6 +39,7 @@ export function AllDayLane<T>({
   onLongPressEvent,
 }: AllDayLaneProps<T>) {
   const theme = useCalendarTheme();
+  const slot = useSlots<AllDayLaneSlot>();
   const RenderEventComponent = renderEvent;
 
   const allDay = events.filter(isAllDayEvent);
@@ -47,27 +53,35 @@ export function AllDayLane<T>({
 
   return (
     <View
-      style={[
-        styles.lane,
-        { borderBottomColor: theme.colors.gridLine },
-        theme.containers.allDayLane,
-      ]}
+      {...slot("allDayLane", {
+        base: styles.lane,
+        themed: [{ borderBottomColor: theme.colors.gridLine }, theme.containers.allDayLane],
+      })}
     >
       <View style={[styles.gutter, { width: hourColumnWidth }]}>
         {/* The "all-day" gutter label, mirroring the dom renderer: small, muted,
             and right-aligned against the timed columns. Centered vertically so it
             lines up with the chips whether the lane holds one event or several. */}
-        <Text style={[styles.label, { color: theme.colors.textMuted }]} allowFontScaling={false}>
+        <Text
+          {...slot("allDayLabel", {
+            base: styles.label,
+            themed: { color: theme.colors.textMuted },
+          })}
+          allowFontScaling={false}
+        >
           all-day
         </Text>
       </View>
       {days.map((day, dayIndex) => (
         <View
           key={day.toISOString()}
-          style={[styles.column, { width: dayWidth }, theme.containers.allDayColumn]}
+          {...slot("allDayColumn", {
+            base: [styles.column, { width: dayWidth }],
+            themed: theme.containers.allDayColumn,
+          })}
         >
           {perDay[dayIndex].map((event, index) => (
-            <View key={keyExtractor(event, index)} style={styles.chip}>
+            <View key={keyExtractor(event, index)} {...slot("allDayEvent", { base: styles.chip })}>
               <RenderEventComponent
                 event={event}
                 mode={mode}
