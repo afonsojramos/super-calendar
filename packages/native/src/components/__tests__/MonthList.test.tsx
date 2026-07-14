@@ -23,3 +23,13 @@ describe("MonthList", () => {
     expect(getAllByText("Sun").length).toBeGreaterThan(0);
   });
 });
+
+describe("MonthList slot styling", () => {
+  it("classes its weekday header slots and keeps the structural layout", () => {
+    const { getAllByText } = render(
+      <MonthList {...baseProps} classNames={{ weekday: "text-indigo-400 uppercase" }} />,
+    );
+    const label = getAllByText("Mon")[0];
+    expect(label.props.className).toBe("text-indigo-400 uppercase");
+  });
+});

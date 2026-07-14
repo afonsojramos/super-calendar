@@ -18,8 +18,9 @@ import {
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent, WeekStartsOn } from "../types";
 import { type WeekdayFormat, getWeekDays, weekdayFormatToken } from "@super-calendar/core";
+import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
-import { MonthView } from "./MonthView";
+import { MonthView, type MonthViewSlot } from "./MonthView";
 
 // Horizontal swipe paging doesn't translate to web; there we disable it and page
 // with the arrow keys instead.
@@ -64,7 +65,7 @@ export type MonthPagerProps<T> = {
   renderHeaderForMonthView?: (weekDays: Date[]) => React.ReactNode;
   /** Replace the default date badge in each day cell. Receives the day. */
   renderCustomDateForMonth?: (date: Date) => React.ReactNode;
-};
+} & SlotStyleProps<MonthViewSlot>;
 
 function MonthPagerInner<T>({
   date,
@@ -93,8 +94,15 @@ function MonthPagerInner<T>({
   activeDate,
   renderHeaderForMonthView,
   renderCustomDateForMonth,
+  classNames,
+  styles: styleOverrides,
 }: MonthPagerProps<T>): ReactElement {
   const theme = useCalendarTheme();
+  // Stable across renders (it feeds the memoized renderItem below).
+  const slot = useMemo(
+    () => createSlots<MonthViewSlot>({ classNames, styles: styleOverrides }),
+    [classNames, styleOverrides],
+  );
   const { width, height } = useWindowDimensions();
   const listRef = useRef<LegendListRef>(null);
   const containerRef = useRef<View>(null);
@@ -238,6 +246,8 @@ function MonthPagerInner<T>({
           onLongPressEvent={onLongPressEvent}
           onPressMore={onPressMore}
           renderCustomDateForMonth={renderCustomDateForMonth}
+          classNames={classNames}
+          styles={styleOverrides}
         />
       </View>
     ),
@@ -264,6 +274,8 @@ function MonthPagerInner<T>({
       onLongPressEvent,
       onPressMore,
       renderCustomDateForMonth,
+      classNames,
+      styleOverrides,
     ],
   );
 
@@ -272,7 +284,10 @@ function MonthPagerInner<T>({
       {/* The active month's title, above the (shared) weekday header — mirrors the
           dom MonthView's title. The grids below omit their own title/weekdays. */}
       <Text
-        style={[styles.monthTitle, theme.text.monthTitle, { color: theme.colors.text }]}
+        {...slot("title", {
+          base: styles.monthTitle,
+          themed: [theme.text.monthTitle, { color: theme.colors.text }],
+        })}
         allowFontScaling={false}
       >
         {format(date, "MMMM yyyy", locale ? { locale } : undefined)}
@@ -280,7 +295,12 @@ function MonthPagerInner<T>({
       {renderHeaderForMonthView ? (
         renderHeaderForMonthView(weekDays)
       ) : (
-        <MonthWeekdayHeader weekDays={weekDays} weekdayFormat={weekdayFormat} locale={locale} />
+        <MonthWeekdayHeader
+          weekDays={weekDays}
+          weekdayFormat={weekdayFormat}
+          locale={locale}
+          slot={slot}
+        />
       )}
       <View
         style={styles.pager}
@@ -348,6 +368,7 @@ type MonthWeekdayHeaderProps = {
   weekDays: Date[];
   weekdayFormat?: WeekdayFormat;
   locale?: Locale;
+  slot: ReturnType<typeof createSlots<MonthViewSlot>>;
 };
 
 // The default weekday-label row above the month grid (e.g. "Mon Tue Wed…"),
@@ -356,14 +377,23 @@ const MonthWeekdayHeader = ({
   weekDays,
   weekdayFormat = "short",
   locale,
+  slot,
 }: MonthWeekdayHeaderProps) => {
   const theme = useCalendarTheme();
   return (
-    <View style={[styles.weekdayHeader, theme.containers.weekdayHeader]}>
+    <View
+      {...slot("weekdays", {
+        base: styles.weekdayHeader,
+        themed: theme.containers.weekdayHeader,
+      })}
+    >
       {weekDays.map((day) => (
         <Text
           key={day.toISOString()}
-          style={[theme.text.weekday, styles.weekdayLabel, { color: theme.colors.textMuted }]}
+          {...slot("weekday", {
+            base: styles.weekdayLabel,
+            themed: [theme.text.weekday, { color: theme.colors.textMuted }],
+          })}
           allowFontScaling={false}
         >
           {format(day, weekdayFormatToken(weekdayFormat), { locale })}

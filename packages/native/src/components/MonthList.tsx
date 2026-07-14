@@ -36,8 +36,12 @@ import {
   isDateSelectable,
 } from "@super-calendar/core";
 import { buildMonthWeeks, getWeekDays, weekdayFormatToken } from "@super-calendar/core";
+import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { DefaultMonthEvent } from "./DefaultMonthEvent";
-import { MonthView } from "./MonthView";
+import { MonthView, type MonthViewSlot } from "./MonthView";
+
+/** The styleable parts of {@link MonthList}: the same slots as {@link MonthView}. */
+export type MonthListSlot = MonthViewSlot;
 
 const isWeb = Platform.OS === "web";
 
@@ -133,7 +137,7 @@ export type MonthListProps<T> = {
   onChangeVisibleMonth?: (month: Date) => void;
   /** Replace the per-month title (default "LLLL yyyy"). */
   renderMonthHeader?: (month: Date) => React.ReactNode;
-};
+} & SlotStyleProps<MonthListSlot>;
 
 function MonthListInner<T>({
   date,
@@ -168,8 +172,15 @@ function MonthListInner<T>({
   onSelectDrag,
   onChangeVisibleMonth,
   renderMonthHeader,
+  classNames,
+  styles: styleOverrides,
 }: MonthListProps<T>): ReactElement {
   const theme = useCalendarTheme();
+  // Stable across renders (it feeds the memoized renderItem below).
+  const slot = useMemo(
+    () => createSlots<MonthListSlot>({ classNames, styles: styleOverrides }),
+    [classNames, styleOverrides],
+  );
   const listRef = useRef<LegendListRef>(null);
 
   // Compact rows for the picker; taller rows once events are shown, so a day cell
@@ -414,7 +425,12 @@ function MonthListInner<T>({
           {renderMonthHeader ? (
             renderMonthHeader(item)
           ) : (
-            <Text style={[styles.monthTitle, { color: theme.colors.text }]}>
+            <Text
+              {...slot("title", {
+                base: styles.monthTitle,
+                themed: [styles.monthTitleText, { color: theme.colors.text }],
+              })}
+            >
               {format(item, "LLLL yyyy", { locale })}
             </Text>
           )}
@@ -451,6 +467,8 @@ function MonthListInner<T>({
             onPressMore={onPressMore}
             onDayPointerDown={isWeb && dragEnabled ? onDayPointerDown : undefined}
             onDayPointerEnter={isWeb && dragEnabled ? onDayPointerEnter : undefined}
+            classNames={classNames}
+            styles={styleOverrides}
           />
         </View>
       </MonthBlock>
@@ -484,6 +502,9 @@ function MonthListInner<T>({
       onPressMore,
       onDayPointerDown,
       onDayPointerEnter,
+      slot,
+      classNames,
+      styleOverrides,
     ],
   );
 
@@ -517,11 +538,19 @@ function MonthListInner<T>({
   return (
     <CalendarSelectionProvider value={selection}>
       <View style={styles.container}>
-        <View style={[styles.weekdayHeader, { borderBottomColor: theme.colors.gridLine }]}>
+        <View
+          {...slot("weekdays", {
+            base: styles.weekdayHeader,
+            themed: { borderBottomColor: theme.colors.gridLine },
+          })}
+        >
           {weekDays.map((day) => (
             <Text
               key={day.toISOString()}
-              style={[styles.weekdayLabel, { color: theme.colors.textMuted }]}
+              {...slot("weekday", {
+                base: styles.weekdayLabel,
+                themed: [styles.weekdayLabelText, { color: theme.colors.textMuted }],
+              })}
               allowFontScaling={false}
             >
               {format(day, weekdayFormatToken(weekdayFormat), { locale })}
@@ -591,12 +620,16 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   list: { flex: 1 },
   monthHeader: { justifyContent: "center" },
-  monthTitle: { paddingHorizontal: 8, fontSize: 17, fontWeight: "700" },
+  // Structural layout / themed typography split per slot, so a slot class can
+  // replace the look without breaking the layout.
+  monthTitle: { paddingHorizontal: 8 },
+  monthTitleText: { fontSize: 17, fontWeight: "700" },
   grid: { flex: 1 },
   weekdayHeader: {
     flexDirection: "row",
     paddingVertical: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  weekdayLabel: { flex: 1, textAlign: "center", fontSize: 12, fontWeight: "600" },
+  weekdayLabel: { flex: 1, textAlign: "center" },
+  weekdayLabelText: { fontSize: 12, fontWeight: "600" },
 });

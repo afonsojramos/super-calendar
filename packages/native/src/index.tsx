@@ -25,7 +25,7 @@ export { Agenda, type AgendaProps } from "./components/Agenda";
 export { MonthView, type MonthViewProps, type MonthViewSlot } from "./components/MonthView";
 export { type ResolvedSlot, type SlotDefault, type SlotStyleProps } from "./utils/slots";
 export { MonthPager, type MonthPagerProps } from "./components/MonthPager";
-export { MonthList, type MonthListProps } from "./components/MonthList";
+export { MonthList, type MonthListProps, type MonthListSlot } from "./components/MonthList";
 export {
   TimeGrid,
   type TimeGridProps,
