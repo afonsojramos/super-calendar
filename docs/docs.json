@@ -8,6 +8,12 @@
     "dark": "#1A5FCC"
   },
   "favicon": "/favicon.svg",
+  "redirects": [
+    {
+      "source": "/mintlify-assets",
+      "destination": "/"
+    }
+  ],
   "navigation": {
     "groups": [
       {
