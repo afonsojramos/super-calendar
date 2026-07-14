@@ -38,6 +38,7 @@ import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useDerivedValue,
+  useReducedMotion,
   useSharedValue,
 } from "react-native-reanimated";
 import { useCalendarTheme } from "../theme";
@@ -1606,6 +1607,10 @@ function TimeGridInner<T>({
   );
   useWebPagerKeys(swipeEnabled, goToPage);
 
+  // Honour the OS "reduce motion" setting: the pager's one animated transition
+  // (the snap-back below) becomes an instant jump when it's on.
+  const reduceMotion = useReducedMotion();
+
   // Optionally snap the pager back to the active page after an empty-cell press
   // (so tapping a far-swiped page returns to the committed date).
   const handlePressCell = useMemo(() => {
@@ -1613,9 +1618,9 @@ function TimeGridInner<T>({
     if (!resetPageOnPressCell) return onPressCell;
     return (cellDate: Date) => {
       onPressCell(cellDate);
-      void listRef.current?.scrollToIndex({ index: activeIndex, animated: true });
+      void listRef.current?.scrollToIndex({ index: activeIndex, animated: !reduceMotion });
     };
-  }, [onPressCell, resetPageOnPressCell, activeIndex]);
+  }, [onPressCell, resetPageOnPressCell, activeIndex, reduceMotion]);
 
   const snapToIndices = useMemo(() => pageDates.map((_, index) => index), [pageDates]);
   const keyExtractorList = useCallback((item: Date) => item.toISOString(), []);
