@@ -217,6 +217,17 @@ const events: CalendarEvent[] = [
 they exist on the react-dom renderer only. The React Native renderer pages with
 the arrow keys on react-native-web instead.
 
+### Paging with the keyboard
+
+Pass `onChangeDate` and the focused calendar pages with **PageDown** / **PageUp**:
+a month in `month`, a week in `schedule`, otherwise the view's day span. It's
+controlled, so update `date` in response (the same handler you'd wire to your own
+prev/next buttons). Omit `onChangeDate` and the keys fall through untouched.
+
+```tsx
+<Calendar mode="week" date={date} onChangeDate={setDate} events={events} />
+```
+
 ## Theming
 
 The DOM theme is a flat object of colors plus a few metrics, separate from the

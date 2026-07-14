@@ -28,12 +28,13 @@ CSS), not missing functionality.
 
 ## Interaction
 
-| Capability                     | native | dom | Notes                                                                                                       |
-| ------------------------------ | :----: | :-: | ----------------------------------------------------------------------------------------------------------- |
-| Drag to move / resize / create |   ✅   | ✅  | native: long-press + gesture; dom: pointer.                                                                 |
-| Pinch / scroll to zoom         |   ✅   | ✅  | native: pinch; dom: pinch + Ctrl/⌘-scroll (`zoomable`).                                                     |
-| Controlled navigation          |   ✅   | ✅  | native pages internally and fires `onChangeDate`; dom has no internal paging, so you drive `date` yourself. |
-| RTL layout                     |   ✅   | ❌  | native `isRTL` (cosmetic).                                                                                  |
+| Capability                     | native | dom | Notes                                                                                          |
+| ------------------------------ | :----: | :-: | ---------------------------------------------------------------------------------------------- |
+| Drag to move / resize / create |   ✅   | ✅  | native: long-press + gesture; dom: pointer.                                                    |
+| Pinch / scroll to zoom         |   ✅   | ✅  | native: pinch; dom: pinch + Ctrl/⌘-scroll (`zoomable`).                                        |
+| Controlled navigation          |   ✅   | ✅  | both fire `onChangeDate` — native on swipe/paging, dom on PageDown/PageUp of the focused grid. |
+| RTL layout                     |   ✅   | ❌  | native `isRTL` (cosmetic).                                                                     |
+| Respects OS reduce-motion      |   ✅   | ✅  | native makes its one animated page-snap instant; dom uses almost no animation.                 |
 
 ## Time grid
 

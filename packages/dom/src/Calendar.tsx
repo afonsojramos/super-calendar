@@ -9,7 +9,13 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { type CSSProperties, type ReactElement, type ReactNode, useMemo } from "react";
+import {
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactElement,
+  type ReactNode,
+  useMemo,
+} from "react";
 import {
   type BusinessHours,
   type CalendarEvent,
@@ -46,6 +52,13 @@ export interface CalendarProps<T = unknown>
   mode?: "month" | "schedule" | TimeGridMode;
   /** Controlled anchor date. Change it (e.g. from your own header) to navigate. */
   date: Date;
+  /**
+   * Fires with the next/previous period's date when the user pages the focused
+   * calendar with **PageDown** / **PageUp** (a month in `month`, a week in
+   * `schedule`, else the view's day span). It's controlled, so update `date` in
+   * response. Omit it to leave paging to your own controls.
+   */
+  onChangeDate?: (date: Date) => void;
   /** Your events. */
   events?: CalendarEvent<T>[];
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */
@@ -186,6 +199,20 @@ function expansionRange(
   return [startOfDay(days[0]), endOfDay(days[days.length - 1])];
 }
 
+// The date one page away in `direction` (+1 next, −1 previous): a month for
+// `month`, a week for `schedule`, else the view's day span.
+function pageStep(
+  mode: "month" | "schedule" | TimeGridMode,
+  date: Date,
+  direction: number,
+  weekStartsOn: WeekStartsOn,
+  numberOfDays: number | undefined,
+): Date {
+  if (mode === "month") return addMonths(date, direction);
+  if (mode === "schedule") return addDays(date, direction * 7);
+  return addDays(date, direction * getViewDays(mode, date, weekStartsOn, numberOfDays ?? 1).length);
+}
+
 /**
  * Batteries-included entry point for the react-dom renderer: it picks the right
  * view for `mode`. `month` renders a single {@link MonthView}; `schedule` renders
@@ -201,6 +228,7 @@ export function Calendar<T = unknown>({
   mode = "week",
   date,
   events,
+  onChangeDate,
   weekStartsOn = 0,
   numberOfDays,
   locale,
@@ -274,8 +302,19 @@ export function Calendar<T = unknown>({
     // `date.getTime()`: recompute on the instant, not a re-created Date identity.
   }, [events, mode, date.getTime(), weekStartsOn, numberOfDays, timeZone]);
 
+  // PageDown / PageUp page the calendar when the consumer opts in with
+  // `onChangeDate`; keydowns bubble up from the focused grid to this handler.
+  const handlePageKeys = (e: ReactKeyboardEvent) => {
+    if (!onChangeDate) return;
+    if (e.key === "PageDown") onChangeDate(pageStep(mode, date, 1, weekStartsOn, numberOfDays));
+    else if (e.key === "PageUp") onChangeDate(pageStep(mode, date, -1, weekStartsOn, numberOfDays));
+    else return;
+    e.preventDefault();
+  };
+
+  let view: ReactElement;
   if (mode === "schedule") {
-    return (
+    view = (
       <Agenda<T>
         events={displayEvents}
         locale={locale}
@@ -293,10 +332,8 @@ export function Calendar<T = unknown>({
         onPressDay={onPressDay}
       />
     );
-  }
-
-  if (mode === "month") {
-    return (
+  } else if (mode === "month") {
+    view = (
       <MonthView<T>
         date={date}
         events={displayEvents}
@@ -326,46 +363,56 @@ export function Calendar<T = unknown>({
         eventAccessibilityLabel={eventAccessibilityLabel}
       />
     );
+  } else {
+    view = (
+      <TimeGrid<T>
+        date={date}
+        mode={mode}
+        events={displayEvents}
+        weekStartsOn={weekStartsOn}
+        weekdayFormat={weekdayFormat}
+        numberOfDays={numberOfDays}
+        locale={locale}
+        theme={theme}
+        height={height}
+        className={className}
+        style={style}
+        classNames={classNames}
+        styles={styles}
+        ampm={ampm}
+        hourHeight={hourHeight}
+        scrollOffsetMinutes={scrollOffsetMinutes}
+        timeslots={timeslots}
+        minHour={minHour}
+        maxHour={maxHour}
+        hideHours={hideHours}
+        showWeekNumber={showWeekNumber}
+        weekNumberPrefix={weekNumberPrefix}
+        businessHours={businessHours}
+        showNowIndicator={showNowIndicator}
+        showAllDayEventCell={showAllDayEventCell}
+        dragStepMinutes={dragStepMinutes}
+        onPressEvent={onPressEvent}
+        onPressCell={onPressCell}
+        onCreateEvent={onCreateEvent}
+        onDragStart={onDragStart}
+        onDragEvent={onDragEvent}
+        onPressDateHeader={onPressDateHeader}
+        renderEvent={renderTimeEvent}
+        eventAccessibilityLabel={eventAccessibilityLabel}
+        hourComponent={hourComponent}
+        keyboardEventNavigation={keyboardEventNavigation}
+      />
+    );
   }
 
+  // `display: contents` adds no layout box, so the view renders exactly as before
+  // while keydowns from the focused grid still bubble to the paging handler (a
+  // no-op when `onChangeDate` is unset). Rendered unconditionally so toggling the
+  // handler never remounts the view subtree.
   return (
-    <TimeGrid<T>
-      date={date}
-      mode={mode}
-      events={displayEvents}
-      weekStartsOn={weekStartsOn}
-      weekdayFormat={weekdayFormat}
-      numberOfDays={numberOfDays}
-      locale={locale}
-      theme={theme}
-      height={height}
-      className={className}
-      style={style}
-      classNames={classNames}
-      styles={styles}
-      ampm={ampm}
-      hourHeight={hourHeight}
-      scrollOffsetMinutes={scrollOffsetMinutes}
-      timeslots={timeslots}
-      minHour={minHour}
-      maxHour={maxHour}
-      hideHours={hideHours}
-      showWeekNumber={showWeekNumber}
-      weekNumberPrefix={weekNumberPrefix}
-      businessHours={businessHours}
-      showNowIndicator={showNowIndicator}
-      showAllDayEventCell={showAllDayEventCell}
-      dragStepMinutes={dragStepMinutes}
-      onPressEvent={onPressEvent}
-      onPressCell={onPressCell}
-      onCreateEvent={onCreateEvent}
-      onDragStart={onDragStart}
-      onDragEvent={onDragEvent}
-      onPressDateHeader={onPressDateHeader}
-      renderEvent={renderTimeEvent}
-      eventAccessibilityLabel={eventAccessibilityLabel}
-      hourComponent={hourComponent}
-      keyboardEventNavigation={keyboardEventNavigation}
-    />
+    <div style={{ display: "contents" }} onKeyDown={handlePageKeys}>
+      {view}
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import type { CalendarEvent } from "@super-calendar/core";
 
 // Legend List (used by the schedule agenda) needs measured layout jsdom can't
@@ -55,6 +55,44 @@ describe("dom Calendar", () => {
     );
     const label = week.container.querySelector('[data-slot="hourLabel"]') as HTMLElement;
     expect(label.className).toBe("text-xs");
+  });
+
+  describe("keyboard paging via onChangeDate", () => {
+    it("pages by the view span with PageDown / PageUp in a time-grid mode", () => {
+      const onChangeDate = jest.fn();
+      const { container } = render(
+        <Calendar
+          mode="week"
+          date={date}
+          weekStartsOn={1}
+          onChangeDate={onChangeDate}
+          hourHeight={48}
+        />,
+      );
+      // A keydown from the focused grid bubbles to the paging wrapper.
+      fireEvent.keyDown(container.firstElementChild!, { key: "PageDown" });
+      expect((onChangeDate.mock.calls[0][0] as Date).getDate()).toBe(22); // +1 week from 15 Jul
+      fireEvent.keyDown(container.firstElementChild!, { key: "PageUp" });
+      expect((onChangeDate.mock.calls[1][0] as Date).getDate()).toBe(8); // −1 week
+    });
+
+    it("pages by a month in month mode", () => {
+      const onChangeDate = jest.fn();
+      const { container } = render(
+        <Calendar mode="month" date={date} weekStartsOn={1} onChangeDate={onChangeDate} />,
+      );
+      fireEvent.keyDown(container.firstElementChild!, { key: "PageDown" });
+      expect((onChangeDate.mock.calls[0][0] as Date).getMonth()).toBe(7); // Jul → Aug
+    });
+
+    it("ignores the paging keys when onChangeDate is not provided", () => {
+      const onChangeDate = jest.fn();
+      const { container } = render(
+        <Calendar mode="week" date={date} weekStartsOn={1} hourHeight={48} />,
+      );
+      fireEvent.keyDown(container.firstElementChild!, { key: "PageDown" });
+      expect(onChangeDate).not.toHaveBeenCalled();
+    });
   });
 
   describe("recurrence + timeZone", () => {
