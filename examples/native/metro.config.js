@@ -1,5 +1,6 @@
 const path = require("path");
 const { getDefaultConfig } = require("expo/metro-config");
+const { withUniwindConfig } = require("uniwind/metro");
 
 // Standard Expo + pnpm-workspace setup: watch the whole workspace so edits to
 // the @super-calendar packages hot-reload, and resolve modules from both the
@@ -19,4 +20,9 @@ config.resolver.nodeModulesPaths = [
 ];
 config.resolver.disableHierarchicalLookup = true;
 
-module.exports = config;
+// Uniwind (Tailwind classes on native components) powers the "tailwind" demo
+// tab; its wrapper must be the outermost one.
+module.exports = withUniwindConfig(config, {
+  cssEntryFile: "./global.css",
+  dtsFile: "./uniwind-types.d.ts",
+});

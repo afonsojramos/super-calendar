@@ -1,3 +1,6 @@
+// Uniwind's CSS entry point: enables Tailwind classes on native components,
+// powering the "tailwind" demo tab.
+import "./global.css";
 import { addDays, addMonths, addWeeks, format } from "date-fns";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useState } from "react";
@@ -8,6 +11,7 @@ import {
   Calendar,
   type CalendarEvent,
   type CalendarMode,
+  type CalendarSlot,
   expandRecurringEvents,
   getViewDays,
   parseICalendar,
@@ -27,8 +31,20 @@ const MODES: CalendarMode[] = ["month", "week", "3days", "day", "schedule"];
 // the native package supports them: "picker" (range selection via useDateRange),
 // "list" (the vertically-scrolling MonthList), "resource" (ResourceTimeline),
 // "recurring" (expandRecurringEvents), and "ics" (parse/export iCalendar).
-type DemoTab = CalendarMode | "picker" | "list" | "resource" | "recurring" | "ics";
-const TABS: DemoTab[] = [...MODES, "picker", "list", "resource", "recurring", "ics"];
+type DemoTab = CalendarMode | "picker" | "list" | "tailwind" | "resource" | "recurring" | "ics";
+const TABS: DemoTab[] = [...MODES, "picker", "list", "tailwind", "resource", "recurring", "ics"];
+
+// A fully Tailwind-styled month (via uniwind), restyled entirely through
+// per-slot `classNames` — no theme object. Mirrors the dom example's tailwind
+// tab; a classed slot drops its themed styles, so the classes own the look.
+const TAILWIND_SLOTS: Partial<Record<CalendarSlot, string>> = {
+  title: "text-center text-xl font-bold text-indigo-900 py-3",
+  weekdays: "border-b border-indigo-100",
+  weekday: "text-center text-[11px] font-semibold uppercase tracking-wider text-indigo-400 py-1.5",
+  day: "border-t border-r border-indigo-50",
+  dayBadgeText: "text-sm font-bold text-indigo-900",
+  more: "px-1.5 text-[11px] font-semibold text-indigo-400",
+};
 
 // Rooms for the resource-timeline demo; events are spread across them by id.
 const ROOMS: Resource[] = [
@@ -302,6 +318,22 @@ export default function App() {
                     onSelectDrag={selectRange}
                   />
                 </View>
+              </View>
+            ) : activeMode === "tailwind" ? (
+              <View style={styles.card} className="rounded-2xl border-indigo-100">
+                <Calendar
+                  mode="month"
+                  date={date}
+                  events={events}
+                  weekStartsOn={1}
+                  classNames={TAILWIND_SLOTS}
+                  onChangeDate={setDate}
+                  onPressEvent={(event) => console.log("press event:", event.title)}
+                  onPressDay={(day) => {
+                    setDate(day);
+                    setMode("day");
+                  }}
+                />
               </View>
             ) : activeMode === "resource" ? (
               <View style={styles.card}>
