@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /mintlify-assets/
+
+Sitemap: https://super-calendar.afonsojramos.me/sitemap.xml
