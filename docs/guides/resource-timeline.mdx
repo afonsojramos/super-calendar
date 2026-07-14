@@ -111,6 +111,12 @@ import { ResourceTimeline } from "@super-calendar/native";
 />;
 ```
 
+Because dragging is gesture-only, native draggable bars also carry screen-reader
+actions: **move earlier / later** and **extend / shorten**, each stepping by
+`dragStepMinutes`. VoiceOver / TalkBack users invoke them from the bar's actions
+menu to reschedule without a gesture, through the same `onDragEvent`. (The visual
+resize grip is a pointer/touch affordance and isn't a separate focus target.)
+
 ## Styling
 
 Like the other views, every part is a [slot](/guides/styling): `header`, `timeAxis`,

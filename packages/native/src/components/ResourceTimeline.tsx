@@ -1,6 +1,13 @@
 import type { ComponentType, ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  type AccessibilityActionEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import {
@@ -174,6 +181,38 @@ function ResourceBar<T>({
     [snapMinutes, snapBack],
   );
 
+  // Dragging is gesture-only, so mirror move AND resize as screen-reader actions on
+  // the same `commit` path. They all live on the bar's accessible Pressable (the
+  // resize grip is a non-focusable visual/gesture affordance, so an `adjustable`
+  // role there would never receive focus on a real device).
+  const unit = (n: number) => `${n} minute${n === 1 ? "" : "s"}`;
+  const barActions = draggable
+    ? [
+        { name: "move-later", label: `Move ${unit(snapMinutes)} later` },
+        { name: "move-earlier", label: `Move ${unit(snapMinutes)} earlier` },
+        { name: "extend", label: `Extend by ${unit(snapMinutes)}` },
+        { name: "shrink", label: `Shorten by ${unit(snapMinutes)}` },
+      ]
+    : undefined;
+  const onBarAction = draggable
+    ? (e: AccessibilityActionEvent) => {
+        switch (e.nativeEvent.actionName) {
+          case "move-later":
+            commit(snapMinutes, snapMinutes);
+            break;
+          case "move-earlier":
+            commit(-snapMinutes, -snapMinutes);
+            break;
+          case "extend":
+            commit(0, snapMinutes);
+            break;
+          case "shrink":
+            commit(0, -snapMinutes);
+            break;
+        }
+      }
+    : undefined;
+
   const barStyle = useAnimatedStyle(
     () => ({ transform: [{ translateX: moveX.value }], width: Math.max(width + resizeW.value, 2) }),
     [width],
@@ -230,16 +269,21 @@ function ResourceBar<T>({
           onPress={onPress}
           accessibilityRole="button"
           accessibilityLabel={pe.event.title}
+          accessibilityActions={barActions}
+          onAccessibilityAction={onBarAction}
           style={styles.fill}
         >
           <Renderer event={pe.event} width={width} onPress={onPress} />
         </Pressable>
       </GestureDetector>
       <GestureDetector gesture={resizeGesture}>
+        {/* Visual + gesture resize affordance only; screen readers use the bar's
+            extend/shorten actions above (a non-focusable View can't hold them). */}
         <View
+          testID="resource-resize-grip"
           style={[styles.resizeGrip, { backgroundColor: theme.colors.eventText }]}
-          accessibilityRole="adjustable"
-          accessibilityLabel={`Resize ${pe.event.title}`}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
         />
       </GestureDetector>
     </Animated.View>

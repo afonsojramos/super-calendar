@@ -52,7 +52,7 @@ describe("ResourceTimeline", () => {
   it("renders a resize grip per event and still taps when onDragEvent is set", () => {
     const onDragEvent = jest.fn();
     const onPressEvent = jest.fn();
-    const { getByLabelText, getAllByLabelText } = render(
+    const { getByLabelText, getAllByTestId } = render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}
@@ -61,11 +61,47 @@ describe("ResourceTimeline", () => {
         onPressEvent={onPressEvent}
       />,
     );
-    // Each bar exposes a resize handle for the edge-resize gesture.
-    expect(getAllByLabelText(/^Resize /)).toHaveLength(events.length);
+    // Each bar exposes a resize handle for the edge-resize gesture. It's hidden
+    // from accessibility (so it needs includeHiddenElements) — screen readers use
+    // the bar's extend/shorten actions instead.
+    expect(getAllByTestId("resource-resize-grip", { includeHiddenElements: true })).toHaveLength(
+      events.length,
+    );
     // Tapping the bar still fires onPressEvent (long-press is what starts a drag).
     fireEvent.press(getByLabelText("Standup"));
     expect(onPressEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("exposes screen-reader move and resize actions on the draggable bar", () => {
+    const onDragEvent = jest.fn();
+    const { getByLabelText } = render(
+      <ResourceTimeline
+        date={at(0)}
+        resources={resources}
+        events={events}
+        onDragEvent={onDragEvent}
+      />,
+    );
+    // The accessible bar carries all four actions (the resize grip isn't focusable).
+    const bar = getByLabelText("Standup");
+    expect((bar.props.accessibilityActions ?? []).map((a: { name: string }) => a.name)).toEqual([
+      "move-later",
+      "move-earlier",
+      "extend",
+      "shrink",
+    ]);
+
+    // "Move later" reschedules via onDragEvent, preserving the duration.
+    fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "move-later" } });
+    const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent, Date, Date];
+    expect(start.getTime()).toBeGreaterThan(at(9).getTime());
+    expect(end.getTime() - start.getTime()).toBe(60 * 60 * 1000);
+
+    // "Extend" grows the end only.
+    fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "extend" } });
+    const [, s2, e2] = onDragEvent.mock.calls[1] as [CalendarEvent, Date, Date];
+    expect(s2.getTime()).toBe(at(9).getTime());
+    expect(e2.getTime()).toBeGreaterThan(at(10).getTime());
   });
 
   it("renders the hour axis with the configured window", () => {
