@@ -199,6 +199,10 @@ type DragState = {
   kind: "move" | "resize";
   startHours: number;
   durationHours: number;
+  /** Whole day columns the box has been dragged across, clamped to the view. */
+  dayDelta: number;
+  /** Pixel equivalent of dayDelta, applied as a transform on the dragged box. */
+  dayOffsetPx: number;
   moved: boolean;
 };
 
@@ -395,9 +399,14 @@ export function TimeGrid<T = unknown>({
   // handlers read, so they never see a stale state closure between events.
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
-  const dragOrigin = useRef<{ pointerY: number; startHours: number; durationHours: number } | null>(
-    null,
-  );
+  const dragOrigin = useRef<{
+    pointerX: number;
+    pointerY: number;
+    startHours: number;
+    durationHours: number;
+    dayIndex: number;
+    dayWidth: number;
+  } | null>(null);
   const applyDrag = (next: DragState | null) => {
     dragRef.current = next;
     setDrag(next);
@@ -490,6 +499,7 @@ export function TimeGrid<T = unknown>({
     kind: "move" | "resize",
     startHours: number,
     durationHours: number,
+    dayIndex: number,
   ) => {
     if (!onDragEvent) return;
     e.stopPropagation();
@@ -498,8 +508,20 @@ export function TimeGrid<T = unknown>({
     } catch {
       // Pointer capture is best-effort; some environments reject it.
     }
-    dragOrigin.current = { pointerY: e.clientY, startHours, durationHours };
-    applyDrag({ key, kind, startHours, durationHours, moved: false });
+    // The event box is positioned inside its day column, so the parent's width
+    // is one day; columns are equal-width, so measuring one is enough. Resizes
+    // never move across days, so 0 is fine there.
+    const column = kind === "move" ? (e.currentTarget as HTMLElement).parentElement : null;
+    const dayWidth = column ? column.getBoundingClientRect().width : 0;
+    dragOrigin.current = {
+      pointerX: e.clientX,
+      pointerY: e.clientY,
+      startHours,
+      durationHours,
+      dayIndex,
+      dayWidth,
+    };
+    applyDrag({ key, kind, startHours, durationHours, dayDelta: 0, dayOffsetPx: 0, moved: false });
     onDragStart?.(event);
   };
   const cancelDrag = () => {
@@ -521,7 +543,13 @@ export function TimeGrid<T = unknown>({
         windowStart,
         Math.max(windowStart, windowEnd - d.durationHours),
       );
-      applyDrag({ ...d, startHours, moved: true });
+      // Map the horizontal drag to whole day columns, clamped so the event
+      // can't leave the visible range (mirrors the native renderer).
+      const o = dragOrigin.current;
+      const rawDayDelta = o.dayWidth > 0 ? Math.round((e.clientX - o.pointerX) / o.dayWidth) : 0;
+      const targetDay = clamp(o.dayIndex + rawDayDelta, 0, days.length - 1);
+      const dayDelta = targetDay - o.dayIndex;
+      applyDrag({ ...d, startHours, dayDelta, dayOffsetPx: dayDelta * o.dayWidth, moved: true });
     } else {
       const durationHours = clamp(
         snap(dragOrigin.current.durationHours + dHours),
@@ -549,7 +577,8 @@ export function TimeGrid<T = unknown>({
       onPress();
       return;
     }
-    const base = startOfDay(day);
+    // The horizontal delta lands the event on another visible day column.
+    const base = startOfDay(addDays(day, d.dayDelta));
     const start = addMinutes(base, Math.round(d.startHours * 60));
     const end = addMinutes(base, Math.round((d.startHours + d.durationHours) * 60));
     onDragEvent?.(event, start, end);
@@ -1077,7 +1106,15 @@ export function TimeGrid<T = unknown>({
                       onPointerDown={
                         draggable
                           ? (e) =>
-                              beginDrag(e, pe.event, key, "move", pe.startHours, pe.durationHours)
+                              beginDrag(
+                                e,
+                                pe.event,
+                                key,
+                                "move",
+                                pe.startHours,
+                                pe.durationHours,
+                                dayIndex,
+                              )
                           : undefined
                       }
                       onPointerMove={draggable ? moveDrag : undefined}
@@ -1102,6 +1139,11 @@ export function TimeGrid<T = unknown>({
                           touchAction: draggable ? "none" : "auto",
                           zIndex: active ? 3 : 1,
                           opacity: active ? 0.85 : 1,
+                          // Snap the dragged box over the target day column so the
+                          // drop location is visible before release.
+                          ...(active && active.dayOffsetPx !== 0
+                            ? { transform: `translateX(${active.dayOffsetPx}px)` }
+                            : null),
                         },
                       })}
                     >
@@ -1114,7 +1156,15 @@ export function TimeGrid<T = unknown>({
                         <div
                           onPointerDown={(e) => {
                             e.stopPropagation();
-                            beginDrag(e, pe.event, key, "resize", pe.startHours, pe.durationHours);
+                            beginDrag(
+                              e,
+                              pe.event,
+                              key,
+                              "resize",
+                              pe.startHours,
+                              pe.durationHours,
+                              dayIndex,
+                            );
                           }}
                           style={{
                             position: "absolute",

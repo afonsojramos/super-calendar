@@ -64,6 +64,51 @@ describe("dom TimeGrid", () => {
     expect(end.getHours()).toBe(14);
   });
 
+  it("drag-moves an event to another day column, keeping its time and duration", () => {
+    const onDragEvent = jest.fn();
+    const { getByText } = render(
+      <TimeGrid date={day} mode="week" events={events} hourHeight={48} onDragEvent={onDragEvent} />,
+    );
+    const box = wrapperOf(getByText("Focus"));
+    // jsdom has no layout, so give the day column a real width for the
+    // horizontal day math.
+    const column = box.parentElement as HTMLElement;
+    column.getBoundingClientRect = () => ({ width: 100 }) as DOMRect;
+    // Drag one column to the right with no vertical movement: same time, +1 day.
+    fireEvent.pointerDown(box, { clientX: 50, clientY: 300, pointerId: 1 });
+    fireEvent.pointerMove(box, { clientX: 150, clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(box, { clientX: 150, clientY: 300, pointerId: 1 });
+
+    expect(onDragEvent).toHaveBeenCalledTimes(1);
+    const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent, Date, Date];
+    expect(start.getDate()).toBe(27);
+    expect(start.getHours()).toBe(14);
+    expect(end.getDate()).toBe(27);
+    expect(end.getHours()).toBe(16);
+  });
+
+  it("clamps a cross-day drag to the edges of the visible week", () => {
+    const onDragEvent = jest.fn();
+    const { getByText } = render(
+      <TimeGrid date={day} mode="week" events={events} hourHeight={48} onDragEvent={onDragEvent} />,
+    );
+    const box = wrapperOf(getByText("Focus"));
+    const column = box.parentElement as HTMLElement;
+    column.getBoundingClientRect = () => ({ width: 100 }) as DOMRect;
+    // The event sits on Friday the 26th; the default Sunday-start week runs
+    // 21–27. Ten columns right (raw +10) must clamp to Saturday the 27th.
+    fireEvent.pointerDown(box, { clientX: 50, clientY: 300, pointerId: 1 });
+    fireEvent.pointerMove(box, { clientX: 1050, clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(box, { clientX: 1050, clientY: 300, pointerId: 1 });
+    expect((onDragEvent.mock.calls[0][1] as Date).getDate()).toBe(27);
+
+    // And ten columns left (raw -10) must clamp to Sunday the 21st.
+    fireEvent.pointerDown(box, { clientX: 50, clientY: 300, pointerId: 1 });
+    fireEvent.pointerMove(box, { clientX: -950, clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(box, { clientX: -950, clientY: 300, pointerId: 1 });
+    expect((onDragEvent.mock.calls[1][1] as Date).getDate()).toBe(21);
+  });
+
   it("treats a press with no movement as a tap, not a drag", () => {
     const onDragEvent = jest.fn();
     const onPressEvent = jest.fn();
