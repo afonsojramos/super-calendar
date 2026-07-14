@@ -16,6 +16,7 @@ import {
 const isWeb = Platform.OS === "web";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent, WeekStartsOn } from "../types";
+import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { withEventAccessibilityLabel } from "../utils/withEventAccessibilityLabel";
 import {
   type DateRange,
@@ -50,8 +51,26 @@ const FALLBACK_VISIBLE_COUNT = 3;
 const numericStyle = (value: number | string | undefined, fallback: number) =>
   typeof value === "number" ? value : fallback;
 
+/**
+ * The styleable parts of {@link MonthView}. Mirrors the dom renderer's slot
+ * names where the structure matches; `dayBadgeText` is native-only (React
+ * Native text colour doesn't inherit from the badge). Event chips are styled
+ * by `renderEvent` (or the theme), not a slot.
+ */
+export type MonthViewSlot =
+  | "title"
+  | "weekdays"
+  | "weekday"
+  | "grid"
+  | "week"
+  | "day"
+  | "dayBadge"
+  | "dayBadgeText"
+  | "rangeBand"
+  | "more";
+
 /** Props for {@link MonthView}, the single-month grid. */
-export type MonthViewProps<T> = {
+export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
   date: Date;
   events: CalendarEvent<T>[];
   /**
@@ -158,8 +177,11 @@ function MonthViewInner<T>({
   renderCustomDateForMonth,
   onDayPointerDown,
   onDayPointerEnter,
+  classNames,
+  styles: styleOverrides,
 }: MonthViewProps<T>): ReactElement {
   const theme = useCalendarTheme();
+  const slot = createSlots<MonthViewSlot>({ classNames, styles: styleOverrides });
   // Selection comes from context (so cached pages still repaint), but explicit
   // props win for direct/standalone use of MonthView.
   const selection = useCalendarSelection();
@@ -238,17 +260,19 @@ function MonthViewInner<T>({
       return (
         <View
           key={day.toISOString()}
-          style={[
-            styles.dayCell,
-            showGrid && {
-              borderTopWidth: StyleSheet.hairlineWidth,
-              borderRightWidth: StyleSheet.hairlineWidth,
-              borderColor: theme.colors.gridLine,
-            },
-            // No weekend tint on blank placeholders, so the shading doesn't bleed
-            // into the empty cells of non-existent days.
-            theme.containers.dayCell,
-          ]}
+          {...slot("day", {
+            base: styles.dayCell,
+            themed: [
+              showGrid && {
+                borderTopWidth: StyleSheet.hairlineWidth,
+                borderRightWidth: StyleSheet.hairlineWidth,
+                borderColor: theme.colors.gridLine,
+              },
+              // No weekend tint on blank placeholders, so the shading doesn't bleed
+              // into the empty cells of non-existent days.
+              theme.containers.dayCell,
+            ],
+          })}
         />
       );
     }
@@ -298,24 +322,29 @@ function MonthViewInner<T>({
     const eventCount = dayEvents.length;
     const accessibilityLabel = `${format(day, "EEEE, d LLLL yyyy", { locale })}${isToday ? ", today" : ""}${isSelected ? ", selected" : ""}${isDisabled ? ", unavailable" : ""}, ${eventCount} ${eventCount === 1 ? "event" : "events"}`;
 
+    const daySlot = slot("day", {
+      // Events mode mirrors the dom renderer: left-aligned cell content with
+      // the date badge in the top-right. The picker (no grid) stays centered
+      // so the selection range band lines up with the centered badge.
+      base: [styles.dayCell, showGrid && styles.dayCellEvents],
+      themed: [
+        showGrid && {
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderRightWidth: StyleSheet.hairlineWidth,
+          borderColor: theme.colors.gridLine,
+        },
+        isWeekend(day) && { backgroundColor: theme.colors.weekendBackground },
+        theme.containers.dayCell,
+      ],
+    });
+
     return (
       <TouchableOpacity
         key={day.toISOString()}
-        style={[
-          styles.dayCell,
-          // Events mode mirrors the dom renderer: left-aligned cell content with
-          // the date badge in the top-right. The picker (no grid) stays centered
-          // so the selection range band lines up with the centered badge.
-          showGrid && styles.dayCellEvents,
-          showGrid && {
-            borderTopWidth: StyleSheet.hairlineWidth,
-            borderRightWidth: StyleSheet.hairlineWidth,
-            borderColor: theme.colors.gridLine,
-          },
-          isWeekend(day) && { backgroundColor: theme.colors.weekendBackground },
-          calendarCellStyle?.(day),
-          theme.containers.dayCell,
-        ]}
+        {...daySlot}
+        // The consumer's per-date style is an explicit override, so it merges
+        // after the slot (and survives a `day` class).
+        style={[daySlot.style, calendarCellStyle?.(day)]}
         // In the picker, don't dim the whole cell on press: the tap should show on
         // the badge (the circle) only, not the cell background. `onPressIn/Out` drive
         // the badge's own opacity below. The events calendar keeps the default
@@ -360,56 +389,69 @@ function MonthViewInner<T>({
         {hasBand ? (
           <View
             testID="month-range-band"
-            style={[
-              styles.rangeBand,
-              { pointerEvents: "none" },
-              { backgroundColor: theme.colors.rangeBackground },
-              fillCellOnSelection
-                ? { top: 0, bottom: 0 }
-                : { top: BAND_CENTER_Y - theme.rangeBandHeight / 2, height: theme.rangeBandHeight },
-              // Cap the pill at the endpoint circle (half a badge in from centre)
-              // instead of spilling to the cell edge, so no band shows beside it.
-              !fillCellOnSelection &&
-                isRangeStart && {
-                  left: "50%",
-                  marginLeft: -DATE_BADGE_HEIGHT / 2,
-                  borderTopLeftRadius: theme.rangeBandHeight / 2,
-                  borderBottomLeftRadius: theme.rangeBandHeight / 2,
-                },
-              !fillCellOnSelection &&
-                isRangeEnd && {
-                  right: "50%",
-                  marginRight: -DATE_BADGE_HEIGHT / 2,
-                  borderTopRightRadius: theme.rangeBandHeight / 2,
-                  borderBottomRightRadius: theme.rangeBandHeight / 2,
-                },
-            ]}
+            {...slot("rangeBand", {
+              base: [
+                styles.rangeBand,
+                { pointerEvents: "none" },
+                fillCellOnSelection
+                  ? { top: 0, bottom: 0 }
+                  : {
+                      top: BAND_CENTER_Y - theme.rangeBandHeight / 2,
+                      height: theme.rangeBandHeight,
+                    },
+                // Cap the pill at the endpoint circle (half a badge in from centre)
+                // instead of spilling to the cell edge, so no band shows beside it.
+                !fillCellOnSelection &&
+                  isRangeStart && {
+                    left: "50%",
+                    marginLeft: -DATE_BADGE_HEIGHT / 2,
+                    borderTopLeftRadius: theme.rangeBandHeight / 2,
+                    borderBottomLeftRadius: theme.rangeBandHeight / 2,
+                  },
+                !fillCellOnSelection &&
+                  isRangeEnd && {
+                    right: "50%",
+                    marginRight: -DATE_BADGE_HEIGHT / 2,
+                    borderTopRightRadius: theme.rangeBandHeight / 2,
+                    borderBottomRightRadius: theme.rangeBandHeight / 2,
+                  },
+              ],
+              themed: { backgroundColor: theme.colors.rangeBackground },
+            })}
           />
         ) : null}
         {renderCustomDateForMonth ? (
           renderCustomDateForMonth(day)
         ) : (
           <View
-            style={[
-              styles.dateBadge,
-              showGrid && styles.dateBadgeEvents,
-              isFilledBadge && {
-                backgroundColor: isHighlighted
-                  ? theme.colors.todayBackground
-                  : theme.colors.selectedBackground,
-                borderRadius: theme.todayBadgeRadius,
-              },
-              isHovered &&
-                !isFilledBadge && {
-                  backgroundColor: theme.colors.hoverBackground,
+            {...slot("dayBadge", {
+              base: [
+                styles.dateBadge,
+                showGrid && styles.dateBadgeEvents,
+                // Tap feedback lives on the badge, not the cell (picker only);
+                // kept even under a class so the press still reads.
+                !showGrid && pressedKey === dayKey && { opacity: 0.2 },
+              ],
+              themed: [
+                isFilledBadge && {
+                  backgroundColor: isHighlighted
+                    ? theme.colors.todayBackground
+                    : theme.colors.selectedBackground,
                   borderRadius: theme.todayBadgeRadius,
                 },
-              // Tap feedback lives on the badge, not the cell (picker only).
-              !showGrid && pressedKey === dayKey && { opacity: 0.2 },
-              theme.containers.dayBadge,
-            ]}
+                isHovered &&
+                  !isFilledBadge && {
+                    backgroundColor: theme.colors.hoverBackground,
+                    borderRadius: theme.todayBadgeRadius,
+                  },
+                theme.containers.dayBadge,
+              ],
+            })}
           >
-            <Text style={[theme.text.dateCell, { color: dateColor }]} allowFontScaling={false}>
+            <Text
+              {...slot("dayBadgeText", { themed: [theme.text.dateCell, { color: dateColor }] })}
+              allowFontScaling={false}
+            >
               {format(day, "d")}
             </Text>
           </View>
@@ -434,7 +476,10 @@ function MonthViewInner<T>({
         ))}
         {hiddenCount > 0 ? (
           <Text
-            style={[theme.text.more, styles.moreLabel, { color: theme.colors.textMuted }]}
+            {...slot("more", {
+              base: styles.moreLabel,
+              themed: [theme.text.more, { color: theme.colors.textMuted }],
+            })}
             onPress={onPressMore ? () => onPressMore(dayEvents, day) : undefined}
             accessibilityRole="button"
             accessibilityLabel={`Show ${hiddenCount} more events`}
@@ -456,18 +501,29 @@ function MonthViewInner<T>({
     <View style={styles.root}>
       {showTitle ? (
         <Text
-          style={[styles.title, theme.text.monthTitle, { color: theme.colors.text }]}
+          {...slot("title", {
+            base: styles.title,
+            themed: [theme.text.monthTitle, { color: theme.colors.text }],
+          })}
           allowFontScaling={false}
         >
           {format(date, "MMMM yyyy", locale ? { locale } : undefined)}
         </Text>
       ) : null}
       {showWeekdays ? (
-        <View style={[styles.weekdayHeader, theme.containers.weekdayHeader]}>
+        <View
+          {...slot("weekdays", {
+            base: styles.weekdayHeader,
+            themed: theme.containers.weekdayHeader,
+          })}
+        >
           {weekdayLabels.map((day) => (
             <Text
               key={day.toISOString()}
-              style={[theme.text.weekday, styles.weekdayLabel, { color: theme.colors.textMuted }]}
+              {...slot("weekday", {
+                base: styles.weekdayLabel,
+                themed: [theme.text.weekday, { color: theme.colors.textMuted }],
+              })}
               allowFontScaling={false}
             >
               {format(day, weekdayFormatToken(weekdayFormat), { locale })}
@@ -475,9 +531,12 @@ function MonthViewInner<T>({
           ))}
         </View>
       ) : null}
-      <View style={styles.container} onLayout={handleLayout}>
+      <View {...slot("grid", { base: styles.container })} onLayout={handleLayout}>
         {weeks.map((week) => (
-          <View style={[styles.weekRow, theme.containers.weekRow]} key={week[0].toISOString()}>
+          <View
+            {...slot("week", { base: styles.weekRow, themed: theme.containers.weekRow })}
+            key={week[0].toISOString()}
+          >
             {week.map((day) => renderDay(day))}
           </View>
         ))}

@@ -162,3 +162,60 @@ describe("MonthView disabled days", () => {
     expect(getByLabelText("Custom: Standup")).toBeTruthy();
   });
 });
+
+describe("MonthView slot styling", () => {
+  const flatten = (node: { props: { style?: unknown } }) =>
+    StyleSheet.flatten(node.props.style as ViewStyle) as Record<string, unknown>;
+
+  it("passes a slot class through and drops that slot's themed styles", () => {
+    const { getByText } = render(
+      <MonthView {...baseProps} classNames={{ title: "text-xl font-bold text-indigo-900" }} />,
+    );
+    const title = getByText("June 2026");
+    expect(title.props.className).toBe("text-xl font-bold text-indigo-900");
+    const flat = flatten(title);
+    // Themed typography is dropped so the class owns the look...
+    expect(flat.fontSize).toBeUndefined();
+    expect(flat.color).toBeUndefined();
+    // ...but the structural layout padding is kept.
+    expect(flat.paddingTop).toBe(10);
+  });
+
+  it("keeps the themed look and merges per-slot style overrides last", () => {
+    const { getByText } = render(
+      <MonthView {...baseProps} styles={{ title: { color: "rebeccapurple" } }} />,
+    );
+    const title = getByText("June 2026");
+    expect(title.props.className).toBeUndefined();
+    const flat = flatten(title);
+    expect(flat.color).toBe("rebeccapurple");
+    expect(flat.fontSize).toBe(defaultTheme.text.monthTitle.fontSize);
+  });
+
+  it("keeps a consumer calendarCellStyle even when the day slot has a class", () => {
+    const { getByLabelText } = render(
+      <MonthView
+        {...baseProps}
+        classNames={{ day: "bg-slate-50" }}
+        calendarCellStyle={() => ({ backgroundColor: "papayawhip" })}
+      />,
+    );
+    const cell = getByLabelText(/15 June 2026/);
+    expect(flatten(cell).backgroundColor).toBe("papayawhip");
+  });
+
+  it("classes a state-styled slot: the badge drops its today colors for the class", () => {
+    const { UNSAFE_getAllByProps } = render(
+      <MonthView
+        {...baseProps}
+        classNames={{ dayBadge: "rounded-full bg-indigo-600" }}
+        activeDate={new Date(2026, 5, 15)}
+      />,
+    );
+    // Every day badge carries the class; none keeps the themed active-day fill,
+    // because a classed slot drops its themed styles.
+    const badges = UNSAFE_getAllByProps({ className: "rounded-full bg-indigo-600" });
+    expect(badges.length).toBeGreaterThan(27);
+    for (const badge of badges) expect(flatten(badge).backgroundColor).toBeUndefined();
+  });
+});
