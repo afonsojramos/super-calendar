@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@super-calendar/dom example</title>
+    <!-- Explicit white so the page doesn't pick up the docs site's background
+         when embedded there in an iframe; the native example does the same via
+         its root view. -->
+    <style>
+      body {
+        background: #fff;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
