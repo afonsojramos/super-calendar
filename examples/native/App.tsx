@@ -1,14 +1,19 @@
 import { addDays, addMonths, addWeeks, format } from "date-fns";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   Calendar,
   type CalendarEvent,
   type CalendarMode,
+  expandRecurringEvents,
   getViewDays,
+  parseICalendar,
+  type Resource,
+  ResourceTimeline,
+  toICalendar,
 } from "@super-calendar/native";
 // The picker surface imports from the Reanimated-free /picker entry point.
 import { type DateRange, MonthList, useDateRange } from "@super-calendar/native/picker";
@@ -18,10 +23,33 @@ import { EventContextMenu } from "./components/EventContextMenu";
 
 const MODES: CalendarMode[] = ["month", "week", "3days", "day", "schedule"];
 
-// The mode tabs plus a "picker" tab (range selection via useDateRange) and a
-// "list" tab (the vertically-scrolling MonthList).
-type DemoTab = CalendarMode | "picker" | "list";
-const TABS: DemoTab[] = [...MODES, "picker", "list"];
+// The mode tabs plus the extra demo surfaces, matching the dom example where
+// the native package supports them: "picker" (range selection via useDateRange),
+// "list" (the vertically-scrolling MonthList), "resource" (ResourceTimeline),
+// "recurring" (expandRecurringEvents), and "ics" (parse/export iCalendar).
+type DemoTab = CalendarMode | "picker" | "list" | "resource" | "recurring" | "ics";
+const TABS: DemoTab[] = [...MODES, "picker", "list", "resource", "recurring", "ics"];
+
+// Rooms for the resource-timeline demo; events are spread across them by id.
+const ROOMS: Resource[] = [
+  { id: "room-a", title: "Room A" },
+  { id: "room-b", title: "Room B" },
+  { id: "room-c", title: "Room C" },
+];
+
+const SAMPLE_ICS = `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART;TZID=America/New_York:20260619T090000
+DURATION:PT1H
+SUMMARY:Imported standup
+LOCATION:Room A
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20260620
+SUMMARY:Imported holiday
+END:VEVENT
+END:VCALENDAR`;
 
 // The grid views that step by a fixed period; schedule/picker/list scroll instead.
 const GRID_MODES: CalendarMode[] = ["month", "week", "3days", "day"];
@@ -83,6 +111,55 @@ export default function App() {
   const { range, onPressDate, selectRange, reset } = useDateRange({ minDate: pickerMinDate });
   // DEMO_MODE pins the view when set; otherwise the tab bar drives it.
   const activeMode: DemoTab = DEMO_MODE ?? mode;
+
+  // The "ics" tab parses whatever is in the text box; invalid input just yields
+  // an empty list while typing.
+  const [icsText, setIcsText] = useState(SAMPLE_ICS);
+  const importedIcs = useMemo(() => {
+    try {
+      return parseICalendar(icsText);
+    } catch {
+      return [];
+    }
+  }, [icsText]);
+
+  // Rules for the "recurring" tab, expanded to concrete occurrences around the
+  // visible month so paging re-materialises them. Mirrors the dom example.
+  const recurringEvents = useMemo(() => {
+    const rules: CalendarEvent[] = [
+      {
+        title: "Payroll",
+        start: new Date(2026, 0, 1, 9),
+        end: new Date(2026, 0, 1, 10),
+        recurrence: { freq: "monthly", monthDays: [1, 15] },
+      },
+      {
+        title: "Team lunch",
+        start: new Date(2026, 0, 2, 12),
+        end: new Date(2026, 0, 2, 13),
+        recurrence: { freq: "weekly", weekdays: [5] },
+      },
+      {
+        title: "Quarterly review",
+        start: new Date(2026, 0, 15, 15),
+        end: new Date(2026, 0, 15, 16),
+        recurrence: { freq: "yearly", months: [1, 4, 7, 10] },
+      },
+    ];
+    return expandRecurringEvents(rules, addMonths(date, -1), addMonths(date, 1));
+  }, [date]);
+
+  // Download the current events as an .ics file; the button only renders on the
+  // web, where the anchor-download trick is available.
+  const exportIcs = () => {
+    const blob = new Blob([toICalendar(events)], { type: "text/calendar" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "super-calendar.ics";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Actions the (web) right-click menu performs; matched back to events by id.
   const menuActions = useMemo<EventMenuActions>(
@@ -159,12 +236,7 @@ export default function App() {
                 </Text>
               </View>
             ) : null}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.tabsScroll}
-              contentContainerStyle={styles.tabs}
-            >
+            <View style={styles.tabs}>
               {TABS.map((m) => (
                 <Pressable
                   key={m}
@@ -179,7 +251,7 @@ export default function App() {
                   </Text>
                 </Pressable>
               ))}
-            </ScrollView>
+            </View>
             {DEMO_MODE == null && isGridMode(activeMode) ? (
               <View style={styles.navRow}>
                 <View style={styles.navButtons}>
@@ -231,6 +303,62 @@ export default function App() {
                   />
                 </View>
               </View>
+            ) : activeMode === "resource" ? (
+              <View style={styles.card}>
+                <ResourceTimeline
+                  date={date}
+                  resources={ROOMS}
+                  events={events}
+                  resourceId={(event) => ROOMS[Number(event.id) % ROOMS.length].id}
+                  startHour={7}
+                  endHour={20}
+                  onPressEvent={(event) => console.log("press event:", event.title)}
+                  onDragEvent={(event, start, end) => {
+                    if (event.kind === "exam") return false; // exams are locked
+                    setEvents((prev) =>
+                      prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)),
+                    );
+                  }}
+                />
+              </View>
+            ) : activeMode === "recurring" ? (
+              <View style={styles.card}>
+                <Calendar
+                  mode="month"
+                  date={date}
+                  events={recurringEvents}
+                  weekStartsOn={1}
+                  onChangeDate={setDate}
+                  onPressEvent={(event) => console.log("press event:", event.title)}
+                  onPressDay={setDate}
+                />
+              </View>
+            ) : activeMode === "ics" ? (
+              <ScrollView style={styles.icsScreen}>
+                {Platform.OS === "web" ? (
+                  <Pressable style={styles.icsExport} onPress={exportIcs}>
+                    <Text style={styles.todayText}>Export {events.length} events → .ics</Text>
+                  </Pressable>
+                ) : null}
+                <Text style={styles.icsHint}>
+                  Paste an .ics feed to parse it (DTEND/DURATION, all-day, TZID, RRULE/EXDATE):
+                </Text>
+                <TextInput
+                  multiline
+                  value={icsText}
+                  onChangeText={setIcsText}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  spellCheck={false}
+                  style={styles.icsInput}
+                />
+                <Text style={styles.icsParsed}>Parsed {importedIcs.length} events:</Text>
+                {importedIcs.map((e, i) => (
+                  <Text key={i} style={styles.icsItem}>
+                    • {e.title} — {e.allDay ? e.start.toDateString() : e.start.toLocaleString()}
+                  </Text>
+                ))}
+              </ScrollView>
             ) : activeMode === "list" ? (
               <View style={styles.card}>
                 <EventMenuProvider value={menuActions}>
@@ -325,8 +453,8 @@ const styles = StyleSheet.create({
     // header and all-day lane); on a device fill the available screen.
     ...Platform.select({ web: { height: 649 }, default: { flex: 1 } }),
   },
-  tabsScroll: { flexGrow: 0 },
-  tabs: { flexDirection: "row", paddingVertical: 8, gap: 8 },
+  // Pill buttons that wrap onto extra rows, matching the dom example's bar.
+  tabs: { flexDirection: "row", flexWrap: "wrap", paddingVertical: 8, gap: 8 },
   tab: {
     paddingVertical: 8,
     paddingHorizontal: 18,
@@ -384,6 +512,34 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   pickerLabel: { fontSize: 15, fontWeight: "600", color: "#1A1B1E" },
+  // The "ics" tab: export button, paste box, and the parsed-event list.
+  icsScreen: { flex: 1, paddingVertical: 8 },
+  icsExport: {
+    alignSelf: "flex-start",
+    height: 34,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#E2E4E9",
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+  },
+  icsHint: { color: "#6B7280", fontSize: 13, marginBottom: 6 },
+  icsInput: {
+    minHeight: 180,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#E2E4E9",
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 12,
+    color: "#1A1B1E",
+    fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+    textAlignVertical: "top",
+  },
+  icsParsed: { fontWeight: "600", fontSize: 14, color: "#1A1B1E", marginTop: 8, marginBottom: 4 },
+  icsItem: { color: "#1A1B1E", fontSize: 13, lineHeight: 20 },
   clearButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
