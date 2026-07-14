@@ -62,6 +62,27 @@ export function MyCalendar() {
 }
 ```
 
+## Styling with Tailwind
+
+Every styleable part is a named slot that accepts a class (resolved by a Tailwind runtime such as [uniwind](https://docs.uniwind.dev) or NativeWind) and/or a style override. A classed slot drops its built-in themed styles, so your classes own the look:
+
+```tsx
+<Calendar
+  mode="month"
+  date={date}
+  events={events}
+  classNames={{
+    title: "text-center text-xl font-bold text-indigo-900",
+    weekday: "uppercase tracking-wider text-indigo-400",
+  }}
+  styles={{ more: { color: "#6366F1" } }}
+  onChangeDate={setDate}
+  onPressEvent={(event) => console.log(event.id)}
+/>
+```
+
+See the [styling guide](https://super-calendar.afonsojramos.me/guides/styling) for the slot list and the uniwind setup.
+
 ## Documentation
 
 See the [full documentation](https://super-calendar.afonsojramos.me) and the [quickstart](https://super-calendar.afonsojramos.me/quickstart), including theming, recurring events, time zones, and the headless picker.

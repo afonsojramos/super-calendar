@@ -1,15 +1,16 @@
 ---
 title: Styling with Tailwind & CSS
-description: Restyle any part of the web calendar with per-slot classes, inline styles, and data-* state variants.
+description: Restyle any part of the calendar with per-slot classes and inline styles, on the web and on React Native.
 ---
 
 <Note>
-  This is the **web renderer** (`@super-calendar/dom`). For colours, typography, and metrics shared
-  by both renderers, see [Theming](/guides/theming). On React Native, style through the theme object
-  instead.
+  Both renderers support per-slot `classNames` / `styles`. On the web they work with any CSS setup;
+  on React Native the classes need a Tailwind runtime such as [uniwind](https://docs.uniwind.dev) or
+  NativeWind (see [React Native](#react-native-uniwind--nativewind) below). For colours, typography,
+  and metrics in one place, see [Theming](/guides/theming).
 </Note>
 
-The web components render with inline styles driven by the [theme](/guides/theming),
+The components render with inline styles driven by the [theme](/guides/theming),
 so a zero-config `<Calendar />` looks complete with no stylesheet. But inline styles
 beat external CSS, which would leave a Tailwind class powerless to override them. To
 close that gap, every styleable part is a named **slot** you can target with a class,
@@ -55,7 +56,54 @@ import { MonthView } from "@super-calendar/dom";
 <MonthView styles={{ title: { textAlign: "center" }, day: { borderRadius: 8 } }} />;
 ```
 
-## State variants with `data-*`
+## React Native (uniwind / NativeWind)
+
+The native renderer accepts the same `classNames` / `styles` maps with the same
+contract. Class strings pass through to the underlying `View`/`Text` elements, where a
+Tailwind runtime resolves them; the library ships TypeScript source through the
+`react-native` export condition, so your bundler compiles it with your Tailwind setup.
+Without such a runtime, `className` is ignored and `styles` still works.
+
+With [uniwind](https://docs.uniwind.dev), no extra configuration is needed beyond its
+quickstart; classes you pass from your app code are picked up by Tailwind's automatic
+content scanning:
+
+```tsx
+import { Calendar } from "@super-calendar/native";
+
+<Calendar
+  mode="month"
+  date={date}
+  events={events}
+  classNames={{
+    title: "text-center text-xl font-bold text-indigo-900",
+    weekday: "uppercase tracking-wider text-indigo-400",
+    day: "border-t border-r border-indigo-50",
+  }}
+  onChangeDate={setDate}
+  onPressEvent={onPress}
+/>;
+```
+
+Differences from the web renderer:
+
+- **No `data-*` state variants.** React Native has no CSS selectors; state styling
+  (today, selected) stays with the [theme](/guides/theming), or replace the part with
+  a custom renderer.
+- **Slot names differ where the structure does.** Native adds text slots
+  (`dayBadgeText`, `columnHeaderDateText`) because text colour doesn't inherit from a
+  parent view, plus `weekendShade` and `daySeparator` for layers the dom styles
+  through `dayColumn`. It omits dom-only slots (`hourGutter`, `dayColumn`, `events`,
+  `chipButton`, `chip`, `eventBox`).
+- **Event chips and cards are `renderEvent`'s job.** To restyle them with Tailwind,
+  pass your own `renderEvent` (or `renderMonthEvent` etc.) built from classed
+  components.
+- **Animated slots.** `gridLines` sub-hour dividers, `businessHours`, `weekendShade`,
+  `daySeparator`, `event`, `nowIndicator`, and `createGhost` render as Reanimated
+  views. Their `styles` overrides always apply; whether `className` resolves there
+  depends on your runtime's support for Animated components.
+
+## State variants with `data-*` (web only)
 
 Day cells expose their state as present/absent `data-*` attributes, so you can style
 selection, today, and more with Tailwind variants or plain CSS — no JS:
@@ -96,6 +144,9 @@ shared header and forwards the rest to each month's `MonthView`.
 
 ### MonthView
 
+Native's `MonthView` supports `title`, `weekdays`, `weekday`, `grid`, `week`, `day`,
+`dayBadge`, `dayBadgeText`, `rangeBand`, and `more`.
+
 | Slot         | Element                                           |
 | ------------ | ------------------------------------------------- |
 | `title`      | The "Month yyyy" heading                          |
@@ -112,6 +163,11 @@ shared header and forwards the rest to each month's `MonthView`.
 | `more`       | The "+N more" overflow row                        |
 
 ### TimeGrid (week / day / N-day)
+
+Native's `TimeGrid` supports `header`, `weekNumber`, `columnHeader`,
+`columnHeaderWeekday`, `columnHeaderDate`, `columnHeaderDateText`, the `allDay*`
+slots, `hourLabel`, `gridLines`, `businessHours`, `weekendShade`, `daySeparator`,
+`event`, `nowIndicator`, and `createGhost`.
 
 | Slot                  | Element                                   |
 | --------------------- | ----------------------------------------- |
@@ -134,6 +190,8 @@ shared header and forwards the rest to each month's `MonthView`.
 | `createGhost`         | The drag-to-create preview                |
 
 ### Agenda (schedule)
+
+Native's `Agenda` supports `dayHeader`, `eventRow`, and `empty`.
 
 | Slot        | Element                        |
 | ----------- | ------------------------------ |

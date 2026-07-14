@@ -67,17 +67,19 @@ and `minDate` / `maxDate` / `isDateDisabled` for disabled days. See the
 
 ## Display
 
-| Prop                   | Type                   | Notes                              |
-| ---------------------- | ---------------------- | ---------------------------------- |
-| `scrollOffsetMinutes`  | `number`               | Initial vertical scroll.           |
-| `hourHeight`           | `number`               | Row height (px per hour).          |
-| `timeslots`            | `number`               | Hour sub-divisions.                |
-| `ampm`                 | `boolean`              | 12-hour labels.                    |
-| `showNowIndicator`     | `boolean`              | Current-time line (default on).    |
-| `showAllDayEventCell`  | `boolean`              | All-day lane (default on).         |
-| `allDayLabel`          | `string`               | Schedule all-day text ("All day"). |
-| `maxVisibleEventCount` | `number`               | Month: fixed chip cap.             |
-| `theme`                | `PartialCalendarTheme` | Color/text/metric overrides.       |
+| Prop                   | Type                                       | Notes                                                                           |
+| ---------------------- | ------------------------------------------ | ------------------------------------------------------------------------------- |
+| `scrollOffsetMinutes`  | `number`                                   | Initial vertical scroll.                                                        |
+| `hourHeight`           | `number`                                   | Row height (px per hour).                                                       |
+| `timeslots`            | `number`                                   | Hour sub-divisions.                                                             |
+| `ampm`                 | `boolean`                                  | 12-hour labels.                                                                 |
+| `showNowIndicator`     | `boolean`                                  | Current-time line (default on).                                                 |
+| `showAllDayEventCell`  | `boolean`                                  | All-day lane (default on).                                                      |
+| `allDayLabel`          | `string`                                   | Schedule all-day text ("All day").                                              |
+| `maxVisibleEventCount` | `number`                                   | Month: fixed chip cap.                                                          |
+| `theme`                | `PartialCalendarTheme`                     | Color/text/metric overrides.                                                    |
+| `classNames`           | `Partial<Record<CalendarSlot, string>>`    | Per-slot Tailwind classes (uniwind/NativeWind); see [Styling](/guides/styling). |
+| `styles`               | `Partial<Record<CalendarSlot, StyleProp>>` | Per-slot style overrides, merged last.                                          |
 
 ## Exports
 
@@ -100,6 +102,6 @@ and `minDate` / `maxDate` / `isDateDisabled` for disabled days. See the
   <Card title="Types">
     `CalendarEvent`, `CalendarMode`, `RenderEventArgs`, `RecurrenceRule`, `BusinessHours`,
     `EventDragHandler`, `CalendarTheme`, `PositionedEvent`, `DateRange`, `MonthGrid`,
-    `MonthListProps`
+    `MonthListProps`, `CalendarSlot`, `SlotStyleProps`
   </Card>
 </CardGroup>
