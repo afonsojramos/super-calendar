@@ -1,4 +1,5 @@
 import { render } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 import type { CalendarEvent } from "../../types";
 
 // Capture the props handed to the virtualized list, and render only the active
@@ -17,6 +18,8 @@ jest.mock("@legendapp/list/react-native", () => ({
 }));
 
 import { Calendar } from "../Calendar";
+import { DefaultEvent } from "../DefaultEvent";
+import { TimeGrid } from "../TimeGrid";
 
 type WithId = { id: string };
 const event: CalendarEvent<WithId> = {
@@ -220,9 +223,6 @@ describe("TimeGrid column header", () => {
 });
 
 describe("TimeGrid slot styling", () => {
-  const { StyleSheet } = require("react-native");
-  const { TimeGrid } = require("../TimeGrid");
-  const { DefaultEvent } = require("../DefaultEvent");
   const date = new Date(2026, 0, 6, 12, 0, 0);
   const gridProps = () => ({
     mode: "day" as const,
@@ -233,6 +233,7 @@ describe("TimeGrid slot styling", () => {
     renderEvent: DefaultEvent,
     keyExtractor: (_e: CalendarEvent<WithId>, i: number) => String(i),
     onChangeDate: noop,
+    onPressEvent: noop,
   });
 
   it("passes slot classes to the header and hour labels, dropping their themed styles", () => {

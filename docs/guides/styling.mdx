@@ -102,6 +102,10 @@ Differences from the web renderer:
   `daySeparator`, `event`, `nowIndicator`, and `createGhost` render as Reanimated
   views. Their `styles` overrides always apply; whether `className` resolves there
   depends on your runtime's support for Animated components.
+- **Pass stable references.** Define the `classNames` / `styles` maps at module scope
+  (or wrap them in `useMemo`). Inline literals still work, but they change identity on
+  every render, so the calendar re-resolves its slots each time instead of skipping
+  the work.
 
 ## State variants with `data-*` (web only)
 
