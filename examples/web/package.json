@@ -10,12 +10,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@legendapp/list": "^3.2.0",
+    "@legendapp/list": "^3.3.2",
     "@super-calendar/dom": "workspace:*",
     "@super-calendar/example-shared": "workspace:*",
     "date-fns": "4.4.0",
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.2",
@@ -24,6 +24,6 @@
     "@vitejs/plugin-react": "^6.0.3",
     "tailwindcss": "^4.3.2",
     "typescript": "^6.0.3",
-    "vite": "^8.1.2"
+    "vite": "^8.1.4"
   }
 }
