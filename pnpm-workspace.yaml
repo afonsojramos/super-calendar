@@ -1,6 +1,8 @@
 packages:
   - "packages/*"
   - "examples/*"
-nodeLinker: hoisted
 allowBuilds:
   esbuild: true
+# nub and pnpm interop on this workspace (same lockfile, both isolated layouts).
+# Don't let a pnpm script-run reinstall over a nub-installed node_modules.
+verifyDepsBeforeRun: false
