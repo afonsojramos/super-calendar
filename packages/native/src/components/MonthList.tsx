@@ -194,6 +194,17 @@ function MonthListInner<T>({
   // land on an off-screen month and scroll the list backwards.
   const [firstViewableIndex, setFirstViewableIndex] = useState(0);
 
+  // Months are keyed by dates that never change, so LegendList keeps mounted
+  // rows and only re-renders them when `data` or `extraData` changes. Feed
+  // `events` and `activeDate` (renderItem captures them; without this, events
+  // that arrive after mount never paint, same bug as the MonthPager had) plus
+  // `firstViewableIndex` (the web `inert` cutoff must stay current). Selection
+  // needs no entry: it reaches MonthView through context.
+  const listExtraData = useMemo(
+    () => ({ events, activeDate, firstViewableIndex }),
+    [events, activeDate, firstViewableIndex],
+  );
+
   // A fixed window of months anchored once, aligned to the month start.
   const [anchorDate] = useState(date);
   const anchor = useMemo(() => startOfMonth(anchorDate), [anchorDate]);
@@ -514,9 +525,7 @@ function MonthListInner<T>({
       style={styles.list}
       data={monthDates}
       recycleItems={false}
-      // Re-render mounted months when the viewport cutoff changes, so the inert
-      // flag on above-viewport months (web focus containment) stays current.
-      extraData={firstViewableIndex}
+      extraData={listExtraData}
       keyExtractor={keyExtractorList}
       getFixedItemSize={getFixedItemSize}
       initialScrollIndex={initialIndex}
