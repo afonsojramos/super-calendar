@@ -35,7 +35,7 @@ Both renderers depend on core via `workspace:*`. The npm slug and repo are `supe
 - `pnpm bench` — core benchmarks (runs under bun)
 - `pnpm parity:visual` screenshots both web renderers side by side for manual visual parity (see Scripts)
 
-Use pnpm, not npm/npx. CI runs lint, format, typecheck (root + both examples), test, build, then attw + publint per package and a docs broken-link check.
+Use pnpm or nub, not npm/npx; both install correctly from the shared `pnpm-lock.yaml` now that the workspace uses the default isolated layout (CI stays on pnpm). Two rules keep that true: never reintroduce `nodeLinker: hoisted` (nub mislinks under it, and hoisted splits react whenever the lockfile carries mixed react versions; run `pnpm dedupe` after partial bumps), and never re-add `disableHierarchicalLookup` to the example's metro config (Metro needs hierarchical symlink resolution for isolated layouts). CI runs lint, format, typecheck (root + both examples), test, build, then attw + publint per package and a docs broken-link check.
 
 ## Scripts
 
