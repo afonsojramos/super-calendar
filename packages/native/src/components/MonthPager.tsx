@@ -214,6 +214,14 @@ function MonthPagerInner<T>({
     return isRTL ? days.reverse() : days;
   }, [anchor, weekStartsOn, isRTL]);
 
+  // Pages are keyed by month Dates that never change, so LegendList keeps the
+  // pages it has already rendered and only re-renders them when `data` or
+  // `extraData` changes — a new `renderItem` identity is not enough. Feed
+  // `events` (events that arrive after mount, e.g. from an async fetch, must
+  // repaint the mounted page) and `activeDate` (the selected-day highlight must
+  // move). Mirrors listExtraData in TimeGrid.
+  const listExtraData = useMemo(() => ({ events, activeDate }), [events, activeDate]);
+
   const snapToIndices = useMemo(() => monthDates.map((_, index) => index), [monthDates]);
   const keyExtractorList = useCallback((item: Date) => item.toISOString(), []);
   const getFixedItemSize = useCallback(() => containerWidth, [containerWidth]);
@@ -317,6 +325,7 @@ function MonthPagerInner<T>({
           ref={listRef}
           style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
           data={monthDates}
+          extraData={listExtraData}
           horizontal
           recycleItems={false}
           keyExtractor={keyExtractorList}
