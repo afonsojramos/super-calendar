@@ -129,6 +129,16 @@ export function App() {
   const { range, onPressDate, reset } = useDateRange({ minDate: pickerMinDate });
   const [rangeValue, setRangeValue] = useState<DateRange | null>(null);
   const [icsText, setIcsText] = useState(SAMPLE_ICS);
+  // Tracks the phone-width breakpoint reactively for the resource tab.
+  const [narrowViewport, setNarrowViewport] = useState(
+    () => window.matchMedia("(max-width: 600px)").matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 600px)");
+    const onChange = (e: MediaQueryListEvent) => setNarrowViewport(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
   const importedIcs = useMemo(() => {
     try {
       return parseICalendar(icsText);
@@ -371,6 +381,9 @@ export function App() {
           <div style={styles.card}>
             <ResourceTimeline
               date={date}
+              // Phones read better with time flowing down; wide screens keep
+              // the classic horizontal timeline. Mirrors the native example.
+              orientation={narrowViewport ? "vertical" : "horizontal"}
               resources={ROOMS}
               events={events}
               resourceId={(event) => ROOMS[Number(event.id) % ROOMS.length].id}
