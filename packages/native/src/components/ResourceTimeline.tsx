@@ -36,16 +36,28 @@ export interface Resource {
 /** Props passed to a custom resource-timeline event renderer. */
 export interface ResourceEventArgs<T = unknown> {
   event: CalendarEvent<T>;
-  /** Pixel width of the event bar. */
+  /**
+   * Pixel width of the event bar. In the vertical orientation the columns flex
+   * to the container, so this is 0 there; size against `height` instead.
+   */
   width: number;
+  /** Pixel height of the event bar; set in the vertical orientation. */
+  height?: number;
   onPress: () => void;
 }
 
 /** Props for {@link ResourceTimeline}. */
 export interface ResourceTimelineProps<T = unknown> {
-  /** The day to lay out along the horizontal axis. */
+  /** The day to lay out along the time axis. */
   date: Date;
-  /** The rows, top to bottom. */
+  /**
+   * Lay the day out along the horizontal axis with resources as rows (the
+   * default), or down the vertical axis with resources as columns, like the
+   * time grid. Vertical reads better on narrow screens: the columns share the
+   * width instead of the axis scrolling sideways.
+   */
+  orientation?: "horizontal" | "vertical";
+  /** The resource lanes: rows when horizontal, columns when vertical. */
   resources: Resource[];
   /** Events; each is placed in the row named by `resourceId(event)`. */
   events: CalendarEvent<T>[];
@@ -55,11 +67,13 @@ export interface ResourceTimelineProps<T = unknown> {
   startHour?: number;
   /** Last hour shown, exclusive (default 24). */
   endHour?: number;
-  /** Pixels per hour along the axis (default 80). */
+  /** Pixels per hour along the horizontal axis (default 80). Horizontal only. */
   hourWidth?: number;
-  /** Height of each resource row in px (default 56). */
+  /** Pixels per hour down the vertical axis (default 48). Vertical only. */
+  hourHeight?: number;
+  /** Height of each resource row in px (default 56). Horizontal only. */
   rowHeight?: number;
-  /** Width of the left resource-label column in px (default 140). */
+  /** Width of the left resource-label column in px (default 140). Horizontal only. */
   labelWidth?: number;
   /** 12-hour AM/PM axis labels (default false). */
   ampm?: boolean;
@@ -79,8 +93,13 @@ export interface ResourceTimelineProps<T = unknown> {
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-function DefaultBar<T>({ event, width }: ResourceEventArgs<T>): ReactElement {
+// Hour-gutter width in the vertical orientation, matching the time grid's axis.
+const GUTTER_WIDTH = 56;
+
+function DefaultBar<T>({ event, width, height }: ResourceEventArgs<T>): ReactElement {
   const theme = useCalendarTheme();
+  // Show the time line only when the bar has room for it along its long axis.
+  const showTime = height != null ? height > 34 : width > 56;
   const time = eventTimeLabel({
     mode: "day",
     isAllDay: false,
@@ -104,7 +123,7 @@ function DefaultBar<T>({ event, width }: ResourceEventArgs<T>): ReactElement {
       >
         {event.title}
       </Text>
-      {time && width > 56 ? (
+      {time && showTime ? (
         <Text
           numberOfLines={1}
           style={[styles.barTime, { color: theme.colors.eventText }]}
@@ -119,10 +138,19 @@ function DefaultBar<T>({ event, width }: ResourceEventArgs<T>): ReactElement {
 
 type ResourceBarProps<T> = {
   pe: PositionedEvent<T>;
-  left: number;
-  width: number;
-  laneHeight: number;
-  hourWidth: number;
+  /** Time flows down instead of across; gestures and resize follow. */
+  vertical: boolean;
+  /** Pixels per hour along the time axis. */
+  hourSize: number;
+  /** Cross-axis lane offset: px when horizontal, a percent string when vertical. */
+  left: number | `${number}%`;
+  top: number;
+  /** Along-axis size when horizontal (px); lane width (percent) when vertical. */
+  width: number | `${number}%`;
+  /** Lane height when horizontal; along-axis size when vertical (px). */
+  height: number;
+  /** What the custom renderer is told about the bar's box. */
+  rendererSize: { width: number; height?: number };
   snapMinutes: number;
   Renderer: ComponentType<ResourceEventArgs<T>>;
   onPress: () => void;
@@ -130,15 +158,19 @@ type ResourceBarProps<T> = {
   theme: ReturnType<typeof useCalendarTheme>;
 };
 
-// A bar with drag-to-move (long-press) and right-edge resize along the time axis.
-// The pure snap/commit math is shared with the time grid (`snapDeltaMinutes`,
-// `resolveDraggedBounds`); this only wires the horizontal gestures.
+// A bar with drag-to-move (long-press) and edge resize along the time axis
+// (right edge when horizontal, bottom edge when vertical). The pure snap/commit
+// math is shared with the time grid (`snapDeltaMinutes`, `resolveDraggedBounds`);
+// this only wires the gestures.
 function ResourceBar<T>({
   pe,
+  vertical,
+  hourSize,
   left,
+  top,
   width,
-  laneHeight,
-  hourWidth,
+  height,
+  rendererSize,
   snapMinutes,
   Renderer,
   onPress,
@@ -214,8 +246,17 @@ function ResourceBar<T>({
     : undefined;
 
   const barStyle = useAnimatedStyle(
-    () => ({ transform: [{ translateX: moveX.value }], width: Math.max(width + resizeW.value, 2) }),
-    [width],
+    () =>
+      vertical
+        ? {
+            transform: [{ translateY: moveX.value }],
+            height: Math.max(height + resizeW.value, 2),
+          }
+        : {
+            transform: [{ translateX: moveX.value }],
+            width: Math.max((width as number) + resizeW.value, 2),
+          },
+    [vertical, width, height],
   );
 
   const moveGesture = useMemo(
@@ -224,18 +265,19 @@ function ResourceBar<T>({
         .enabled(draggable)
         .activateAfterLongPress(MOVE_ACTIVATE_MS)
         .onUpdate((e) => {
-          moveX.value = e.translationX;
+          moveX.value = vertical ? e.translationY : e.translationX;
         })
         .onEnd((e) => {
-          const delta = snapDeltaMinutes(e.translationX, hourWidth, snapMinutes);
+          const translation = vertical ? e.translationY : e.translationX;
+          const delta = snapDeltaMinutes(translation, hourSize, snapMinutes);
           if (delta === 0) {
             moveX.value = 0;
             return;
           }
-          moveX.value = (delta / MINUTES_PER_HOUR) * hourWidth;
+          moveX.value = (delta / MINUTES_PER_HOUR) * hourSize;
           runOnJS(commit)(delta, delta);
         }),
-    [draggable, hourWidth, snapMinutes, moveX, commit],
+    [draggable, vertical, hourSize, snapMinutes, moveX, commit],
   );
 
   const resizeGesture = useMemo(
@@ -243,24 +285,26 @@ function ResourceBar<T>({
       Gesture.Pan()
         .enabled(draggable)
         .onUpdate((e) => {
-          resizeW.value = e.translationX;
+          resizeW.value = vertical ? e.translationY : e.translationX;
         })
         .onEnd((e) => {
-          const delta = snapDeltaMinutes(e.translationX, hourWidth, snapMinutes);
+          const translation = vertical ? e.translationY : e.translationX;
+          const delta = snapDeltaMinutes(translation, hourSize, snapMinutes);
           if (delta === 0) {
             resizeW.value = 0;
             return;
           }
-          resizeW.value = (delta / MINUTES_PER_HOUR) * hourWidth;
+          resizeW.value = (delta / MINUTES_PER_HOUR) * hourSize;
           runOnJS(commit)(0, delta);
         }),
-    [draggable, hourWidth, snapMinutes, resizeW, commit],
+    [draggable, vertical, hourSize, snapMinutes, resizeW, commit],
   );
 
   return (
     <Animated.View
       style={[
-        { position: "absolute", left, top: pe.column * laneHeight, height: laneHeight, padding: 1 },
+        { position: "absolute", left, top, padding: 1 },
+        vertical ? { width } : { height },
         barStyle,
       ]}
     >
@@ -273,7 +317,12 @@ function ResourceBar<T>({
           onAccessibilityAction={onBarAction}
           style={styles.fill}
         >
-          <Renderer event={pe.event} width={width} onPress={onPress} />
+          <Renderer
+            event={pe.event}
+            width={rendererSize.width}
+            height={rendererSize.height}
+            onPress={onPress}
+          />
         </Pressable>
       </GestureDetector>
       <GestureDetector gesture={resizeGesture}>
@@ -281,7 +330,10 @@ function ResourceBar<T>({
             extend/shorten actions above (a non-focusable View can't hold them). */}
         <View
           testID="resource-resize-grip"
-          style={[styles.resizeGrip, { backgroundColor: theme.colors.eventText }]}
+          style={[
+            vertical ? styles.resizeGripBottom : styles.resizeGrip,
+            { backgroundColor: theme.colors.eventText },
+          ]}
           accessibilityElementsHidden
           importantForAccessibility="no"
         />
@@ -310,12 +362,14 @@ function ResourceBar<T>({
  */
 export function ResourceTimeline<T = unknown>({
   date,
+  orientation = "horizontal",
   resources,
   events,
   resourceId = (event) => (event as { resourceId?: string }).resourceId,
   startHour = 0,
   endHour = 24,
   hourWidth = 80,
+  hourHeight = 48,
   rowHeight = 56,
   labelWidth = 140,
   ampm = false,
@@ -342,6 +396,123 @@ export function ResourceTimeline<T = unknown>({
     }
     return map;
   }, [resources, events, resourceId, date]);
+
+  if (orientation === "vertical") {
+    // Time flows down like the time grid: hour gutter on the left and one
+    // flexed column per resource, so narrow screens share the width instead of
+    // scrolling sideways. The resource headers stay fixed above the scroll.
+    const trackHeight = (endHour - startHour) * hourHeight;
+    return (
+      <View style={styles.vroot}>
+        <View style={[styles.header, { borderBottomColor: theme.colors.gridLine }]}>
+          <View style={{ width: GUTTER_WIDTH }} />
+          {resources.map((resource) => (
+            <View key={resource.id} style={[styles.vheaderCell, theme.containers.resourceLabel]}>
+              <Text
+                numberOfLines={1}
+                style={[styles.vheaderText, { color: theme.colors.text }]}
+                allowFontScaling={false}
+              >
+                {resource.title ?? resource.id}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <ScrollView showsVerticalScrollIndicator>
+          <View style={[styles.vbody, { height: trackHeight }]}>
+            <View style={{ width: GUTTER_WIDTH }}>
+              {hours.map((h) => (
+                <Text
+                  key={h}
+                  allowFontScaling={false}
+                  style={[
+                    styles.vhourLabel,
+                    {
+                      top: Math.max(0, (h - startHour) * hourHeight - 6),
+                      color: theme.colors.textMuted,
+                    },
+                  ]}
+                >
+                  {formatHour(h, { ampm })}
+                </Text>
+              ))}
+            </View>
+            {resources.map((resource) => {
+              const positioned = byResource.get(resource.id) ?? [];
+              return (
+                <View
+                  key={resource.id}
+                  style={[
+                    styles.vcolumn,
+                    { borderLeftColor: theme.colors.gridLine },
+                    theme.containers.resourceRow,
+                  ]}
+                >
+                  {hours.slice(1).map((h) => (
+                    <View
+                      key={h}
+                      pointerEvents="none"
+                      style={[
+                        styles.vgridLine,
+                        {
+                          top: (h - startHour) * hourHeight,
+                          backgroundColor: theme.colors.gridLine,
+                        },
+                      ]}
+                    />
+                  ))}
+                  {positioned.map((pe, idx) => {
+                    const top =
+                      clamp(pe.startHours - startHour, 0, endHour - startHour) * hourHeight;
+                    const bottomPx =
+                      clamp(pe.startHours + pe.durationHours - startHour, 0, endHour - startHour) *
+                      hourHeight;
+                    const height = Math.max(bottomPx - top, 2);
+                    // Overlapping events share the column as side-by-side sub-lanes.
+                    const lanePct = 100 / pe.columns;
+                    const left = `${pe.column * lanePct}%` as const;
+                    const width = `${lanePct}%` as const;
+                    const onPress = () => onPressEvent?.(pe.event);
+                    if (onDragEvent) {
+                      return (
+                        <ResourceBar
+                          key={idx}
+                          pe={pe}
+                          vertical
+                          hourSize={hourHeight}
+                          left={left}
+                          top={top}
+                          width={width}
+                          height={height}
+                          rendererSize={{ width: 0, height }}
+                          snapMinutes={dragStepMinutes}
+                          Renderer={Renderer}
+                          onPress={onPress}
+                          onDragEvent={onDragEvent}
+                          theme={theme}
+                        />
+                      );
+                    }
+                    return (
+                      <Pressable
+                        key={idx}
+                        onPress={onPress}
+                        accessibilityRole="button"
+                        accessibilityLabel={pe.event.title}
+                        style={{ position: "absolute", left, width, top, height, padding: 1 }}
+                      >
+                        <Renderer event={pe.event} width={0} height={height} onPress={onPress} />
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator style={styles.root}>
@@ -418,10 +589,13 @@ export function ResourceTimeline<T = unknown>({
                       <ResourceBar
                         key={idx}
                         pe={pe}
+                        vertical={false}
+                        hourSize={hourWidth}
                         left={left}
+                        top={pe.column * laneHeight}
                         width={width}
-                        laneHeight={laneHeight}
-                        hourWidth={hourWidth}
+                        height={laneHeight}
+                        rendererSize={{ width }}
                         snapMinutes={dragStepMinutes}
                         Renderer={Renderer}
                         onPress={onPress}
@@ -482,4 +656,27 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     opacity: 0.5,
   },
+  // Its bottom-edge counterpart in the vertical orientation.
+  resizeGripBottom: {
+    position: "absolute",
+    bottom: 1,
+    left: "30%",
+    right: "30%",
+    height: 4,
+    borderRadius: 2,
+    opacity: 0.5,
+  },
+  vroot: { flex: 1 },
+  vheaderCell: {
+    flex: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    borderLeftWidth: StyleSheet.hairlineWidth,
+  },
+  vheaderText: { fontSize: 13, fontWeight: "600" },
+  vbody: { flexDirection: "row" },
+  vcolumn: { flex: 1, borderLeftWidth: StyleSheet.hairlineWidth },
+  vhourLabel: { position: "absolute", right: 6, fontSize: 10 },
+  vgridLine: { position: "absolute", left: 0, right: 0, height: StyleSheet.hairlineWidth },
 });

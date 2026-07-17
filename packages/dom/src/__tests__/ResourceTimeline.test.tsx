@@ -169,3 +169,74 @@ describe("dom ResourceTimeline", () => {
     expect(rows[0].textContent).not.toContain("Custom");
   });
 });
+
+describe("dom ResourceTimeline vertical orientation", () => {
+  it("lays resources out as columns with time flowing down", () => {
+    const { getByText } = render(
+      <ResourceTimeline
+        date={date}
+        orientation="vertical"
+        resources={resources}
+        events={events}
+        startHour={8}
+        hourHeight={48}
+      />,
+    );
+    // Standup: 09:00–10:00, startHour 8 → top = (9-8)*48 = 48px, height = 1h*48.
+    const bar = getByText("Standup").closest("button") as HTMLElement;
+    expect(bar.style.top).toBe("48px");
+    expect(bar.style.height).toBe("48px");
+    // The column flexes, so the lane is a percentage, not a pixel offset.
+    expect(bar.style.width).toBe("100%");
+  });
+
+  it("drags an event down the time axis and reports the new start/end", () => {
+    const onDragEvent = jest.fn();
+    const { getByText } = render(
+      <ResourceTimeline
+        date={date}
+        orientation="vertical"
+        resources={resources}
+        events={events}
+        hourHeight={48}
+        onDragEvent={onDragEvent}
+      />,
+    );
+    // Standup 09:00–10:00; drag +96px = +2h at 48px/hour → 11:00–12:00.
+    const bar = getByText("Standup").closest("button") as HTMLElement;
+    fireEvent.pointerDown(bar, { clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(bar, { clientY: 196, pointerId: 1 });
+    fireEvent.pointerUp(bar, { clientY: 196, pointerId: 1 });
+
+    expect(onDragEvent).toHaveBeenCalledTimes(1);
+    const [, start, end] = onDragEvent.mock.calls[0] as [unknown, Date, Date];
+    expect(start.getHours()).toBe(11);
+    expect(end.getHours()).toBe(12);
+  });
+
+  it("resizes from the bottom edge along the time axis", () => {
+    const onDragEvent = jest.fn();
+    const { getByText } = render(
+      <ResourceTimeline
+        date={date}
+        orientation="vertical"
+        resources={resources}
+        events={events}
+        hourHeight={48}
+        onDragEvent={onDragEvent}
+      />,
+    );
+    // The resize handle is the span inside the bar; drag it +48px = +1h.
+    const bar = getByText("Standup").closest("button") as HTMLElement;
+    const handle = bar.querySelector("span[aria-hidden]") as HTMLElement;
+    fireEvent.pointerDown(handle, { clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(bar, { clientY: 148, pointerId: 1 });
+    fireEvent.pointerUp(bar, { clientY: 148, pointerId: 1 });
+
+    expect(onDragEvent).toHaveBeenCalledTimes(1);
+    const [, start, end] = onDragEvent.mock.calls[0] as [unknown, Date, Date];
+    // Start unchanged, end extended by an hour: 09:00–11:00.
+    expect(start.getHours()).toBe(9);
+    expect(end.getHours()).toBe(11);
+  });
+});

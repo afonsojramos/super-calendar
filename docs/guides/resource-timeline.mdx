@@ -1,6 +1,6 @@
 ---
 title: Resource timeline
-description: A horizontal, one-day timeline with a row per resource (room, person, machine).
+description: A one-day timeline with a lane per resource (room, person, machine), horizontal or vertical.
 ---
 
 <Note>
@@ -58,13 +58,47 @@ read from `event.resourceId`; pass a `resourceId` accessor for a different shape
 Overlapping events **in the same row** stack into sub-lanes (via the shared
 `layoutDayEvents`), so nothing is hidden behind anything else.
 
+## Vertical orientation
+
+On a narrow screen the horizontal axis has to scroll sideways, which reads poorly.
+Pass `orientation="vertical"` to flip the layout into the time grid's shape: the
+hour axis runs down the left, each resource becomes a **column**, and the columns
+flex to share the available width, so a phone shows the whole board at once.
+
+```tsx
+<ResourceTimeline
+  date={date}
+  orientation="vertical"
+  resources={resources}
+  events={events}
+  startHour={7}
+  endHour={20}
+/>
+```
+
+A common pattern is switching on the viewport, like the example app does:
+
+```tsx
+orientation={width < 600 ? "vertical" : "horizontal"}
+```
+
+Everything else carries over: overlapping events share their column as side-by-side
+sub-lanes, drag-to-move follows the vertical axis, and resize moves to the bottom
+edge. On React Native the resource headers stay fixed while the hours scroll, so
+give the timeline a bounded height (a flexed or fixed-height parent); on the web
+the track scrolls inside the component when you constrain its height. `hourHeight` (default 48) sets the pixels per hour; `hourWidth`, `rowHeight`,
+and `labelWidth` apply to the horizontal orientation only. Custom renderers get
+`height` (the bar's pixel height) in their `ResourceEventArgs`; `width` is 0 in
+this orientation because the columns flex.
+
 ## Sizing & window
 
 - `startHour` / `endHour` — the visible hour window (default 0–24).
-- `hourWidth` — pixels per hour along the axis (default 80); the track scrolls
-  horizontally when it overflows.
-- `rowHeight` — height of each resource row (default 56).
-- `labelWidth` — width of the left resource-label column (default 140).
+- `hourWidth` — pixels per hour along the horizontal axis (default 80); the track
+  scrolls horizontally when it overflows. Horizontal only.
+- `hourHeight` — pixels per hour down the vertical axis (default 48). Vertical only.
+- `rowHeight` — height of each resource row (default 56). Horizontal only.
+- `labelWidth` — width of the left resource-label column (default 140). Horizontal only.
 - `ampm` — 12-hour axis labels.
 
 ## Moving & resizing (web)
@@ -92,7 +126,7 @@ import { ResourceTimeline } from "@super-calendar/dom";
 ## React Native
 
 The native renderer exposes the same board and props (`date`, `resources`, `events`,
-`resourceId`, `startHour`/`endHour`, `hourWidth`, `rowHeight`, `labelWidth`, `ampm`,
+`orientation`, `resourceId`, `startHour`/`endHour`, `hourWidth`, `hourHeight`, `rowHeight`, `labelWidth`, `ampm`,
 `renderEvent`, `onPressEvent`), plus `onDragEvent` / `dragStepMinutes` for
 **long-press drag-to-move and edge-resize**. It reads the theme from context, so
 restyle via `theme.containers` (see [Theming](/guides/theming)):

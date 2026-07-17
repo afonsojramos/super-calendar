@@ -42,16 +42,28 @@ export interface Resource {
 /** Props passed to a custom resource-timeline event renderer. */
 export interface ResourceEventArgs<T = unknown> {
   event: CalendarEvent<T>;
-  /** Pixel width of the event bar. */
+  /**
+   * Pixel width of the event bar. In the vertical orientation the columns flex
+   * to the container, so this is 0 there; size against `height` instead.
+   */
   width: number;
+  /** Pixel height of the event bar; set in the vertical orientation. */
+  height?: number;
   onPress: () => void;
 }
 
 /** Props for {@link ResourceTimeline}. */
 export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<ResourceTimelineSlot> {
-  /** The day to lay out along the horizontal axis. */
+  /** The day to lay out along the time axis. */
   date: Date;
-  /** The rows, top to bottom. */
+  /**
+   * Lay the day out along the horizontal axis with resources as rows (the
+   * default), or down the vertical axis with resources as columns, like the
+   * time grid. Vertical reads better on narrow screens: the columns share the
+   * width instead of the axis scrolling sideways.
+   */
+  orientation?: "horizontal" | "vertical";
+  /** The resource lanes: rows when horizontal, columns when vertical. */
   resources: Resource[];
   /** Events; each is placed in the row named by `resourceId(event)`. */
   events: CalendarEvent<T>[];
@@ -61,11 +73,13 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
   startHour?: number;
   /** Last hour shown, exclusive (default 24). */
   endHour?: number;
-  /** Pixels per hour along the axis (default 80). */
+  /** Pixels per hour along the horizontal axis (default 80). Horizontal only. */
   hourWidth?: number;
-  /** Height of each resource row in px (default 56). */
+  /** Pixels per hour down the vertical axis (default 48). Vertical only. */
+  hourHeight?: number;
+  /** Height of each resource row in px (default 56). Horizontal only. */
   rowHeight?: number;
-  /** Width of the left resource-label column in px (default 140). */
+  /** Width of the left resource-label column in px (default 140). Horizontal only. */
   labelWidth?: number;
   /** 12-hour AM/PM axis labels (default false). */
   ampm?: boolean;
@@ -90,6 +104,9 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+// Hour-gutter width in the vertical orientation, matching the time grid's axis.
+const GUTTER_WIDTH = 56;
+
 type DragState = {
   key: string;
   kind: "move" | "resize";
@@ -100,9 +117,13 @@ type DragState = {
 
 function DefaultBar<T>({
   event,
+  height,
   boxProps,
   theme,
 }: ResourceEventArgs<T> & { boxProps: ResolvedSlot; theme: DomCalendarTheme }) {
+  // Vertical bars gate the time line on their height (short slots show just the
+  // title); horizontal bars keep it always, as before.
+  const showTime = height != null ? height > 34 : true;
   const time = eventTimeLabel({
     mode: "day",
     isAllDay: false,
@@ -139,7 +160,7 @@ function DefaultBar<T>({
       >
         {event.title}
       </div>
-      {time ? <div style={{ opacity: 0.75, fontSize: 11 }}>{time}</div> : null}
+      {time && showTime ? <div style={{ opacity: 0.75, fontSize: 11 }}>{time}</div> : null}
     </div>
   );
 }
@@ -162,12 +183,14 @@ function DefaultBar<T>({
  */
 export function ResourceTimeline<T = unknown>({
   date,
+  orientation = "horizontal",
   resources,
   events,
   resourceId = (event) => (event as { resourceId?: string }).resourceId,
   startHour = 0,
   endHour = 24,
   hourWidth = 80,
+  hourHeight = 48,
   rowHeight = 56,
   labelWidth = 140,
   ampm = false,
@@ -185,6 +208,9 @@ export function ResourceTimeline<T = unknown>({
   const slot = createSlots<ResourceTimelineSlot>({ classNames, styles });
   const Renderer = renderEvent;
   const snapHours = dragStepMinutes / 60;
+  const vertical = orientation === "vertical";
+  // Pixels per hour along whichever axis carries the time.
+  const hourSize = vertical ? hourHeight : hourWidth;
 
   // `drag` drives the visual; `dragRef` is the source of truth the pointer
   // handlers read so they never see a stale closure between events.
@@ -210,13 +236,13 @@ export function ResourceTimeline<T = unknown>({
     } catch {
       // Pointer capture is best-effort.
     }
-    origin.current = { x: e.clientX, startHours, durationHours };
+    origin.current = { x: vertical ? e.clientY : e.clientX, startHours, durationHours };
     applyDrag({ key, kind, startHours, durationHours, moved: false });
   };
   const moveDrag = (e: ReactPointerEvent) => {
     const d = dragRef.current;
     if (!d || !origin.current) return;
-    const dHours = (e.clientX - origin.current.x) / hourWidth;
+    const dHours = ((vertical ? e.clientY : e.clientX) - origin.current.x) / hourSize;
     const snap = (v: number) => Math.round(v / snapHours) * snapHours;
     if (d.kind === "move") {
       const startHours = clamp(
@@ -274,6 +300,186 @@ export function ResourceTimeline<T = unknown>({
     }
     return map;
   }, [resources, events, resourceId, date]);
+
+  if (vertical) {
+    // Time flows down like the time grid: hour gutter on the left, one flexed
+    // column per resource, so narrow screens share the width instead of
+    // scrolling sideways.
+    const trackHeight = (endHour - startHour) * hourHeight;
+    const vGridLines = `repeating-linear-gradient(to bottom, transparent 0, transparent ${hourHeight - 1}px, ${theme.gridLine} ${hourHeight - 1}px, ${theme.gridLine} ${hourHeight}px)`;
+    return (
+      <div
+        className={className}
+        style={{ fontFamily: theme.fontFamily, color: theme.text, overflowY: "auto", ...style }}
+      >
+        {/* Header: corner above the hour gutter + one label per resource column */}
+        <div
+          {...slot("header", {
+            // Sticky so the resource labels stay visible while the hours scroll
+            // (matching the native renderer's fixed header row).
+            base: { display: "flex", position: "sticky", top: 0, zIndex: 2 },
+            themed: { borderBottom: `1px solid ${theme.gridLine}`, background: theme.surface },
+          })}
+        >
+          <div {...slot("corner", { base: { width: GUTTER_WIDTH, flex: "none" } })} />
+          {resources.map((resource) => (
+            <div
+              key={resource.id}
+              {...slot("resourceLabel", {
+                base: {
+                  flex: 1,
+                  minWidth: 0,
+                  padding: "6px 4px",
+                  textAlign: "center",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  boxSizing: "border-box",
+                },
+                themed: {
+                  fontSize: 13,
+                  fontWeight: 600,
+                  borderLeft: `1px solid ${theme.gridLine}`,
+                },
+              })}
+            >
+              {resource.title ?? resource.id}
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex" }}>
+          <div
+            {...slot("timeAxis", {
+              base: {
+                position: "relative",
+                width: GUTTER_WIDTH,
+                flex: "none",
+                height: trackHeight,
+              },
+            })}
+          >
+            {hours.map((h) => (
+              <div
+                key={h}
+                {...slot("hourTick", {
+                  base: {
+                    position: "absolute",
+                    top: Math.max(0, (h - startHour) * hourHeight - 6),
+                    right: 6,
+                  },
+                  themed: { fontSize: 10, color: theme.textMuted },
+                })}
+              >
+                {formatHour(h, { ampm })}
+              </div>
+            ))}
+          </div>
+          {resources.map((resource) => {
+            const positioned = byResource.get(resource.id) ?? [];
+            return (
+              <div
+                key={resource.id}
+                {...slot("row", {
+                  base: { flex: 1, minWidth: 0 },
+                  themed: { borderLeft: `1px solid ${theme.gridLine}` },
+                })}
+              >
+                <div {...slot("track", { base: { position: "relative", height: trackHeight } })}>
+                  <div
+                    aria-hidden
+                    {...slot("gridLines", {
+                      base: { position: "absolute", inset: 0, pointerEvents: "none" },
+                      themed: { backgroundImage: vGridLines },
+                    })}
+                  />
+                  {positioned.map((pe, idx) => {
+                    const key = `${resource.id}:${idx}`;
+                    const active = drag?.key === key ? drag : null;
+                    const startH = active ? active.startHours : pe.startHours;
+                    const durH = active ? active.durationHours : pe.durationHours;
+                    const top = clamp(startH - startHour, 0, endHour - startHour) * hourHeight;
+                    const bottom =
+                      clamp(startH + durH - startHour, 0, endHour - startHour) * hourHeight;
+                    const height = Math.max(bottom - top, 2);
+                    // Overlapping events share the column as side-by-side sub-lanes.
+                    const lanePct = 100 / pe.columns;
+                    const onPress = () => onPressEvent?.(pe.event);
+                    const args: ResourceEventArgs<T> = {
+                      event: pe.event,
+                      width: 0,
+                      height,
+                      onPress,
+                    };
+                    const draggable = !!onDragEvent;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={draggable ? undefined : onPress}
+                        aria-label={pe.event.title}
+                        {...dataState({ "data-dragging": !!active })}
+                        onPointerDown={
+                          draggable
+                            ? (e) => beginDrag(e, key, "move", pe.startHours, pe.durationHours)
+                            : undefined
+                        }
+                        onPointerMove={draggable ? moveDrag : undefined}
+                        onPointerUp={draggable ? (e) => endDrag(e, pe.event, onPress) : undefined}
+                        onPointerCancel={draggable ? cancelDrag : undefined}
+                        {...slot("event", {
+                          base: {
+                            position: "absolute",
+                            top,
+                            height,
+                            left: `${pe.column * lanePct}%`,
+                            width: `${lanePct}%`,
+                            padding: 1,
+                            border: "none",
+                            background: "transparent",
+                            cursor: draggable ? "grab" : "pointer",
+                            touchAction: draggable ? "none" : "auto",
+                            font: "inherit",
+                            textAlign: "left",
+                            boxSizing: "border-box",
+                            zIndex: active ? 3 : 1,
+                            opacity: active ? 0.85 : 1,
+                          },
+                        })}
+                      >
+                        {Renderer ? (
+                          <Renderer {...args} />
+                        ) : (
+                          <DefaultBar {...args} theme={theme} boxProps={slot("eventBox")} />
+                        )}
+                        {draggable ? (
+                          <span
+                            aria-hidden
+                            onPointerDown={(e) => {
+                              e.stopPropagation();
+                              beginDrag(e, key, "resize", pe.startHours, pe.durationHours);
+                            }}
+                            style={{
+                              position: "absolute",
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              height: 8,
+                              cursor: "ns-resize",
+                              touchAction: "none",
+                            }}
+                          />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   const gridLines = `repeating-linear-gradient(to right, transparent 0, transparent ${hourWidth - 1}px, ${theme.gridLine} ${hourWidth - 1}px, ${theme.gridLine} ${hourWidth}px)`;
 
