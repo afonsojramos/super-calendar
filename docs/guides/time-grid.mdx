@@ -1,0 +1,61 @@
+---
+title: Time grid
+description: The week, day, 3-day, and custom hour-by-hour views.
+---
+
+<Note>
+  Examples use the React Native `Calendar`; most props are shared with the dom renderer, and the
+  [dom vs native comparison](/reference/renderers) lists what differs per renderer.
+</Note>
+
+`mode="week"`, `day`, `3days`, and `custom` all render the time grid: one
+column per day, hours down the side, events as positioned boxes, and an all-day
+lane on top. `week` pages by the calendar week (set `weekStartsOn`: 0 = Sunday,
+1 = Monday, and so on); `day` and `3days` page by their column count; [`custom`](/guides/views#custom-day-counts) renders any slice you
+choose.
+
+```tsx
+<Calendar
+  mode="week"
+  date={date}
+  events={events}
+  scrollOffsetMinutes={8 * 60} // open scrolled to 8am
+  onChangeDate={setDate}
+/>
+```
+
+## The hour axis
+
+- `minHour` / `maxHour` — clamp the visible window (e.g. 7–20) instead of the
+  full day.
+- `hourHeight` — initial pixels per hour.
+- Zooming rescales it between `minHourHeight` and `maxHourHeight`: pinch on
+  native, Ctrl/⌘ + wheel on the web.
+- `timeslots` — sub-hour divider lines per hour (e.g. `2` for half-hours).
+- `ampm` — 12-hour labels; `hourComponent` replaces the label entirely.
+- `hideHours` — collapse the hour gutter (the grid lines stay).
+- `showWeekNumber` / `weekNumberPrefix` — ISO week number in the header gutter.
+
+## The all-day lane
+
+All-day events (flagged `allDay`, or spanning midnight-to-midnight) leave the
+timed columns and stack in a lane above the grid. Turn it off with
+`showAllDayEventCell={false}`.
+
+## Now line and business hours
+
+The red current-time line follows the wall clock (`showNowIndicator`, on by
+default). `businessHours` shades the closed hours per day; return `null` for a
+fully closed day (see [Theming](/guides/theming) for the shade colour).
+
+## Interaction
+
+Tap handlers: `onPressCell` / `onLongPressCell` (empty grid space),
+`onPressEvent` / `onLongPressEvent`, and `onPressDateHeader` (the day-column
+headers). Drag-to-move, resize, and drag-to-create are covered in
+[Dragging & creating](/guides/dragging); keyboard and screen-reader support in
+[Accessibility](/guides/accessibility).
+
+Replace the day-header row with `renderTimeGridHeader` (React Native), style parts of the grid
+with per-slot [classes](/guides/styling), or recolour it via the
+[theme](/guides/theming).

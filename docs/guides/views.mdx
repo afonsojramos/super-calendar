@@ -1,0 +1,48 @@
+---
+title: Views & modes
+description: Every surface the calendar can render, and the mode prop that picks one.
+---
+
+<Note>
+  Examples use the React Native `Calendar`; most props are shared with the dom renderer, and the
+  [dom vs native comparison](/reference/renderers) lists what differs per renderer.
+</Note>
+
+`Calendar` renders one view at a time, picked by `mode`:
+
+```tsx
+<Calendar mode="week" date={date} events={events} onChangeDate={setDate} />
+```
+
+| View                           | `mode`                           | What it is                                        |
+| ------------------------------ | -------------------------------- | ------------------------------------------------- |
+| [Month](/guides/month-view)    | `month`                          | The classic month grid with event chips.          |
+| [Time grid](/guides/time-grid) | `week`, `day`, `3days`, `custom` | Hour-by-hour columns with positioned event boxes. |
+| [Schedule](/guides/schedule)   | `schedule`                       | A vertical, day-grouped agenda list.              |
+
+Three more surfaces ship as standalone components rather than modes:
+
+| Component                                     | What it is                                             |
+| --------------------------------------------- | ------------------------------------------------------ |
+| [MonthList](/guides/month-list)               | An infinite vertically-scrolling list of months.       |
+| [ResourceTimeline](/guides/resource-timeline) | Rooms/people/machines as lanes over one day's hours.   |
+| [DateRangePicker](/guides/date-picker)        | Date and range picking, standalone or as a form field. |
+
+## Custom day counts
+
+`custom` renders any number of columns. Set `numberOfDays` (e.g. `5` for a
+work-week), or set `weekEndsOn` to show a fixed slice of the week
+(`weekStartsOn`…`weekEndsOn`) that pages week by week.
+
+```tsx
+<Calendar mode="custom" numberOfDays={5} date={date} events={events} onChangeDate={setDate} />
+```
+
+## Paging
+
+Every paged view moves one page per swipe by default. Set `freeSwipe` to let a
+fling carry across several pages (still snapping to a boundary), or
+`swipeEnabled={false}` to page only programmatically. `onChangeDate` fires with
+the new anchor date; `onChangeDateRange` (React Native) fires with the
+`[start, end]` of the visible window. On react-native-web the pager follows the left/right arrow
+keys; the dom renderer pages with PageUp/PageDown when `onChangeDate` is wired.

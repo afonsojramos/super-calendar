@@ -1,0 +1,62 @@
+---
+title: Month view
+description: The month grid, event chip fitting, overflow, and month paging.
+---
+
+<Note>
+  Examples use the React Native `Calendar`; most props are shared with the dom renderer, and the
+  [dom vs native comparison](/reference/renderers) lists what differs per renderer.
+</Note>
+
+`mode="month"` renders the classic month grid: a swipeable pager of 4–6 week
+rows, with each day cell showing its event chips.
+
+```tsx
+<Calendar
+  mode="month"
+  date={date}
+  events={events}
+  onChangeDate={setDate}
+  onPressDay={(day) => {
+    setDate(day);
+    setMode("day");
+  }}
+/>
+```
+
+## Event chips and overflow
+
+Each day cell shows as many chips as its height allows and collapses the rest
+into a `+N more` label.
+
+```tsx
+<Calendar mode="month" /* ... */ />                            // auto-fit (default)
+<Calendar mode="month" maxVisibleEventCount={3} /* ... */ />   // fixed cap
+```
+
+- `maxVisibleEventCount` — a fixed cap instead of auto-fit. Recommended when you
+  pass a custom `renderEvent`, since auto-fit assumes the built-in chip height.
+- `onPressMore` — tap the overflow label; receives the hidden events and the day.
+- `moreLabel` — customize the overflow text (e.g. `"+{moreCount}"`).
+- `sortedMonthView` — sort each day's chips by start time (default on); all-day
+  events lead the day.
+
+## Grid shape
+
+- `showSixWeeks` — always render six week rows for a fixed-height grid.
+- `showAdjacentMonths` — show (dimmed) days from the neighbouring months
+  (default on).
+- `weekStartsOn` — 0 = Sunday, 1 = Monday, and so on.
+- `weekdayFormat` — header label width: `narrow` ("M"), `short` ("Mon"), or
+  `long` ("Monday").
+
+## Taps and custom cells
+
+`onPressDay` / `onLongPressDay` fire for the cell, `onPressEvent` /
+`onLongPressEvent` for a chip. Replace parts of the cell with
+`renderCustomDateForMonth` (the date badge) or a custom `renderEvent`
+(see [Custom events](/guides/events)); restyle everything else through the
+[theme](/guides/theming) or per-slot [classes](/guides/styling).
+
+Looking for a vertically scrolling list of months instead of a pager, or an
+events-free month grid for picking dates? That's [MonthList](/guides/month-list).

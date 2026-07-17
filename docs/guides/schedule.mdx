@@ -1,0 +1,35 @@
+---
+title: Schedule
+description: The vertical, day-grouped agenda list.
+---
+
+<Note>
+  Examples use the React Native `Calendar`; most props are shared with the dom renderer, and the
+  [dom vs native comparison](/reference/renderers) lists what differs per renderer.
+</Note>
+
+`mode="schedule"` renders a flat agenda: events sorted by start time and
+grouped under a date header per day, with no time grid. It's the "what's
+coming up" view.
+
+```tsx
+<Calendar mode="schedule" date={date} events={events} onChangeDate={setDate} />
+```
+
+The list shows the events you pass, so you control the range by controlling the
+array. Recurring events are the exception: rules
+[auto-expand](/guides/recurring-events) over a forward window so a repeating
+event fills the agenda without you materialising occurrences.
+
+## Rows and headers
+
+- Date headers announce the day; today's header is highlighted (or the
+  `activeDate` you pass). `onPressDay` makes headers tappable.
+- `onPressEvent` / `onLongPressEvent` fire for rows; `renderEvent` (or
+  `renderScheduleEvent` on the dom `Calendar`) replaces the row's card.
+- `allDayLabel` sets the text shown instead of a time range for all-day events.
+- `itemSeparatorComponent` (React Native) draws between rows.
+- An empty list renders a "No events" placeholder.
+
+Restyle the headers, rows, and placeholder through the `dayHeader`, `eventRow`,
+and `empty` [slots](/guides/styling), or the [theme](/guides/theming).

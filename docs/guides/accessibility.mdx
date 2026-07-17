@@ -1,0 +1,61 @@
+---
+title: Accessibility
+description: Screen-reader labels and actions, keyboard navigation, and reduced motion.
+---
+
+Both renderers ship accessible defaults: every event, day cell, and day-column
+header carries a full label and role out of the box, and the interactions that
+are gesture-only for sighted users have screen-reader and keyboard equivalents.
+
+## Labels
+
+Day cells announce the full date, today, selection state, and how many events
+they hold ("Friday, 17 July 2026, today, 3 events"). Events announce their
+title and time range; all-day events say so instead of a time. Override the
+event announcement with `eventAccessibilityLabel`:
+
+```tsx
+<Calendar
+  eventAccessibilityLabel={(event, { isAllDay }) =>
+    isAllDay ? `${event.title}, all day` : `${event.title} at ${event.start.toLocaleTimeString()}`
+  }
+  /* ... */
+/>
+```
+
+## Screen-reader actions (React Native)
+
+Dragging is a gesture, so draggable events expose the same operations as
+[accessibility actions](https://reactnative.dev/docs/accessibility#accessibility-actions):
+VoiceOver and TalkBack users pick "Move 15 minutes later/earlier" or
+"Extend/Shorten by 15 minutes" from the actions rotor, and the change commits
+through the same `onDragEvent` path as a gesture. The step follows
+`dragStepMinutes`. Time-grid events and [ResourceTimeline](/guides/resource-timeline)
+bars both expose them whenever `onDragEvent` is set.
+
+## Keyboard (web)
+
+- **Paging** — on react-native-web the left/right arrow keys page the month and
+  time-grid views (the schedule scrolls instead); the dom renderer pages with
+  PageUp/PageDown when `onChangeDate` is wired.
+- **`keyboardDayNavigation`** (dom `MonthView` / `MonthList`) — arrow keys move
+  between day cells, Enter/Space selects.
+- **`keyboardEventNavigation`** (dom `TimeGrid`) — Up/Down move through a day's
+  events by time, Left/Right jump to the nearest event in the adjacent day,
+  Home/End reach the first/last, Enter/Space activate. Navigation is additive:
+  every event stays in the Tab order.
+
+## Reduced motion
+
+On React Native the time grid honours the OS reduce-motion setting: its one
+animated snap (recentring after a cell press) becomes an instant jump. The
+month pager's page transitions never animate programmatic jumps in the first
+place. Reanimated drives the remaining transitions on the UI thread, so nothing
+relies on JS-thread timing.
+
+## Custom renderers
+
+A custom `renderEvent` receives `accessibilityActions` /
+`onAccessibilityAction` in its args on native; spread them onto your pressable
+root so screen-reader move/resize keeps working (the built-in renderers do this
+for you).
