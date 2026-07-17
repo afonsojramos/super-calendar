@@ -4,7 +4,16 @@ import "./global.css";
 import { addDays, addMonths, addWeeks, format } from "date-fns";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -127,6 +136,7 @@ export default function App() {
   const { range, onPressDate, selectRange, reset } = useDateRange({ minDate: pickerMinDate });
   // DEMO_MODE pins the view when set; otherwise the tab bar drives it.
   const activeMode: DemoTab = DEMO_MODE ?? mode;
+  const { width: windowWidth } = useWindowDimensions();
 
   // The "ics" tab parses whatever is in the text box; invalid input just yields
   // an empty list while typing.
@@ -339,6 +349,9 @@ export default function App() {
               <View style={styles.card}>
                 <ResourceTimeline
                   date={date}
+                  // Phones read better with time flowing down; wide screens keep
+                  // the classic horizontal timeline.
+                  orientation={windowWidth < 600 ? "vertical" : "horizontal"}
                   resources={ROOMS}
                   events={events}
                   resourceId={(event) => ROOMS[Number(event.id) % ROOMS.length].id}
