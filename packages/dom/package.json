@@ -1,6 +1,6 @@
 {
   "name": "@super-calendar/dom",
-  "version": "2.3.2",
+  "version": "2.4.0",
   "description": "Virtualized month / week / day calendar and date picker for react-dom. No React Native, no react-native-web.",
   "keywords": [
     "calendar",

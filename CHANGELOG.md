@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.4.0](https://github.com/afonsojramos/super-calendar/compare/v2.3.2...v2.4.0) (2026-07-17)
+
+
+### Features
+
+* add a vertical orientation to the ResourceTimeline ([c6ae545](https://github.com/afonsojramos/super-calendar/commit/c6ae54500e33e8379454b68c07bc4453f1aa787f))
+* **dom:** drag events across day columns in the TimeGrid ([8de7118](https://github.com/afonsojramos/super-calendar/commit/8de71187cb2b7836e78222ed3db0731191c891a2))
+* **dom:** page the Calendar with PageUp/PageDown via onChangeDate ([b5f28e0](https://github.com/afonsojramos/super-calendar/commit/b5f28e0fb051bdba36ef5b433d55c24e3bec2585))
+* **dom:** round out TimeGrid parity and keyboard accessibility ([bf7f2e7](https://github.com/afonsojramos/super-calendar/commit/bf7f2e7b9a37a3c969f74445128db224e542bdea))
+* expand recurrence and apply a timeZone inside Calendar, export iCal from native ([115ff26](https://github.com/afonsojramos/super-calendar/commit/115ff260c56392001b51894d714905728427f5c3))
+* **native:** add Agenda slots, Calendar classNames forwarding, and enforce slot-prop parity ([d816108](https://github.com/afonsojramos/super-calendar/commit/d8161085e1c5603441578df9e85cec854f5e303c))
+* **native:** add per-slot classNames/styles to MonthView for Tailwind runtimes ([0d92621](https://github.com/afonsojramos/super-calendar/commit/0d9262112a6d2a1e3b849333d2e689c8cdb8399c))
+* **native:** add per-slot classNames/styles to the TimeGrid and all-day lane ([68de498](https://github.com/afonsojramos/super-calendar/commit/68de498ea1208731024bf860685a31f5cfbcbec3))
+* **native:** add screen-reader move/resize actions to ResourceTimeline bars ([f13e6b2](https://github.com/afonsojramos/super-calendar/commit/f13e6b29293b8a3965b258c7e2e76df3c49aa684))
+* **native:** announce day-column headers and add a dom/native comparison table ([8b6c4e1](https://github.com/afonsojramos/super-calendar/commit/8b6c4e1e252360adf9625896630cefcf2a8a0796))
+* **native:** expose screen-reader move/resize actions on draggable events ([54b2f9e](https://github.com/afonsojramos/super-calendar/commit/54b2f9e2d1c1551894af03d823fc9099b002b308))
+* **native:** forward slot classNames/styles through MonthList and MonthPager ([543bac8](https://github.com/afonsojramos/super-calendar/commit/543bac8b6545799bd3e19ec3f873241e6fd003cc))
+* **native:** honor OS reduce-motion for the pager's animated snap ([ee1be65](https://github.com/afonsojramos/super-calendar/commit/ee1be653600a284c4cda1665988b384116879a99))
+
+
+### Bug Fixes
+
+* **core:** don't reject a drag-move of an event shorter than one snap step ([2c54beb](https://github.com/afonsojramos/super-calendar/commit/2c54bebc2b47399c1e868d94b9d3657ad830daf2))
+* **core:** make recurrence expansion correct over long and far-future ranges ([8815923](https://github.com/afonsojramos/super-calendar/commit/8815923731bf26c4474a388f876314983b6c8885))
+* **native:** repaint mounted month pages when events or activeDate change ([#29](https://github.com/afonsojramos/super-calendar/issues/29)) ([4345edc](https://github.com/afonsojramos/super-calendar/commit/4345edc5b54c323057c6de7831f573fc8928efbc))
+* **native:** repaint mounted MonthList months when events or activeDate change ([3f99148](https://github.com/afonsojramos/super-calendar/commit/3f9914833d6f287a0a44ef3c40c6709371fb75c1))
+
 ## [2.3.2](https://github.com/afonsojramos/super-calendar/compare/v2.3.1...v2.3.2) (2026-07-08)
 
 
