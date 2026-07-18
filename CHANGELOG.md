@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.0](https://github.com/afonsojramos/super-calendar/compare/v2.4.0...v2.5.0) (2026-07-18)
+
+
+### Features
+
+* add cell presses, drag-to-create, and business hours to the ResourceTimeline ([dfdddaa](https://github.com/afonsojramos/super-calendar/commit/dfdddaa86e2cd9f8977ea4a5e9a2aece7e11d822))
+
 ## [2.4.0](https://github.com/afonsojramos/super-calendar/compare/v2.3.2...v2.4.0) (2026-07-17)
 
 
