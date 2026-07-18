@@ -386,9 +386,33 @@ export function App() {
               orientation={narrowViewport ? "vertical" : "horizontal"}
               resources={ROOMS}
               events={events}
-              resourceId={(event) => ROOMS[Number(event.id) % ROOMS.length].id}
+              // Created events carry a real resourceId; demo data spreads by id.
+              resourceId={(event) =>
+                (event as { resourceId?: string }).resourceId ??
+                ROOMS[Number(event.id) % ROOMS.length].id
+              }
               startHour={7}
               endHour={20}
+              businessHours={() => ({ start: 9, end: 17 })}
+              onPressCell={(cellAt, resource) =>
+                console.log("press cell:", resource.title, cellAt.toISOString())
+              }
+              onCreateEvent={(start, end, resource) =>
+                setEvents((prev) => {
+                  const nextId = String(Math.max(0, ...prev.map((e) => Number(e.id) || 0)) + 1);
+                  return [
+                    ...prev,
+                    {
+                      id: nextId,
+                      kind: "work",
+                      title: `✨ ${resource.title}`,
+                      start,
+                      end,
+                      resourceId: resource.id,
+                    } as (typeof prev)[number],
+                  ];
+                })
+              }
               onPressEvent={(event) => console.log("press event:", event.title)}
               onDragEvent={(event, start, end) => {
                 if (event.kind === "exam") return false; // exams are locked
