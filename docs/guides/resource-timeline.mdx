@@ -107,7 +107,8 @@ On the web renderer, pass `onDragEvent` to make the board interactive: drag a ba
 move it along the axis, or drag its right edge to resize. It's called with the
 proposed new start/end; return `false` to reject the drop (the bar snaps back).
 Movement snaps to `dragStepMinutes` (default 15). A bar being dragged carries
-`data-dragging` for styling.
+`data-dragging` for styling. In the vertical orientation the same drag follows
+the vertical axis and resize moves to the bottom edge.
 
 ```tsx
 import { ResourceTimeline } from "@super-calendar/dom";
@@ -123,12 +124,57 @@ import { ResourceTimeline } from "@super-calendar/dom";
 />;
 ```
 
+## Creating and pressing empty space
+
+The board takes the same empty-space interactions as the time grid, with the
+lane's resource added to each callback so you know **where** as well as when:
+
+- `onPressCell(at, resource)` — tap an empty slot; `at` is snapped to
+  `dragStepMinutes`.
+- `onCreateEvent(start, end, resource)` — sweep out a new event on empty lane
+  space: drag with a mouse or pen on the web, long-press then drag on React
+  Native. A ghost previews the range while you drag.
+- `onLongPressEvent(event)` / `onLongPressCell(at, resource)` — React Native
+  long-presses. A bar's long-press is claimed by `onDragEvent` when set (so
+  `onLongPressEvent` fires only for non-draggable bars), and empty-space
+  long-press is claimed by `onCreateEvent` when set (so `onLongPressCell` fires
+  only without it).
+
+```tsx
+<ResourceTimeline
+  date={date}
+  resources={resources}
+  events={events}
+  onPressCell={(at, resource) => openBookingForm(resource, at)}
+  onCreateEvent={(start, end, resource) =>
+    setEvents((prev) => [...prev, { title: "New booking", start, end, resourceId: resource.id }])
+  }
+/>
+```
+
+## Business hours
+
+`businessHours` shades the closed hours of each lane. It takes the same shape
+as the Calendar's prop plus the lane's resource, so lanes can keep different
+opening hours; return `null` for a fully closed lane. A date-only function
+(the exact one you pass to `Calendar`) is accepted as-is.
+
+```tsx
+<ResourceTimeline
+  date={date}
+  resources={resources}
+  events={events}
+  businessHours={(day, resource) => (resource.id === "vault" ? null : { start: 9, end: 17 })}
+/>
+```
+
 ## React Native
 
 The native renderer exposes the same board and props (`date`, `resources`, `events`,
 `orientation`, `resourceId`, `startHour`/`endHour`, `hourWidth`, `hourHeight`, `rowHeight`, `labelWidth`, `ampm`,
-`renderEvent`, `onPressEvent`), plus `onDragEvent` / `dragStepMinutes` for
-**long-press drag-to-move and edge-resize**. It reads the theme from context, so
+`renderEvent`, `onPressEvent`, `onPressCell`, `onCreateEvent`, `businessHours`), plus
+`onDragEvent` / `dragStepMinutes` for **long-press drag-to-move and edge-resize**
+and the long-press variants `onLongPressEvent` / `onLongPressCell`. It reads the theme from context, so
 restyle via `theme.containers` (see [Theming](/guides/theming)):
 
 ```tsx

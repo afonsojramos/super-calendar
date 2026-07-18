@@ -240,3 +240,164 @@ describe("dom ResourceTimeline vertical orientation", () => {
     expect(end.getHours()).toBe(11);
   });
 });
+
+describe("dom ResourceTimeline cell interactions", () => {
+  it("sweeps empty lane space into onCreateEvent with the lane's resource", () => {
+    const onCreateEvent = jest.fn();
+    const { container } = render(
+      <ResourceTimeline
+        date={date}
+        resources={resources}
+        events={events}
+        startHour={8}
+        hourWidth={80}
+        onCreateEvent={onCreateEvent}
+      />,
+    );
+    const track = container.querySelectorAll('[data-slot="track"]')[0] as HTMLElement;
+    // Sweep 80px → 240px at 80px/hour from 08:00: 09:00 → 11:00.
+    fireEvent.pointerDown(track, { clientX: 80, pointerId: 1 });
+    fireEvent.pointerMove(track, { clientX: 240, pointerId: 1 });
+    fireEvent.pointerUp(track, { clientX: 240, pointerId: 1 });
+
+    expect(onCreateEvent).toHaveBeenCalledTimes(1);
+    const [start, end, resource] = onCreateEvent.mock.calls[0] as [Date, Date, { id: string }];
+    expect(start.getHours()).toBe(9);
+    expect(end.getHours()).toBe(11);
+    expect(resource.id).toBe("a");
+  });
+
+  it("treats a click without movement as onPressCell with the snapped time", () => {
+    const onPressCell = jest.fn();
+    const { container } = render(
+      <ResourceTimeline
+        date={date}
+        orientation="vertical"
+        resources={resources}
+        events={events}
+        startHour={8}
+        hourHeight={48}
+        onPressCell={onPressCell}
+      />,
+    );
+    // Second lane (Room B), 72px down at 48px/hour from 08:00 → 09:30.
+    const track = container.querySelectorAll('[data-slot="track"]')[1] as HTMLElement;
+    fireEvent.pointerDown(track, { clientY: 72, pointerId: 1 });
+    fireEvent.pointerUp(track, { clientY: 72, pointerId: 1 });
+
+    expect(onPressCell).toHaveBeenCalledTimes(1);
+    const [at, resource] = onPressCell.mock.calls[0] as [Date, { id: string }];
+    expect(at.getHours()).toBe(9);
+    expect(at.getMinutes()).toBe(30);
+    expect(resource.id).toBe("b");
+  });
+
+  it("does not start a create when the pointer goes down on a bar", () => {
+    const onCreateEvent = jest.fn();
+    const onPressEvent = jest.fn();
+    const { getByText } = render(
+      <ResourceTimeline
+        date={date}
+        resources={resources}
+        events={events}
+        startHour={8}
+        hourWidth={80}
+        onCreateEvent={onCreateEvent}
+        onPressEvent={onPressEvent}
+      />,
+    );
+    // Pointer down on the bar bubbles to the track, but the target !== currentTarget
+    // guard rejects it, so no create is swept and the bar's click still presses.
+    const bar = getByText("Standup").closest("button") as HTMLElement;
+    fireEvent.pointerDown(bar, { clientX: 100, pointerId: 1 });
+    fireEvent.pointerMove(bar, { clientX: 220, pointerId: 1 });
+    fireEvent.pointerUp(bar, { clientX: 220, pointerId: 1 });
+    fireEvent.click(bar);
+    expect(onCreateEvent).not.toHaveBeenCalled();
+    expect(onPressEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores touch pointers so the board stays free to scroll", () => {
+    const onPressCell = jest.fn();
+    const onCreateEvent = jest.fn();
+    const { container } = render(
+      <ResourceTimeline
+        date={date}
+        resources={resources}
+        events={events}
+        startHour={8}
+        hourWidth={80}
+        onPressCell={onPressCell}
+        onCreateEvent={onCreateEvent}
+      />,
+    );
+    const track = container.querySelectorAll('[data-slot="track"]')[0] as HTMLElement;
+    fireEvent.pointerDown(track, { clientX: 80, pointerId: 1, pointerType: "touch" });
+    fireEvent.pointerMove(track, { clientX: 240, pointerId: 1, pointerType: "touch" });
+    fireEvent.pointerUp(track, { clientX: 240, pointerId: 1, pointerType: "touch" });
+    expect(onPressCell).not.toHaveBeenCalled();
+    expect(onCreateEvent).not.toHaveBeenCalled();
+  });
+
+  it("does not commit a create when the gesture is cancelled", () => {
+    const onCreateEvent = jest.fn();
+    const { container } = render(
+      <ResourceTimeline
+        date={date}
+        resources={resources}
+        events={events}
+        startHour={8}
+        hourWidth={80}
+        onCreateEvent={onCreateEvent}
+      />,
+    );
+    const track = container.querySelectorAll('[data-slot="track"]')[0] as HTMLElement;
+    fireEvent.pointerDown(track, { clientX: 80, pointerId: 1 });
+    fireEvent.pointerMove(track, { clientX: 240, pointerId: 1 });
+    fireEvent.pointerCancel(track, { pointerId: 1 });
+    fireEvent.pointerUp(track, { clientX: 240, pointerId: 1 });
+    expect(onCreateEvent).not.toHaveBeenCalled();
+  });
+
+  it("previews no create ghost in press-only mode (onPressCell without onCreateEvent)", () => {
+    const onPressCell = jest.fn();
+    const { container } = render(
+      <ResourceTimeline
+        date={date}
+        resources={resources}
+        events={events}
+        startHour={8}
+        hourWidth={80}
+        onPressCell={onPressCell}
+      />,
+    );
+    const track = container.querySelectorAll('[data-slot="track"]')[0] as HTMLElement;
+    // Sweeping with a mouse in press-only mode must not paint a create ghost; the
+    // drag still resolves to a press at the start via the pointer path.
+    fireEvent.pointerDown(track, { clientX: 80, pointerId: 1 });
+    fireEvent.pointerMove(track, { clientX: 240, pointerId: 1 });
+    expect(container.querySelectorAll('[data-slot="createGhost"]')).toHaveLength(0);
+    fireEvent.pointerUp(track, { clientX: 240, pointerId: 1 });
+    expect(onPressCell).toHaveBeenCalledTimes(1);
+  });
+
+  it("shades closed hours per lane from businessHours", () => {
+    const { container } = render(
+      <ResourceTimeline
+        date={date}
+        resources={resources}
+        events={events}
+        startHour={8}
+        endHour={20}
+        hourWidth={80}
+        businessHours={(_d, resource) => (resource.id === "a" ? { start: 9, end: 17 } : null)}
+      />,
+    );
+    const bands = container.querySelectorAll('[data-slot="businessHours"]');
+    // Room A: before-open + after-close; Room B: closed all day (one full band).
+    expect(bands).toHaveLength(3);
+    const first = bands[0] as HTMLElement;
+    expect(first.style.left).toBe("0px");
+    expect(first.style.width).toBe("80px"); // 08:00–09:00 at 80px/hour
+  });
+});

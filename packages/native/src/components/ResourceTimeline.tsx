@@ -2,6 +2,8 @@ import type { ComponentType, ReactElement } from "react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   type AccessibilityActionEvent,
+  type GestureResponderEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +14,8 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import {
   type CalendarEvent,
+  cellRangeFromDrag,
+  closedHourBands,
   eventTimeLabel,
   formatHour,
   layoutDayEvents,
@@ -23,7 +27,11 @@ import { useCalendarTheme } from "../theme";
 
 // Native long-press duration (ms) before a bar is picked up to move.
 const MOVE_ACTIVATE_MS = 250;
+// Web: activate the create sweep past a small drag instead of a long-press, so
+// a plain mouse drag creates (mirrors the time grid).
+const DRAG_ACTIVATE_PX = 8;
 const MINUTES_PER_HOUR = 60;
+const isWeb = Platform.OS === "web";
 
 /** A schedulable lane (room, person, machine) events are grouped under. */
 export interface Resource {
@@ -82,11 +90,34 @@ export interface ResourceTimelineProps<T = unknown> {
   /** Tap an event. */
   onPressEvent?: (event: CalendarEvent<T>) => void;
   /**
+   * Long-press an event. When `onDragEvent` is also set, a long-press picks the
+   * bar up to move instead, so this fires only for non-draggable bars.
+   */
+  onLongPressEvent?: (event: CalendarEvent<T>) => void;
+  /**
    * Enables drag-to-move and edge-resize along the time axis: long-press a bar to
    * move it, or drag its right edge to resize. Called with the proposed new
    * start/end; return `false` to reject the drop (it snaps back).
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
+  /** Tap empty lane space; called with the snapped time and the lane's resource. */
+  onPressCell?: (at: Date, resource: Resource) => void;
+  /**
+   * Long-press empty lane space. When `onCreateEvent` is also set, the long-press
+   * starts the create drag instead, so this fires only without it.
+   */
+  onLongPressCell?: (at: Date, resource: Resource) => void;
+  /**
+   * Long-press empty lane space, then drag along the time axis to sweep out a new
+   * event; called with the swept start/end and the lane's resource.
+   */
+  onCreateEvent?: (start: Date, end: Date, resource: Resource) => void;
+  /**
+   * Shade the hours outside this window, per lane. Same shape as the Calendar's
+   * `businessHours` plus the lane's resource, so per-resource opening hours work
+   * (return `null` for a fully closed lane). A date-only function is accepted.
+   */
+  businessHours?: (date: Date, resource: Resource) => { start: number; end: number } | null;
   /** Snap dragged events to this many minutes (default 15). */
   dragStepMinutes?: number;
 }
@@ -154,6 +185,7 @@ type ResourceBarProps<T> = {
   snapMinutes: number;
   Renderer: ComponentType<ResourceEventArgs<T>>;
   onPress: () => void;
+  onLongPress?: () => void;
   onDragEvent: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
   theme: ReturnType<typeof useCalendarTheme>;
 };
@@ -174,6 +206,7 @@ function ResourceBar<T>({
   snapMinutes,
   Renderer,
   onPress,
+  onLongPress,
   onDragEvent,
   theme,
 }: ResourceBarProps<T>): ReactElement {
@@ -311,6 +344,9 @@ function ResourceBar<T>({
       <GestureDetector gesture={moveGesture}>
         <Pressable
           onPress={onPress}
+          // When the bar is draggable, the move gesture claims the long-press
+          // first; this fires only for non-draggable (disabled) bars.
+          onLongPress={onLongPress}
           accessibilityRole="button"
           accessibilityLabel={pe.event.title}
           accessibilityActions={barActions}
@@ -339,6 +375,171 @@ function ResourceBar<T>({
         />
       </GestureDetector>
     </Animated.View>
+  );
+}
+
+type LaneInteractionLayerProps = {
+  resource: Resource;
+  /** Time flows down instead of across. */
+  vertical: boolean;
+  /** Pixels per hour along the time axis. */
+  hourSize: number;
+  startHour: number;
+  date: Date;
+  snapMinutes: number;
+  onPressCell?: (at: Date, resource: Resource) => void;
+  onLongPressCell?: (at: Date, resource: Resource) => void;
+  onCreateEvent?: (start: Date, end: Date, resource: Resource) => void;
+  theme: ReturnType<typeof useCalendarTheme>;
+};
+
+// The tap/long-press/create surface behind a lane's bars, mirroring the time
+// grid's cell layer: taps snap to `snapMinutes`, and (when `onCreateEvent` is
+// set) a long-press starts a drag that sweeps out a ghost along the time axis.
+// Hidden from screen readers — it's a pointer convenience, not the accessible
+// path.
+function LaneInteractionLayer({
+  resource,
+  vertical,
+  hourSize,
+  startHour,
+  date,
+  snapMinutes,
+  onPressCell,
+  onLongPressCell,
+  onCreateEvent,
+  theme,
+}: LaneInteractionLayerProps): ReactElement {
+  const ghostStart = useSharedValue(0);
+  const ghostSize = useSharedValue(0);
+  const ghostVisible = useSharedValue(0);
+
+  const timeAt = useCallback(
+    (px: number) => cellRangeFromDrag(date, px, px, hourSize, startHour, snapMinutes)?.start,
+    [date, hourSize, startHour, snapMinutes],
+  );
+  const commitCreate = useCallback(
+    (fromPx: number, toPx: number) => {
+      const range = cellRangeFromDrag(date, fromPx, toPx, hourSize, startHour, snapMinutes);
+      if (range) onCreateEvent?.(range.start, range.end, resource);
+    },
+    [date, hourSize, startHour, snapMinutes, onCreateEvent, resource],
+  );
+
+  const pressAt = useCallback(
+    (px: number) => {
+      const at = timeAt(px);
+      if (at) onPressCell?.(at, resource);
+    },
+    [timeAt, onPressCell, resource],
+  );
+
+  // Web: a GestureDetector swallows the Pressable's presses on react-native-web,
+  // so taps come back through a Tap gesture, and the create sweep activates past
+  // a small drag instead of a long-press so a plain mouse drag creates. Both
+  // mirror the time grid's cell layer.
+  const laneGesture = useMemo(() => {
+    const pan = onCreateEvent
+      ? Gesture.Pan()
+          .onStart((e) => {
+            ghostStart.value = vertical ? e.y : e.x;
+            ghostSize.value = 0;
+            ghostVisible.value = 1;
+          })
+          .onUpdate((e) => {
+            ghostSize.value = (vertical ? e.y : e.x) - ghostStart.value;
+          })
+          // `success` is false when the gesture is cancelled/failed after it
+          // activated (RNGH still calls onEnd); only a real end should create.
+          .onEnd((e, success) => {
+            ghostVisible.value = 0;
+            if (success) runOnJS(commitCreate)(ghostStart.value, vertical ? e.y : e.x);
+          })
+          .onFinalize(() => {
+            ghostVisible.value = 0;
+          })
+      : null;
+    const activatedPan = pan
+      ? isWeb
+        ? vertical
+          ? pan.activeOffsetY([-DRAG_ACTIVATE_PX, DRAG_ACTIVATE_PX])
+          : pan.activeOffsetX([-DRAG_ACTIVATE_PX, DRAG_ACTIVATE_PX])
+        : pan.activateAfterLongPress(MOVE_ACTIVATE_MS)
+      : null;
+    const tap =
+      isWeb && onPressCell
+        ? Gesture.Tap().onEnd((e) => {
+            runOnJS(pressAt)(vertical ? e.y : e.x);
+          })
+        : null;
+    if (activatedPan && tap) return Gesture.Exclusive(activatedPan, tap);
+    return activatedPan ?? tap;
+  }, [
+    onCreateEvent,
+    onPressCell,
+    vertical,
+    commitCreate,
+    pressAt,
+    ghostStart,
+    ghostSize,
+    ghostVisible,
+  ]);
+
+  const ghostStyle = useAnimatedStyle(() => {
+    // Snap the preview to the same grid the commit resolves to, so what you see
+    // is what cellRangeFromDrag will create.
+    const stepPx = (snapMinutes / MINUTES_PER_HOUR) * hourSize;
+    const snap = (v: number) => (stepPx > 0 ? Math.round(v / stepPx) * stepPx : v);
+    const a = snap(ghostStart.value);
+    const b = snap(ghostStart.value + ghostSize.value);
+    const from = Math.min(a, b);
+    const size = Math.max(Math.abs(b - a), 2);
+    return vertical
+      ? { opacity: ghostVisible.value, top: from, height: size }
+      : { opacity: ghostVisible.value, left: from, width: size };
+  }, [vertical, hourSize, snapMinutes]);
+
+  const pxOf = (e: GestureResponderEvent) =>
+    vertical ? e.nativeEvent.locationY : e.nativeEvent.locationX;
+  const handlePress = onPressCell ? (e: GestureResponderEvent) => pressAt(pxOf(e)) : undefined;
+  // When create is on, a long-press starts the create drag, so don't also fire
+  // the consumer's long-press handler (mirrors the time grid).
+  const handleLongPress =
+    onLongPressCell && !onCreateEvent
+      ? (e: GestureResponderEvent) => {
+          const at = timeAt(pxOf(e));
+          if (at) onLongPressCell(at, resource);
+        }
+      : undefined;
+
+  const layer = (
+    <Pressable
+      testID="resource-cell-layer"
+      style={StyleSheet.absoluteFill}
+      onPress={handlePress}
+      onLongPress={handleLongPress}
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+    />
+  );
+  return (
+    <>
+      {laneGesture ? <GestureDetector gesture={laneGesture}>{layer}</GestureDetector> : layer}
+      {onCreateEvent ? (
+        <Animated.View
+          testID="resource-create-ghost"
+          pointerEvents="none"
+          style={[
+            vertical ? styles.vcreateGhost : styles.hcreateGhost,
+            {
+              backgroundColor: theme.colors.eventBackground,
+              borderColor: theme.colors.todayBackground,
+            },
+            ghostStyle,
+          ]}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -375,11 +576,22 @@ export function ResourceTimeline<T = unknown>({
   ampm = false,
   renderEvent,
   onPressEvent,
+  onLongPressEvent,
   onDragEvent,
+  onPressCell,
+  onLongPressCell,
+  onCreateEvent,
+  businessHours,
   dragStepMinutes = 15,
 }: ResourceTimelineProps<T>): ReactElement {
   const theme = useCalendarTheme();
   const Renderer = renderEvent ?? DefaultBar;
+  const cellEnabled = !!onPressCell || !!onLongPressCell || !!onCreateEvent;
+  // The closed-hours bands to shade in a lane, resolved per resource.
+  const bandsFor = (resource: Resource) =>
+    businessHours
+      ? closedHourBands(date, (d) => businessHours(d, resource), startHour, endHour)
+      : [];
 
   const hours = useMemo(
     () => Array.from({ length: Math.max(0, endHour - startHour) }, (_, i) => startHour + i),
@@ -448,6 +660,22 @@ export function ResourceTimeline<T = unknown>({
                     theme.containers.resourceRow,
                   ]}
                 >
+                  {/* Closed-hours shade, behind the grid lines and bars. */}
+                  {bandsFor(resource).map((b) => (
+                    <View
+                      key={`shade-${b.start}`}
+                      pointerEvents="none"
+                      testID="resource-hours-shade"
+                      style={[
+                        styles.vshadeBand,
+                        {
+                          top: (b.start - startHour) * hourHeight,
+                          height: (b.end - b.start) * hourHeight,
+                          backgroundColor: theme.colors.outsideHoursBackground,
+                        },
+                      ]}
+                    />
+                  ))}
                   {hours.slice(1).map((h) => (
                     <View
                       key={h}
@@ -461,6 +689,20 @@ export function ResourceTimeline<T = unknown>({
                       ]}
                     />
                   ))}
+                  {cellEnabled ? (
+                    <LaneInteractionLayer
+                      resource={resource}
+                      vertical
+                      hourSize={hourHeight}
+                      startHour={startHour}
+                      date={date}
+                      snapMinutes={dragStepMinutes}
+                      onPressCell={onPressCell}
+                      onLongPressCell={onLongPressCell}
+                      onCreateEvent={onCreateEvent}
+                      theme={theme}
+                    />
+                  ) : null}
                   {positioned.map((pe, idx) => {
                     const top =
                       clamp(pe.startHours - startHour, 0, endHour - startHour) * hourHeight;
@@ -488,6 +730,9 @@ export function ResourceTimeline<T = unknown>({
                           snapMinutes={dragStepMinutes}
                           Renderer={Renderer}
                           onPress={onPress}
+                          onLongPress={
+                            onLongPressEvent ? () => onLongPressEvent(pe.event) : undefined
+                          }
                           onDragEvent={onDragEvent}
                           theme={theme}
                         />
@@ -497,6 +742,9 @@ export function ResourceTimeline<T = unknown>({
                       <Pressable
                         key={idx}
                         onPress={onPress}
+                        onLongPress={
+                          onLongPressEvent ? () => onLongPressEvent(pe.event) : undefined
+                        }
                         accessibilityRole="button"
                         accessibilityLabel={pe.event.title}
                         style={{ position: "absolute", left, width, top, height, padding: 1 }}
@@ -564,6 +812,22 @@ export function ResourceTimeline<T = unknown>({
                 </Text>
               </View>
               <View style={{ width: trackWidth }}>
+                {/* Closed-hours shade, behind the grid lines and bars. */}
+                {bandsFor(resource).map((b) => (
+                  <View
+                    key={`shade-${b.start}`}
+                    pointerEvents="none"
+                    testID="resource-hours-shade"
+                    style={[
+                      styles.hshadeBand,
+                      {
+                        left: (b.start - startHour) * hourWidth,
+                        width: (b.end - b.start) * hourWidth,
+                        backgroundColor: theme.colors.outsideHoursBackground,
+                      },
+                    ]}
+                  />
+                ))}
                 {/* Hour grid lines */}
                 {hours.slice(1).map((h) => (
                   <View
@@ -575,6 +839,20 @@ export function ResourceTimeline<T = unknown>({
                     ]}
                   />
                 ))}
+                {cellEnabled ? (
+                  <LaneInteractionLayer
+                    resource={resource}
+                    vertical={false}
+                    hourSize={hourWidth}
+                    startHour={startHour}
+                    date={date}
+                    snapMinutes={dragStepMinutes}
+                    onPressCell={onPressCell}
+                    onLongPressCell={onLongPressCell}
+                    onCreateEvent={onCreateEvent}
+                    theme={theme}
+                  />
+                ) : null}
                 {positioned.map((pe, idx) => {
                   const left = clamp(pe.startHours - startHour, 0, endHour - startHour) * hourWidth;
                   const right =
@@ -599,6 +877,9 @@ export function ResourceTimeline<T = unknown>({
                         snapMinutes={dragStepMinutes}
                         Renderer={Renderer}
                         onPress={onPress}
+                        onLongPress={
+                          onLongPressEvent ? () => onLongPressEvent(pe.event) : undefined
+                        }
                         onDragEvent={onDragEvent}
                         theme={theme}
                       />
@@ -608,6 +889,7 @@ export function ResourceTimeline<T = unknown>({
                     <Pressable
                       key={idx}
                       onPress={onPress}
+                      onLongPress={onLongPressEvent ? () => onLongPressEvent(pe.event) : undefined}
                       accessibilityRole="button"
                       accessibilityLabel={pe.event.title}
                       style={{
@@ -679,4 +961,27 @@ const styles = StyleSheet.create({
   vcolumn: { flex: 1, borderLeftWidth: StyleSheet.hairlineWidth },
   vhourLabel: { position: "absolute", right: 6, fontSize: 10 },
   vgridLine: { position: "absolute", left: 0, right: 0, height: StyleSheet.hairlineWidth },
+  // The drag-to-create preview, sized along the time axis by the gesture. It
+  // sits above the bars (like the dom renderer and the time grid) so the sweep
+  // stays visible when it crosses an existing event.
+  vcreateGhost: {
+    position: "absolute",
+    left: 2,
+    right: 2,
+    borderWidth: 1,
+    borderRadius: 6,
+    opacity: 0,
+    zIndex: 2,
+  },
+  hcreateGhost: {
+    position: "absolute",
+    top: 2,
+    bottom: 2,
+    borderWidth: 1,
+    borderRadius: 6,
+    opacity: 0,
+    zIndex: 2,
+  },
+  hshadeBand: { position: "absolute", top: 0, bottom: 0 },
+  vshadeBand: { position: "absolute", left: 0, right: 0 },
 });

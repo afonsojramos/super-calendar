@@ -207,3 +207,135 @@ describe("ResourceTimeline vertical orientation", () => {
     expect(gripFlat.height).toBe(4);
   });
 });
+
+describe("ResourceTimeline cell interactions", () => {
+  it("fires onPressCell with the snapped time and the lane's resource", () => {
+    const onPressCell = jest.fn();
+    const { getAllByTestId } = render(
+      <ResourceTimeline
+        date={at(0)}
+        resources={resources}
+        events={events}
+        startHour={8}
+        hourWidth={80}
+        onPressCell={onPressCell}
+      />,
+    );
+    const layers = getAllByTestId("resource-cell-layer", { includeHiddenElements: true });
+    expect(layers).toHaveLength(2);
+    // 120px at 80px/hour from 08:00 → 09:30.
+    fireEvent.press(layers[1], { nativeEvent: { locationX: 120, locationY: 0 } });
+    expect(onPressCell).toHaveBeenCalledTimes(1);
+    const [pressedAt, resource] = onPressCell.mock.calls[0];
+    expect(pressedAt.getHours()).toBe(9);
+    expect(pressedAt.getMinutes()).toBe(30);
+    expect(resource.id).toBe("b");
+  });
+
+  it("shades closed hours per lane in the vertical orientation", () => {
+    const { getAllByTestId } = render(
+      <ResourceTimeline
+        date={at(0)}
+        orientation="vertical"
+        resources={resources}
+        events={events}
+        startHour={8}
+        endHour={20}
+        businessHours={(_d, resource) => (resource.id === "a" ? { start: 9, end: 17 } : null)}
+      />,
+    );
+    // Room A: before-open + after-close; Room B: closed all day.
+    expect(getAllByTestId("resource-hours-shade", { includeHiddenElements: true })).toHaveLength(3);
+  });
+
+  it("fires onLongPressEvent for a non-draggable bar", () => {
+    const onLongPressEvent = jest.fn();
+    const { getByText } = render(
+      <ResourceTimeline
+        date={at(0)}
+        resources={resources}
+        events={events}
+        onLongPressEvent={onLongPressEvent}
+      />,
+    );
+    fireEvent(getByText("Standup"), "longPress");
+    expect(onLongPressEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "Standup" }));
+  });
+
+  it("fires onPressCell from a vertical lane using locationY", () => {
+    const onPressCell = jest.fn();
+    const { getAllByTestId } = render(
+      <ResourceTimeline
+        date={at(0)}
+        orientation="vertical"
+        resources={resources}
+        events={events}
+        startHour={8}
+        hourHeight={48}
+        onPressCell={onPressCell}
+      />,
+    );
+    const layers = getAllByTestId("resource-cell-layer", { includeHiddenElements: true });
+    // Second column (Room B), 72px down at 48px/hour from 08:00 → 09:30.
+    fireEvent.press(layers[1], { nativeEvent: { locationX: 0, locationY: 72 } });
+    expect(onPressCell).toHaveBeenCalledTimes(1);
+    const [pressedAt, resource] = onPressCell.mock.calls[0];
+    expect(pressedAt.getHours()).toBe(9);
+    expect(pressedAt.getMinutes()).toBe(30);
+    expect(resource.id).toBe("b");
+  });
+
+  it("renders a create ghost per lane when onCreateEvent is set", () => {
+    const { getAllByTestId } = render(
+      <ResourceTimeline
+        date={at(0)}
+        resources={resources}
+        events={events}
+        onCreateEvent={jest.fn()}
+      />,
+    );
+    expect(getAllByTestId("resource-create-ghost", { includeHiddenElements: true })).toHaveLength(
+      resources.length,
+    );
+  });
+
+  it("fires onLongPressCell with the snapped time when create is off", () => {
+    const onLongPressCell = jest.fn();
+    const { getAllByTestId } = render(
+      <ResourceTimeline
+        date={at(0)}
+        resources={resources}
+        events={events}
+        startHour={8}
+        hourWidth={80}
+        onLongPressCell={onLongPressCell}
+      />,
+    );
+    const layers = getAllByTestId("resource-cell-layer", { includeHiddenElements: true });
+    // 120px at 80px/hour from 08:00 → 09:30, in Room B's lane.
+    fireEvent(layers[1], "longPress", { nativeEvent: { locationX: 120, locationY: 0 } });
+    expect(onLongPressCell).toHaveBeenCalledTimes(1);
+    const [pressedAt, resource] = onLongPressCell.mock.calls[0];
+    expect(pressedAt.getHours()).toBe(9);
+    expect(pressedAt.getMinutes()).toBe(30);
+    expect(resource.id).toBe("b");
+  });
+
+  it("suppresses onLongPressCell when onCreateEvent is set (long-press starts the create drag)", () => {
+    const onLongPressCell = jest.fn();
+    const { getAllByTestId } = render(
+      <ResourceTimeline
+        date={at(0)}
+        resources={resources}
+        events={events}
+        startHour={8}
+        hourWidth={80}
+        onCreateEvent={jest.fn()}
+        onLongPressCell={onLongPressCell}
+      />,
+    );
+    const layers = getAllByTestId("resource-cell-layer", { includeHiddenElements: true });
+    fireEvent(layers[0], "longPress", { nativeEvent: { locationX: 40, locationY: 0 } });
+    expect(onLongPressCell).not.toHaveBeenCalled();
+  });
+});

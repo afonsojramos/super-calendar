@@ -8,6 +8,8 @@ import type {
 import { useMemo, useRef, useState } from "react";
 import {
   type CalendarEvent,
+  cellRangeFromDrag,
+  closedHourBands,
   eventTimeLabel,
   formatHour,
   layoutDayEvents,
@@ -28,8 +30,10 @@ export type ResourceTimelineSlot =
   | "row"
   | "track"
   | "gridLines"
+  | "businessHours"
   | "event"
-  | "eventBox";
+  | "eventBox"
+  | "createGhost";
 
 /** A schedulable lane (room, person, machine) that events are grouped under. */
 export interface Resource {
@@ -94,6 +98,16 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
    * proposed new start/end. Return `false` to reject the drop (it snaps back).
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
+  /** Tap empty lane space; called with the snapped time and the lane's resource. */
+  onPressCell?: (at: Date, resource: Resource) => void;
+  /** Drag empty lane space to create; called with the swept start/end and the lane's resource. */
+  onCreateEvent?: (start: Date, end: Date, resource: Resource) => void;
+  /**
+   * Shade the hours outside this window, per lane. Same shape as the Calendar's
+   * `businessHours` plus the lane's resource, so per-resource opening hours work
+   * (return `null` for a fully closed lane). A date-only function is accepted.
+   */
+  businessHours?: (date: Date, resource: Resource) => { start: number; end: number } | null;
   /** Snap dragged events to this many minutes (default 15). */
   dragStepMinutes?: number;
   /** Class applied to the root element. */
@@ -198,6 +212,9 @@ export function ResourceTimeline<T = unknown>({
   renderEvent,
   onPressEvent,
   onDragEvent,
+  onPressCell,
+  onCreateEvent,
+  businessHours,
   dragStepMinutes = 15,
   className,
   style,
@@ -284,6 +301,90 @@ export function ResourceTimeline<T = unknown>({
     applyDrag(null);
     origin.current = null;
   };
+
+  // Create-by-drag / tap on empty lane space, mirroring the time grid: mouse and
+  // pen sweep out a new event, and a tap without movement fires onPressCell. Touch
+  // is left free to scroll the board, so cell taps are pointer (mouse/pen) only.
+  const [createBox, setCreateBox] = useState<{
+    resourceKey: string;
+    startPx: number;
+    curPx: number;
+  } | null>(null);
+  const createOrigin = useRef<{ el: HTMLElement; resource: Resource; startPx: number } | null>(
+    null,
+  );
+  const cellEnabled = !!onPressCell || !!onCreateEvent;
+  const pxAlongAxis = (el: HTMLElement, e: ReactPointerEvent) => {
+    const rect = el.getBoundingClientRect();
+    return vertical ? e.clientY - rect.top : e.clientX - rect.left;
+  };
+  const beginCreate = (e: ReactPointerEvent, resource: Resource) => {
+    // Only from the lane background, primary button, never on an event bar.
+    if (!cellEnabled || e.pointerType === "touch") return;
+    if (e.target !== e.currentTarget || e.button > 0) return;
+    const el = e.currentTarget as HTMLElement;
+    const startPx = pxAlongAxis(el, e);
+    try {
+      el.setPointerCapture?.(e.pointerId);
+    } catch {
+      // Best-effort capture.
+    }
+    createOrigin.current = { el, resource, startPx };
+    // Only preview a ghost when a create can happen; in press-only mode
+    // (onPressCell without onCreateEvent) the tap still commits via endCreate.
+    if (onCreateEvent) setCreateBox({ resourceKey: resource.id, startPx, curPx: startPx });
+  };
+  const moveCreate = (e: ReactPointerEvent) => {
+    const o = createOrigin.current;
+    if (!o || !onCreateEvent) return;
+    setCreateBox({ resourceKey: o.resource.id, startPx: o.startPx, curPx: pxAlongAxis(o.el, e) });
+  };
+  const endCreate = (e: ReactPointerEvent) => {
+    const o = createOrigin.current;
+    if (!o) return;
+    try {
+      o.el.releasePointerCapture?.(e.pointerId);
+    } catch {
+      // Best-effort release.
+    }
+    const endPx = pxAlongAxis(o.el, e);
+    const moved = Math.abs(endPx - o.startPx) > 4;
+    if (moved && onCreateEvent) {
+      const range = cellRangeFromDrag(date, o.startPx, endPx, hourSize, startHour, dragStepMinutes);
+      if (range) onCreateEvent(range.start, range.end, o.resource);
+    } else if (onPressCell) {
+      const at = cellRangeFromDrag(
+        date,
+        o.startPx,
+        o.startPx,
+        hourSize,
+        startHour,
+        dragStepMinutes,
+      );
+      if (at) onPressCell(at.start, o.resource);
+    }
+    createOrigin.current = null;
+    setCreateBox(null);
+  };
+  // A gesture the browser cancels (scroll takeover, etc.) must not commit.
+  const cancelCreate = () => {
+    createOrigin.current = null;
+    setCreateBox(null);
+  };
+  const trackInteractionProps = (resource: Resource) =>
+    cellEnabled
+      ? {
+          onPointerDown: (e: ReactPointerEvent) => beginCreate(e, resource),
+          onPointerMove: moveCreate,
+          onPointerUp: endCreate,
+          onPointerCancel: cancelCreate,
+        }
+      : null;
+  // The closed-hours bands to shade in a lane, resolved per resource.
+  const bandsFor = (resource: Resource) =>
+    businessHours
+      ? closedHourBands(date, (d) => businessHours(d, resource), startHour, endHour)
+      : [];
 
   const hours = useMemo(
     () => Array.from({ length: Math.max(0, endHour - startHour) }, (_, i) => startHour + i),
@@ -384,7 +485,29 @@ export function ResourceTimeline<T = unknown>({
                   themed: { borderLeft: `1px solid ${theme.gridLine}` },
                 })}
               >
-                <div {...slot("track", { base: { position: "relative", height: trackHeight } })}>
+                <div
+                  {...trackInteractionProps(resource)}
+                  {...slot("track", { base: { position: "relative", height: trackHeight } })}
+                >
+                  {/* Closed-hours shade, behind the grid lines and events. */}
+                  {bandsFor(resource).map((b) => (
+                    <div
+                      key={b.start}
+                      aria-hidden
+                      {...slot("businessHours", {
+                        base: {
+                          position: "absolute",
+                          left: 0,
+                          right: 0,
+                          top: (b.start - startHour) * hourHeight,
+                          height: (b.end - b.start) * hourHeight,
+                          pointerEvents: "none",
+                          zIndex: 0,
+                        },
+                        themed: { background: theme.outsideHoursBackground },
+                      })}
+                    />
+                  ))}
                   <div
                     aria-hidden
                     {...slot("gridLines", {
@@ -472,6 +595,28 @@ export function ResourceTimeline<T = unknown>({
                       </button>
                     );
                   })}
+                  {createBox?.resourceKey === resource.id ? (
+                    <div
+                      aria-hidden
+                      {...slot("createGhost", {
+                        base: {
+                          position: "absolute",
+                          left: 1,
+                          right: 1,
+                          top: Math.min(createBox.startPx, createBox.curPx),
+                          height: Math.max(Math.abs(createBox.curPx - createBox.startPx), 2),
+                          opacity: 0.7,
+                          pointerEvents: "none",
+                          zIndex: 2,
+                        },
+                        themed: {
+                          background: theme.rangeBackground,
+                          border: `1px solid ${theme.selectedBackground}`,
+                          borderRadius: 6,
+                        },
+                      })}
+                    />
+                  ) : null}
                 </div>
               </div>
             );
@@ -544,7 +689,29 @@ export function ResourceTimeline<T = unknown>({
               >
                 {resource.title ?? resource.id}
               </div>
-              <div {...slot("track", { base: { position: "relative", width: trackWidth } })}>
+              <div
+                {...trackInteractionProps(resource)}
+                {...slot("track", { base: { position: "relative", width: trackWidth } })}
+              >
+                {/* Closed-hours shade, behind the grid lines and events. */}
+                {bandsFor(resource).map((b) => (
+                  <div
+                    key={b.start}
+                    aria-hidden
+                    {...slot("businessHours", {
+                      base: {
+                        position: "absolute",
+                        top: 0,
+                        bottom: 0,
+                        left: (b.start - startHour) * hourWidth,
+                        width: (b.end - b.start) * hourWidth,
+                        pointerEvents: "none",
+                        zIndex: 0,
+                      },
+                      themed: { background: theme.outsideHoursBackground },
+                    })}
+                  />
+                ))}
                 <div
                   aria-hidden
                   {...slot("gridLines", {
@@ -627,6 +794,28 @@ export function ResourceTimeline<T = unknown>({
                     </button>
                   );
                 })}
+                {createBox?.resourceKey === resource.id ? (
+                  <div
+                    aria-hidden
+                    {...slot("createGhost", {
+                      base: {
+                        position: "absolute",
+                        top: 1,
+                        bottom: 1,
+                        left: Math.min(createBox.startPx, createBox.curPx),
+                        width: Math.max(Math.abs(createBox.curPx - createBox.startPx), 2),
+                        opacity: 0.7,
+                        pointerEvents: "none",
+                        zIndex: 2,
+                      },
+                      themed: {
+                        background: theme.rangeBackground,
+                        border: `1px solid ${theme.selectedBackground}`,
+                        borderRadius: 6,
+                      },
+                    })}
+                  />
+                ) : null}
               </div>
             </div>
           );
