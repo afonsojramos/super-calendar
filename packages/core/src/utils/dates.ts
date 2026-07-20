@@ -121,9 +121,13 @@ export const buildMonthWeeks = (
   return weeks;
 };
 
-/** Drop the days whose weekday (0=Sunday…6=Saturday) is listed in `hiddenDays`. */
+/**
+ * Drop the days whose weekday (0=Sunday…6=Saturday) is listed in `hiddenDays`.
+ * Hiding all seven weekdays is treated as hiding nothing (matching
+ * `getViewDays`), so a misconfiguration degrades to the full grid, not a blank.
+ */
 export const filterHiddenDays = (days: Date[], hiddenDays?: number[]): Date[] =>
-  hiddenDays && hiddenDays.length > 0
+  hiddenDays && hiddenDays.length > 0 && new Set(hiddenDays).size < 7
     ? days.filter((day) => !hiddenDays.includes(day.getDay()))
     : days;
 

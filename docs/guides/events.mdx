@@ -144,3 +144,9 @@ const { events, loading, error, refetch } = useEventSource("https://example.com/
 
 JSON feeds default to items with ISO `start`/`end` strings; pass `map` to
 reshape anything else (rename fields, attach a `resourceId`, filter).
+
+One nuance for function sources: swapping the function itself doesn't trigger a
+refetch (inline functions change identity every render, which would loop).
+The next interval tick or a manual `refetch()` always calls the latest
+function, so change what the function reads, or call `refetch()` after
+swapping it.

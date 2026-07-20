@@ -23,8 +23,11 @@ describe("hiddenDays", () => {
   });
 
   it("treats a fully-hidden week as hide nothing", () => {
-    const days = getViewDays("week", monday, 1, 1, false, undefined, [0, 1, 2, 3, 4, 5, 6]);
-    expect(days).toHaveLength(7);
+    const all = [0, 1, 2, 3, 4, 5, 6];
+    expect(getViewDays("week", monday, 1, 1, false, undefined, all)).toHaveLength(7);
+    // The month grid degrades the same way instead of rendering blank.
+    expect(buildMonthWeeks(monday, 1, { hiddenDays: all })[0]).toHaveLength(7);
+    expect(filterHiddenDays([monday], all)).toHaveLength(1);
   });
 
   it("drops hidden weekdays from month weeks and the filter helper", () => {

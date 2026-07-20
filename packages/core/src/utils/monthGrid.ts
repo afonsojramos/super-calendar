@@ -139,6 +139,9 @@ export function buildMonthGrid(month: Date, options: UseMonthGridOptions = {}): 
   }));
 
   // Weekday labels depend only on the first row's dates (already ordered).
+  // `hiddenDays` covering every weekday leaves no rows; return an empty grid
+  // rather than dereferencing a missing first row.
+  if (rows.length === 0) return { weeks: [], weekdays: [] };
   const weekdays: MonthGridWeekday[] = rows[0].map((date) => ({
     date,
     label: format(date, WEEKDAY_TOKENS[weekdayFormat], { locale }),

@@ -737,6 +737,10 @@ export function MonthView<T = unknown>({
                       {overflow ? (
                         <button
                           type="button"
+                          // In built-in-popover mode, keep the document
+                          // pointerdown dismiss from firing before this click's
+                          // toggle, so pressing the button again closes it.
+                          onPointerDown={onPressMore ? undefined : (e) => e.stopPropagation()}
                           onClick={(e) => {
                             e.stopPropagation();
                             if (onPressMore) onPressMore(rest, day.date);

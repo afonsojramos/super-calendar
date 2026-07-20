@@ -92,4 +92,29 @@ describe("useEventSource", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.events[0].title).toBe("Booking");
   });
+
+  it("ignores a superseded fetch when the source changes mid-flight", async () => {
+    // The generation counter must drop the in-flight response for the old source
+    // so a slow first request can't overwrite the newer source's result.
+    let resolveSlow: (value: Partial<Response>) => void = () => {};
+    const slow = new Promise<Partial<Response>>((resolve) => {
+      resolveSlow = resolve;
+    });
+    mockFetch((url) =>
+      url.includes("slow") ? slow : Promise.resolve({ ok: true, json: async () => jsonFeed }),
+    );
+    const { result, rerender } = renderHook(({ url }) => useEventSource(url), {
+      initialProps: { url: "https://example.com/slow" },
+    });
+    // Switch sources while the first request is still pending.
+    rerender({ url: "https://example.com/fast" });
+    await waitFor(() => expect(result.current.events[0]?.title).toBe("Standup"));
+
+    // The slow request now resolves late; its generation is stale, so it's dropped.
+    await act(async () => {
+      resolveSlow({ ok: true, json: async () => [{ ...jsonFeed[0], title: "Stale" }] });
+      await slow;
+    });
+    expect(result.current.events[0].title).toBe("Standup");
+  });
 });
