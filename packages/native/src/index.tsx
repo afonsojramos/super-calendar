@@ -108,4 +108,10 @@ export {
   isSameCalendarDay,
   minutesIntoDay,
 } from "@super-calendar/core";
-export { layoutDayEvents, isAllDayEvent, type PositionedEvent } from "@super-calendar/core";
+export {
+  layoutDayEvents,
+  isAllDayEvent,
+  isBackgroundEvent,
+  backgroundBandsForDay,
+  type PositionedEvent,
+} from "@super-calendar/core";

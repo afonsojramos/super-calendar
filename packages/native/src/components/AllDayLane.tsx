@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, CalendarMode, EventKeyExtractor, RenderEvent } from "../types";
 import { useSlots } from "../utils/slots";
-import { isAllDayEvent } from "@super-calendar/core";
+import { isAllDayEvent, isBackgroundEvent } from "@super-calendar/core";
 
 // The lane's slots are a subset of the TimeGrid slot union; typed locally so
 // this file doesn't import the full TimeGrid type.
@@ -42,7 +42,8 @@ export function AllDayLane<T>({
   const slot = useSlots<AllDayLaneSlot>();
   const RenderEventComponent = renderEvent;
 
-  const allDay = events.filter(isAllDayEvent);
+  // Background events shade the timed columns instead of taking a lane chip.
+  const allDay = events.filter((event) => isAllDayEvent(event) && !isBackgroundEvent(event));
   const perDay = days.map((day) => {
     const start = startOfDay(day);
     const next = addDays(start, 1);

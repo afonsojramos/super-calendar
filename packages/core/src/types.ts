@@ -26,6 +26,13 @@ export interface ICalendarEvent {
   /** Ignore taps/long-presses on this event (the built-in renderer also dims it). */
   disabled?: boolean;
   /**
+   * How the event renders. `"auto"` (default) is a normal event box/chip;
+   * `"background"` paints the event's time range as a non-interactive shaded
+   * band behind the grid instead (blocked time, holidays). Background events
+   * are excluded from chips, the agenda, and year-view dots.
+   */
+  display?: "auto" | "background";
+  /**
    * Repeat rule. Pass the event to `expandRecurringEvents(events, start, end)` to
    * materialise its occurrences within a range; the calendar itself doesn't
    * expand recurrences.

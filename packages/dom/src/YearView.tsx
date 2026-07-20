@@ -8,6 +8,7 @@ import {
   getWeekDays,
   getYearMonths,
   groupEventsByDay,
+  isBackgroundEvent,
   isSameCalendarDay,
   type WeekStartsOn,
   weekdayFormatToken,
@@ -91,7 +92,12 @@ export function YearView<T = unknown>({
   );
   // Days that hold at least one event, keyed like `groupEventsByDay`.
   const eventDays = useMemo(
-    () => new Set(events && events.length > 0 ? groupEventsByDay(events).keys() : []),
+    () =>
+      new Set(
+        events && events.length > 0
+          ? groupEventsByDay(events.filter((e) => !isBackgroundEvent(e))).keys()
+          : [],
+      ),
     [events],
   );
 

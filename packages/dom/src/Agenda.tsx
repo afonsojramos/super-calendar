@@ -2,7 +2,7 @@ import { LegendList } from "@legendapp/list/react";
 import { format, isSameDay, type Locale, startOfDay } from "date-fns";
 import { type ComponentType, type CSSProperties, type ReactElement, useMemo } from "react";
 import type { CalendarEvent, EventAccessibilityLabeler } from "@super-calendar/core";
-import { eventTimeLabel, getIsToday, isAllDayEvent } from "@super-calendar/core";
+import { eventTimeLabel, getIsToday, isAllDayEvent, isBackgroundEvent } from "@super-calendar/core";
 import { createSlots, type ResolvedSlot, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
@@ -122,7 +122,10 @@ export function Agenda<T = unknown>({
   const Renderer = renderEvent;
 
   const rows = useMemo<Row<T>[]>(() => {
-    const sorted = [...events].sort((a, b) => a.start.getTime() - b.start.getTime());
+    const sorted = events
+      // Background events shade the grids; they have no agenda row.
+      .filter((event) => !isBackgroundEvent(event))
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
     const out: Row<T>[] = [];
     let currentDay: Date | null = null;
     sorted.forEach((event, index) => {

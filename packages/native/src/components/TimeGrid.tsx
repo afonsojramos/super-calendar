@@ -59,6 +59,7 @@ import {
   viewDayCount,
 } from "@super-calendar/core";
 import {
+  backgroundBandsForDay,
   cellRangeFromDrag,
   closedHourBands,
   resolveDraggedBounds,
@@ -564,6 +565,9 @@ type ShadeBandProps = {
   left: number;
   width: number;
   color: string;
+  /** Which slot/testID the band belongs to (closed hours vs background events). */
+  slotName?: "businessHours" | "backgroundEvent";
+  testID?: string;
 };
 
 // A muted band over a closed hour-range of one day column (driven by the live
@@ -576,6 +580,8 @@ const ShadeBand = ({
   left,
   width,
   color,
+  slotName = "businessHours",
+  testID = "business-hours-shade",
 }: ShadeBandProps) => {
   const slot = useSlots<TimeGridSlot>();
   const animatedStyle = useAnimatedStyle(
@@ -585,17 +591,11 @@ const ShadeBand = ({
     }),
     [startHour, endHour, minHour],
   );
-  const bandSlot = slot("businessHours", {
+  const bandSlot = slot(slotName, {
     base: [styles.shadeBand, styles.nonInteractive, { left, width }],
     themed: { backgroundColor: color },
   });
-  return (
-    <Animated.View
-      testID="business-hours-shade"
-      {...bandSlot}
-      style={[bandSlot.style, animatedStyle]}
-    />
-  );
+  return <Animated.View testID={testID} {...bandSlot} style={[bandSlot.style, animatedStyle]} />;
 };
 
 type TimetablePageProps<T> = {
@@ -1115,6 +1115,31 @@ function TimetablePageInner<T>({
                 )
               : null}
 
+            {/* Background events: shaded, non-interactive time ranges. */}
+            {days.flatMap((day, dayIndex) =>
+              backgroundBandsForDay(events, day)
+                .map((b) => ({
+                  ...b,
+                  startHours: Math.max(b.startHours, minHour),
+                  endHours: Math.min(b.endHours, maxHour),
+                }))
+                .filter((b) => b.endHours > b.startHours)
+                .map((b, bandIndex) => (
+                  <ShadeBand
+                    key={`bg-${day.toISOString()}-${bandIndex}`}
+                    cellHeight={heightSource}
+                    startHour={b.startHours}
+                    endHour={b.endHours}
+                    minHour={minHour}
+                    left={dayLeft(dayIndex)}
+                    width={dayWidth}
+                    color={theme.colors.backgroundEvent}
+                    slotName="backgroundEvent"
+                    testID="background-event-shade"
+                  />
+                )),
+            )}
+
             {days.map((day, dayIndex) => {
               const separatorSlot = slot("daySeparator", {
                 base: [styles.daySeparator, styles.nonInteractive, { left: dayLeft(dayIndex) }],
@@ -1237,6 +1262,7 @@ export type TimeGridSlot =
   | "hourLabel"
   | "gridLines"
   | "businessHours"
+  | "backgroundEvent"
   | "weekendShade"
   | "daySeparator"
   | "event"

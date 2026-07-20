@@ -27,6 +27,7 @@ import {
   type DateSelectionConstraints,
   type EventAccessibilityLabeler,
   groupEventsByDay,
+  isBackgroundEvent,
   isAllDayEvent,
   type MonthGridDay,
   monthVisibleCount,
@@ -411,7 +412,8 @@ export function MonthView<T = unknown>({
     // The list (MonthList) sorts before passing its index in; only sort here when
     // building our own, so each day reads all-day events first, then by start.
     if (eventsByDayProp) return eventsByDayProp;
-    const map = groupEventsByDay(events ?? []);
+    // Background events shade the time grid; the month grid ignores them.
+    const map = groupEventsByDay((events ?? []).filter((event) => !isBackgroundEvent(event)));
     for (const list of map.values()) list.sort(compareDayEvents);
     return map;
   }, [eventsByDayProp, events]);

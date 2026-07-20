@@ -538,3 +538,29 @@ describe("dom TimeGrid", () => {
     expect(weekdays).toHaveLength(5);
   });
 });
+
+describe("dom TimeGrid background events", () => {
+  it("shades a background event's range instead of rendering a box", () => {
+    const withBackground: CalendarEvent[] = [
+      ...events,
+      {
+        title: "Maintenance",
+        start: new Date(2026, 5, 26, 9),
+        end: new Date(2026, 5, 26, 12),
+        display: "background",
+      },
+    ];
+    const { container, queryByText } = render(
+      <TimeGrid date={day} mode="day" events={withBackground} hourHeight={48} />,
+    );
+    const band = container.querySelector('[data-slot="backgroundEvent"]') as HTMLElement;
+    expect(band).toBeTruthy();
+    // 09:00 at 48px/hour from midnight → 432px top, 3h → 144px tall.
+    expect(band.style.top).toBe("432px");
+    expect(band.style.height).toBe("144px");
+    // No event box for it, and it takes no overlap column from the timed event.
+    expect(queryByText("Maintenance")).toBeNull();
+    const focus = container.querySelectorAll('[data-slot="event"]');
+    expect(focus).toHaveLength(1);
+  });
+});

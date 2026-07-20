@@ -17,6 +17,7 @@ import {
   getWeekDays,
   getYearMonths,
   groupEventsByDay,
+  isBackgroundEvent,
   isSameCalendarDay,
   weekdayFormatToken,
 } from "@super-calendar/core";
@@ -94,7 +95,12 @@ function YearViewInner<T>({
   );
   // Days that hold at least one event, keyed like `groupEventsByDay`.
   const eventDays = useMemo(
-    () => new Set(events && events.length > 0 ? groupEventsByDay(events).keys() : []),
+    () =>
+      new Set(
+        events && events.length > 0
+          ? groupEventsByDay(events.filter((e) => !isBackgroundEvent(e))).keys()
+          : [],
+      ),
     [events],
   );
 

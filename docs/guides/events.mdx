@@ -104,3 +104,22 @@ context, and its return value replaces the default label across every view.
 
 The same prop is on the standalone `MonthView`, `MonthList`, and `TimeGrid`, so a
 custom renderer and its label stay in sync.
+
+## Background events
+
+Set `display: "background"` to paint an event's time range as a shaded,
+non-interactive band behind the grid instead of an event box — blocked time,
+maintenance windows, public holidays:
+
+```tsx
+const events: CalendarEvent[] = [
+  { title: "Maintenance", start: at(9), end: at(12), display: "background" },
+  { title: "Standup", start: at(9), end: at(10) }, // renders normally, on top
+];
+```
+
+Background events shade the time grid and the resource timeline's lanes (an
+all-day or multi-day one covers each day's full window). They take no overlap
+column, render no chip in the month grid or agenda, and produce no year-view
+dot. Restyle the band with the `backgroundEvent` slot or the theme's
+`backgroundEvent` colour token.

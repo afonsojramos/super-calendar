@@ -42,8 +42,9 @@ export function layoutDayEvents<T>(events: CalendarEvent<T>[], day: Date): Posit
   const nextDayStart = addDays(dayStart, 1);
 
   const segments: Segment<T>[] = events
-    // All-day events live in the lane, not the timed columns.
-    .filter((event) => !isAllDayEvent(event))
+    // All-day events live in the lane, not the timed columns; background events
+    // paint as bands (see `backgroundBandsForDay`), not boxes.
+    .filter((event) => !isAllDayEvent(event) && !isBackgroundEvent(event))
     // Overlaps this day if it starts before the day ends and ends after it begins.
     .filter((event) => event.start < nextDayStart && event.end > dayStart)
     .map((event) => {
@@ -192,4 +193,33 @@ export function closedHourBands(
   if (start > minHour) bands.push({ start: minHour, end: start });
   if (end < maxHour) bands.push({ start: end, end: maxHour });
   return bands;
+}
+
+/** True when the event paints as a shaded background band, not an event box. */
+export function isBackgroundEvent<T>(event: CalendarEvent<T>): boolean {
+  return event.display === "background";
+}
+
+/**
+ * The background events of `events` sliced to `day`, as fractional-hour bands
+ * (an all-day or multi-day background covers the day's full window). Shared by
+ * both renderers so the shading can't disagree.
+ */
+export function backgroundBandsForDay<T>(
+  events: CalendarEvent<T>[],
+  day: Date,
+): { event: CalendarEvent<T>; startHours: number; endHours: number }[] {
+  const dayStart = startOfDay(day);
+  const nextDayStart = addDays(dayStart, 1);
+  const out: { event: CalendarEvent<T>; startHours: number; endHours: number }[] = [];
+  for (const event of events) {
+    if (!isBackgroundEvent(event)) continue;
+    if (event.start >= nextDayStart || event.end <= dayStart) continue;
+    const from = event.start > dayStart ? event.start : dayStart;
+    const to = event.end < nextDayStart ? event.end : nextDayStart;
+    const startHours = (from.getTime() - dayStart.getTime()) / 3_600_000;
+    const endHours = (to.getTime() - dayStart.getTime()) / 3_600_000;
+    if (endHours > startHours) out.push({ event, startHours, endHours });
+  }
+  return out;
 }

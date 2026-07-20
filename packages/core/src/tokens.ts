@@ -37,6 +37,8 @@ export interface CalendarColors {
   eventBackground: string;
   /** Default event chip text. */
   eventText: string;
+  /** Shaded band behind a `display: "background"` event. */
+  backgroundEvent: string;
 }
 
 /** The default light-theme colour palette. */
@@ -57,6 +59,7 @@ export const lightColors: CalendarColors = {
   textDisabled: "#B5B9C0",
   eventBackground: "#DCE7FF",
   eventText: "#1A1B1E",
+  backgroundEvent: "#E3F4E4",
 };
 
 /** The default dark-theme colour palette. */
@@ -77,4 +80,5 @@ export const darkColors: CalendarColors = {
   textDisabled: "#4B4F58",
   eventBackground: "#243B53",
   eventText: "#EAF2FF",
+  backgroundEvent: "#17301F",
 };

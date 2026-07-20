@@ -16,7 +16,9 @@ import {
   type CalendarEvent,
   type CalendarMode,
   cellRangeFromDrag,
+  backgroundBandsForDay,
   closedHourBands,
+  isBackgroundEvent,
   eventAccessibilityLabel as defaultEventAccessibilityLabel,
   type EventAccessibilityLabeler,
   eventChipLayout,
@@ -56,6 +58,7 @@ export type TimeGridSlot =
   | "dayColumn"
   | "gridLines"
   | "businessHours"
+  | "backgroundEvent"
   | "event"
   | "eventBox"
   | "nowIndicator"
@@ -434,7 +437,9 @@ export function TimeGrid<T = unknown>({
       days.map((day) => {
         const dayStart = startOfDay(day);
         const dayEnd = addDays(dayStart, 1);
-        return events.filter((e) => isAllDayEvent(e) && e.start < dayEnd && e.end > dayStart);
+        return events.filter(
+          (e) => isAllDayEvent(e) && !isBackgroundEvent(e) && e.start < dayEnd && e.end > dayStart,
+        );
       }),
     [days, events],
   );
@@ -730,6 +735,20 @@ export function TimeGrid<T = unknown>({
   const bandsByDay = useMemo(
     () => days.map((day) => closedHourBands(day, businessHours, windowStart, windowEnd)),
     [days, businessHours, windowStart, windowEnd],
+  );
+  // `display: "background"` events, sliced per day and clipped to the window.
+  const backgroundByDay = useMemo(
+    () =>
+      days.map((day) =>
+        backgroundBandsForDay(events, day)
+          .map((b) => ({
+            ...b,
+            startHours: Math.max(b.startHours, windowStart),
+            endHours: Math.min(b.endHours, windowEnd),
+          }))
+          .filter((b) => b.endHours > b.startHours),
+      ),
+    [days, events, windowStart, windowEnd],
   );
   const gridLines = useMemo(() => {
     const hourLines = `repeating-linear-gradient(to bottom, transparent 0, transparent ${hourHeight - 1}px, ${theme.gridLine} ${hourHeight - 1}px, ${theme.gridLine} ${hourHeight}px)`;
@@ -1038,6 +1057,26 @@ export function TimeGrid<T = unknown>({
                         zIndex: 0,
                       },
                       themed: { background: theme.outsideHoursBackground },
+                    })}
+                  />
+                ))}
+                {/* Background events: shaded, non-interactive time ranges. */}
+                {backgroundByDay[dayIndex].map((b, bandIndex) => (
+                  <div
+                    key={`bg-${bandIndex}`}
+                    aria-hidden
+                    title={b.event.title}
+                    {...slot("backgroundEvent", {
+                      base: {
+                        position: "absolute",
+                        left: 0,
+                        right: 0,
+                        top: (b.startHours - windowStart) * hourHeight,
+                        height: (b.endHours - b.startHours) * hourHeight,
+                        pointerEvents: "none",
+                        zIndex: 0,
+                      },
+                      themed: { background: theme.backgroundEvent },
                     })}
                   />
                 ))}

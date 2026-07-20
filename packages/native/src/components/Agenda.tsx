@@ -6,7 +6,7 @@ import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent } from "../types";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { getIsToday } from "@super-calendar/core";
-import { isAllDayEvent } from "@super-calendar/core";
+import { isAllDayEvent, isBackgroundEvent } from "@super-calendar/core";
 
 /**
  * The styleable parts of {@link Agenda}. Mirrors the dom renderer's slot names;
@@ -60,7 +60,10 @@ export function Agenda<T>({
   const RenderEventComponent = renderEvent;
 
   const rows = useMemo<Row<T>[]>(() => {
-    const sorted = [...events].sort((a, b) => a.start.getTime() - b.start.getTime());
+    const sorted = events
+      // Background events shade the grids; they have no agenda row.
+      .filter((event) => !isBackgroundEvent(event))
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
     const out: Row<T>[] = [];
     let currentDay: Date | null = null;
     sorted.forEach((event, index) => {

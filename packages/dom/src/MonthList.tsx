@@ -9,6 +9,7 @@ import {
   type DateSelectionConstraints,
   type EventAccessibilityLabeler,
   groupEventsByDay,
+  isBackgroundEvent,
   type WeekdayFormat,
   type WeekStartsOn,
 } from "@super-calendar/core";
@@ -133,7 +134,8 @@ export function MonthList<T = unknown>({
   // Build the day→events index once for the whole list rather than per month.
   const eventsByDay = useMemo(() => {
     if (!events) return undefined;
-    const map = groupEventsByDay(events);
+    // Background events shade the time grid; the month grids ignore them.
+    const map = groupEventsByDay(events.filter((event) => !isBackgroundEvent(event)));
     // Each day reads all-day events first, then timed events by start.
     for (const list of map.values()) list.sort(compareDayEvents);
     return map;

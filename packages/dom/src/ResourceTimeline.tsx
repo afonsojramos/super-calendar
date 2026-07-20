@@ -7,6 +7,7 @@ import type {
 } from "react";
 import { useMemo, useRef, useState } from "react";
 import {
+  backgroundBandsForDay,
   type CalendarEvent,
   cellRangeFromDrag,
   closedHourBands,
@@ -31,6 +32,7 @@ export type ResourceTimelineSlot =
   | "track"
   | "gridLines"
   | "businessHours"
+  | "backgroundEvent"
   | "event"
   | "eventBox"
   | "createGhost";
@@ -385,6 +387,18 @@ export function ResourceTimeline<T = unknown>({
     businessHours
       ? closedHourBands(date, (d) => businessHours(d, resource), startHour, endHour)
       : [];
+  // `display: "background"` events in a lane, clipped to the visible window.
+  const backgroundBandsFor = (resource: Resource) =>
+    backgroundBandsForDay(
+      events.filter((e) => resourceId(e) === resource.id),
+      date,
+    )
+      .map((b) => ({
+        ...b,
+        startHours: Math.max(b.startHours, startHour),
+        endHours: Math.min(b.endHours, endHour),
+      }))
+      .filter((b) => b.endHours > b.startHours);
 
   const hours = useMemo(
     () => Array.from({ length: Math.max(0, endHour - startHour) }, (_, i) => startHour + i),
@@ -505,6 +519,25 @@ export function ResourceTimeline<T = unknown>({
                           zIndex: 0,
                         },
                         themed: { background: theme.outsideHoursBackground },
+                      })}
+                    />
+                  ))}
+                  {backgroundBandsFor(resource).map((b, i) => (
+                    <div
+                      key={`bg-${i}`}
+                      aria-hidden
+                      title={b.event.title}
+                      {...slot("backgroundEvent", {
+                        base: {
+                          position: "absolute",
+                          left: 0,
+                          right: 0,
+                          top: (b.startHours - startHour) * hourHeight,
+                          height: (b.endHours - b.startHours) * hourHeight,
+                          pointerEvents: "none",
+                          zIndex: 0,
+                        },
+                        themed: { background: theme.backgroundEvent },
                       })}
                     />
                   ))}
@@ -709,6 +742,25 @@ export function ResourceTimeline<T = unknown>({
                         zIndex: 0,
                       },
                       themed: { background: theme.outsideHoursBackground },
+                    })}
+                  />
+                ))}
+                {backgroundBandsFor(resource).map((b, i) => (
+                  <div
+                    key={`bg-${i}`}
+                    aria-hidden
+                    title={b.event.title}
+                    {...slot("backgroundEvent", {
+                      base: {
+                        position: "absolute",
+                        top: 0,
+                        bottom: 0,
+                        left: (b.startHours - startHour) * hourWidth,
+                        width: (b.endHours - b.startHours) * hourWidth,
+                        pointerEvents: "none",
+                        zIndex: 0,
+                      },
+                      themed: { background: theme.backgroundEvent },
                     })}
                   />
                 ))}

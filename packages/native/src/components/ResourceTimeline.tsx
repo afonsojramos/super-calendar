@@ -13,6 +13,7 @@ import {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import {
+  backgroundBandsForDay,
   type CalendarEvent,
   cellRangeFromDrag,
   closedHourBands,
@@ -592,6 +593,18 @@ export function ResourceTimeline<T = unknown>({
     businessHours
       ? closedHourBands(date, (d) => businessHours(d, resource), startHour, endHour)
       : [];
+  // `display: "background"` events in a lane, clipped to the visible window.
+  const backgroundBandsFor = (resource: Resource) =>
+    backgroundBandsForDay(
+      events.filter((event) => resourceId(event) === resource.id),
+      date,
+    )
+      .map((b) => ({
+        ...b,
+        startHours: Math.max(b.startHours, startHour),
+        endHours: Math.min(b.endHours, endHour),
+      }))
+      .filter((b) => b.endHours > b.startHours);
 
   const hours = useMemo(
     () => Array.from({ length: Math.max(0, endHour - startHour) }, (_, i) => startHour + i),
@@ -672,6 +685,21 @@ export function ResourceTimeline<T = unknown>({
                           top: (b.start - startHour) * hourHeight,
                           height: (b.end - b.start) * hourHeight,
                           backgroundColor: theme.colors.outsideHoursBackground,
+                        },
+                      ]}
+                    />
+                  ))}
+                  {backgroundBandsFor(resource).map((b, i) => (
+                    <View
+                      key={`bg-${i}`}
+                      pointerEvents="none"
+                      testID="background-event-shade"
+                      style={[
+                        styles.vshadeBand,
+                        {
+                          top: (b.startHours - startHour) * hourHeight,
+                          height: (b.endHours - b.startHours) * hourHeight,
+                          backgroundColor: theme.colors.backgroundEvent,
                         },
                       ]}
                     />
@@ -824,6 +852,21 @@ export function ResourceTimeline<T = unknown>({
                         left: (b.start - startHour) * hourWidth,
                         width: (b.end - b.start) * hourWidth,
                         backgroundColor: theme.colors.outsideHoursBackground,
+                      },
+                    ]}
+                  />
+                ))}
+                {backgroundBandsFor(resource).map((b, i) => (
+                  <View
+                    key={`bg-${i}`}
+                    pointerEvents="none"
+                    testID="background-event-shade"
+                    style={[
+                      styles.hshadeBand,
+                      {
+                        left: (b.startHours - startHour) * hourWidth,
+                        width: (b.endHours - b.startHours) * hourWidth,
+                        backgroundColor: theme.colors.backgroundEvent,
                       },
                     ]}
                   />
