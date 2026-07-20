@@ -17,7 +17,7 @@ const DOM_INDEX = path.join(REPO_ROOT, "packages", "dom", "src", "index.ts");
 const NATIVE_INDEX = path.join(REPO_ROOT, "packages", "native", "src", "index.tsx");
 
 // The shared components, by their exported `*Props` type.
-const SHARED_COMPONENTS = ["MonthView", "MonthList", "TimeGrid"] as const;
+const SHARED_COMPONENTS = ["MonthView", "MonthList", "TimeGrid", "YearView"] as const;
 
 // Props that exist only on the dom renderer because they are web-platform
 // concerns with no native equivalent. Anything here is exempt from the
@@ -54,6 +54,8 @@ const DOM_PLATFORM_PROPS: Record<string, Set<string>> = {
   ]),
   // pastMonths/futureMonths size the dom scroll window (native virtualizes by date).
   // keyboardDayNavigation is web-only (see MonthView).
+  // DOM elements take className/style; the dom theme is a flat prop object.
+  YearView: new Set(["className", "style", "theme"]),
   MonthList: new Set([
     "className",
     "style",

@@ -8,6 +8,9 @@ import {
   startOfDay,
   startOfMonth,
   startOfWeek,
+  addYears,
+  endOfYear,
+  startOfYear,
 } from "date-fns";
 import {
   type CSSProperties,
@@ -17,6 +20,7 @@ import {
   useMemo,
 } from "react";
 import {
+  type CalendarMode,
   type BusinessHours,
   type CalendarEvent,
   type DateRange,
@@ -25,11 +29,11 @@ import {
   eventsInTimeZone,
   expandRecurringEvents,
   getViewDays,
-  type TimeGridMode,
   type WeekdayFormat,
   type WeekStartsOn,
 } from "@super-calendar/core";
 import { Agenda, type AgendaSlot, type DomAgendaEvent } from "./Agenda";
+import { YearView, type YearViewSlot } from "./YearView";
 import { type DomMonthEvent, MonthView, type MonthViewSlot } from "./MonthView";
 import type { SlotStyleProps } from "./slots";
 import { type DomRenderEvent, TimeGrid, type TimeGridSlot } from "./TimeGrid";
@@ -40,7 +44,7 @@ import type { DomCalendarTheme } from "./theme";
  * for the active `mode` apply; the rest are ignored. See {@link MonthViewSlot},
  * {@link TimeGridSlot}, and {@link AgendaSlot}.
  */
-export type CalendarSlot = MonthViewSlot | TimeGridSlot | AgendaSlot;
+export type CalendarSlot = MonthViewSlot | TimeGridSlot | AgendaSlot | YearViewSlot;
 
 /** Props for {@link Calendar}. */
 export interface CalendarProps<T = unknown>
@@ -49,7 +53,7 @@ export interface CalendarProps<T = unknown>
    * The view to render (default "week"). `month` renders a month grid, `schedule`
    * a day-grouped agenda list, and the others a time grid.
    */
-  mode?: "month" | "schedule" | TimeGridMode;
+  mode?: CalendarMode;
   /** Controlled anchor date. Change it (e.g. from your own header) to navigate. */
   date: Date;
   /**
@@ -161,6 +165,8 @@ export interface CalendarProps<T = unknown>
   keyboardDayNavigation?: boolean;
   /** Tap a day cell. */
   onPressDay?: (date: Date) => void;
+  /** Tap a month's title in the year view — e.g. jump to that month. */
+  onPressMonth?: (month: Date) => void;
   /** Tap the "+N more" overflow row. */
   onPressMore?: (events: CalendarEvent<T>[], date: Date) => void;
   /** Custom month chip renderer. */
@@ -179,7 +185,7 @@ const EMPTY_EVENTS: CalendarEvent<never>[] = [];
 // `month`, the day columns for the time-grid modes, and a forward window for the
 // `schedule` agenda (which has no bounded viewport of its own).
 function expansionRange(
-  mode: "month" | "schedule" | TimeGridMode,
+  mode: CalendarMode,
   date: Date,
   weekStartsOn: WeekStartsOn,
   numberOfDays: number | undefined,
@@ -188,6 +194,12 @@ function expansionRange(
     return [
       startOfWeek(startOfMonth(date), { weekStartsOn }),
       endOfWeek(endOfMonth(date), { weekStartsOn }),
+    ];
+  }
+  if (mode === "year") {
+    return [
+      startOfWeek(startOfYear(date), { weekStartsOn }),
+      endOfWeek(endOfYear(date), { weekStartsOn }),
     ];
   }
   if (mode === "schedule") {
@@ -199,15 +211,16 @@ function expansionRange(
   return [startOfDay(days[0]), endOfDay(days[days.length - 1])];
 }
 
-// The date one page away in `direction` (+1 next, −1 previous): a month for
-// `month`, a week for `schedule`, else the view's day span.
+// The date one page away in `direction` (+1 next, −1 previous): a year for
+// `year`, a month for `month`, a week for `schedule`, else the view's day span.
 function pageStep(
-  mode: "month" | "schedule" | TimeGridMode,
+  mode: CalendarMode,
   date: Date,
   direction: number,
   weekStartsOn: WeekStartsOn,
   numberOfDays: number | undefined,
 ): Date {
+  if (mode === "year") return addYears(date, direction);
   if (mode === "month") return addMonths(date, direction);
   if (mode === "schedule") return addDays(date, direction * 7);
   return addDays(date, direction * getViewDays(mode, date, weekStartsOn, numberOfDays ?? 1).length);
@@ -274,6 +287,7 @@ export function Calendar<T = unknown>({
   isDateDisabled,
   keyboardDayNavigation,
   onPressDay,
+  onPressMonth,
   onPressMore,
   renderMonthEvent,
   // schedule
@@ -313,7 +327,23 @@ export function Calendar<T = unknown>({
   };
 
   let view: ReactElement;
-  if (mode === "schedule") {
+  if (mode === "year") {
+    view = (
+      <YearView<T>
+        date={date}
+        events={displayEvents}
+        weekStartsOn={weekStartsOn}
+        locale={locale}
+        theme={theme}
+        className={className}
+        style={height != null ? { height, ...style } : style}
+        classNames={classNames}
+        styles={styles}
+        onPressDay={onPressDay}
+        onPressMonth={onPressMonth}
+      />
+    );
+  } else if (mode === "schedule") {
     view = (
       <Agenda<T>
         events={displayEvents}

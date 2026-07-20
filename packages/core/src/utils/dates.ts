@@ -119,3 +119,7 @@ export const isSameCalendarDay = (a: Date, b: Date): boolean => isSameDay(a, b);
 
 /** Minutes elapsed since midnight (0–1439). */
 export const minutesIntoDay = (date: Date): number => getHours(date) * 60 + getMinutes(date);
+
+/** The twelve month anchors (first-of-month) of `date`'s year, January first. */
+export const getYearMonths = (date: Date): Date[] =>
+  Array.from({ length: 12 }, (_, i) => new Date(date.getFullYear(), i, 1));

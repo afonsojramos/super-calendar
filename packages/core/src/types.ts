@@ -1,8 +1,8 @@
 /** The view the calendar renders: a day-column grid (`day`, `3days`, `week`, `custom`), the `month` grid, or the `schedule` list. */
-export type CalendarMode = "day" | "3days" | "week" | "custom" | "month" | "schedule";
+export type CalendarMode = "day" | "3days" | "week" | "custom" | "month" | "schedule" | "year";
 
 /** The time-grid modes (day-column views, excluding month and schedule). */
-export type TimeGridMode = Exclude<CalendarMode, "month" | "schedule">;
+export type TimeGridMode = Exclude<CalendarMode, "month" | "schedule" | "year">;
 
 /**
  * The minimal shape every calendar event must have. Layout (positioning,

@@ -42,6 +42,7 @@ export {
   type MonthViewSlot,
 } from "./MonthView";
 export { MonthList, type MonthListProps, type MonthListSlot } from "./MonthList";
+export { YearView, type YearViewProps, type YearViewSlot } from "./YearView";
 export {
   type Resource,
   type ResourceEventArgs,

@@ -23,6 +23,7 @@
 export { Calendar, type CalendarProps, type CalendarSlot } from "./components/Calendar";
 export { Agenda, type AgendaProps, type AgendaSlot } from "./components/Agenda";
 export { MonthView, type MonthViewProps, type MonthViewSlot } from "./components/MonthView";
+export { YearView, type YearViewProps, type YearViewSlot } from "./components/YearView";
 export { type ResolvedSlot, type SlotDefault, type SlotStyleProps } from "./utils/slots";
 export { MonthPager, type MonthPagerProps } from "./components/MonthPager";
 export { MonthList, type MonthListProps, type MonthListSlot } from "./components/MonthList";

@@ -5,10 +5,12 @@ import {
   endOfDay,
   endOfMonth,
   endOfWeek,
+  endOfYear,
   type Locale,
   startOfDay,
   startOfMonth,
   startOfWeek,
+  startOfYear,
 } from "date-fns";
 import { type ReactElement, useCallback, useMemo } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
@@ -31,6 +33,7 @@ import {
   getViewDays,
 } from "@super-calendar/core";
 import { type SlotStyleProps } from "../utils/slots";
+import { YearView, type YearViewSlot } from "./YearView";
 import { Agenda, type AgendaSlot } from "./Agenda";
 import { DefaultEvent } from "./DefaultEvent";
 import { MonthPager } from "./MonthPager";
@@ -49,7 +52,7 @@ import {
  * month pager, the grid slots reach the time grid, and the agenda slots reach
  * the schedule view; slots for views that aren't rendered are ignored.
  */
-export type CalendarSlot = MonthViewSlot | TimeGridSlot | AgendaSlot;
+export type CalendarSlot = MonthViewSlot | TimeGridSlot | AgendaSlot | YearViewSlot;
 
 /** Props for the {@link Calendar} component. */
 export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
@@ -85,8 +88,10 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
    * drag-to-move and drag-to-resize working while hiding the visible indicator.
    */
   showDragHandle?: boolean;
-  /** Tap a day cell (month mode) — e.g. drill into the day view. */
+  /** Tap a day cell (month and year modes) — e.g. drill into the day view. */
   onPressDay?: (date: Date) => void;
+  /** Tap a month's title in the year view — e.g. jump to that month. */
+  onPressMonth?: (month: Date) => void;
   /** Long-press a day cell (month mode). */
   onLongPressDay?: (date: Date) => void;
   /** Tap the "+N more" overflow label in a month cell. */
@@ -261,6 +266,12 @@ function visibleRange(
       endOfWeek(endOfMonth(date), { weekStartsOn }),
     ];
   }
+  if (mode === "year") {
+    return [
+      startOfWeek(startOfYear(date), { weekStartsOn }),
+      endOfWeek(endOfYear(date), { weekStartsOn }),
+    ];
+  }
   const days = getViewDays(mode, date, weekStartsOn, numberOfDays, false, weekEndsOn);
   return [startOfDay(days[0]), endOfDay(days[days.length - 1])];
 }
@@ -281,6 +292,12 @@ function expansionRange(
       // The extra week covers a `showSixWeeks` neighbour page whose own month
       // fits in five weeks but is padded to six (the 6th row trails the month).
       addWeeks(endOfWeek(endOfMonth(addMonths(date, 1)), { weekStartsOn }), 1),
+    ];
+  }
+  if (mode === "year") {
+    return [
+      startOfWeek(startOfYear(date), { weekStartsOn }),
+      endOfWeek(endOfYear(date), { weekStartsOn }),
     ];
   }
   if (mode === "schedule") {
@@ -332,6 +349,7 @@ export function Calendar<T>({
   dragStepMinutes,
   showDragHandle,
   onPressDay,
+  onPressMonth,
   onLongPressDay,
   onPressMore,
   onPressCell,
@@ -520,6 +538,18 @@ export function Calendar<T>({
           onChangeDate={handleChangeDate}
           freeSwipe={freeSwipe}
           swipeEnabled={swipeEnabled}
+          classNames={classNames}
+          styles={styleOverrides}
+        />
+      ) : mode === "year" ? (
+        <YearView
+          date={date}
+          events={displayEvents}
+          weekStartsOn={weekStartsOn}
+          locale={locale}
+          activeDate={activeDate}
+          onPressDay={onPressDay}
+          onPressMonth={onPressMonth}
           classNames={classNames}
           styles={styleOverrides}
         />
