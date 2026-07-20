@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.0](https://github.com/afonsojramos/super-calendar/compare/v2.5.0...v2.6.0) (2026-07-20)
+
+
+### Features
+
+* add a year view mode ([6740cfc](https://github.com/afonsojramos/super-calendar/commit/6740cfc844fabf110dbf4ef21e25c7a5c4a1c0ae)), closes [#30](https://github.com/afonsojramos/super-calendar/issues/30)
+
 ## [2.5.0](https://github.com/afonsojramos/super-calendar/compare/v2.4.0...v2.5.0) (2026-07-18)
 
 
