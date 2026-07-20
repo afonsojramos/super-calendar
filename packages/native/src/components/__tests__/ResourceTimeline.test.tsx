@@ -339,3 +339,26 @@ describe("ResourceTimeline cell interactions", () => {
     expect(onLongPressCell).not.toHaveBeenCalled();
   });
 });
+
+describe("ResourceTimeline now indicator", () => {
+  it("draws the line when the board shows the now instant's day", () => {
+    const now = new Date(2026, 0, 1, 10, 30);
+    const { getAllByTestId } = render(
+      <ResourceTimeline date={at(0)} resources={resources} events={events} now={now} />,
+    );
+    // One line per lane, visually continuous across the board.
+    expect(getAllByTestId("resource-now-indicator", { includeHiddenElements: true })).toHaveLength(
+      2,
+    );
+  });
+
+  it("hides the line when the board shows another day", () => {
+    const now = new Date(2026, 5, 10, 10, 30);
+    const { queryAllByTestId } = render(
+      <ResourceTimeline date={at(0)} resources={resources} events={events} now={now} />,
+    );
+    expect(
+      queryAllByTestId("resource-now-indicator", { includeHiddenElements: true }),
+    ).toHaveLength(0);
+  });
+});

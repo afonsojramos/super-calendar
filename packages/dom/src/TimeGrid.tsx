@@ -30,6 +30,7 @@ import {
   isSameCalendarDay,
   isWeekend,
   layoutDayEvents,
+  useNow,
   type TimeGridMode,
   titleNumberOfLines,
   type WeekdayFormat,
@@ -151,6 +152,10 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   businessHours?: BusinessHours;
   /** Show the current-time indicator on today's column (default true). */
   showNowIndicator?: boolean;
+  /** Fixed "now" instant for the indicator (doesn't tick). Defaults to the device clock. */
+  now?: Date;
+  /** Shift the now indicator into this IANA zone (pair with `eventsInTimeZone`). */
+  timeZone?: string;
   /** Show the all-day lane above the grid (default true). */
   showAllDayEventCell?: boolean;
   /** date-fns locale for the column headers and time labels. */
@@ -307,21 +312,8 @@ function DefaultDomEvent<T>({
   );
 }
 
-const NOW_TICK_MS = 60_000;
-
 // A `Date` that advances every minute while `enabled`, so the now-indicator
 // tracks the wall clock instead of freezing at the last render. Mirrors the
-// native renderer's `useNow`.
-function useNow(enabled: boolean): Date {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    if (!enabled) return;
-    setNow(new Date());
-    const id = setInterval(() => setNow(new Date()), NOW_TICK_MS);
-    return () => clearInterval(id);
-  }, [enabled]);
-  return now;
-}
 
 /**
  * A day / week / N-day time grid rendered with plain DOM elements. Events are
@@ -358,6 +350,8 @@ export function TimeGrid<T = unknown>({
   keyboardEventNavigation = false,
   businessHours,
   showNowIndicator = true,
+  now: nowProp,
+  timeZone,
   showAllDayEventCell = true,
   locale,
   theme: themeOverrides,
@@ -393,8 +387,9 @@ export function TimeGrid<T = unknown>({
     [windowStart, windowHours],
   );
 
-  // Ticks every minute so the red now-line follows the wall clock.
-  const now = useNow(showNowIndicator);
+  // Ticks every minute so the red now-line follows the wall clock; a `now`
+  // override pins it, and `timeZone` shifts it to match zone-shifted events.
+  const now = useNow(showNowIndicator, { now: nowProp, timeZone });
 
   const [hourHeight, setHourHeight] = useState(initialHourHeight);
   useEffect(() => setHourHeight(initialHourHeight), [initialHourHeight]);

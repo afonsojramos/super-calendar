@@ -16,6 +16,8 @@ import {
   backgroundBandsForDay,
   type CalendarEvent,
   cellRangeFromDrag,
+  isSameCalendarDay,
+  useNow,
   closedHourBands,
   eventTimeLabel,
   formatHour,
@@ -121,6 +123,12 @@ export interface ResourceTimelineProps<T = unknown> {
   businessHours?: (date: Date, resource: Resource) => { start: number; end: number } | null;
   /** Snap dragged events to this many minutes (default 15). */
   dragStepMinutes?: number;
+  /** Show the current-time line when `date` is today (default true). */
+  showNowIndicator?: boolean;
+  /** Fixed "now" instant for the indicator (doesn't tick). Defaults to the device clock. */
+  now?: Date;
+  /** Shift the now indicator into this IANA zone (pair with `eventsInTimeZone`). */
+  timeZone?: string;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -584,10 +592,37 @@ export function ResourceTimeline<T = unknown>({
   onCreateEvent,
   businessHours,
   dragStepMinutes = 15,
+  showNowIndicator = true,
+  now: nowProp,
+  timeZone,
 }: ResourceTimelineProps<T>): ReactElement {
   const theme = useCalendarTheme();
   const Renderer = renderEvent ?? DefaultBar;
   const cellEnabled = !!onPressCell || !!onLongPressCell || !!onCreateEvent;
+  // The current-time line, shown only when the board's day is the zone's today.
+  const now = useNow(showNowIndicator, { now: nowProp, timeZone });
+  const nowHours = now.getHours() + now.getMinutes() / 60;
+  const showNow =
+    showNowIndicator &&
+    isSameCalendarDay(now, date) &&
+    nowHours >= startHour &&
+    nowHours <= endHour;
+  const nowLine = (vertical: boolean, hourSize: number) =>
+    showNow ? (
+      <View
+        pointerEvents="none"
+        testID="resource-now-indicator"
+        style={[
+          vertical
+            ? { position: "absolute", left: 0, right: 0, height: 2 }
+            : { position: "absolute", top: 0, bottom: 0, width: 2 },
+          vertical
+            ? { top: (nowHours - startHour) * hourSize }
+            : { left: (nowHours - startHour) * hourSize },
+          { backgroundColor: theme.colors.nowIndicator, zIndex: 2 },
+        ]}
+      />
+    ) : null;
   // The closed-hours bands to shade in a lane, resolved per resource.
   const bandsFor = (resource: Resource) =>
     businessHours
@@ -717,6 +752,7 @@ export function ResourceTimeline<T = unknown>({
                       ]}
                     />
                   ))}
+                  {nowLine(true, hourHeight)}
                   {cellEnabled ? (
                     <LaneInteractionLayer
                       resource={resource}
@@ -882,6 +918,7 @@ export function ResourceTimeline<T = unknown>({
                     ]}
                   />
                 ))}
+                {nowLine(false, hourWidth)}
                 {cellEnabled ? (
                   <LaneInteractionLayer
                     resource={resource}

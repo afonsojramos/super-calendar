@@ -69,6 +69,12 @@ export interface CalendarProps<T = unknown>
   weekStartsOn?: WeekStartsOn;
   /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
   hiddenDays?: number[];
+  /**
+   * Fixed "now" instant for the current-time indicator (doesn't tick), e.g. a
+   * server-synced clock. Defaults to the device clock, shifted into `timeZone`
+   * when one is set so the line matches the displayed events.
+   */
+  now?: Date;
   /** Column count for `mode="custom"`. */
   numberOfDays?: number;
   /** date-fns locale for titles, headers, and time labels. */
@@ -246,6 +252,7 @@ export function Calendar<T = unknown>({
   onChangeDate,
   weekStartsOn = 0,
   hiddenDays,
+  now,
   numberOfDays,
   locale,
   timeZone,
@@ -405,6 +412,8 @@ export function Calendar<T = unknown>({
         mode={mode}
         events={displayEvents}
         weekStartsOn={weekStartsOn}
+        now={now}
+        timeZone={timeZone}
         weekdayFormat={weekdayFormat}
         numberOfDays={numberOfDays}
         locale={locale}

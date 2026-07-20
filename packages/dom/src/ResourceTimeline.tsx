@@ -9,6 +9,8 @@ import { useMemo, useRef, useState } from "react";
 import {
   backgroundBandsForDay,
   type CalendarEvent,
+  isSameCalendarDay,
+  useNow,
   cellRangeFromDrag,
   closedHourBands,
   eventTimeLabel,
@@ -35,6 +37,7 @@ export type ResourceTimelineSlot =
   | "backgroundEvent"
   | "event"
   | "eventBox"
+  | "nowIndicator"
   | "createGhost";
 
 /** A schedulable lane (room, person, machine) that events are grouped under. */
@@ -112,6 +115,12 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
   businessHours?: (date: Date, resource: Resource) => { start: number; end: number } | null;
   /** Snap dragged events to this many minutes (default 15). */
   dragStepMinutes?: number;
+  /** Show the current-time line when `date` is today (default true). */
+  showNowIndicator?: boolean;
+  /** Fixed "now" instant for the indicator (doesn't tick). Defaults to the device clock. */
+  now?: Date;
+  /** Shift the now indicator into this IANA zone (pair with `eventsInTimeZone`). */
+  timeZone?: string;
   /** Class applied to the root element. */
   className?: string;
   /** Inline styles applied to the root element. */
@@ -218,6 +227,9 @@ export function ResourceTimeline<T = unknown>({
   onCreateEvent,
   businessHours,
   dragStepMinutes = 15,
+  showNowIndicator = true,
+  now: nowProp,
+  timeZone,
   className,
   style,
   classNames,
@@ -230,6 +242,43 @@ export function ResourceTimeline<T = unknown>({
   const vertical = orientation === "vertical";
   // Pixels per hour along whichever axis carries the time.
   const hourSize = vertical ? hourHeight : hourWidth;
+  // The current-time line, shown only when the board's day is the zone's today.
+  const now = useNow(showNowIndicator, { now: nowProp, timeZone });
+  const nowHours = now.getHours() + now.getMinutes() / 60;
+  const showNow =
+    showNowIndicator &&
+    isSameCalendarDay(now, date) &&
+    nowHours >= startHour &&
+    nowHours <= endHour;
+  const nowLine = (resourceKey: string) =>
+    showNow ? (
+      <div
+        key={`now-${resourceKey}`}
+        aria-hidden
+        {...slot("nowIndicator", {
+          base: vertical
+            ? {
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: (nowHours - startHour) * hourSize,
+                height: 2,
+                pointerEvents: "none",
+                zIndex: 2,
+              }
+            : {
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: (nowHours - startHour) * hourSize,
+                width: 2,
+                pointerEvents: "none",
+                zIndex: 2,
+              },
+          themed: { background: theme.nowIndicator },
+        })}
+      />
+    ) : null;
 
   // `drag` drives the visual; `dragRef` is the source of truth the pointer
   // handlers read so they never see a stale closure between events.
@@ -628,6 +677,7 @@ export function ResourceTimeline<T = unknown>({
                       </button>
                     );
                   })}
+                  {nowLine(resource.id)}
                   {createBox?.resourceKey === resource.id ? (
                     <div
                       aria-hidden
@@ -846,6 +896,7 @@ export function ResourceTimeline<T = unknown>({
                     </button>
                   );
                 })}
+                {nowLine(resource.id)}
                 {createBox?.resourceKey === resource.id ? (
                   <div
                     aria-hidden

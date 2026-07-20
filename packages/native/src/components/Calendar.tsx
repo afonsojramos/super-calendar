@@ -130,6 +130,12 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   weekStartsOn?: WeekStartsOn;
   /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
   hiddenDays?: number[];
+  /**
+   * Fixed "now" instant for the current-time indicator (doesn't tick), e.g. a
+   * server-synced clock. Defaults to the device clock, shifted into `timeZone`
+   * when one is set so the line matches the displayed events.
+   */
+  now?: Date;
   /** Weekday header label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
   weekdayFormat?: WeekdayFormat;
   /** Number of day columns when `mode="custom"`. Ignored by other modes. Default 1. */
@@ -366,6 +372,7 @@ export function Calendar<T>({
   disableMonthEventCellPress,
   weekStartsOn = 0,
   hiddenDays,
+  now,
   weekdayFormat,
   numberOfDays,
   weekEndsOn,
@@ -584,6 +591,8 @@ export function Calendar<T>({
           weekStartsOn={weekStartsOn}
           weekdayFormat={weekdayFormat}
           hiddenDays={hiddenDays}
+          now={now}
+          timeZone={timeZone}
           renderEvent={resolvedRenderEvent}
           keyExtractor={keyExtractor}
           scrollOffsetMinutes={scrollOffsetMinutes}

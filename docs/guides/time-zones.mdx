@@ -28,3 +28,12 @@ const zoned = eventsInTimeZone(events, "America/New_York");
   The returned dates are for display only — they carry the zone's wall clock, not the original
   instant. Keep your source events around for editing and saving.
 </Warning>
+
+## The now indicator
+
+The current-time line follows the same zone as your events: set `timeZone` on
+`Calendar` and the line lands where "now" is in that zone, not where the device
+clock is. Pass `now` for a fixed instant instead (a server-synced clock, or a
+stable value in tests); a fixed `now` doesn't tick. `ResourceTimeline` takes the
+same `showNowIndicator` / `now` / `timeZone` props and draws its line across the
+lanes whenever the board's `date` is that zone's today.

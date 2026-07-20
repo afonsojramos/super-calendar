@@ -61,6 +61,7 @@ import {
 import {
   backgroundBandsForDay,
   cellRangeFromDrag,
+  useNow,
   closedHourBands,
   resolveDraggedBounds,
   snapDeltaMinutes,
@@ -144,21 +145,6 @@ export type EventDragStartHandler<T> = (event: CalendarEvent<T>) => void;
 // scroll content by the same amount so the top-most label is never clipped.
 const HOUR_LABEL_TOP_INSET = 12;
 const HOUR_LABEL_NUDGE = 6;
-const NOW_TICK_MS = 60_000;
-
-// A `Date` that advances every minute while `enabled`, so the now-indicator
-// tracks the wall clock instead of freezing at mount. Off-screen pages pass
-// `enabled = false` and re-read the time when they become active.
-function useNow(enabled: boolean): Date {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    if (!enabled) return;
-    setNow(new Date());
-    const id = setInterval(() => setNow(new Date()), NOW_TICK_MS);
-    return () => clearInterval(id);
-  }, [enabled]);
-  return now;
-}
 
 type AnimatedEventBoxProps<T> = {
   positioned: PositionedEvent<T>;
@@ -602,6 +588,8 @@ type TimetablePageProps<T> = {
   mode: TimeGridMode;
   numberOfDays: number;
   hiddenDays?: number[];
+  now?: Date;
+  nowTimeZone?: string;
   date: Date;
   events: CalendarEvent<T>[];
   cellHeight: SharedValue<number>;
@@ -656,6 +644,8 @@ function TimetablePageInner<T>({
   mode,
   numberOfDays,
   hiddenDays,
+  now: nowProp,
+  nowTimeZone,
   date,
   events,
   cellHeight,
@@ -825,8 +815,10 @@ function TimetablePageInner<T>({
     [minHour, maxHour],
   );
 
-  const now = useNow(showNowIndicator && isActive);
-  const nowDayIndex = days.findIndex((day) => getIsToday(day));
+  const now = useNow(showNowIndicator && isActive, { now: nowProp, timeZone: nowTimeZone });
+  // "Today" follows the (possibly zone-shifted or overridden) now, so the line
+  // lands in the column the events are displayed in.
+  const nowDayIndex = days.findIndex((day) => isSameCalendarDay(day, now));
   const nowHours = (getHours(now) * MINUTES_PER_HOUR + getMinutes(now)) / MINUTES_PER_HOUR;
   const nowInWindow = nowHours >= minHour && nowHours <= maxHour;
 
@@ -1284,6 +1276,10 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   weekEndsOn?: WeekStartsOn;
   /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
   hiddenDays?: number[];
+  /** Fixed "now" instant for the indicator (doesn't tick). Defaults to the device clock. */
+  now?: Date;
+  /** Shift the now indicator into this IANA zone (pair with `eventsInTimeZone`). */
+  timeZone?: string;
   date: Date;
   events: CalendarEvent<T>[];
   cellHeight: SharedValue<number>;
@@ -1404,6 +1400,8 @@ function TimeGridInner<T>({
   verticalScrollEnabled = true,
   weekNumberPrefix = "W",
   hiddenDays,
+  now,
+  timeZone,
   hourComponent,
   activeDate,
   resetPageOnPressCell = false,
@@ -1701,6 +1699,8 @@ function TimeGridInner<T>({
           mode={mode}
           numberOfDays={numberOfDays}
           hiddenDays={hiddenDays}
+          now={now}
+          nowTimeZone={timeZone}
           date={item}
           width={containerWidth}
           events={events}
@@ -1784,6 +1784,8 @@ function TimeGridInner<T>({
       onLongPressCell,
       onCreateEvent,
       hiddenDays,
+      now,
+      timeZone,
     ],
   );
 
