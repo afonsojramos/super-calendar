@@ -1,0 +1,70 @@
+---
+title: Year view
+description: The twelve-month year grid, with a dot under days that hold events.
+---
+
+<Note>
+  Examples use the React Native `Calendar`; most props are shared with the dom renderer, and the
+  [dom vs native comparison](/reference/renderers) lists what differs per renderer.
+</Note>
+
+`mode="year"` renders the year at a glance: twelve compact mini months in a
+responsive grid, with today highlighted and a dot under any day that holds an
+event. Days and month titles are tappable, so it works as the top of a
+drill-down: year → month → day.
+
+```tsx
+<Calendar
+  mode="year"
+  date={date}
+  events={events}
+  onChangeDate={setDate}
+  onPressDay={(day) => {
+    setDate(day);
+    setMode("day");
+  }}
+  onPressMonth={(month) => {
+    setDate(month);
+    setMode("month");
+  }}
+/>
+```
+
+## What a mini month shows
+
+Each month renders its title, narrow weekday initials, and the day grid, with
+adjacent-month days left blank. Events are summarised, not rendered: a day with
+at least one event gets a small dot (recurring rules are expanded across the
+whole year first). Today gets the theme's filled badge; pass `activeDate` to
+highlight a different day.
+
+## Layout
+
+The grid fits as many columns as the width allows, so a phone gets 2 columns
+and a desktop 3–4. `minMonthWidth` (default 150) sets the narrowest a mini
+month may be before the grid drops a column.
+
+## Paging
+
+The year view has no swipe pager: page it from your own toolbar through
+`onChangeDate` (e.g. `addYears(date, 1)`). On the web, the dom renderer pages a
+year at a time with PageUp/PageDown when `onChangeDate` is wired.
+
+## Standalone use
+
+`YearView` is exported from both packages if you want it outside `Calendar`,
+e.g. as a date-jump overview in your own chrome:
+
+```tsx
+import { YearView } from "@super-calendar/native";
+
+<YearView date={date} events={events} weekStartsOn={1} onPressDay={jumpTo} />;
+```
+
+## Styling
+
+Every part is a [slot](/guides/styling): `grid`, `month`, `monthTitle`,
+`weekdays`, `weekday`, `week`, `day`, and `eventDot` (plus `dayText` on React
+Native, where text colour doesn't inherit). On the web, day cells carry
+`data-today` and `data-events` for Tailwind variants. The theme's
+`todayBackground` / `todayText` drive the badge and dots.

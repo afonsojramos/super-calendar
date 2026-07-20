@@ -60,7 +60,7 @@ Terminology:
 - "the calendar" or "the library" means the package itself.
 - "consumer" means a developer using the library in their app.
 - "event" is a `CalendarEvent`; "occurrence" is an expanded recurring event.
-- Modes are `month`, `week`, `day`, `3days`, `custom`, `schedule`.
+- Modes are `month`, `week`, `day`, `3days`, `custom`, `schedule`, `year`.
 
 Style:
 

@@ -29,6 +29,7 @@
         "pages": [
           "guides/views",
           "guides/month-view",
+          "guides/year-view",
           "guides/time-grid",
           "guides/schedule",
           "guides/month-list",
