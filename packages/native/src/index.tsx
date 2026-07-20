@@ -80,6 +80,8 @@ export {
   isWithinDateRange,
   nextDateRange,
   useDateRange,
+  useEventSource,
+  useNow,
 } from "@super-calendar/core";
 export {
   buildMonthGrid,

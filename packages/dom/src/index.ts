@@ -91,6 +91,8 @@ export {
   isWithinDateRange,
   nextDateRange,
   useDateRange,
+  useEventSource,
+  useNow,
   useMonthGrid,
   buildMonthGrid,
   weekdayFormatToken,

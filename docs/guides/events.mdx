@@ -123,3 +123,24 @@ all-day or multi-day one covers each day's full window). They take no overlap
 column, render no chip in the month grid or agenda, and produce no year-view
 dot. Restyle the band with the `backgroundEvent` slot or the theme's
 `backgroundEvent` colour token.
+
+## Loading events from a feed
+
+`useEventSource` (from `@super-calendar/core`) owns the fetching for you: point
+it at a JSON feed, an iCalendar feed (`.ics` URLs are parsed automatically), or
+your own async function, and hand the result to any view. Set
+`refetchIntervalMs` for a live feed; `refetch` reloads on demand, and a failed
+refetch keeps the previous events while reporting `error`.
+
+```tsx
+import { useEventSource } from "@super-calendar/core";
+
+const { events, loading, error, refetch } = useEventSource("https://example.com/rooms.ics", {
+  refetchIntervalMs: 5 * 60_000,
+});
+
+<Calendar mode="week" date={date} events={events} onChangeDate={setDate} />;
+```
+
+JSON feeds default to items with ISO `start`/`end` strings; pass `map` to
+reshape anything else (rename fields, attach a `resourceId`, filter).
