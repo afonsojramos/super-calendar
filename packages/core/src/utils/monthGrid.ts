@@ -80,6 +80,8 @@ export function weekdayFormatToken(format: WeekdayFormat): string {
 export interface UseMonthGridOptions extends DateSelectionConstraints {
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */
   weekStartsOn?: WeekStartsOn;
+  /** Weekdays (0=Sunday…6=Saturday) to drop from the grid and header. */
+  hiddenDays?: number[];
   /** Weekday header label width. Default `short` ("Mon"). */
   weekdayFormat?: WeekdayFormat;
   /** Always return six week rows for a fixed-height grid. Default false. */
@@ -105,6 +107,7 @@ export function buildMonthGrid(month: Date, options: UseMonthGridOptions = {}): 
     weekdayFormat = "short",
     showSixWeeks = false,
     isRTL = false,
+    hiddenDays,
     selectedDates,
     selectedRange,
     minDate,
@@ -113,7 +116,7 @@ export function buildMonthGrid(month: Date, options: UseMonthGridOptions = {}): 
     locale,
   } = options;
 
-  const rows = buildMonthWeeks(month, weekStartsOn, { showSixWeeks, isRTL });
+  const rows = buildMonthWeeks(month, weekStartsOn, { showSixWeeks, isRTL, hiddenDays });
 
   const weeks: MonthGridWeek[] = rows.map((days) => ({
     id: days[0].toISOString(),

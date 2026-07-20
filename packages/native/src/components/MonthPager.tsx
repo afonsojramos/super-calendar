@@ -17,7 +17,12 @@ import {
 } from "react-native";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent, WeekStartsOn } from "../types";
-import { type WeekdayFormat, getWeekDays, weekdayFormatToken } from "@super-calendar/core";
+import {
+  type WeekdayFormat,
+  filterHiddenDays,
+  getWeekDays,
+  weekdayFormatToken,
+} from "@super-calendar/core";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { MonthView, type MonthViewSlot } from "./MonthView";
@@ -41,6 +46,8 @@ export type MonthPagerProps<T> = {
   events: CalendarEvent<T>[];
   maxVisibleEventCount?: number;
   weekStartsOn: WeekStartsOn;
+  /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
+  hiddenDays?: number[];
   weekdayFormat?: WeekdayFormat;
   locale?: Locale;
   sortedMonthView?: boolean;
@@ -72,6 +79,7 @@ function MonthPagerInner<T>({
   events,
   maxVisibleEventCount,
   weekStartsOn,
+  hiddenDays,
   weekdayFormat = "short",
   locale,
   sortedMonthView,
@@ -210,9 +218,9 @@ function MonthPagerInner<T>({
   // only on `weekStartsOn`, so any week works; reuse the anchor. Reversed in RTL
   // to line up with the mirrored day cells.
   const weekDays = useMemo(() => {
-    const days = getWeekDays(anchor, weekStartsOn);
+    const days = filterHiddenDays(getWeekDays(anchor, weekStartsOn), hiddenDays);
     return isRTL ? days.reverse() : days;
-  }, [anchor, weekStartsOn, isRTL]);
+  }, [anchor, weekStartsOn, isRTL, hiddenDays]);
 
   // Pages are keyed by month Dates that never change, so LegendList keeps the
   // pages it has already rendered and only re-renders them when `data` or
@@ -237,6 +245,7 @@ function MonthPagerInner<T>({
           showWeekdays={false}
           maxVisibleEventCount={maxVisibleEventCount}
           weekStartsOn={weekStartsOn}
+          hiddenDays={hiddenDays}
           locale={locale}
           sortedMonthView={sortedMonthView}
           moreLabel={moreLabel}

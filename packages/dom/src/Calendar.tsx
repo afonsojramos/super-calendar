@@ -67,6 +67,8 @@ export interface CalendarProps<T = unknown>
   events?: CalendarEvent<T>[];
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */
   weekStartsOn?: WeekStartsOn;
+  /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
+  hiddenDays?: number[];
   /** Column count for `mode="custom"`. */
   numberOfDays?: number;
   /** date-fns locale for titles, headers, and time labels. */
@@ -243,6 +245,7 @@ export function Calendar<T = unknown>({
   events,
   onChangeDate,
   weekStartsOn = 0,
+  hiddenDays,
   numberOfDays,
   locale,
   timeZone,
@@ -333,6 +336,7 @@ export function Calendar<T = unknown>({
         date={date}
         events={displayEvents}
         weekStartsOn={weekStartsOn}
+        hiddenDays={hiddenDays}
         locale={locale}
         theme={theme}
         className={className}
@@ -368,6 +372,7 @@ export function Calendar<T = unknown>({
         date={date}
         events={displayEvents}
         weekStartsOn={weekStartsOn}
+        hiddenDays={hiddenDays}
         weekdayFormat={weekdayFormat}
         locale={locale}
         theme={theme}

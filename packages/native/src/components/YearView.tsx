@@ -14,6 +14,7 @@ import { createSlots, type SlotStyleProps } from "../utils/slots";
 import {
   buildMonthWeeks,
   getIsToday,
+  filterHiddenDays,
   getWeekDays,
   getYearMonths,
   groupEventsByDay,
@@ -44,6 +45,8 @@ export type YearViewProps<T = unknown> = SlotStyleProps<YearViewSlot> & {
   /** Days holding at least one event get a dot. Omit for a plain year. */
   events?: CalendarEvent<T>[];
   weekStartsOn: WeekStartsOn;
+  /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
+  hiddenDays?: number[];
   locale?: Locale;
   /** Highlight this date instead of the real "today". */
   activeDate?: Date;
@@ -66,6 +69,7 @@ function YearViewInner<T>({
   date,
   events,
   weekStartsOn,
+  hiddenDays,
   locale,
   activeDate,
   minMonthWidth = 150,
@@ -88,10 +92,10 @@ function YearViewInner<T>({
   // Weekday initials for one shared header per mini month.
   const weekdayLabels = useMemo(
     () =>
-      getWeekDays(date, weekStartsOn).map((d) =>
+      filterHiddenDays(getWeekDays(date, weekStartsOn), hiddenDays).map((d) =>
         format(d, weekdayFormatToken("narrow"), { locale }),
       ),
-    [date, weekStartsOn, locale],
+    [date, weekStartsOn, locale, hiddenDays],
   );
   // Days that hold at least one event, keyed like `groupEventsByDay`.
   const eventDays = useMemo(
@@ -108,7 +112,7 @@ function YearViewInner<T>({
     <ScrollView onLayout={handleLayout} showsVerticalScrollIndicator>
       <View {...slot("grid", { base: styles.grid })}>
         {months.map((month) => {
-          const weeks = buildMonthWeeks(month, weekStartsOn);
+          const weeks = buildMonthWeeks(month, weekStartsOn, { hiddenDays });
           const title = format(month, "MMMM", { locale });
           const monthLabel = format(month, "MMMM yyyy", { locale });
           const titleText = (

@@ -80,6 +80,8 @@ export interface MonthViewProps<T = unknown>
   date: Date;
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */
   weekStartsOn?: WeekStartsOn;
+  /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
+  hiddenDays?: number[];
   /** Weekday header label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
   weekdayFormat?: WeekdayFormat;
   /**
@@ -368,6 +370,7 @@ interface MonthViewInternalProps<T = unknown> extends MonthViewProps<T> {
 export function MonthView<T = unknown>({
   date,
   weekStartsOn = 0,
+  hiddenDays,
   weekdayFormat = "short",
   events,
   eventsByDay: eventsByDayProp,
@@ -425,6 +428,7 @@ export function MonthView<T = unknown>({
     () =>
       buildMonthGrid(date, {
         weekStartsOn,
+        hiddenDays,
         weekdayFormat,
         selectedRange,
         selectedDates,

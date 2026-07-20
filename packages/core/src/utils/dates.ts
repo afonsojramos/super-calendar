@@ -65,21 +65,33 @@ export const getViewDays = (
   numberOfDays = 1,
   isRTL = false,
   weekEndsOn?: WeekStartsOn,
+  hiddenDays?: number[],
 ): Date[] => {
+  // A full hidden week would loop forever below; treat it as "hide nothing".
+  const hidden = hiddenDays && hiddenDays.length > 0 && hiddenDays.length < 7 ? hiddenDays : [];
   let days: Date[];
   if (mode === "week") {
-    days = getWeekDays(date, weekStartsOn);
+    days = filterHiddenDays(getWeekDays(date, weekStartsOn), hidden);
   } else if (mode === "custom" && weekEndsOn != null) {
     // Mirror big-calendar: anchor to `date`'s week and take the partial-week span.
     const subject = startOfDay(date);
     const offset = weekStartsOn - subject.getDay();
-    days = Array.from({ length: weekDaysCount(weekStartsOn, weekEndsOn) }, (_, index) =>
-      addDays(subject, index + offset),
+    days = filterHiddenDays(
+      Array.from({ length: weekDaysCount(weekStartsOn, weekEndsOn) }, (_, index) =>
+        addDays(subject, index + offset),
+      ),
+      hidden,
     );
   } else {
-    days = Array.from({ length: viewDayCount(mode, numberOfDays) }, (_, index) =>
-      addDays(startOfDay(date), index),
-    );
+    // Count-based views keep their column count by walking forward over hidden
+    // days (an anchor on a hidden day starts at the next visible one).
+    const count = viewDayCount(mode, numberOfDays);
+    days = [];
+    let cursor = startOfDay(date);
+    while (days.length < count) {
+      if (!hidden.includes(cursor.getDay())) days.push(cursor);
+      cursor = addDays(cursor, 1);
+    }
   }
   return isRTL ? days.reverse() : days;
 };
@@ -92,18 +104,28 @@ export const getViewDays = (
 export const buildMonthWeeks = (
   month: Date,
   weekStartsOn: WeekStartsOn,
-  { showSixWeeks = false, isRTL = false }: { showSixWeeks?: boolean; isRTL?: boolean } = {},
+  {
+    showSixWeeks = false,
+    isRTL = false,
+    hiddenDays,
+  }: { showSixWeeks?: boolean; isRTL?: boolean; hiddenDays?: number[] } = {},
 ): Date[][] => {
   const start = startOfWeek(startOfMonth(month), { weekStartsOn });
   const end = showSixWeeks ? addDays(start, 41) : endOfWeek(endOfMonth(month), { weekStartsOn });
   const days = eachDayOfInterval({ start, end });
   const weeks: Date[][] = [];
   for (let index = 0; index < days.length; index += 7) {
-    const week = days.slice(index, index + 7);
-    weeks.push(isRTL ? week.reverse() : week);
+    const week = filterHiddenDays(days.slice(index, index + 7), hiddenDays);
+    if (week.length > 0) weeks.push(isRTL ? week.reverse() : week);
   }
   return weeks;
 };
+
+/** Drop the days whose weekday (0=Sunday…6=Saturday) is listed in `hiddenDays`. */
+export const filterHiddenDays = (days: Date[], hiddenDays?: number[]): Date[] =>
+  hiddenDays && hiddenDays.length > 0
+    ? days.filter((day) => !hiddenDays.includes(day.getDay()))
+    : days;
 
 /** True when `date` is a Saturday or Sunday. */
 export const isWeekend = (date: Date): boolean => {

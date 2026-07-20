@@ -564,3 +564,15 @@ describe("dom TimeGrid background events", () => {
     expect(focus).toHaveLength(1);
   });
 });
+
+describe("dom TimeGrid hiddenDays", () => {
+  it("renders a five-column week when weekends are hidden", () => {
+    const { queryByText, getByText } = render(
+      <TimeGrid date={day} mode="week" events={events} hourHeight={48} hiddenDays={[0, 6]} />,
+    );
+    // 26 June 2026 is a Friday; Saturday 27 and Sunday 21 disappear.
+    expect(getByText("26")).toBeTruthy();
+    expect(queryByText("27")).toBeNull();
+    expect(queryByText("21")).toBeNull();
+  });
+});

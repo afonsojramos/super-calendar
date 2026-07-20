@@ -5,6 +5,7 @@ import {
   buildMonthWeeks,
   type CalendarEvent,
   getIsToday,
+  filterHiddenDays,
   getWeekDays,
   getYearMonths,
   groupEventsByDay,
@@ -39,6 +40,8 @@ export interface YearViewProps<T = unknown> extends SlotStyleProps<YearViewSlot>
   events?: CalendarEvent<T>[];
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */
   weekStartsOn?: WeekStartsOn;
+  /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
+  hiddenDays?: number[];
   locale?: Locale;
   /** Highlight this date instead of the real "today". */
   activeDate?: Date;
@@ -68,6 +71,7 @@ export function YearView<T = unknown>({
   date,
   events,
   weekStartsOn = 0,
+  hiddenDays,
   locale,
   activeDate,
   minMonthWidth = 150,
@@ -85,10 +89,10 @@ export function YearView<T = unknown>({
   const months = useMemo(() => getYearMonths(date), [date]);
   const weekdayLabels = useMemo(
     () =>
-      getWeekDays(date, weekStartsOn).map((d) =>
+      filterHiddenDays(getWeekDays(date, weekStartsOn), hiddenDays).map((d) =>
         format(d, weekdayFormatToken("narrow"), { locale }),
       ),
-    [date, weekStartsOn, locale],
+    [date, weekStartsOn, locale, hiddenDays],
   );
   // Days that hold at least one event, keyed like `groupEventsByDay`.
   const eventDays = useMemo(
@@ -115,7 +119,7 @@ export function YearView<T = unknown>({
         })}
       >
         {months.map((month) => {
-          const weeks = buildMonthWeeks(month, weekStartsOn);
+          const weeks = buildMonthWeeks(month, weekStartsOn, { hiddenDays });
           const monthLabel = format(month, "MMMM yyyy", { locale });
           const titleContent = format(month, "MMMM", { locale });
           return (

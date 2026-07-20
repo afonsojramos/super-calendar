@@ -30,6 +30,7 @@ import { dayBadgeKind, rangeBandKind } from "@super-calendar/core";
 import {
   buildMonthWeeks,
   getIsToday,
+  filterHiddenDays,
   getWeekDays,
   isSameCalendarDay,
   isWeekend,
@@ -86,6 +87,8 @@ export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
    */
   maxVisibleEventCount?: number;
   weekStartsOn: WeekStartsOn;
+  /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
+  hiddenDays?: number[];
   /** Weekday header label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
   weekdayFormat?: WeekdayFormat;
   locale?: Locale;
@@ -153,6 +156,7 @@ function MonthViewInner<T>({
   events,
   maxVisibleEventCount,
   weekStartsOn,
+  hiddenDays,
   weekdayFormat = "short",
   locale,
   sortedMonthView = true,
@@ -210,16 +214,16 @@ function MonthViewInner<T>({
   const [pressedKey, setPressedKey] = useState<string | null>(null);
 
   const weeks = useMemo(
-    () => buildMonthWeeks(date, weekStartsOn, { showSixWeeks, isRTL }),
-    [date, weekStartsOn, isRTL, showSixWeeks],
+    () => buildMonthWeeks(date, weekStartsOn, { showSixWeeks, isRTL, hiddenDays }),
+    [date, weekStartsOn, isRTL, showSixWeeks, hiddenDays],
   );
 
   // Weekday labels for the header row (any week works; reuse this month). Reversed
   // in RTL so they line up with the mirrored day columns.
   const weekdayLabels = useMemo(() => {
-    const days = getWeekDays(date, weekStartsOn);
+    const days = filterHiddenDays(getWeekDays(date, weekStartsOn), hiddenDays);
     return isRTL ? days.reverse() : days;
-  }, [date, weekStartsOn, isRTL]);
+  }, [date, weekStartsOn, isRTL, hiddenDays]);
 
   // How many chips fit per cell: a fixed cap when `maxVisibleEventCount` is set,
   // else derived from the measured cell height and the (default) chip metrics.

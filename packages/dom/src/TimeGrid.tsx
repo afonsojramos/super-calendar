@@ -145,6 +145,8 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   showWeekNumber?: boolean;
   /** Prefix for the week number, e.g. "W" → "W28". Default "W". */
   weekNumberPrefix?: string;
+  /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
+  hiddenDays?: number[];
   /** Shade the hours outside business hours; `null` shades the whole day. */
   businessHours?: BusinessHours;
   /** Show the current-time indicator on today's column (default true). */
@@ -352,6 +354,7 @@ export function TimeGrid<T = unknown>({
   hideHours = false,
   showWeekNumber = false,
   weekNumberPrefix = "W",
+  hiddenDays,
   keyboardEventNavigation = false,
   businessHours,
   showNowIndicator = true,
@@ -426,8 +429,8 @@ export function TimeGrid<T = unknown>({
   const cellEnabled = !!onPressCell || !!onCreateEvent;
 
   const days = useMemo(
-    () => getViewDays(mode, date, weekStartsOn, numberOfDays),
-    [mode, date, weekStartsOn, numberOfDays],
+    () => getViewDays(mode, date, weekStartsOn, numberOfDays, false, undefined, hiddenDays),
+    [mode, date, weekStartsOn, numberOfDays, hiddenDays],
   );
 
   const allDayByDay = useMemo(

@@ -601,6 +601,7 @@ const ShadeBand = ({
 type TimetablePageProps<T> = {
   mode: TimeGridMode;
   numberOfDays: number;
+  hiddenDays?: number[];
   date: Date;
   events: CalendarEvent<T>[];
   cellHeight: SharedValue<number>;
@@ -654,6 +655,7 @@ type TimetablePageProps<T> = {
 function TimetablePageInner<T>({
   mode,
   numberOfDays,
+  hiddenDays,
   date,
   events,
   cellHeight,
@@ -782,8 +784,8 @@ function TimetablePageInner<T>({
   );
 
   const days = useMemo(
-    () => getViewDays(mode, date, weekStartsOn, numberOfDays, isRTL, weekEndsOn),
-    [mode, date, weekStartsOn, numberOfDays, isRTL, weekEndsOn],
+    () => getViewDays(mode, date, weekStartsOn, numberOfDays, isRTL, weekEndsOn, hiddenDays),
+    [mode, date, weekStartsOn, numberOfDays, isRTL, weekEndsOn, hiddenDays],
   );
 
   // Plain number for worklets to close over: reading `days.length` inside a
@@ -1280,6 +1282,8 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
    * precedence over `numberOfDays`. Ignored by other modes.
    */
   weekEndsOn?: WeekStartsOn;
+  /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
+  hiddenDays?: number[];
   date: Date;
   events: CalendarEvent<T>[];
   cellHeight: SharedValue<number>;
@@ -1399,6 +1403,7 @@ function TimeGridInner<T>({
   showVerticalScrollIndicator = true,
   verticalScrollEnabled = true,
   weekNumberPrefix = "W",
+  hiddenDays,
   hourComponent,
   activeDate,
   resetPageOnPressCell = false,
@@ -1532,8 +1537,9 @@ function TimeGridInner<T>({
         numberOfDays,
         isRTL,
         weekEndsOn,
+        hiddenDays,
       ),
-    [mode, pageDates, activeIndex, date, weekStartsOn, numberOfDays, isRTL, weekEndsOn],
+    [mode, pageDates, activeIndex, date, weekStartsOn, numberOfDays, isRTL, weekEndsOn, hiddenDays],
   );
 
   const handleViewableItemsChanged = useCallback(
@@ -1694,6 +1700,7 @@ function TimeGridInner<T>({
         <TimetablePage
           mode={mode}
           numberOfDays={numberOfDays}
+          hiddenDays={hiddenDays}
           date={item}
           width={containerWidth}
           events={events}
@@ -1776,6 +1783,7 @@ function TimeGridInner<T>({
       handlePressCell,
       onLongPressCell,
       onCreateEvent,
+      hiddenDays,
     ],
   );
 

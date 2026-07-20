@@ -128,6 +128,8 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   disableMonthEventCellPress?: boolean;
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */
   weekStartsOn?: WeekStartsOn;
+  /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
+  hiddenDays?: number[];
   /** Weekday header label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
   weekdayFormat?: WeekdayFormat;
   /** Number of day columns when `mode="custom"`. Ignored by other modes. Default 1. */
@@ -363,6 +365,7 @@ export function Calendar<T>({
   showAdjacentMonths,
   disableMonthEventCellPress,
   weekStartsOn = 0,
+  hiddenDays,
   weekdayFormat,
   numberOfDays,
   weekEndsOn,
@@ -516,6 +519,7 @@ export function Calendar<T>({
           events={displayEvents}
           maxVisibleEventCount={maxVisibleEventCount}
           weekStartsOn={weekStartsOn}
+          hiddenDays={hiddenDays}
           weekdayFormat={weekdayFormat}
           locale={locale}
           sortedMonthView={sortedMonthView}
@@ -546,6 +550,7 @@ export function Calendar<T>({
           date={date}
           events={displayEvents}
           weekStartsOn={weekStartsOn}
+          hiddenDays={hiddenDays}
           locale={locale}
           activeDate={activeDate}
           onPressDay={onPressDay}
@@ -578,6 +583,7 @@ export function Calendar<T>({
           hourHeight={hourHeight}
           weekStartsOn={weekStartsOn}
           weekdayFormat={weekdayFormat}
+          hiddenDays={hiddenDays}
           renderEvent={resolvedRenderEvent}
           keyExtractor={keyExtractor}
           scrollOffsetMinutes={scrollOffsetMinutes}

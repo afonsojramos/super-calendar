@@ -219,3 +219,15 @@ describe("MonthView slot styling", () => {
     for (const badge of badges) expect(flatten(badge).backgroundColor).toBeUndefined();
   });
 });
+
+describe("MonthView hiddenDays", () => {
+  it("drops hidden weekdays from the grid and header", () => {
+    const { queryAllByText, queryByLabelText } = render(
+      <MonthView {...baseProps} hiddenDays={[0, 6]} />,
+    );
+    expect(queryAllByText("Sun")).toHaveLength(0);
+    expect(queryAllByText("Sat")).toHaveLength(0);
+    // 14 June 2026 is a Sunday: its cell is gone entirely.
+    expect(queryByLabelText(/14 June 2026/)).toBeNull();
+  });
+});

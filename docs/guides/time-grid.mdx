@@ -35,6 +35,9 @@ choose.
 - `ampm` — 12-hour labels; `hourComponent` replaces the label entirely.
 - `hideHours` — collapse the hour gutter (the grid lines stay).
 - `showWeekNumber` / `weekNumberPrefix` — ISO week number in the header gutter.
+- `hiddenDays` — weekdays (0=Sunday…6=Saturday) dropped from the view, e.g.
+  `[0, 6]` for a Monday–Friday business week. Count-based views keep their
+  column count by skipping hidden days.
 
 ## The all-day lane
 
