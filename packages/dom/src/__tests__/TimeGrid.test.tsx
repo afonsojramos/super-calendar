@@ -109,6 +109,37 @@ describe("dom TimeGrid", () => {
     expect((onDragEvent.mock.calls[1][1] as Date).getDate()).toBe(21);
   });
 
+  it("maps a cross-day drag to the target column, not a calendar-day offset, when a day is hidden", () => {
+    const onDragEvent = jest.fn();
+    // Hide Wednesday (the 24th). The Sunday-start week 21–27 then shows the
+    // columns [21, 22, 23, 25, 26, 27]; the Friday event sits at column index 4.
+    const { getByText } = render(
+      <TimeGrid
+        date={day}
+        mode="week"
+        hiddenDays={[3]}
+        events={events}
+        hourHeight={48}
+        onDragEvent={onDragEvent}
+      />,
+    );
+    const box = wrapperOf(getByText("Focus"));
+    const column = box.parentElement as HTMLElement;
+    column.getBoundingClientRect = () => ({ width: 100 }) as DOMRect;
+    // Two columns left lands on the 23rd (Tue), skipping the hidden 24th. A
+    // naive addDays(day, -2) would wrongly land on the hidden Wednesday.
+    fireEvent.pointerDown(box, { clientX: 50, clientY: 300, pointerId: 1 });
+    fireEvent.pointerMove(box, { clientX: -150, clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(box, { clientX: -150, clientY: 300, pointerId: 1 });
+
+    expect(onDragEvent).toHaveBeenCalledTimes(1);
+    const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent, Date, Date];
+    expect(start.getDate()).toBe(23);
+    expect(start.getHours()).toBe(14);
+    expect(end.getDate()).toBe(23);
+    expect(end.getHours()).toBe(16);
+  });
+
   it("treats a press with no movement as a tap, not a drag", () => {
     const onDragEvent = jest.fn();
     const onPressEvent = jest.fn();

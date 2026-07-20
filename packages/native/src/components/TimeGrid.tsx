@@ -157,6 +157,10 @@ type AnimatedEventBoxProps<T> = {
   dayWidth: number;
   dayIndex: number;
   dayCount: number;
+  // Calendar-day offset of each visible column from the first (plain numbers, so
+  // the worklet can close over them). Lets a cross-day move map a column delta to
+  // the right calendar-day delta when hiddenDays makes the columns non-contiguous.
+  dayOrdinals: number[];
   mode: CalendarMode;
   renderEvent: RenderEvent<T>;
   snapMinutes: number;
@@ -176,6 +180,7 @@ function AnimatedEventBox<T>({
   dayWidth,
   dayIndex,
   dayCount,
+  dayOrdinals,
   mode,
   renderEvent,
   snapMinutes,
@@ -310,9 +315,12 @@ function AnimatedEventBox<T>({
         // original before the committed re-render lands.
         moveOffset.value = (minuteDelta / MINUTES_PER_HOUR) * cellHeight.value;
         moveOffsetX.value = dayDelta * dayWidth;
-        // Fold the day shift into the minute delta; shiftMinutes carries it into
-        // the date, so both edges move together and the duration is preserved.
-        const totalDelta = minuteDelta + dayDelta * MINUTES_PER_DAY;
+        // Map the column shift to a calendar-day shift: with hiddenDays the
+        // columns aren't contiguous days, so a one-column move can span several
+        // calendar days. Fold that into the minute delta; shiftMinutes carries it
+        // into the date, so both edges move together and the duration is preserved.
+        const calendarDayDelta = dayOrdinals[targetDay] - dayOrdinals[dayIndex];
+        const totalDelta = minuteDelta + calendarDayDelta * MINUTES_PER_DAY;
         runOnJS(commitDrag)(totalDelta, totalDelta);
       });
     // Native: long-press to pick up. Web: activate past a small drag in either
@@ -331,6 +339,7 @@ function AnimatedEventBox<T>({
     dayWidth,
     dayIndex,
     dayCount,
+    dayOrdinals,
     commitDrag,
     notifyDragStart,
   ]);
@@ -785,6 +794,15 @@ function TimetablePageInner<T>({
   const dayWidth = (width - hourColumnWidth) / dayCount;
   const dayLeft = (dayIndex: number) => hourColumnWidth + dayIndex * dayWidth;
 
+  // Calendar-day offset of each column from the first, as plain numbers a drag
+  // worklet can close over. Identity (0,1,2,…) for contiguous days; with
+  // hiddenDays the gaps widen, so a cross-day move shifts by the right number of
+  // calendar days. Signed correctly for RTL (columns run high→low).
+  const dayOrdinals = useMemo(
+    () => days.map((day) => differenceInCalendarDays(day, days[0])),
+    [days],
+  );
+
   const dayLayouts = useMemo(() => days.map((day) => layoutDayEvents(events, day)), [days, events]);
 
   // Map a tap on empty grid space back to the date+time it represents. Reads the
@@ -1196,6 +1214,7 @@ function TimetablePageInner<T>({
                       dayWidth={dayWidth}
                       dayIndex={dayIndex}
                       dayCount={days.length}
+                      dayOrdinals={dayOrdinals}
                       mode={mode}
                       renderEvent={renderEvent}
                       snapMinutes={snapMinutes}

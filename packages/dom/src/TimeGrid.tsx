@@ -580,8 +580,12 @@ export function TimeGrid<T = unknown>({
       onPress();
       return;
     }
-    // The horizontal delta lands the event on another visible day column.
-    const base = startOfDay(addDays(day, d.dayDelta));
+    // The horizontal delta lands the event on another visible day column. With
+    // hiddenDays the columns aren't contiguous calendar days, so resolve the
+    // destination from the days array rather than shifting `day` by the column
+    // count. `dayDelta` is already clamped to the visible range at drag time.
+    const originIndex = dragOrigin.current?.dayIndex ?? 0;
+    const base = startOfDay(days[originIndex + d.dayDelta] ?? day);
     const start = addMinutes(base, Math.round(d.startHours * 60));
     const end = addMinutes(base, Math.round((d.startHours + d.durationHours) * 60));
     onDragEvent?.(event, start, end);
