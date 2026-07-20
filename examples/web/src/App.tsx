@@ -1,4 +1,4 @@
-import { addDays, addMonths, addWeeks, format } from "date-fns";
+import { addDays, addMonths, addWeeks, addYears, format } from "date-fns";
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import {
   Calendar,
@@ -22,7 +22,7 @@ import { EventContextMenu } from "./EventContextMenu";
 
 // The grid views step by a fixed period (toolbar + letter keys). "schedule" is the
 // agenda list, and picker/list are scrolling MonthLists, so they sit outside it.
-const MODES = ["month", "week", "3days", "day"] as const;
+const MODES = ["year", "month", "week", "3days", "day"] as const;
 type CalendarTab = (typeof MODES)[number];
 type DemoTab =
   | CalendarTab
@@ -85,6 +85,7 @@ const TAILWIND_SLOTS: Partial<Record<CalendarSlot, string>> = {
 // The dom Calendar is fully controlled by `date`, so the example owns navigation.
 // Step the anchor by the period the current mode shows.
 function stepDate(date: Date, mode: CalendarTab, dir: 1 | -1): Date {
+  if (mode === "year") return addYears(date, dir);
   if (mode === "month") return addMonths(date, dir);
   if (mode === "week") return addWeeks(date, dir);
   if (mode === "3days") return addDays(date, dir * 3);
@@ -93,6 +94,7 @@ function stepDate(date: Date, mode: CalendarTab, dir: 1 | -1): Date {
 
 // Label for the visible period, matching exactly what the grid renders.
 function periodLabel(date: Date, mode: CalendarTab): string {
+  if (mode === "year") return format(date, "yyyy");
   if (mode === "month") return format(date, "MMMM yyyy");
   if (mode === "day") return format(date, "EEE, d MMM yyyy");
   const days = getViewDays(mode, date, WEEK_STARTS_ON);
@@ -449,6 +451,10 @@ export function App() {
                 setDate(day);
                 setMode("day");
               }}
+              onPressMonth={(month) => {
+                setDate(month);
+                setMode("month");
+              }}
             />
           </div>
         ) : (
@@ -485,6 +491,10 @@ export function App() {
               onPressDay={(day) => {
                 setDate(day);
                 setMode("day");
+              }}
+              onPressMonth={(month) => {
+                setDate(month);
+                setMode("month");
               }}
               onPressMore={(dayEvents, day) =>
                 console.log("more:", day.toDateString(), dayEvents.length)

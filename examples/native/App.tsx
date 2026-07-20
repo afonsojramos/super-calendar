@@ -1,7 +1,7 @@
 // Uniwind's CSS entry point: enables Tailwind classes on native components,
 // powering the "tailwind" demo tab.
 import "./global.css";
-import { addDays, addMonths, addWeeks, format } from "date-fns";
+import { addDays, addMonths, addWeeks, addYears, format } from "date-fns";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -34,7 +34,7 @@ import { EventMenuProvider, type EventMenuActions } from "@super-calendar/exampl
 import { buildEvents, type EventMeta } from "@super-calendar/example-shared/events";
 import { EventContextMenu } from "./components/EventContextMenu";
 
-const MODES: CalendarMode[] = ["month", "week", "3days", "day", "schedule"];
+const MODES: CalendarMode[] = ["year", "month", "week", "3days", "day", "schedule"];
 
 // The mode tabs plus the extra demo surfaces, matching the dom example where
 // the native package supports them: "picker" (range selection via useDateRange),
@@ -77,7 +77,7 @@ END:VEVENT
 END:VCALENDAR`;
 
 // The grid views that step by a fixed period; schedule/picker/list scroll instead.
-const GRID_MODES: CalendarMode[] = ["month", "week", "3days", "day"];
+const GRID_MODES: CalendarMode[] = ["year", "month", "week", "3days", "day"];
 function isGridMode(tab: DemoTab): tab is CalendarMode {
   return (GRID_MODES as string[]).includes(tab);
 }
@@ -85,6 +85,7 @@ function isGridMode(tab: DemoTab): tab is CalendarMode {
 // Step the anchor by the period the current grid view shows. Matches the dom
 // example so both demos navigate identically.
 function stepDate(date: Date, mode: CalendarMode, dir: 1 | -1): Date {
+  if (mode === "year") return addYears(date, dir);
   if (mode === "month") return addMonths(date, dir);
   if (mode === "week") return addWeeks(date, dir);
   if (mode === "3days") return addDays(date, dir * 3);
@@ -94,6 +95,7 @@ function stepDate(date: Date, mode: CalendarMode, dir: 1 | -1): Date {
 // Label for the visible period, matching exactly what the grid renders. Mirrors
 // the dom example so both demos show the same toolbar title.
 function periodLabel(date: Date, mode: CalendarMode): string {
+  if (mode === "year") return format(date, "yyyy");
   if (mode === "month") return format(date, "MMMM yyyy");
   if (mode === "day") return format(date, "EEE, d MMM yyyy");
   const days = getViewDays(mode, date, 1);
@@ -485,6 +487,10 @@ export default function App() {
                     onPressDay={(day) => {
                       setDate(day);
                       setMode("day");
+                    }}
+                    onPressMonth={(month) => {
+                      setDate(month);
+                      setMode("month");
                     }}
                     onPressMore={(dayEvents, day) =>
                       console.log("more:", day.toDateString(), dayEvents.length)
