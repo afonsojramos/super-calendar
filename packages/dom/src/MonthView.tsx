@@ -54,7 +54,8 @@ export type MonthViewSlot =
   | "events"
   | "chipButton"
   | "chip"
-  | "more";
+  | "more"
+  | "morePopover";
 
 // Chip metrics for the events layout (when `events` is provided).
 const DATE_ROW = 24;
@@ -421,6 +422,26 @@ export function MonthView<T = unknown>({
     return map;
   }, [eventsByDayProp, events]);
   const Chip = renderEvent;
+  // Built-in "+N more" popover: opens when the consumer doesn't handle
+  // `onPressMore` themselves. Keyed by the day id; closes on outside click,
+  // Escape, or picking an event.
+  const [moreOpenFor, setMoreOpenFor] = useState<string | null>(null);
+  const morePopoverRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!moreOpenFor) return;
+    const onDocPointerDown = (e: PointerEvent) => {
+      if (!morePopoverRef.current?.contains(e.target as Node)) setMoreOpenFor(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMoreOpenFor(null);
+    };
+    document.addEventListener("pointerdown", onDocPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDocPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [moreOpenFor]);
   // Reserve `maxVisibleEventCount` rows below the date so every cell is uniform;
   // when a day overflows, the last row becomes the "+N more" affordance.
   const eventRowHeight = CELL_PAD * 2 + DATE_ROW + maxVisibleEventCount * (CHIP_HEIGHT + CHIP_GAP);
@@ -718,13 +739,74 @@ export function MonthView<T = unknown>({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onPressMore?.(rest, day.date);
+                            if (onPressMore) onPressMore(rest, day.date);
+                            else setMoreOpenFor((open) => (open === day.id ? null : day.id));
                           }}
                           {...slot("more", moreButtonDefault(theme))}
                           aria-label={`${rest.length} more events, ${dayLabel}`}
+                          aria-expanded={onPressMore ? undefined : moreOpenFor === day.id}
                         >
                           {moreLabel.replace("{moreCount}", String(rest.length))}
                         </button>
+                      ) : null}
+                      {moreOpenFor === day.id ? (
+                        <div
+                          ref={morePopoverRef}
+                          role="dialog"
+                          aria-label={dayLabel}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          {...slot("morePopover", {
+                            base: {
+                              position: "absolute",
+                              top: 2,
+                              left: 2,
+                              right: 2,
+                              zIndex: 10,
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 2,
+                              maxHeight: 240,
+                              overflowY: "auto",
+                            },
+                            themed: {
+                              background: theme.surface,
+                              border: `1px solid ${theme.gridLine}`,
+                              borderRadius: 8,
+                              padding: 6,
+                              boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                            },
+                          })}
+                        >
+                          <div style={{ fontSize: 11, fontWeight: 600, color: theme.textMuted }}>
+                            {dayLabel}
+                          </div>
+                          {dayEvents.map((event, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => {
+                                setMoreOpenFor(null);
+                                onPressEvent?.(event);
+                              }}
+                              style={{
+                                display: "block",
+                                width: "100%",
+                                border: "none",
+                                background: "transparent",
+                                padding: 0,
+                                font: "inherit",
+                                textAlign: "left",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {Chip ? (
+                                <Chip event={event} onPress={() => onPressEvent?.(event)} />
+                              ) : (
+                                <span {...slot("chip", chipDefault(theme))}>{event.title}</span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
                       ) : null}
                     </div>
                   </div>

@@ -2,7 +2,10 @@ import { format, type Locale, isSameMonth, startOfDay } from "date-fns";
 import { memo, type ReactElement, useMemo, useState } from "react";
 import {
   type LayoutChangeEvent,
+  Modal,
   Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   type StyleProp,
   Text,
@@ -73,7 +76,8 @@ export type MonthViewSlot =
   | "dayBadge"
   | "dayBadgeText"
   | "rangeBand"
-  | "more";
+  | "more"
+  | "morePopover";
 
 /** Props for {@link MonthView}, the single-month grid. */
 export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
@@ -212,6 +216,12 @@ function MonthViewInner<T>({
   // Picker: which day is being pressed, so the tap dims only its badge (the circle),
   // not the whole cell background. Stays null in the events calendar.
   const [pressedKey, setPressedKey] = useState<string | null>(null);
+  // Built-in "+N more" popover: opens when the consumer doesn't handle
+  // `onPressMore` themselves; lists the day's events in a modal card.
+  const [moreOpenFor, setMoreOpenFor] = useState<{
+    day: Date;
+    events: CalendarEvent<T>[];
+  } | null>(null);
 
   const weeks = useMemo(
     () => buildMonthWeeks(date, weekStartsOn, { showSixWeeks, isRTL, hiddenDays }),
@@ -490,7 +500,11 @@ function MonthViewInner<T>({
               base: styles.moreLabel,
               themed: [theme.text.more, { color: theme.colors.textMuted }],
             })}
-            onPress={onPressMore ? () => onPressMore(dayEvents, day) : undefined}
+            onPress={
+              onPressMore
+                ? () => onPressMore(dayEvents, day)
+                : () => setMoreOpenFor({ day, events: dayEvents })
+            }
             accessibilityRole="button"
             accessibilityLabel={`Show ${hiddenCount} more events`}
             allowFontScaling={false}
@@ -540,6 +554,50 @@ function MonthViewInner<T>({
             </Text>
           ))}
         </View>
+      ) : null}
+      {moreOpenFor ? (
+        <Modal transparent animationType="fade" visible onRequestClose={() => setMoreOpenFor(null)}>
+          <Pressable
+            style={styles.moreBackdrop}
+            accessibilityLabel="Close"
+            onPress={() => setMoreOpenFor(null)}
+          >
+            <Pressable
+              // Swallow taps on the card so only the backdrop dismisses.
+              onPress={() => {}}
+              {...slot("morePopover", {
+                base: styles.moreCard,
+                themed: {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.gridLine,
+                },
+              })}
+            >
+              <Text
+                accessibilityRole="header"
+                style={[styles.moreCardTitle, { color: theme.colors.text }]}
+                allowFontScaling={false}
+              >
+                {format(moreOpenFor.day, "EEEE, d LLLL yyyy", { locale })}
+              </Text>
+              <ScrollView>
+                {moreOpenFor.events.map((event, index) => (
+                  <View key={keyExtractor(event, index)} style={styles.moreCardRow}>
+                    <RenderEventComponent
+                      event={event}
+                      mode="month"
+                      isAllDay={isAllDayEvent(event)}
+                      onPress={() => {
+                        setMoreOpenFor(null);
+                        onPressEvent(event);
+                      }}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+            </Pressable>
+          </Pressable>
+        </Modal>
       ) : null}
       <View {...slot("grid", { base: styles.container })} onLayout={handleLayout}>
         {weeks.map((week) => (
@@ -630,4 +688,23 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginHorizontal: 4,
   },
+  // The built-in "+N more" popover card.
+  moreBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  moreCard: {
+    width: "100%",
+    maxWidth: 360,
+    maxHeight: "60%",
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 12,
+    gap: 6,
+  },
+  moreCardTitle: { fontSize: 14, fontWeight: "600", marginBottom: 4 },
+  moreCardRow: { marginBottom: 4 },
 });

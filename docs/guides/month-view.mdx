@@ -36,7 +36,9 @@ into a `+N more` label.
 
 - `maxVisibleEventCount` — a fixed cap instead of auto-fit. Recommended when you
   pass a custom `renderEvent`, since auto-fit assumes the built-in chip height.
-- `onPressMore` — tap the overflow label; receives the hidden events and the day.
+- `onPressMore` — tap the overflow label; receives the hidden events and the
+  day. Without it, the built-in popover opens instead, listing the day's events
+  (style it via the `morePopover` slot).
 - `moreLabel` — customize the overflow text (e.g. `"+{moreCount}"`).
 - `sortedMonthView` — sort each day's chips by start time (default on); all-day
   events lead the day.

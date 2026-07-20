@@ -348,3 +348,43 @@ describe("dom MonthView", () => {
     });
   });
 });
+
+describe("dom MonthView built-in more popover", () => {
+  const manyEvents: CalendarEvent[] = Array.from({ length: 6 }, (_, i) => ({
+    title: `Event ${i + 1}`,
+    start: new Date(2026, 5, 15, 9 + i),
+    end: new Date(2026, 5, 15, 10 + i),
+  }));
+
+  it("opens a popover listing the day's events when onPressMore is absent", () => {
+    const onPressEvent = jest.fn();
+    const { getByText, getByRole } = render(
+      <MonthView
+        date={new Date(2026, 5, 15)}
+        events={manyEvents}
+        maxVisibleEventCount={2}
+        onPressEvent={onPressEvent}
+      />,
+    );
+    fireEvent.click(getByText(/More/));
+    const dialog = getByRole("dialog");
+    expect(dialog).toBeTruthy();
+    fireEvent.click(getByText("Event 6"));
+    expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "Event 6" }));
+  });
+
+  it("defers to a consumer onPressMore instead", () => {
+    const onPressMore = jest.fn();
+    const { getByText, queryByRole } = render(
+      <MonthView
+        date={new Date(2026, 5, 15)}
+        events={manyEvents}
+        maxVisibleEventCount={2}
+        onPressMore={onPressMore}
+      />,
+    );
+    fireEvent.click(getByText(/More/));
+    expect(onPressMore).toHaveBeenCalledTimes(1);
+    expect(queryByRole("dialog")).toBeNull();
+  });
+});
