@@ -412,6 +412,7 @@ export function Calendar<T = unknown>({
         mode={mode}
         events={displayEvents}
         weekStartsOn={weekStartsOn}
+        hiddenDays={hiddenDays}
         now={now}
         timeZone={timeZone}
         weekdayFormat={weekdayFormat}

@@ -401,3 +401,13 @@ describe("dom ResourceTimeline cell interactions", () => {
     expect(first.style.width).toBe("80px"); // 08:00–09:00 at 80px/hour
   });
 });
+
+describe("dom ResourceTimeline now indicator", () => {
+  it("draws one line per lane when the board shows the now instant's day", () => {
+    const now = new Date(2026, 5, 26, 10, 30);
+    const { container } = render(
+      <ResourceTimeline date={date} resources={resources} events={events} now={now} />,
+    );
+    expect(container.querySelectorAll('[data-slot="nowIndicator"]')).toHaveLength(2);
+  });
+});

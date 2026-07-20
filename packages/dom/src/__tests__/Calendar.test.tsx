@@ -177,3 +177,18 @@ describe("dom Calendar", () => {
     });
   });
 });
+
+describe("Calendar hiddenDays forwarding", () => {
+  it("drops hidden weekdays from the week grid", () => {
+    const { container } = render(
+      <Calendar
+        mode="week"
+        date={new Date(2026, 5, 26)}
+        events={[]}
+        hiddenDays={[0, 6]}
+        onChangeDate={() => {}}
+      />,
+    );
+    expect(container.querySelectorAll('[data-slot="columnHeader"]')).toHaveLength(5);
+  });
+});
