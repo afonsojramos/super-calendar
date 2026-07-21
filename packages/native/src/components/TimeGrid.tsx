@@ -595,7 +595,14 @@ const ShadeBand = ({
     themed: color === undefined ? undefined : { backgroundColor: color },
   });
   return (
-    <Animated.View testID={testID} {...bandSlot} style={[bandSlot.style, animatedStyle]}>
+    <Animated.View
+      testID={testID}
+      // Decorative, like the dom bands' aria-hidden: never announced or focused.
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      {...bandSlot}
+      style={[bandSlot.style, animatedStyle]}
+    >
       {children}
     </Animated.View>
   );
@@ -1341,7 +1348,8 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   /**
    * Render a closed-hours band's content yourself (a label, icon, pattern).
    * The grid keeps positioning the band; when set, the themed tint is dropped
-   * and your output fills the band instead.
+   * and your output fills the band instead. Decorative only: the
+   * band stays non-interactive and hidden from assistive tech.
    */
   renderBusinessHours?: (band: BusinessHoursBand) => React.ReactNode;
   /** Show the ISO week number in the header gutter. Default false. */

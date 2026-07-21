@@ -154,7 +154,8 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   /**
    * Render a closed-hours band's content yourself (a label, icon, pattern).
    * The grid keeps positioning the band; when set, the themed tint is dropped
-   * and your output fills the band instead.
+   * and your output fills the band instead. Decorative only: the
+   * band stays non-interactive and hidden from assistive tech.
    */
   renderBusinessHours?: (band: BusinessHoursBand) => ReactNode;
   /** Show the current-time indicator on today's column (default true). */

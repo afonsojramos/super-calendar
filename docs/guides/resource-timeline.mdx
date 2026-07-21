@@ -197,7 +197,8 @@ opening hours; return `null` for a fully closed lane. A date-only function
 To render the closed region yourself (a label, an icon, a pattern), add
 `renderBusinessHours`. The board keeps positioning each band and calls you with
 `{ date, start, end, resource }`; the themed tint is dropped so your output owns
-the look:
+the look. The band is decorative: it stays non-interactive and hidden from
+assistive tech, so return visuals, not buttons or announced text:
 
 ```tsx
 <ResourceTimeline

@@ -168,7 +168,8 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   /**
    * Week/day grid only: render a closed-hours band's content yourself (a
    * label, icon, pattern). The grid keeps positioning the band; when set, the
-   * themed tint is dropped and your output fills the band instead.
+   * themed tint is dropped and your output fills the band instead. Decorative only: the
+   * band stays non-interactive and hidden from assistive tech.
    */
   renderBusinessHours?: (band: BusinessHoursBand) => React.ReactNode;
   /** Stable key per event. Defaults to start-time + index. */

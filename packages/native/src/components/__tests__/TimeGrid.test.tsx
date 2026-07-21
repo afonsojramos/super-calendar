@@ -121,7 +121,7 @@ describe("TimeGrid business hours", () => {
       />,
     );
     // Closed before 09:00 and after 17:00.
-    expect(getAllByTestId("business-hours-shade")).toHaveLength(2);
+    expect(getAllByTestId("business-hours-shade", { includeHiddenElements: true })).toHaveLength(2);
   });
 
   it("shades the whole day when closed (null)", () => {
@@ -135,14 +135,16 @@ describe("TimeGrid business hours", () => {
         onPressEvent={noop}
       />,
     );
-    expect(getAllByTestId("business-hours-shade")).toHaveLength(1);
+    expect(getAllByTestId("business-hours-shade", { includeHiddenElements: true })).toHaveLength(1);
   });
 
   it("shades nothing without a businessHours callback", () => {
     const { queryAllByTestId } = render(
       <Calendar mode="day" date={date} events={[]} onChangeDate={noop} onPressEvent={noop} />,
     );
-    expect(queryAllByTestId("business-hours-shade")).toHaveLength(0);
+    expect(queryAllByTestId("business-hours-shade", { includeHiddenElements: true })).toHaveLength(
+      0,
+    );
   });
 
   it("hands each closed band to renderBusinessHours and drops the themed tint", () => {
@@ -161,7 +163,7 @@ describe("TimeGrid business hours", () => {
     expect(getByText("closed 0-9", { includeHiddenElements: true })).toBeTruthy();
     expect(getByText("closed 17-24", { includeHiddenElements: true })).toBeTruthy();
     // ...and the built-in tint steps aside for it.
-    for (const band of getAllByTestId("business-hours-shade")) {
+    for (const band of getAllByTestId("business-hours-shade", { includeHiddenElements: true })) {
       expect(StyleSheet.flatten(band.props.style).backgroundColor).toBeUndefined();
     }
   });

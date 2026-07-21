@@ -138,7 +138,8 @@ export interface ResourceTimelineProps<T = unknown> {
   /**
    * Render a closed-hours band's content yourself (a label, icon, pattern). The
    * board keeps positioning the band; when set, the themed tint is dropped and
-   * your output fills the band instead. Receives the lane's resource.
+   * your output fills the band instead. Receives the lane's resource. Decorative only: the
+   * band stays non-interactive and hidden from assistive tech.
    */
   renderBusinessHours?: (band: BusinessHoursBand & { resource: Resource }) => ReactNode;
   /** Snap dragged events to this many minutes (default 15). */
@@ -743,6 +744,8 @@ export function ResourceTimeline<T = unknown>({
                     <View
                       key={`shade-${b.start}`}
                       pointerEvents="none"
+                      accessibilityElementsHidden
+                      importantForAccessibility="no-hide-descendants"
                       testID="resource-hours-shade"
                       style={[
                         styles.vshadeBand,
@@ -915,6 +918,8 @@ export function ResourceTimeline<T = unknown>({
                   <View
                     key={`shade-${b.start}`}
                     pointerEvents="none"
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
                     testID="resource-hours-shade"
                     style={[
                       styles.hshadeBand,
