@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.7.0](https://github.com/afonsojramos/super-calendar/compare/v2.6.0...v2.7.0) (2026-07-21)
+
+
+### Features
+
+* add renderBusinessHours to the time grid and resource timeline ([bf1afb7](https://github.com/afonsojramos/super-calendar/commit/bf1afb774e325800872fa49ddea71f0367681f48))
+* add resourcesPerPage and resourcePage lane paging to the resource timeline ([8dc9149](https://github.com/afonsojramos/super-calendar/commit/8dc914908a375ed740f24fc2b296d6909037309a))
+* **core:** load events from JSON and iCal feeds with useEventSource ([056d941](https://github.com/afonsojramos/super-calendar/commit/056d94165c34dfb3218df9cefab466a2d9fc12cf))
+* drag events across lanes on the resource timeline ([73fec41](https://github.com/afonsojramos/super-calendar/commit/73fec4173086d9bcc6d95e3f525991b13e3e14fe))
+* hide chosen weekdays from the grids with hiddenDays ([091abb8](https://github.com/afonsojramos/super-calendar/commit/091abb880be3ba2d34aab5690f99c24cc9692509))
+* make the now indicator timezone-aware and add it to the ResourceTimeline ([d7c2bef](https://github.com/afonsojramos/super-calendar/commit/d7c2beff085e059d930b8f5658b32f2515e6605b)), closes [#32](https://github.com/afonsojramos/super-calendar/issues/32)
+* open a built-in popover from the month overflow label ([a49846c](https://github.com/afonsojramos/super-calendar/commit/a49846c6209600aad9758748770af7f4c5ea1675))
+* paint background events as shaded ranges across the grids ([79b44d2](https://github.com/afonsojramos/super-calendar/commit/79b44d209f4fdaa69abaf286eeb4a00a4306786e))
+
+
+### Bug Fixes
+
+* close the more popover on repeat presses and harden hiddenDays edge cases ([4114340](https://github.com/afonsojramos/super-calendar/commit/4114340fc53976287f85c992a85b624d4583787b))
+* **core:** abort superseded useEventSource fetches and cover interval refetching ([fa8e781](https://github.com/afonsojramos/super-calendar/commit/fa8e7815c5bdff6e5573f17f9f22b32625c855db))
+* **core:** match timed EXDATEs by exact instant instead of collapsing to the day ([94afffd](https://github.com/afonsojramos/super-calendar/commit/94afffd0bd11247d7a71d7c1ed310ecbe7534bb7))
+* **dom:** forward hiddenDays from Calendar to the time grid ([0fc2422](https://github.com/afonsojramos/super-calendar/commit/0fc2422be8c85b6fed3977abeff22badc301baae))
+* **dom:** keep pointer-dismissal focus and drop the popover aria-modal claim ([e01a4d5](https://github.com/afonsojramos/super-calendar/commit/e01a4d55741e3ece97974e4e5dd5c3d096f54780))
+* **dom:** manage keyboard focus in the built-in month overflow popover ([8929f1c](https://github.com/afonsojramos/super-calendar/commit/8929f1cd46a386eabdd0f02a75d96e6502388ef6))
+* land cross-day drags on visible columns when days are hidden ([5a20e1e](https://github.com/afonsojramos/super-calendar/commit/5a20e1e62dbc3eb6aa77deb1e934f3bc8f885892))
+* **native:** hide business-hours bands from assistive tech and document the decorative contract ([06e0299](https://github.com/afonsojramos/super-calendar/commit/06e02994a7986843d3b20b32d3e826cc2e6186f3))
+* settle the cross-lane drag preview and harden the drop hit-test ([b4caf22](https://github.com/afonsojramos/super-calendar/commit/b4caf22e65bd7a243820842adecc27a50455b46e))
+
 ## [2.6.0](https://github.com/afonsojramos/super-calendar/compare/v2.5.0...v2.6.0) (2026-07-20)
 
 
