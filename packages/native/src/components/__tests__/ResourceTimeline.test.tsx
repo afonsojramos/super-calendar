@@ -83,13 +83,16 @@ describe("ResourceTimeline", () => {
         onDragEvent={onDragEvent}
       />,
     );
-    // The accessible bar carries all four actions (the resize grip isn't focusable).
+    // The accessible bar carries the time actions plus a cross-lane move (the
+    // resize grip isn't focusable). Standup is in lane "a" (index 0), so only the
+    // next-lane action is offered, not a previous-lane one.
     const bar = getByLabelText("Standup");
     expect((bar.props.accessibilityActions ?? []).map((a: { name: string }) => a.name)).toEqual([
       "move-later",
       "move-earlier",
       "extend",
       "shrink",
+      "move-next-lane",
     ]);
 
     // "Move later" reschedules via onDragEvent, preserving the duration.
@@ -155,7 +158,7 @@ describe("ResourceTimeline vertical orientation", () => {
     );
     const bar = getAllByRole("button")[0];
     const names = (bar.props.accessibilityActions ?? []).map((a: { name: string }) => a.name);
-    expect(names).toEqual(["move-later", "move-earlier", "extend", "shrink"]);
+    expect(names).toEqual(["move-later", "move-earlier", "extend", "shrink", "move-next-lane"]);
     fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "move-later" } });
     expect(onDragEvent).toHaveBeenCalledTimes(1);
   });
@@ -451,5 +454,48 @@ describe("ResourceTimeline resource paging", () => {
     // A negative page clamps to the first.
     expect(horizontal.getByText("Room A")).toBeTruthy();
     expect(horizontal.queryByText("Room D")).toBeNull();
+  });
+});
+
+describe("ResourceTimeline cross-lane drag", () => {
+  it("retargets the resource via the cross-lane screen-reader action, keeping the time", () => {
+    const onDragEvent = jest.fn();
+    const { getByLabelText } = render(
+      <ResourceTimeline
+        date={at(0)}
+        resources={resources}
+        events={events}
+        onDragEvent={onDragEvent}
+      />,
+    );
+    // Standup is in lane "a" (index 0); moving it to the next lane targets "b".
+    const bar = getByLabelText("Standup");
+    fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "move-next-lane" } });
+    const call = onDragEvent.mock.calls[0] as [CalendarEvent, Date, Date, { id: string }];
+    expect(call[3]).toEqual(expect.objectContaining({ id: "b" }));
+    // A pure lane move preserves start/end.
+    expect(call[1].getTime()).toBe(at(9).getTime());
+    expect(call[2].getTime()).toBe(at(10).getTime());
+  });
+
+  it("only offers the lane moves that exist at each edge", () => {
+    const { getByLabelText } = render(
+      <ResourceTimeline
+        date={at(0)}
+        resources={resources}
+        events={events}
+        onDragEvent={() => {}}
+      />,
+    );
+    const names = (node: { props: { accessibilityActions?: { name: string }[] } }) =>
+      (node.props.accessibilityActions ?? []).map((a) => a.name);
+    // First lane: next only.
+    const first = names(getByLabelText("Standup"));
+    expect(first).toContain("move-next-lane");
+    expect(first).not.toContain("move-previous-lane");
+    // Last lane: previous only.
+    const last = names(getByLabelText("Interview"));
+    expect(last).toContain("move-previous-lane");
+    expect(last).not.toContain("move-next-lane");
   });
 });

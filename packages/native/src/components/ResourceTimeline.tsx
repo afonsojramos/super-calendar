@@ -1,5 +1,5 @@
 import type { ComponentType, ReactElement, ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
@@ -112,11 +112,19 @@ export interface ResourceTimelineProps<T = unknown> {
    */
   onLongPressEvent?: (event: CalendarEvent<T>) => void;
   /**
-   * Enables drag-to-move and edge-resize along the time axis: long-press a bar to
-   * move it, or drag its right edge to resize. Called with the proposed new
-   * start/end; return `false` to reject the drop (it snaps back).
+   * Enables drag-to-move and edge-resize: long-press a bar to move it along the
+   * time axis or across lanes, or drag its trailing edge to resize. Called with
+   * the proposed new start/end and the lane the bar was dropped in (the original
+   * lane when it didn't cross); retarget the event's resource from it. Return
+   * `false` to reject the drop (it snaps back). Only visible lanes are drop
+   * targets (see `resourcesPerPage`).
    */
-  onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
+  onDragEvent?: (
+    event: CalendarEvent<T>,
+    start: Date,
+    end: Date,
+    resource: Resource,
+  ) => void | boolean;
   /** Tap empty lane space; called with the snapped time and the lane's resource. */
   onPressCell?: (at: Date, resource: Resource) => void;
   /**
@@ -216,7 +224,20 @@ type ResourceBarProps<T> = {
   Renderer: ComponentType<ResourceEventArgs<T>>;
   onPress: () => void;
   onLongPress?: () => void;
-  onDragEvent: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
+  onDragEvent: (
+    event: CalendarEvent<T>,
+    start: Date,
+    end: Date,
+    resource: Resource,
+  ) => void | boolean;
+  /** The visible lanes, for cross-lane drops and their screen-reader actions. */
+  resources: Resource[];
+  /** This bar's lane index within `resources`. */
+  laneIndex: number;
+  /** Cross-axis pixels per lane; 0 disables cross-lane dragging (unmeasured). */
+  laneSize: number;
+  /** Raise this bar's lane above its siblings while a drag is live. */
+  onDragActiveChange: (laneId: string | null) => void;
   theme: ReturnType<typeof useCalendarTheme>;
 };
 
@@ -238,28 +259,36 @@ function ResourceBar<T>({
   onPress,
   onLongPress,
   onDragEvent,
+  resources,
+  laneIndex,
+  laneSize,
+  onDragActiveChange,
   theme,
 }: ResourceBarProps<T>): ReactElement {
   const moveX = useSharedValue(0);
+  const moveCross = useSharedValue(0);
   const resizeW = useSharedValue(0);
-  const latest = useRef({ event: pe.event, onDragEvent });
-  latest.current = { event: pe.event, onDragEvent };
+  const latest = useRef({ event: pe.event, onDragEvent, resources, laneIndex });
+  latest.current = { event: pe.event, onDragEvent, resources, laneIndex };
+  const laneCount = resources.length;
   const draggable = !(pe.event as { disabled?: boolean }).disabled;
 
   // Clear the live preview once the committed change re-renders the bar.
   useEffect(() => {
     moveX.value = 0;
+    moveCross.value = 0;
     resizeW.value = 0;
-  }, [pe.startHours, pe.durationHours, moveX, resizeW]);
+  }, [pe.startHours, pe.durationHours, moveX, moveCross, resizeW]);
 
   const snapBack = useCallback(() => {
     moveX.value = 0;
+    moveCross.value = 0;
     resizeW.value = 0;
-  }, [moveX, resizeW]);
+  }, [moveX, moveCross, resizeW]);
 
   const commit = useCallback(
-    (deltaStartMin: number, deltaEndMin: number) => {
-      const { event, onDragEvent: handler } = latest.current;
+    (deltaStartMin: number, deltaEndMin: number, laneDelta = 0) => {
+      const { event, onDragEvent: handler, resources: lanes, laneIndex: lane } = latest.current;
       const next = resolveDraggedBounds(
         event.start,
         event.end,
@@ -267,11 +296,12 @@ function ResourceBar<T>({
         deltaEndMin,
         snapMinutes,
       );
-      if (!next) {
+      const target = lanes[Math.min(Math.max(lane + laneDelta, 0), lanes.length - 1)];
+      if (!next || !target) {
         snapBack();
         return;
       }
-      if (handler(event, next.start, next.end) === false) snapBack();
+      if (handler(event, next.start, next.end, target) === false) snapBack();
     },
     [snapMinutes, snapBack],
   );
@@ -281,12 +311,17 @@ function ResourceBar<T>({
   // resize grip is a non-focusable visual/gesture affordance, so an `adjustable`
   // role there would never receive focus on a real device).
   const unit = (n: number) => `${n} minute${n === 1 ? "" : "s"}`;
+  const laneTitle = (lane?: Resource) => lane && (lane.title ?? lane.id);
+  const nextLane = laneTitle(resources[laneIndex + 1]);
+  const previousLane = laneTitle(resources[laneIndex - 1]);
   const barActions = draggable
     ? [
         { name: "move-later", label: `Move ${unit(snapMinutes)} later` },
         { name: "move-earlier", label: `Move ${unit(snapMinutes)} earlier` },
         { name: "extend", label: `Extend by ${unit(snapMinutes)}` },
         { name: "shrink", label: `Shorten by ${unit(snapMinutes)}` },
+        ...(nextLane ? [{ name: "move-next-lane", label: `Move to ${nextLane}` }] : []),
+        ...(previousLane ? [{ name: "move-previous-lane", label: `Move to ${previousLane}` }] : []),
       ]
     : undefined;
   const onBarAction = draggable
@@ -304,6 +339,12 @@ function ResourceBar<T>({
           case "shrink":
             commit(0, -snapMinutes);
             break;
+          case "move-next-lane":
+            commit(0, 0, 1);
+            break;
+          case "move-previous-lane":
+            commit(0, 0, -1);
+            break;
         }
       }
     : undefined;
@@ -312,35 +353,74 @@ function ResourceBar<T>({
     () =>
       vertical
         ? {
-            transform: [{ translateY: moveX.value }],
+            transform: [{ translateY: moveX.value }, { translateX: moveCross.value }],
             height: Math.max(height + resizeW.value, 2),
           }
         : {
-            transform: [{ translateX: moveX.value }],
+            transform: [{ translateX: moveX.value }, { translateY: moveCross.value }],
             width: Math.max((width as number) + resizeW.value, 2),
           },
     [vertical, width, height],
   );
 
+  const laneId = resources[laneIndex]?.id ?? "";
   const moveGesture = useMemo(
     () =>
       Gesture.Pan()
         .enabled(draggable)
         .activateAfterLongPress(MOVE_ACTIVATE_MS)
+        .onStart(() => {
+          // Lift this bar's lane above its siblings so the preview isn't
+          // painted under later lanes (RN zIndex only orders siblings).
+          runOnJS(onDragActiveChange)(laneId);
+        })
         .onUpdate((e) => {
           moveX.value = vertical ? e.translationY : e.translationX;
+          if (laneSize > 0 && laneCount > 1) {
+            const cross = vertical ? e.translationX : e.translationY;
+            moveCross.value = Math.min(
+              Math.max(cross, -laneIndex * laneSize),
+              (laneCount - 1 - laneIndex) * laneSize,
+            );
+          }
         })
         .onEnd((e) => {
           const translation = vertical ? e.translationY : e.translationX;
           const delta = snapDeltaMinutes(translation, hourSize, snapMinutes);
-          if (delta === 0) {
+          const cross = laneSize > 0 ? (vertical ? e.translationX : e.translationY) : 0;
+          const laneDelta =
+            laneSize > 0
+              ? Math.min(
+                  Math.max(Math.round(cross / laneSize), -laneIndex),
+                  laneCount - 1 - laneIndex,
+                )
+              : 0;
+          if (delta === 0 && laneDelta === 0) {
             moveX.value = 0;
+            moveCross.value = 0;
             return;
           }
           moveX.value = (delta / MINUTES_PER_HOUR) * hourSize;
-          runOnJS(commit)(delta, delta);
+          moveCross.value = laneDelta * laneSize;
+          runOnJS(commit)(delta, delta, laneDelta);
+        })
+        .onFinalize(() => {
+          runOnJS(onDragActiveChange)(null);
         }),
-    [draggable, vertical, hourSize, snapMinutes, moveX, commit],
+    [
+      draggable,
+      vertical,
+      hourSize,
+      snapMinutes,
+      laneSize,
+      laneCount,
+      laneIndex,
+      laneId,
+      moveX,
+      moveCross,
+      commit,
+      onDragActiveChange,
+    ],
   );
 
   const resizeGesture = useMemo(
@@ -628,6 +708,16 @@ export function ResourceTimeline<T = unknown>({
     const page = Math.min(Math.max(resourcePage, 0), pages - 1);
     return allResources.slice(page * resourcesPerPage, (page + 1) * resourcesPerPage);
   }, [allResources, resourcesPerPage, resourcePage]);
+  // The lane a bar is being dragged in, lifted above its siblings (RN zIndex
+  // only orders siblings, so the lane itself must be raised for the cross-lane
+  // preview to stay visible).
+  const [dragLaneId, setDragLaneId] = useState<string | null>(null);
+  // Vertical columns flex, so measure the body to get the per-lane width.
+  const [vBodyWidth, setVBodyWidth] = useState(0);
+  const vLaneSize =
+    resources.length > 0 && vBodyWidth > GUTTER_WIDTH
+      ? (vBodyWidth - GUTTER_WIDTH) / resources.length
+      : 0;
   const Renderer = renderEvent ?? DefaultBar;
   const cellEnabled = !!onPressCell || !!onLongPressCell || !!onCreateEvent;
   // The current-time line, shown only when the board's day is the zone's today.
@@ -710,7 +800,10 @@ export function ResourceTimeline<T = unknown>({
           ))}
         </View>
         <ScrollView showsVerticalScrollIndicator>
-          <View style={[styles.vbody, { height: trackHeight }]}>
+          <View
+            style={[styles.vbody, { height: trackHeight }]}
+            onLayout={(event) => setVBodyWidth(event.nativeEvent.layout.width)}
+          >
             <View style={{ width: GUTTER_WIDTH }}>
               {hours.map((h) => (
                 <Text
@@ -728,7 +821,7 @@ export function ResourceTimeline<T = unknown>({
                 </Text>
               ))}
             </View>
-            {resources.map((resource) => {
+            {resources.map((resource, laneIndex) => {
               const positioned = byResource.get(resource.id) ?? [];
               return (
                 <View
@@ -737,6 +830,7 @@ export function ResourceTimeline<T = unknown>({
                     styles.vcolumn,
                     { borderLeftColor: theme.colors.gridLine },
                     theme.containers.resourceRow,
+                    dragLaneId === resource.id && styles.laneLifted,
                   ]}
                 >
                   {/* Closed-hours shade, behind the grid lines and bars. */}
@@ -822,6 +916,10 @@ export function ResourceTimeline<T = unknown>({
                           key={idx}
                           pe={pe}
                           vertical
+                          resources={resources}
+                          laneIndex={laneIndex}
+                          laneSize={vLaneSize}
+                          onDragActiveChange={setDragLaneId}
                           hourSize={hourHeight}
                           left={left}
                           top={top}
@@ -886,7 +984,7 @@ export function ResourceTimeline<T = unknown>({
         </View>
 
         {/* Resource rows */}
-        {resources.map((resource) => {
+        {resources.map((resource, laneIndex) => {
           const positioned = byResource.get(resource.id) ?? [];
           return (
             <View
@@ -895,6 +993,7 @@ export function ResourceTimeline<T = unknown>({
                 styles.row,
                 { height: rowHeight, borderBottomColor: theme.colors.gridLine },
                 theme.containers.resourceRow,
+                dragLaneId === resource.id && styles.laneLifted,
               ]}
             >
               <View
@@ -991,6 +1090,10 @@ export function ResourceTimeline<T = unknown>({
                         key={idx}
                         pe={pe}
                         vertical={false}
+                        resources={resources}
+                        laneIndex={laneIndex}
+                        laneSize={rowHeight}
+                        onDragActiveChange={setDragLaneId}
                         hourSize={hourWidth}
                         left={left}
                         top={pe.column * laneHeight}
@@ -1081,6 +1184,7 @@ const styles = StyleSheet.create({
   },
   vheaderText: { fontSize: 13, fontWeight: "600" },
   vbody: { flexDirection: "row" },
+  laneLifted: { zIndex: 10 },
   vcolumn: { flex: 1, borderLeftWidth: StyleSheet.hairlineWidth },
   vhourLabel: { position: "absolute", right: 6, fontSize: 10 },
   vgridLine: { position: "absolute", left: 0, right: 0, height: StyleSheet.hairlineWidth },

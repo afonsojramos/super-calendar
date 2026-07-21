@@ -127,14 +127,22 @@ layout too) and on both renderers.
 - `labelWidth` — width of the left resource-label column (default 140). Horizontal only.
 - `ampm` — 12-hour axis labels.
 
-## Moving & resizing (web)
+## Moving & resizing
 
-On the web renderer, pass `onDragEvent` to make the board interactive: drag a bar to
-move it along the axis, or drag its right edge to resize. It's called with the
-proposed new start/end; return `false` to reject the drop (the bar snaps back).
-Movement snaps to `dragStepMinutes` (default 15). A bar being dragged carries
-`data-dragging` for styling. In the vertical orientation the same drag follows
-the vertical axis and resize moves to the bottom edge.
+Pass `onDragEvent` to make the board interactive: drag a bar to move it along the
+time axis **or across lanes**, or drag its trailing edge to resize. It's called
+with the proposed new start/end and the lane the bar was dropped in (the original
+lane when it didn't cross); retarget the event's resource from that fourth
+argument. Return `false` to reject the drop (the bar snaps back). Movement snaps
+to `dragStepMinutes` (default 15). Only the currently visible lanes are drop
+targets, so cap a long list with `resourcesPerPage` and page through it.
+
+On the web, drag with a mouse or pen; a bar being dragged carries `data-dragging`
+for styling. On React Native, long-press a bar to pick it up, then drag along the
+time axis or sideways into another lane; the same move and cross-lane moves are
+also exposed as screen-reader actions on the bar. In the vertical orientation the
+time axis runs down and resize moves to the bottom edge; lanes are the columns, so
+a cross-lane drag goes sideways.
 
 ```tsx
 import { ResourceTimeline } from "@super-calendar/dom";
@@ -143,9 +151,11 @@ import { ResourceTimeline } from "@super-calendar/dom";
   date={date}
   resources={resources}
   events={events}
-  onDragEvent={(event, start, end) => {
+  onDragEvent={(event, start, end, resource) => {
     if (event.locked) return false;
-    setEvents((prev) => prev.map((e) => (e === event ? { ...e, start, end } : e)));
+    setEvents((prev) =>
+      prev.map((e) => (e === event ? { ...e, start, end, resourceId: resource.id } : e)),
+    );
   }}
 />;
 ```
@@ -216,7 +226,7 @@ The native renderer exposes the same board and props (`date`, `resources`, `even
 `orientation`, `resourceId`, `resourcesPerPage`, `resourcePage`, `startHour`/`endHour`, `hourWidth`, `hourHeight`, `rowHeight`, `labelWidth`, `ampm`,
 `renderEvent`, `onPressEvent`, `onPressCell`, `onCreateEvent`, `businessHours`,
 `renderBusinessHours`), plus
-`onDragEvent` / `dragStepMinutes` for **long-press drag-to-move and edge-resize**
+`onDragEvent` / `dragStepMinutes` for **long-press drag-to-move, cross-lane drag, and edge-resize**
 and the long-press variants `onLongPressEvent` / `onLongPressCell`. It reads the theme from context, so
 restyle via `theme.containers` (see [Theming](/guides/theming)):
 
@@ -228,17 +238,21 @@ import { ResourceTimeline } from "@super-calendar/native";
   resources={resources}
   events={events}
   onPressEvent={setSelected}
-  onDragEvent={(event, start, end) => {
-    setEvents((prev) => prev.map((e) => (e === event ? { ...e, start, end } : e)));
+  onDragEvent={(event, start, end, resource) => {
+    setEvents((prev) =>
+      prev.map((e) => (e === event ? { ...e, start, end, resourceId: resource.id } : e)),
+    );
   }}
 />;
 ```
 
 Because dragging is gesture-only, native draggable bars also carry screen-reader
-actions: **move earlier / later** and **extend / shorten**, each stepping by
-`dragStepMinutes`. VoiceOver / TalkBack users invoke them from the bar's actions
-menu to reschedule without a gesture, through the same `onDragEvent`. (The visual
-resize grip is a pointer/touch affordance and isn't a separate focus target.)
+actions: **move earlier / later**, **extend / shorten**, and **move to** the
+adjacent lanes, each stepping by `dragStepMinutes` (the lane moves retarget the
+resource). VoiceOver / TalkBack users invoke them from the bar's actions menu to
+reschedule or reassign without a gesture, through the same `onDragEvent`. (The
+visual resize grip is a pointer/touch affordance and isn't a separate focus
+target.)
 
 ## Styling
 

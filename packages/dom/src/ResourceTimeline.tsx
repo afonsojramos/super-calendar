@@ -117,7 +117,12 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
    * Enables drag-to-move and edge-resize along the time axis; called with the
    * proposed new start/end. Return `false` to reject the drop (it snaps back).
    */
-  onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
+  onDragEvent?: (
+    event: CalendarEvent<T>,
+    start: Date,
+    end: Date,
+    resource: Resource,
+  ) => void | boolean;
   /** Tap empty lane space; called with the snapped time and the lane's resource. */
   onPressCell?: (at: Date, resource: Resource) => void;
   /** Drag empty lane space to create; called with the swept start/end and the lane's resource. */
@@ -156,9 +161,13 @@ const GUTTER_WIDTH = 56;
 
 type DragState = {
   key: string;
+  /** The lane the drag started in, so its row can be lifted while dragging. */
+  resourceId: string;
   kind: "move" | "resize";
   startHours: number;
   durationHours: number;
+  /** Live cross-axis offset (px) of a move, for the follow-the-pointer ghost. */
+  crossPx: number;
   moved: boolean;
 };
 
@@ -316,7 +325,12 @@ export function ResourceTimeline<T = unknown>({
   // handlers read so they never see a stale closure between events.
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragRef = useRef<DragState | null>(null);
-  const origin = useRef<{ x: number; startHours: number; durationHours: number } | null>(null);
+  const origin = useRef<{
+    x: number;
+    cross: number;
+    startHours: number;
+    durationHours: number;
+  } | null>(null);
   const applyDrag = (next: DragState | null) => {
     dragRef.current = next;
     setDrag(next);
@@ -325,6 +339,7 @@ export function ResourceTimeline<T = unknown>({
   const beginDrag = (
     e: ReactPointerEvent,
     key: string,
+    resourceId: string,
     kind: "move" | "resize",
     startHours: number,
     durationHours: number,
@@ -336,8 +351,13 @@ export function ResourceTimeline<T = unknown>({
     } catch {
       // Pointer capture is best-effort.
     }
-    origin.current = { x: vertical ? e.clientY : e.clientX, startHours, durationHours };
-    applyDrag({ key, kind, startHours, durationHours, moved: false });
+    origin.current = {
+      x: vertical ? e.clientY : e.clientX,
+      cross: vertical ? e.clientX : e.clientY,
+      startHours,
+      durationHours,
+    };
+    applyDrag({ key, resourceId, kind, startHours, durationHours, crossPx: 0, moved: false });
   };
   const moveDrag = (e: ReactPointerEvent) => {
     const d = dragRef.current;
@@ -350,7 +370,8 @@ export function ResourceTimeline<T = unknown>({
         startHour,
         endHour - d.durationHours,
       );
-      applyDrag({ ...d, startHours, moved: true });
+      const crossPx = (vertical ? e.clientX : e.clientY) - origin.current.cross;
+      applyDrag({ ...d, startHours, crossPx, moved: true });
     } else {
       const durationHours = clamp(
         snap(origin.current.durationHours + dHours),
@@ -360,7 +381,29 @@ export function ResourceTimeline<T = unknown>({
       applyDrag({ ...d, durationHours, moved: true });
     }
   };
-  const endDrag = (e: ReactPointerEvent, event: CalendarEvent<T>, onPress: () => void) => {
+  // Which visible lane the pointer is over, found by hit-testing rather than
+  // measuring flexed columns. The dragged bar is momentarily made
+  // pointer-transparent so `elementFromPoint` sees the lane, not the bar (which
+  // stays a DOM child of its origin lane however far it's visually translated).
+  const laneAt = (e: ReactPointerEvent, fallback: Resource): Resource => {
+    if (typeof document === "undefined" || typeof document.elementFromPoint !== "function") {
+      return fallback;
+    }
+    const bar = e.currentTarget as HTMLElement;
+    const prev = bar.style.pointerEvents;
+    bar.style.pointerEvents = "none";
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    bar.style.pointerEvents = prev;
+    const laneEl = (hit as HTMLElement | null)?.closest?.("[data-resource-id]");
+    const id = laneEl?.getAttribute("data-resource-id");
+    return (id && resources.find((r) => r.id === id)) || fallback;
+  };
+  const endDrag = (
+    e: ReactPointerEvent,
+    event: CalendarEvent<T>,
+    resource: Resource,
+    onPress: () => void,
+  ) => {
     const d = dragRef.current;
     if (!d) return;
     try {
@@ -373,10 +416,11 @@ export function ResourceTimeline<T = unknown>({
       onPress();
       return;
     }
+    const target = d.kind === "move" ? laneAt(e, resource) : resource;
     const base = startOfDay(date);
     const start = addMinutes(base, Math.round(d.startHours * 60));
     const end = addMinutes(base, Math.round((d.startHours + d.durationHours) * 60));
-    onDragEvent?.(event, start, end);
+    onDragEvent?.(event, start, end, target);
     applyDrag(null);
     origin.current = null;
   };
@@ -497,6 +541,10 @@ export function ResourceTimeline<T = unknown>({
     return map;
   }, [resources, events, resourceId, date]);
 
+  // The lane a move is dragging in, lifted above its siblings so the ghost
+  // stays visible as it crosses into another lane (a later DOM sibling).
+  const dragLaneId = drag?.kind === "move" && drag.moved ? drag.resourceId : null;
+
   if (vertical) {
     // Time flows down like the time grid: hour gutter on the left, one flexed
     // column per resource, so narrow screens share the width instead of
@@ -576,11 +624,16 @@ export function ResourceTimeline<T = unknown>({
               <div
                 key={resource.id}
                 {...slot("row", {
-                  base: { flex: 1, minWidth: 0 },
+                  base: {
+                    flex: 1,
+                    minWidth: 0,
+                    ...(dragLaneId === resource.id ? { position: "relative", zIndex: 5 } : null),
+                  },
                   themed: { borderLeft: `1px solid ${theme.gridLine}` },
                 })}
               >
                 <div
+                  data-resource-id={resource.id}
                   {...trackInteractionProps(resource)}
                   {...slot("track", { base: { position: "relative", height: trackHeight } })}
                 >
@@ -661,11 +714,21 @@ export function ResourceTimeline<T = unknown>({
                         {...dataState({ "data-dragging": !!active })}
                         onPointerDown={
                           draggable
-                            ? (e) => beginDrag(e, key, "move", pe.startHours, pe.durationHours)
+                            ? (e) =>
+                                beginDrag(
+                                  e,
+                                  key,
+                                  resource.id,
+                                  "move",
+                                  pe.startHours,
+                                  pe.durationHours,
+                                )
                             : undefined
                         }
                         onPointerMove={draggable ? moveDrag : undefined}
-                        onPointerUp={draggable ? (e) => endDrag(e, pe.event, onPress) : undefined}
+                        onPointerUp={
+                          draggable ? (e) => endDrag(e, pe.event, resource, onPress) : undefined
+                        }
                         onPointerCancel={draggable ? cancelDrag : undefined}
                         {...slot("event", {
                           base: {
@@ -674,6 +737,10 @@ export function ResourceTimeline<T = unknown>({
                             height,
                             left: `${pe.column * lanePct}%`,
                             width: `${lanePct}%`,
+                            transform:
+                              active?.kind === "move"
+                                ? `translateX(${active.crossPx}px)`
+                                : undefined,
                             padding: 1,
                             border: "none",
                             background: "transparent",
@@ -697,7 +764,14 @@ export function ResourceTimeline<T = unknown>({
                             aria-hidden
                             onPointerDown={(e) => {
                               e.stopPropagation();
-                              beginDrag(e, key, "resize", pe.startHours, pe.durationHours);
+                              beginDrag(
+                                e,
+                                key,
+                                resource.id,
+                                "resize",
+                                pe.startHours,
+                                pe.durationHours,
+                              );
                             }}
                             style={{
                               position: "absolute",
@@ -785,7 +859,11 @@ export function ResourceTimeline<T = unknown>({
             <div
               key={resource.id}
               {...slot("row", {
-                base: { display: "flex", height: rowHeight },
+                base: {
+                  display: "flex",
+                  height: rowHeight,
+                  ...(dragLaneId === resource.id ? { position: "relative", zIndex: 5 } : null),
+                },
                 themed: { borderBottom: `1px solid ${theme.gridLine}` },
               })}
             >
@@ -809,6 +887,7 @@ export function ResourceTimeline<T = unknown>({
                 {resource.title ?? resource.id}
               </div>
               <div
+                data-resource-id={resource.id}
                 {...trackInteractionProps(resource)}
                 {...slot("track", { base: { position: "relative", width: trackWidth } })}
               >
@@ -884,11 +963,21 @@ export function ResourceTimeline<T = unknown>({
                       {...dataState({ "data-dragging": !!active })}
                       onPointerDown={
                         draggable
-                          ? (e) => beginDrag(e, key, "move", pe.startHours, pe.durationHours)
+                          ? (e) =>
+                              beginDrag(
+                                e,
+                                key,
+                                resource.id,
+                                "move",
+                                pe.startHours,
+                                pe.durationHours,
+                              )
                           : undefined
                       }
                       onPointerMove={draggable ? moveDrag : undefined}
-                      onPointerUp={draggable ? (e) => endDrag(e, pe.event, onPress) : undefined}
+                      onPointerUp={
+                        draggable ? (e) => endDrag(e, pe.event, resource, onPress) : undefined
+                      }
                       onPointerCancel={draggable ? cancelDrag : undefined}
                       {...slot("event", {
                         base: {
@@ -897,6 +986,8 @@ export function ResourceTimeline<T = unknown>({
                           width,
                           top: pe.column * laneHeight,
                           height: laneHeight,
+                          transform:
+                            active?.kind === "move" ? `translateY(${active.crossPx}px)` : undefined,
                           padding: 1,
                           border: "none",
                           background: "transparent",
@@ -920,7 +1011,14 @@ export function ResourceTimeline<T = unknown>({
                           aria-hidden
                           onPointerDown={(e) => {
                             e.stopPropagation();
-                            beginDrag(e, key, "resize", pe.startHours, pe.durationHours);
+                            beginDrag(
+                              e,
+                              key,
+                              resource.id,
+                              "resize",
+                              pe.startHours,
+                              pe.durationHours,
+                            );
                           }}
                           style={{
                             position: "absolute",

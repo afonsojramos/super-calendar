@@ -504,3 +504,72 @@ describe("dom ResourceTimeline resource paging", () => {
     expect(horizontal.queryByText("Room D")).toBeNull();
   });
 });
+
+describe("dom ResourceTimeline cross-lane drag", () => {
+  // jsdom has no real hit-testing, so stub elementFromPoint to point at a lane.
+  // jsdom never defines it, so assign a stub and delete it afterwards.
+  const withHitTarget = (target: Element | null, run: () => void) => {
+    const doc = document as { elementFromPoint?: (x: number, y: number) => Element | null };
+    doc.elementFromPoint = () => target;
+    try {
+      run();
+    } finally {
+      delete doc.elementFromPoint;
+    }
+  };
+
+  it("retargets the resource to the lane the bar is dropped in, keeping the time", () => {
+    const onDragEvent = jest.fn();
+    const { container, getByText } = render(
+      <ResourceTimeline
+        date={date}
+        resources={resources}
+        events={events}
+        startHour={0}
+        hourWidth={80}
+        onDragEvent={onDragEvent}
+      />,
+    );
+    const laneB = container.querySelector('[data-resource-id="b"]');
+    withHitTarget(laneB, () => {
+      const bar = getByText("Standup").closest("button") as HTMLElement;
+      // Cross-axis only (clientY) so the time is unchanged and just the lane moves.
+      fireEvent.pointerDown(bar, { clientX: 100, clientY: 20, pointerId: 1 });
+      fireEvent.pointerMove(bar, { clientX: 100, clientY: 90, pointerId: 1 });
+      fireEvent.pointerUp(bar, { clientX: 100, clientY: 90, pointerId: 1 });
+    });
+    expect(onDragEvent).toHaveBeenCalledTimes(1);
+    const [, start, end, resource] = onDragEvent.mock.calls[0] as [
+      unknown,
+      Date,
+      Date,
+      { id: string },
+    ];
+    expect(resource.id).toBe("b");
+    expect(start.getHours()).toBe(9);
+    expect(end.getHours()).toBe(10);
+  });
+
+  it("keeps the original resource when dropped outside any lane", () => {
+    const onDragEvent = jest.fn();
+    const { getByText } = render(
+      <ResourceTimeline
+        date={date}
+        resources={resources}
+        events={events}
+        startHour={0}
+        hourWidth={80}
+        onDragEvent={onDragEvent}
+      />,
+    );
+    // document.body has no [data-resource-id] ancestor, so the drop falls back.
+    withHitTarget(document.body, () => {
+      const bar = getByText("Standup").closest("button") as HTMLElement;
+      fireEvent.pointerDown(bar, { clientX: 100, clientY: 20, pointerId: 1 });
+      fireEvent.pointerMove(bar, { clientX: 100, clientY: 90, pointerId: 1 });
+      fireEvent.pointerUp(bar, { clientX: 100, clientY: 90, pointerId: 1 });
+    });
+    const [, , , resource] = onDragEvent.mock.calls[0] as [unknown, Date, Date, { id: string }];
+    expect(resource.id).toBe("a");
+  });
+});

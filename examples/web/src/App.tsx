@@ -443,10 +443,12 @@ export function App() {
                 })
               }
               onPressEvent={(event) => console.log("press event:", event.title)}
-              onDragEvent={(event, start, end) => {
+              onDragEvent={(event, start, end, resource) => {
                 if (event.kind === "exam") return false; // exams are locked
                 setEvents((prev) =>
-                  prev.map((e) => (e.id === event.id ? { ...e, start, end } : e)),
+                  prev.map((e) =>
+                    e.id === event.id ? { ...e, start, end, resourceId: resource.id } : e,
+                  ),
                 );
               }}
             />
