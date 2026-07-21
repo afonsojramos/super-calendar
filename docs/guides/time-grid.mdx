@@ -76,6 +76,40 @@ headers). Drag-to-move, resize, and drag-to-create are covered in
 [Dragging & creating](/guides/dragging); keyboard and screen-reader support in
 [Accessibility](/guides/accessibility).
 
-Replace the day-header row with `renderTimeGridHeader` (React Native), style parts of the grid
-with per-slot [classes](/guides/styling), or recolour it via the
-[theme](/guides/theming).
+Style parts of the grid with per-slot [classes](/guides/styling), or recolour it
+via the [theme](/guides/theming).
+
+## Custom header (React Native)
+
+Three `Calendar` props customize the area above the grid; all are native-only
+(the dom renderer styles its header through the `header` / `columnHeader*`
+[slots](/guides/styling) instead).
+
+- `renderTimeGridHeader={(days: Date[]) => ReactNode}` **replaces** the built-in
+  day-header row: the week-number gutter and the tappable weekday/date buttons
+  disappear, and your element renders full-width in their place. `days` is the
+  visible page's dates in column order. The all-day lane and the grid itself
+  stay. To line your columns up with the grid's, leave a leading spacer as wide
+  as the hour gutter (`hourColumnWidth`, default 56, or 0 with `hideHours`).
+- `headerComponent={<YourToolbar />}` **inserts** an element, unchanged,
+  between the day-header row and the grid. It takes no arguments and replaces
+  nothing; the built-in header stays above it, and it doesn't scroll with the
+  hours. Use it for a filter row, an avatar strip, or your own toolbar.
+- `renderHeaderForMonthView={(weekDays: Date[]) => ReactNode}` is the month-grid
+  equivalent of `renderTimeGridHeader`: it replaces the weekday-label header;
+  return `null` to hide it.
+
+```tsx
+<Calendar
+  mode="week"
+  date={date}
+  events={events}
+  headerComponent={
+    <View style={{ flexDirection: "row", padding: 8 }}>
+      <TeamFilter value={team} onChange={setTeam} />
+    </View>
+  }
+  onChangeDate={setDate}
+  onPressEvent={onPress}
+/>
+```

@@ -43,6 +43,9 @@ your editor lists the full set with inline docs.
 | `calendarCellStyle`        | `(date) => style`                  | Per-date column/cell shading.            |
 | `businessHours`            | `(date) => { start, end } \| null` | Shade closed hours.                      |
 | `renderBusinessHours`      | `(band) => ReactNode`              | Render closed-hours bands yourself.      |
+| `renderTimeGridHeader`     | `(days) => ReactNode`              | Replace the week/day day-header row.     |
+| `renderHeaderForMonthView` | `(weekDays) => ReactNode`          | Replace the month weekday header.        |
+| `headerComponent`          | `ReactNode`                        | Extra element between header and grid.   |
 | `keyExtractor`             | `(event, index) => string`         | Stable event keys.                       |
 
 ## Interactions
