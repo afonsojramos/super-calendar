@@ -62,7 +62,12 @@ const ROOMS: Resource[] = [
   { id: "room-a", title: "Room A" },
   { id: "room-b", title: "Room B" },
   { id: "room-c", title: "Room C" },
+  { id: "room-d", title: "Room D" },
+  { id: "room-e", title: "Room E" },
 ];
+// Lanes per page on the resource board (see the pager above the board).
+const ROOMS_PER_PAGE = 3;
+const ROOM_PAGES = Math.ceil(ROOMS.length / ROOMS_PER_PAGE);
 
 const SAMPLE_ICS = `BEGIN:VCALENDAR
 VERSION:2.0
@@ -163,6 +168,7 @@ export default function App() {
   // The "ics" tab parses whatever is in the text box; invalid input just yields
   // an empty list while typing.
   const [icsText, setIcsText] = useState(SAMPLE_ICS);
+  const [roomPage, setRoomPage] = useState(0);
   const importedIcs = useMemo(() => {
     try {
       return parseICalendar(icsText);
@@ -369,12 +375,37 @@ export default function App() {
               </View>
             ) : activeMode === "resource" ? (
               <View style={styles.card}>
+                <View style={styles.roomPager}>
+                  <Pressable
+                    style={styles.navButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Previous rooms"
+                    disabled={roomPage === 0}
+                    onPress={() => setRoomPage((p) => Math.max(0, p - 1))}
+                  >
+                    <Text style={styles.navButtonText}>‹</Text>
+                  </Pressable>
+                  <Text style={styles.roomPagerText}>
+                    Rooms {roomPage + 1} / {ROOM_PAGES}
+                  </Text>
+                  <Pressable
+                    style={styles.navButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Next rooms"
+                    disabled={roomPage >= ROOM_PAGES - 1}
+                    onPress={() => setRoomPage((p) => Math.min(ROOM_PAGES - 1, p + 1))}
+                  >
+                    <Text style={styles.navButtonText}>›</Text>
+                  </Pressable>
+                </View>
                 <ResourceTimeline
                   date={date}
                   // Phones read better with time flowing down; wide screens keep
                   // the classic horizontal timeline.
                   orientation={windowWidth < 600 ? "vertical" : "horizontal"}
                   resources={ROOMS}
+                  resourcesPerPage={ROOMS_PER_PAGE}
+                  resourcePage={roomPage}
                   events={events}
                   // Created events carry a real resourceId; demo data spreads by id.
                   resourceId={(event) =>
@@ -566,6 +597,14 @@ const styles = StyleSheet.create({
   // Prev / Today / next navigation, mirroring the dom example's toolbar.
   navRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingBottom: 12 },
   navButtons: { flexDirection: "row", gap: 6 },
+  roomPager: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  roomPagerText: { fontSize: 13, color: "#6B7280" },
   navButton: {
     width: 34,
     height: 34,

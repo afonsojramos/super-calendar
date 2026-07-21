@@ -91,6 +91,32 @@ and `labelWidth` apply to the horizontal orientation only. Custom renderers get
 `height` (the bar's pixel height) in their `ResourceEventArgs`; `width` is 0 in
 this orientation because the columns flex.
 
+## Paging resources
+
+Columns flex to share the width, so past a handful of resources they get too
+narrow, especially at phone widths. `resourcesPerPage` caps how many lanes show
+at once; `resourcePage` (0-based, clamped to the last page) picks which ones.
+It's controlled, like `date`: wire your own prev/next buttons to a state value.
+
+```tsx
+const [page, setPage] = useState(0);
+const pages = Math.ceil(resources.length / 3);
+
+<ResourceTimeline
+  date={date}
+  orientation="vertical"
+  resources={resources}
+  events={events}
+  resourcesPerPage={3}
+  resourcePage={page}
+/>;
+// Your controls:
+<Button title="Next rooms" onPress={() => setPage((p) => Math.min(p + 1, pages - 1))} />;
+```
+
+Both props work in either orientation (they window rows in the horizontal
+layout too) and on both renderers.
+
 ## Sizing & window
 
 - `startHour` / `endHour` — the visible hour window (default 0–24).
@@ -186,7 +212,7 @@ the look:
 ## React Native
 
 The native renderer exposes the same board and props (`date`, `resources`, `events`,
-`orientation`, `resourceId`, `startHour`/`endHour`, `hourWidth`, `hourHeight`, `rowHeight`, `labelWidth`, `ampm`,
+`orientation`, `resourceId`, `resourcesPerPage`, `resourcePage`, `startHour`/`endHour`, `hourWidth`, `hourHeight`, `rowHeight`, `labelWidth`, `ampm`,
 `renderEvent`, `onPressEvent`, `onPressCell`, `onCreateEvent`, `businessHours`,
 `renderBusinessHours`), plus
 `onDragEvent` / `dragStepMinutes` for **long-press drag-to-move and edge-resize**

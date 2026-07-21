@@ -434,3 +434,73 @@ describe("dom ResourceTimeline now indicator", () => {
     expect(container.querySelectorAll('[data-slot="nowIndicator"]')).toHaveLength(2);
   });
 });
+
+describe("dom ResourceTimeline resource paging", () => {
+  const four = [
+    { id: "a", title: "Room A" },
+    { id: "b", title: "Room B" },
+    { id: "c", title: "Room C" },
+    { id: "d", title: "Room D" },
+  ];
+
+  it("shows only the first page of lanes by default", () => {
+    const { getByText, queryByText } = render(
+      <ResourceTimeline
+        date={date}
+        orientation="vertical"
+        resources={four}
+        events={[]}
+        resourcesPerPage={2}
+      />,
+    );
+    expect(getByText("Room A")).toBeTruthy();
+    expect(getByText("Room B")).toBeTruthy();
+    expect(queryByText("Room C")).toBeNull();
+  });
+
+  it("shows the lanes of the controlled resourcePage", () => {
+    const { getByText, queryByText } = render(
+      <ResourceTimeline
+        date={date}
+        orientation="vertical"
+        resources={four}
+        events={[]}
+        resourcesPerPage={2}
+        resourcePage={1}
+      />,
+    );
+    expect(getByText("Room C")).toBeTruthy();
+    expect(getByText("Room D")).toBeTruthy();
+    expect(queryByText("Room A")).toBeNull();
+  });
+
+  it("clamps an out-of-range page to the last one, in either orientation", () => {
+    const vertical = render(
+      <ResourceTimeline
+        date={date}
+        orientation="vertical"
+        resources={four}
+        events={[]}
+        resourcesPerPage={3}
+        resourcePage={99}
+      />,
+    );
+    // Pages of 3 over 4 resources: the last page holds just Room D.
+    expect(vertical.getByText("Room D")).toBeTruthy();
+    expect(vertical.queryByText("Room A")).toBeNull();
+    vertical.unmount();
+
+    const horizontal = render(
+      <ResourceTimeline
+        date={date}
+        resources={four}
+        events={[]}
+        resourcesPerPage={3}
+        resourcePage={-1}
+      />,
+    );
+    // A negative page clamps to the first.
+    expect(horizontal.getByText("Room A")).toBeTruthy();
+    expect(horizontal.queryByText("Room D")).toBeNull();
+  });
+});

@@ -65,7 +65,12 @@ const ROOMS: Resource[] = [
   { id: "room-a", title: "Room A" },
   { id: "room-b", title: "Room B" },
   { id: "room-c", title: "Room C" },
+  { id: "room-d", title: "Room D" },
+  { id: "room-e", title: "Room E" },
 ];
+// Lanes per page on the resource board (see the pager above the board).
+const ROOMS_PER_PAGE = 3;
+const ROOM_PAGES = Math.ceil(ROOMS.length / ROOMS_PER_PAGE);
 const WEEK_STARTS_ON = 1;
 
 // A fully Tailwind-styled month, restyled entirely through per-slot `classNames`
@@ -130,6 +135,7 @@ export function App() {
   const pickerMinDate = useMemo(() => new Date(), []);
   const { range, onPressDate, reset } = useDateRange({ minDate: pickerMinDate });
   const [rangeValue, setRangeValue] = useState<DateRange | null>(null);
+  const [roomPage, setRoomPage] = useState(0);
   const [icsText, setIcsText] = useState(SAMPLE_ICS);
   // Tracks the phone-width breakpoint reactively for the resource tab.
   const [narrowViewport, setNarrowViewport] = useState(
@@ -381,12 +387,33 @@ export function App() {
           </div>
         ) : mode === "resource" ? (
           <div style={styles.card}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "8px 12px" }}>
+              <button
+                type="button"
+                disabled={roomPage === 0}
+                onClick={() => setRoomPage((p) => Math.max(0, p - 1))}
+              >
+                ← Rooms
+              </button>
+              <span style={{ fontSize: 13, color: "#6B7280" }}>
+                Page {roomPage + 1} / {ROOM_PAGES}
+              </span>
+              <button
+                type="button"
+                disabled={roomPage >= ROOM_PAGES - 1}
+                onClick={() => setRoomPage((p) => Math.min(ROOM_PAGES - 1, p + 1))}
+              >
+                Rooms →
+              </button>
+            </div>
             <ResourceTimeline
               date={date}
               // Phones read better with time flowing down; wide screens keep
               // the classic horizontal timeline. Mirrors the native example.
               orientation={narrowViewport ? "vertical" : "horizontal"}
               resources={ROOMS}
+              resourcesPerPage={ROOMS_PER_PAGE}
+              resourcePage={roomPage}
               events={events}
               // Created events carry a real resourceId; demo data spreads by id.
               resourceId={(event) =>

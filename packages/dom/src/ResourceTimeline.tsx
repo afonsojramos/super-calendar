@@ -76,6 +76,19 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
   orientation?: "horizontal" | "vertical";
   /** The resource lanes: rows when horizontal, columns when vertical. */
   resources: Resource[];
+  /**
+   * Cap the number of lanes shown at once; the rest sit on further pages. Pair
+   * with `resourcePage` and your own prev/next controls to page through them
+   * (like `date` drives the time axis). Omit to show every lane, sharing the
+   * available space.
+   */
+  resourcesPerPage?: number;
+  /**
+   * The 0-based page of lanes to show when `resourcesPerPage` is set (default
+   * 0, clamped to the last page). Controlled: update it from your own paging
+   * controls.
+   */
+  resourcePage?: number;
   /** Events; each is placed in the row named by `resourceId(event)`. */
   events: CalendarEvent<T>[];
   /** Read an event's resource id. Default: `event.resourceId`. */
@@ -217,7 +230,9 @@ function DefaultBar<T>({
 export function ResourceTimeline<T = unknown>({
   date,
   orientation = "horizontal",
-  resources,
+  resources: allResources,
+  resourcesPerPage,
+  resourcePage = 0,
   events,
   resourceId = (event) => (event as { resourceId?: string }).resourceId,
   startHour = 0,
@@ -244,6 +259,13 @@ export function ResourceTimeline<T = unknown>({
   classNames,
   styles,
 }: ResourceTimelineProps<T>): ReactElement {
+  // Window the lanes to the requested page when resourcesPerPage caps them.
+  const resources = useMemo(() => {
+    if (!resourcesPerPage || resourcesPerPage <= 0) return allResources;
+    const pages = Math.max(1, Math.ceil(allResources.length / resourcesPerPage));
+    const page = Math.min(Math.max(resourcePage, 0), pages - 1);
+    return allResources.slice(page * resourcesPerPage, (page + 1) * resourcesPerPage);
+  }, [allResources, resourcesPerPage, resourcePage]);
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
   const slot = createSlots<ResourceTimelineSlot>({ classNames, styles });
   const Renderer = renderEvent;
