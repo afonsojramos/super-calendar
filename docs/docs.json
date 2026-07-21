@@ -76,6 +76,14 @@
         "icon": "npm",
         "iconType": "brands",
         "href": "https://www.npmjs.com/package/@super-calendar/native"
+      },
+      {
+        "label": "npmx",
+        "href": "https://npmx.dev/package/@super-calendar/native"
+      },
+      {
+        "label": "JSR",
+        "href": "https://jsr.io/@super-calendar/native"
       }
     ],
     "primary": {
