@@ -55,6 +55,7 @@ export {
 } from "./theme";
 export type {
   BusinessHours,
+  BusinessHoursBand,
   CalendarEvent,
   CalendarMode,
   EventAccessibilityLabelContext,

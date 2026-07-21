@@ -114,3 +114,14 @@ export type WeekStartsOn = 0 | 1 | 2 | 3 | 4 | 5 | 6;
  * by both renderers; pair with `closedHourBands` to get the spans to shade.
  */
 export type BusinessHours = (date: Date) => { start: number; end: number } | null;
+
+/**
+ * One closed-hours band handed to a `renderBusinessHours` override: the day it
+ * belongs to and its span as fractional hours, already clamped to the visible
+ * window. `ResourceTimeline` extends it with the lane's resource.
+ */
+export interface BusinessHoursBand {
+  date: Date;
+  start: number;
+  end: number;
+}

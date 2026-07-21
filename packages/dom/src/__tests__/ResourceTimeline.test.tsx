@@ -400,6 +400,29 @@ describe("dom ResourceTimeline cell interactions", () => {
     expect(first.style.left).toBe("0px");
     expect(first.style.width).toBe("80px"); // 08:00–09:00 at 80px/hour
   });
+
+  it("hands each closed band and its resource to renderBusinessHours, dropping the tint", () => {
+    const { container, getByText } = render(
+      <ResourceTimeline
+        date={date}
+        resources={resources}
+        events={events}
+        startHour={8}
+        endHour={20}
+        hourWidth={80}
+        businessHours={(_d, resource) => (resource.id === "a" ? { start: 9, end: 17 } : null)}
+        renderBusinessHours={({ start, end, resource }) => (
+          <span>{`${resource.id} closed ${start}-${end}`}</span>
+        )}
+      />,
+    );
+    expect(getByText("a closed 8-9")).toBeTruthy();
+    expect(getByText("a closed 17-20")).toBeTruthy();
+    expect(getByText("b closed 8-20")).toBeTruthy();
+    for (const band of container.querySelectorAll<HTMLElement>('[data-slot="businessHours"]')) {
+      expect(band.style.background).toBe("");
+    }
+  });
 });
 
 describe("dom ResourceTimeline now indicator", () => {

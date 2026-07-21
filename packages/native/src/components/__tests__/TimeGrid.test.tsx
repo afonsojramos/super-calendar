@@ -1,5 +1,5 @@
 import { render } from "@testing-library/react-native";
-import { StyleSheet } from "react-native";
+import { StyleSheet, Text } from "react-native";
 import type { CalendarEvent } from "../../types";
 
 // Capture the props handed to the virtualized list, and render only the active
@@ -143,6 +143,27 @@ describe("TimeGrid business hours", () => {
       <Calendar mode="day" date={date} events={[]} onChangeDate={noop} onPressEvent={noop} />,
     );
     expect(queryAllByTestId("business-hours-shade")).toHaveLength(0);
+  });
+
+  it("hands each closed band to renderBusinessHours and drops the themed tint", () => {
+    const { getAllByTestId, getByText } = render(
+      <Calendar
+        mode="day"
+        date={date}
+        events={[]}
+        businessHours={() => ({ start: 9, end: 17 })}
+        renderBusinessHours={({ start, end }) => <Text>{`closed ${start}-${end}`}</Text>}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    // The bands before open and after close render the custom content...
+    expect(getByText("closed 0-9", { includeHiddenElements: true })).toBeTruthy();
+    expect(getByText("closed 17-24", { includeHiddenElements: true })).toBeTruthy();
+    // ...and the built-in tint steps aside for it.
+    for (const band of getAllByTestId("business-hours-shade")) {
+      expect(StyleSheet.flatten(band.props.style).backgroundColor).toBeUndefined();
+    }
   });
 
   it("uses eventAccessibilityLabel to override a timed event's label", () => {

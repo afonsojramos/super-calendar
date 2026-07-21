@@ -42,6 +42,7 @@ your editor lists the full set with inline docs.
 | `eventCellStyle`           | `style \| (event) => style`        | Tweak the built-in box.                  |
 | `calendarCellStyle`        | `(date) => style`                  | Per-date column/cell shading.            |
 | `businessHours`            | `(date) => { start, end } \| null` | Shade closed hours.                      |
+| `renderBusinessHours`      | `(band) => ReactNode`              | Render closed-hours bands yourself.      |
 | `keyExtractor`             | `(event, index) => string`         | Stable event keys.                       |
 
 ## Interactions

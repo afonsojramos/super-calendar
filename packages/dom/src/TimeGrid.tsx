@@ -13,6 +13,7 @@ import {
 } from "react";
 import {
   type BusinessHours,
+  type BusinessHoursBand,
   type CalendarEvent,
   type CalendarMode,
   cellRangeFromDrag,
@@ -150,6 +151,12 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   hiddenDays?: number[];
   /** Shade the hours outside business hours; `null` shades the whole day. */
   businessHours?: BusinessHours;
+  /**
+   * Render a closed-hours band's content yourself (a label, icon, pattern).
+   * The grid keeps positioning the band; when set, the themed tint is dropped
+   * and your output fills the band instead.
+   */
+  renderBusinessHours?: (band: BusinessHoursBand) => ReactNode;
   /** Show the current-time indicator on today's column (default true). */
   showNowIndicator?: boolean;
   /** Fixed "now" instant for the indicator (doesn't tick). Defaults to the device clock. */
@@ -349,6 +356,7 @@ export function TimeGrid<T = unknown>({
   hiddenDays,
   keyboardEventNavigation = false,
   businessHours,
+  renderBusinessHours,
   showNowIndicator = true,
   now: nowProp,
   timeZone,
@@ -1058,9 +1066,13 @@ export function TimeGrid<T = unknown>({
                         pointerEvents: "none",
                         zIndex: 0,
                       },
-                      themed: { background: theme.outsideHoursBackground },
+                      themed: renderBusinessHours
+                        ? undefined
+                        : { background: theme.outsideHoursBackground },
                     })}
-                  />
+                  >
+                    {renderBusinessHours?.({ date: day, start: b.start, end: b.end })}
+                  </div>
                 ))}
                 {/* Background events: shaded, non-interactive time ranges. */}
                 {backgroundByDay[dayIndex].map((b, bandIndex) => (

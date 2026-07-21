@@ -61,6 +61,7 @@ export { type ResolvedSlot, type SlotDefault, type SlotStyleProps } from "./slot
 export { type DomCalendarTheme, darkDomTheme, defaultDomTheme, mergeDomTheme } from "./theme";
 export {
   type BusinessHours,
+  type BusinessHoursBand,
   type CalendarEvent,
   type CalendarMode,
   type DateRange,

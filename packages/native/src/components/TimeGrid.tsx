@@ -44,6 +44,7 @@ import Animated, {
 import { useCalendarTheme } from "../theme";
 import type {
   BusinessHours,
+  BusinessHoursBand,
   CalendarEvent,
   CalendarMode,
   EventKeyExtractor,
@@ -559,10 +560,12 @@ type ShadeBandProps = {
   minHour: number;
   left: number;
   width: number;
-  color: string;
+  /** Themed fill. Omit when a render override owns the band's look. */
+  color?: string;
   /** Which slot/testID the band belongs to (closed hours vs background events). */
   slotName?: "businessHours" | "backgroundEvent";
   testID?: string;
+  children?: React.ReactNode;
 };
 
 // A muted band over a closed hour-range of one day column (driven by the live
@@ -577,6 +580,7 @@ const ShadeBand = ({
   color,
   slotName = "businessHours",
   testID = "business-hours-shade",
+  children,
 }: ShadeBandProps) => {
   const slot = useSlots<TimeGridSlot>();
   const animatedStyle = useAnimatedStyle(
@@ -588,9 +592,13 @@ const ShadeBand = ({
   );
   const bandSlot = slot(slotName, {
     base: [styles.shadeBand, styles.nonInteractive, { left, width }],
-    themed: { backgroundColor: color },
+    themed: color === undefined ? undefined : { backgroundColor: color },
   });
-  return <Animated.View testID={testID} {...bandSlot} style={[bandSlot.style, animatedStyle]} />;
+  return (
+    <Animated.View testID={testID} {...bandSlot} style={[bandSlot.style, animatedStyle]}>
+      {children}
+    </Animated.View>
+  );
 };
 
 type TimetablePageProps<T> = {
@@ -630,6 +638,7 @@ type TimetablePageProps<T> = {
   hourComponent?: HourRenderer;
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
   businessHours?: BusinessHours;
+  renderBusinessHours?: (band: BusinessHoursBand) => React.ReactNode;
   minHourHeight: number;
   maxHourHeight: number;
   showNowIndicator: boolean;
@@ -682,6 +691,7 @@ function TimetablePageInner<T>({
   maxHourHeight,
   showNowIndicator,
   businessHours,
+  renderBusinessHours,
   renderEvent,
   keyExtractor,
   snapMinutes,
@@ -1121,8 +1131,10 @@ function TimetablePageInner<T>({
                       minHour={minHour}
                       left={dayLeft(dayIndex)}
                       width={dayWidth}
-                      color={theme.colors.outsideHoursBackground}
-                    />
+                      color={renderBusinessHours ? undefined : theme.colors.outsideHoursBackground}
+                    >
+                      {renderBusinessHours?.({ date: day, start: band.start, end: band.end })}
+                    </ShadeBand>
                   )),
                 )
               : null}
@@ -1326,6 +1338,12 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   /** Per-date style merged onto each day column. */
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
   businessHours?: BusinessHours;
+  /**
+   * Render a closed-hours band's content yourself (a label, icon, pattern).
+   * The grid keeps positioning the band; when set, the themed tint is dropped
+   * and your output fills the band instead.
+   */
+  renderBusinessHours?: (band: BusinessHoursBand) => React.ReactNode;
   /** Show the ISO week number in the header gutter. Default false. */
   showWeekNumber?: boolean;
   /** Element rendered between the day header and the grid. */
@@ -1403,6 +1421,7 @@ function TimeGridInner<T>({
   showAllDayEventCell = true,
   calendarCellStyle,
   businessHours,
+  renderBusinessHours,
   showWeekNumber = false,
   headerComponent,
   minHour = 0,
@@ -1744,6 +1763,7 @@ function TimeGridInner<T>({
           hourComponent={hourComponent}
           calendarCellStyle={calendarCellStyle}
           businessHours={businessHours}
+          renderBusinessHours={renderBusinessHours}
           minHourHeight={minHourHeight}
           maxHourHeight={maxHourHeight}
           showNowIndicator={showNowIndicator}

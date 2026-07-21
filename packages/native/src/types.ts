@@ -12,6 +12,7 @@ import type { CalendarEvent, CalendarMode } from "@super-calendar/core";
 // importing them from "../types".
 export type {
   BusinessHours,
+  BusinessHoursBand,
   CalendarEvent,
   CalendarMode,
   EventAccessibilityLabelContext,

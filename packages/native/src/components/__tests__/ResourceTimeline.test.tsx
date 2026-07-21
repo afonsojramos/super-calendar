@@ -1,5 +1,5 @@
 import { fireEvent, render } from "@testing-library/react-native";
-import { StyleSheet } from "react-native";
+import { StyleSheet, Text } from "react-native";
 import type { CalendarEvent } from "../../types";
 import { ResourceTimeline } from "../ResourceTimeline";
 
@@ -246,6 +246,28 @@ describe("ResourceTimeline cell interactions", () => {
     );
     // Room A: before-open + after-close; Room B: closed all day.
     expect(getAllByTestId("resource-hours-shade", { includeHiddenElements: true })).toHaveLength(3);
+  });
+
+  it("hands each closed band and its resource to renderBusinessHours, dropping the tint", () => {
+    const { getAllByTestId, getByText } = render(
+      <ResourceTimeline
+        date={at(0)}
+        resources={resources}
+        events={events}
+        startHour={8}
+        endHour={20}
+        businessHours={(_d, resource) => (resource.id === "a" ? { start: 9, end: 17 } : null)}
+        renderBusinessHours={({ start, end, resource }) => (
+          <Text>{`${resource.id} closed ${start}-${end}`}</Text>
+        )}
+      />,
+    );
+    expect(getByText("a closed 8-9", { includeHiddenElements: true })).toBeTruthy();
+    expect(getByText("a closed 17-20", { includeHiddenElements: true })).toBeTruthy();
+    expect(getByText("b closed 8-20", { includeHiddenElements: true })).toBeTruthy();
+    for (const band of getAllByTestId("resource-hours-shade", { includeHiddenElements: true })) {
+      expect(StyleSheet.flatten(band.props.style).backgroundColor).toBeUndefined();
+    }
   });
 
   it("fires onLongPressEvent for a non-draggable bar", () => {

@@ -168,11 +168,27 @@ opening hours; return `null` for a fully closed lane. A date-only function
 />
 ```
 
+To render the closed region yourself (a label, an icon, a pattern), add
+`renderBusinessHours`. The board keeps positioning each band and calls you with
+`{ date, start, end, resource }`; the themed tint is dropped so your output owns
+the look:
+
+```tsx
+<ResourceTimeline
+  date={date}
+  resources={resources}
+  events={events}
+  businessHours={() => ({ start: 9, end: 17 })}
+  renderBusinessHours={({ resource }) => <ClosedBand label={`${resource.title} closed`} />}
+/>
+```
+
 ## React Native
 
 The native renderer exposes the same board and props (`date`, `resources`, `events`,
 `orientation`, `resourceId`, `startHour`/`endHour`, `hourWidth`, `hourHeight`, `rowHeight`, `labelWidth`, `ampm`,
-`renderEvent`, `onPressEvent`, `onPressCell`, `onCreateEvent`, `businessHours`), plus
+`renderEvent`, `onPressEvent`, `onPressCell`, `onCreateEvent`, `businessHours`,
+`renderBusinessHours`), plus
 `onDragEvent` / `dragStepMinutes` for **long-press drag-to-move and edge-resize**
 and the long-press variants `onLongPressEvent` / `onLongPressCell`. It reads the theme from context, so
 restyle via `theme.containers` (see [Theming](/guides/theming)):

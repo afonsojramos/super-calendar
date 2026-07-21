@@ -4,10 +4,12 @@ import type {
   CSSProperties,
   PointerEvent as ReactPointerEvent,
   ReactElement,
+  ReactNode,
 } from "react";
 import { useMemo, useRef, useState } from "react";
 import {
   backgroundBandsForDay,
+  type BusinessHoursBand,
   type CalendarEvent,
   isSameCalendarDay,
   useNow,
@@ -113,6 +115,12 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
    * (return `null` for a fully closed lane). A date-only function is accepted.
    */
   businessHours?: (date: Date, resource: Resource) => { start: number; end: number } | null;
+  /**
+   * Render a closed-hours band's content yourself (a label, icon, pattern). The
+   * board keeps positioning the band; when set, the themed tint is dropped and
+   * your output fills the band instead. Receives the lane's resource.
+   */
+  renderBusinessHours?: (band: BusinessHoursBand & { resource: Resource }) => ReactNode;
   /** Snap dragged events to this many minutes (default 15). */
   dragStepMinutes?: number;
   /** Show the current-time line when `date` is today (default true). */
@@ -226,6 +234,7 @@ export function ResourceTimeline<T = unknown>({
   onPressCell,
   onCreateEvent,
   businessHours,
+  renderBusinessHours,
   dragStepMinutes = 15,
   showNowIndicator = true,
   now: nowProp,
@@ -567,9 +576,13 @@ export function ResourceTimeline<T = unknown>({
                           pointerEvents: "none",
                           zIndex: 0,
                         },
-                        themed: { background: theme.outsideHoursBackground },
+                        themed: renderBusinessHours
+                          ? undefined
+                          : { background: theme.outsideHoursBackground },
                       })}
-                    />
+                    >
+                      {renderBusinessHours?.({ date, start: b.start, end: b.end, resource })}
+                    </div>
                   ))}
                   {backgroundBandsFor(resource).map((b, i) => (
                     <div
@@ -791,9 +804,13 @@ export function ResourceTimeline<T = unknown>({
                         pointerEvents: "none",
                         zIndex: 0,
                       },
-                      themed: { background: theme.outsideHoursBackground },
+                      themed: renderBusinessHours
+                        ? undefined
+                        : { background: theme.outsideHoursBackground },
                     })}
-                  />
+                  >
+                    {renderBusinessHours?.({ date, start: b.start, end: b.end, resource })}
+                  </div>
                 ))}
                 {backgroundBandsFor(resource).map((b, i) => (
                   <div

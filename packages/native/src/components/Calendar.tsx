@@ -18,6 +18,7 @@ import { useSharedValue } from "react-native-reanimated";
 import { CalendarThemeProvider, mergeTheme, type PartialCalendarTheme } from "../theme";
 import type {
   BusinessHours,
+  BusinessHoursBand,
   CalendarEvent,
   CalendarMode,
   EventKeyExtractor,
@@ -164,6 +165,12 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
    * whole day (closed). Omit for no shading.
    */
   businessHours?: BusinessHours;
+  /**
+   * Week/day grid only: render a closed-hours band's content yourself (a
+   * label, icon, pattern). The grid keeps positioning the band; when set, the
+   * themed tint is dropped and your output fills the band instead.
+   */
+  renderBusinessHours?: (band: BusinessHoursBand) => React.ReactNode;
   /** Stable key per event. Defaults to start-time + index. */
   keyExtractor?: EventKeyExtractor<T>;
   /** Partial theme merged over the defaults. */
@@ -381,6 +388,7 @@ export function Calendar<T>({
   eventCellStyle,
   calendarCellStyle,
   businessHours,
+  renderBusinessHours,
   keyExtractor = defaultKeyExtractor as EventKeyExtractor<T>,
   theme,
   cellHeight: cellHeightProp,
@@ -602,6 +610,7 @@ export function Calendar<T>({
           showAllDayEventCell={showAllDayEventCell}
           calendarCellStyle={calendarCellStyle}
           businessHours={businessHours}
+          renderBusinessHours={renderBusinessHours}
           showWeekNumber={showWeekNumber}
           weekNumberPrefix={weekNumberPrefix}
           hourComponent={hourComponent}

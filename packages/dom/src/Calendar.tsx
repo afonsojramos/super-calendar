@@ -22,6 +22,7 @@ import {
 import {
   type CalendarMode,
   type BusinessHours,
+  type BusinessHoursBand,
   type CalendarEvent,
   type DateRange,
   type DateSelectionConstraints,
@@ -124,6 +125,12 @@ export interface CalendarProps<T = unknown>
   weekNumberPrefix?: string;
   /** Shade the hours outside business hours. */
   businessHours?: BusinessHours;
+  /**
+   * Render a closed-hours band's content yourself (a label, icon, pattern).
+   * The grid keeps positioning the band; when set, the themed tint is dropped
+   * and your output fills the band instead.
+   */
+  renderBusinessHours?: (band: BusinessHoursBand) => ReactNode;
   /** Show the current-time indicator (default true). */
   showNowIndicator?: boolean;
   /** Show the all-day lane (default true). */
@@ -273,6 +280,7 @@ export function Calendar<T = unknown>({
   showWeekNumber,
   weekNumberPrefix,
   businessHours,
+  renderBusinessHours,
   showNowIndicator,
   showAllDayEventCell,
   dragStepMinutes,
@@ -434,6 +442,7 @@ export function Calendar<T = unknown>({
         showWeekNumber={showWeekNumber}
         weekNumberPrefix={weekNumberPrefix}
         businessHours={businessHours}
+        renderBusinessHours={renderBusinessHours}
         showNowIndicator={showNowIndicator}
         showAllDayEventCell={showAllDayEventCell}
         dragStepMinutes={dragStepMinutes}

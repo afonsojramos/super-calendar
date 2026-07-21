@@ -229,6 +229,25 @@ describe("dom TimeGrid", () => {
     expect(businessHours).toHaveBeenCalled();
   });
 
+  it("hands each closed band to renderBusinessHours and drops the themed tint", () => {
+    const { container, getByText } = render(
+      <TimeGrid
+        date={day}
+        mode="day"
+        hourHeight={48}
+        businessHours={() => ({ start: 9, end: 17 })}
+        renderBusinessHours={({ start, end }) => <span>{`closed ${start}-${end}`}</span>}
+      />,
+    );
+    // The bands before open and after close render the custom content...
+    expect(getByText("closed 0-9")).toBeTruthy();
+    expect(getByText("closed 17-24")).toBeTruthy();
+    // ...and the built-in tint steps aside for it.
+    for (const band of container.querySelectorAll<HTMLElement>('[data-slot="businessHours"]')) {
+      expect(band.style.background).toBe("");
+    }
+  });
+
   it("does not make empty day columns keyboard tab stops", () => {
     const { container } = render(
       <TimeGrid date={day} mode="day" hourHeight={48} onCreateEvent={jest.fn()} />,

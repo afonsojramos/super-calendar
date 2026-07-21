@@ -51,6 +51,23 @@ The red current-time line follows the wall clock (`showNowIndicator`, on by
 default). `businessHours` shades the closed hours per day; return `null` for a
 fully closed day (see [Theming](/guides/theming) for the shade colour).
 
+To put your own content in the closed region (a label, an icon, a striped
+pattern), add `renderBusinessHours`. The grid keeps positioning each band and
+calls you with `{ date, start, end }` (fractional hours, clamped to the visible
+window); the themed tint is dropped so your output owns the look:
+
+```tsx
+<Calendar
+  mode="week"
+  date={date}
+  events={events}
+  businessHours={() => ({ start: 9, end: 17 })}
+  renderBusinessHours={({ start }) => <ClosedBand label={start === 0 ? "Opens 9am" : "Closed"} />}
+  onChangeDate={setDate}
+  onPressEvent={onPress}
+/>
+```
+
 ## Interaction
 
 Tap handlers: `onPressCell` / `onLongPressCell` (empty grid space),
