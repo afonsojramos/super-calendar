@@ -83,7 +83,8 @@ export interface RecurrenceRule {
    * Dates to skip (exceptions), dropped by `expandRecurringEvents`. A date at
    * local midnight drops every occurrence on that calendar day (iCal
    * `EXDATE;VALUE=DATE`); a date with a time drops only the occurrence starting
-   * at that exact instant. Maps to iCal `EXDATE`.
+   * at that exact instant. Corollary: an occurrence that itself starts at
+   * midnight can only be excluded day-wide. Maps to iCal `EXDATE`.
    */
   exdates?: Date[];
   /**
