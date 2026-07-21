@@ -391,9 +391,15 @@ export function ResourceTimeline<T = unknown>({
     }
     const bar = e.currentTarget as HTMLElement;
     const prev = bar.style.pointerEvents;
+    // Restore in a finally: a left-behind "none" would permanently disable this
+    // bar, since React never re-manages this imperatively-set inline style.
+    let hit: Element | null;
     bar.style.pointerEvents = "none";
-    const hit = document.elementFromPoint(e.clientX, e.clientY);
-    bar.style.pointerEvents = prev;
+    try {
+      hit = document.elementFromPoint(e.clientX, e.clientY);
+    } finally {
+      bar.style.pointerEvents = prev;
+    }
     const laneEl = (hit as HTMLElement | null)?.closest?.("[data-resource-id]");
     const id = laneEl?.getAttribute("data-resource-id");
     return (id && resources.find((r) => r.id === id)) || fallback;

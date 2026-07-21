@@ -236,6 +236,8 @@ type ResourceBarProps<T> = {
   laneIndex: number;
   /** Cross-axis pixels per lane; 0 disables cross-lane dragging (unmeasured). */
   laneSize: number;
+  /** True while a drag on this bar's lane is live (holds the preview until settle). */
+  dragActive: boolean;
   /** Raise this bar's lane above its siblings while a drag is live. */
   onDragActiveChange: (laneId: string | null) => void;
   theme: ReturnType<typeof useCalendarTheme>;
@@ -262,6 +264,7 @@ function ResourceBar<T>({
   resources,
   laneIndex,
   laneSize,
+  dragActive,
   onDragActiveChange,
   theme,
 }: ResourceBarProps<T>): ReactElement {
@@ -273,12 +276,17 @@ function ResourceBar<T>({
   const laneCount = resources.length;
   const draggable = !(pe.event as { disabled?: boolean }).disabled;
 
-  // Clear the live preview once the committed change re-renders the bar.
+  // Clear the live preview when the drag on this lane settles, or when a
+  // committed change re-renders the bar. Skip while a drag is active so this
+  // never clobbers the in-flight preview; the cross-lane offset is held through
+  // the drag (so a relocation stays seamless) and cleared here on settle, which
+  // also snaps a bar back when the handler accepts the move without relocating.
   useEffect(() => {
+    if (dragActive) return;
     moveX.value = 0;
     moveCross.value = 0;
     resizeW.value = 0;
-  }, [pe.startHours, pe.durationHours, moveX, moveCross, resizeW]);
+  }, [dragActive, pe.startHours, pe.durationHours, moveX, moveCross, resizeW]);
 
   const snapBack = useCallback(() => {
     moveX.value = 0;
@@ -311,7 +319,7 @@ function ResourceBar<T>({
   // resize grip is a non-focusable visual/gesture affordance, so an `adjustable`
   // role there would never receive focus on a real device).
   const unit = (n: number) => `${n} minute${n === 1 ? "" : "s"}`;
-  const laneTitle = (lane?: Resource) => lane && (lane.title ?? lane.id);
+  const laneTitle = (lane?: Resource) => lane && (lane.title || lane.id);
   const nextLane = laneTitle(resources[laneIndex + 1]);
   const previousLane = laneTitle(resources[laneIndex - 1]);
   const barActions = draggable
@@ -919,6 +927,7 @@ export function ResourceTimeline<T = unknown>({
                           resources={resources}
                           laneIndex={laneIndex}
                           laneSize={vLaneSize}
+                          dragActive={dragLaneId === resource.id}
                           onDragActiveChange={setDragLaneId}
                           hourSize={hourHeight}
                           left={left}
@@ -1093,6 +1102,7 @@ export function ResourceTimeline<T = unknown>({
                         resources={resources}
                         laneIndex={laneIndex}
                         laneSize={rowHeight}
+                        dragActive={dragLaneId === resource.id}
                         onDragActiveChange={setDragLaneId}
                         hourSize={hourWidth}
                         left={left}

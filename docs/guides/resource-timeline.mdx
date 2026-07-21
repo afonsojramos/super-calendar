@@ -137,6 +137,9 @@ argument. Return `false` to reject the drop (the bar snaps back). Movement snaps
 to `dragStepMinutes` (default 15). Only the currently visible lanes are drop
 targets, so cap a long list with `resourcesPerPage` and page through it.
 
+To keep the board time-only, reject any lane change: compare the dropped
+`resource.id` to the event's current one and `return false` when they differ.
+
 On the web, drag with a mouse or pen; a bar being dragged carries `data-dragging`
 for styling. On React Native, long-press a bar to pick it up, then drag along the
 time axis or sideways into another lane; the same move and cross-lane moves are
