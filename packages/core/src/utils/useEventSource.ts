@@ -61,6 +61,9 @@ export function useEventSource<T = unknown>(
   const [error, setError] = useState<Error | null>(null);
   // Ignore responses from superseded fetches (unmount, source change, races).
   const generation = useRef(0);
+  // Abort the superseded URL request too, so it stops consuming the network
+  // instead of just being ignored when it lands.
+  const abortRef = useRef<AbortController | null>(null);
 
   // The latest source/options without re-subscribing the interval on every
   // render (inline functions and option literals are expected).
@@ -69,6 +72,9 @@ export function useEventSource<T = unknown>(
 
   const load = useCallback(async (isManual: boolean) => {
     const gen = ++generation.current;
+    abortRef.current?.abort();
+    const controller = typeof AbortController === "undefined" ? null : new AbortController();
+    abortRef.current = controller;
     const { source: src, format: fmt, map: mapper } = latest.current;
     if (isManual) setLoading(true);
     try {
@@ -76,7 +82,7 @@ export function useEventSource<T = unknown>(
       if (typeof src === "function") {
         next = await src();
       } else {
-        const response = await fetch(src);
+        const response = await fetch(src, controller ? { signal: controller.signal } : undefined);
         if (!response.ok) throw new Error(`Event source responded ${response.status}`);
         const isIcs = fmt === "ics" || (fmt == null && /\.ics(\?|$)/.test(src));
         if (isIcs) {
@@ -103,12 +109,14 @@ export function useEventSource<T = unknown>(
     if (!refetchIntervalMs) {
       return () => {
         generation.current++;
+        abortRef.current?.abort();
       };
     }
     const id = setInterval(() => void load(false), refetchIntervalMs);
     return () => {
       clearInterval(id);
       generation.current++;
+      abortRef.current?.abort();
     };
   }, [load, sourceKey, refetchIntervalMs]);
 

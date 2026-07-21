@@ -93,6 +93,60 @@ describe("useEventSource", () => {
     expect(result.current.events[0].title).toBe("Booking");
   });
 
+  it("aborts the in-flight request on unmount and on source change", async () => {
+    const seen: (AbortSignal | undefined)[] = [];
+    const fn = jest.fn((_url: string, init?: RequestInit) => {
+      seen.push(init?.signal ?? undefined);
+      return new Promise(() => {}) as Promise<Response>; // never resolves; stays in flight
+    });
+    (globalThis as { fetch: unknown }).fetch = fn;
+
+    const { rerender, unmount } = renderHook(({ url }) => useEventSource(url), {
+      initialProps: { url: "https://example.com/one" },
+    });
+    expect(seen[0]).toBeInstanceOf(AbortSignal);
+    expect(seen[0]?.aborted).toBe(false);
+
+    // A new source supersedes the first request and aborts it.
+    rerender({ url: "https://example.com/two" });
+    await waitFor(() => expect(seen).toHaveLength(2));
+    expect(seen[0]?.aborted).toBe(true);
+    expect(seen[1]?.aborted).toBe(false);
+
+    // Unmount aborts whatever is still in flight.
+    unmount();
+    expect(seen[1]?.aborted).toBe(true);
+  });
+
+  it("refetches on the configured interval and stops on unmount", async () => {
+    jest.useFakeTimers();
+    try {
+      const fetchMock = mockFetch(async () => ({ ok: true, json: async () => jsonFeed }));
+      const { unmount } = renderHook(() =>
+        useEventSource("https://example.com/events", { refetchIntervalMs: 60_000 }),
+      );
+      await act(async () => {}); // let the initial fetch settle
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        jest.advanceTimersByTime(60_000);
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        jest.advanceTimersByTime(120_000);
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+
+      unmount();
+      await act(async () => {
+        jest.advanceTimersByTime(300_000);
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it("ignores a superseded fetch when the source changes mid-flight", async () => {
     // The generation counter must drop the in-flight response for the old source
     // so a slow first request can't overwrite the newer source's result.
