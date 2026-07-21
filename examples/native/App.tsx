@@ -8,11 +8,13 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  type StyleProp,
   StyleSheet,
   Text,
   TextInput,
   useWindowDimensions,
   View,
+  type ViewStyle,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -121,6 +123,24 @@ function shiftedDate(date: Date, minutes: number): Date {
   next.setMinutes(next.getMinutes() + minutes);
   return next;
 }
+
+// Expo web pins the document to the viewport with overflow hidden, so when the
+// demo runs in a short iframe (the docs page) anything past the fold would be
+// unreachable. On web the page scrolls itself; on a device the views scroll.
+const PageContainer = ({
+  style,
+  children,
+}: {
+  style: StyleProp<ViewStyle>;
+  children: React.ReactNode;
+}) =>
+  Platform.OS === "web" ? (
+    <ScrollView style={style} contentContainerStyle={styles.pageContent}>
+      {children}
+    </ScrollView>
+  ) : (
+    <View style={style}>{children}</View>
+  );
 
 // Pin the calendar to a single view, overriding the tab bar — handy for
 // screenshots and docs. Set it to a mode (e.g. "week") to force that view and
@@ -255,7 +275,7 @@ export default function App() {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <SafeAreaView style={styles.root}>
-          <View style={styles.page}>
+          <PageContainer style={styles.page}>
             {DEMO_MODE == null ? (
               <View style={styles.header}>
                 <Text style={styles.title}>@super-calendar/native</Text>
@@ -500,7 +520,7 @@ export default function App() {
                 </EventMenuProvider>
               </View>
             )}
-          </View>
+          </PageContainer>
         </SafeAreaView>
       </SafeAreaProvider>
     </GestureHandlerRootView>
@@ -511,6 +531,9 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#fff" },
   // Center the demo and cap its width on wide (web) viewports, like the dom example.
   page: { flex: 1, width: "100%", maxWidth: 900, alignSelf: "center", paddingHorizontal: 16 },
+  // Web page scroll: let short content still fill the viewport so flexed cards
+  // (the calendar) keep their height.
+  pageContent: { flexGrow: 1 },
   header: { paddingTop: 16, paddingBottom: 4 },
   // Match the dom example's <h1>: Tailwind's preflight resets headings to the
   // inherited (normal) weight, so the title is 20px at the default weight.
