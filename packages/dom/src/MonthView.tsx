@@ -427,6 +427,18 @@ export function MonthView<T = unknown>({
   // Escape, or picking an event.
   const [moreOpenFor, setMoreOpenFor] = useState<string | null>(null);
   const morePopoverRef = useRef<HTMLDivElement | null>(null);
+  // The "+N more" button that opened the popover, so focus can return to it.
+  const moreTriggerRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (moreOpenFor) {
+      // Move focus into the dialog so keyboard users land on the first event.
+      morePopoverRef.current?.querySelector<HTMLElement>("button")?.focus();
+      return;
+    }
+    // Return focus to the trigger when the popover closes.
+    moreTriggerRef.current?.focus();
+    moreTriggerRef.current = null;
+  }, [moreOpenFor]);
   useEffect(() => {
     if (!moreOpenFor) return;
     const onDocPointerDown = (e: PointerEvent) => {
@@ -744,7 +756,10 @@ export function MonthView<T = unknown>({
                           onClick={(e) => {
                             e.stopPropagation();
                             if (onPressMore) onPressMore(rest, day.date);
-                            else setMoreOpenFor((open) => (open === day.id ? null : day.id));
+                            else {
+                              moreTriggerRef.current = e.currentTarget;
+                              setMoreOpenFor((open) => (open === day.id ? null : day.id));
+                            }
                           }}
                           {...slot("more", moreButtonDefault(theme))}
                           aria-label={`${rest.length} more events, ${dayLabel}`}
@@ -757,8 +772,26 @@ export function MonthView<T = unknown>({
                         <div
                           ref={morePopoverRef}
                           role="dialog"
+                          aria-modal="true"
                           aria-label={dayLabel}
                           onPointerDown={(e) => e.stopPropagation()}
+                          // Contain Tab inside the dialog; Escape (handled on the
+                          // document) closes it and restores focus to the trigger.
+                          onKeyDown={(e) => {
+                            if (e.key !== "Tab") return;
+                            const buttons =
+                              morePopoverRef.current?.querySelectorAll<HTMLElement>("button");
+                            if (!buttons?.length) return;
+                            const first = buttons[0];
+                            const last = buttons[buttons.length - 1];
+                            if (e.shiftKey && document.activeElement === first) {
+                              e.preventDefault();
+                              last.focus();
+                            } else if (!e.shiftKey && document.activeElement === last) {
+                              e.preventDefault();
+                              first.focus();
+                            }
+                          }}
                           {...slot("morePopover", {
                             base: {
                               position: "absolute",

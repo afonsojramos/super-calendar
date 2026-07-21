@@ -387,4 +387,39 @@ describe("dom MonthView built-in more popover", () => {
     expect(onPressMore).toHaveBeenCalledTimes(1);
     expect(queryByRole("dialog")).toBeNull();
   });
+
+  it("moves focus into the dialog on open and back to the trigger on Escape", () => {
+    const { getByText, getByRole, queryByRole } = render(
+      <MonthView date={new Date(2026, 5, 15)} events={manyEvents} maxVisibleEventCount={2} />,
+    );
+    const trigger = getByText(/More/);
+    fireEvent.click(trigger);
+    const dialog = getByRole("dialog");
+    // Focus lands on the first event inside the popover (it lists the whole day).
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement?.textContent).toBe("Event 1");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(queryByRole("dialog")).toBeNull();
+    // Focus returns to the "+N more" button that opened it.
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("contains Tab within the dialog, wrapping in both directions", () => {
+    const { getByText, getByRole } = render(
+      <MonthView date={new Date(2026, 5, 15)} events={manyEvents} maxVisibleEventCount={2} />,
+    );
+    fireEvent.click(getByText(/More/));
+    const dialog = getByRole("dialog");
+    const buttons = dialog.querySelectorAll<HTMLElement>("button");
+    const first = buttons[0];
+    const last = buttons[buttons.length - 1];
+
+    last.focus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(document.activeElement).toBe(first);
+
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
+  });
 });
