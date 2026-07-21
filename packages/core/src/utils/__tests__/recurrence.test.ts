@@ -137,6 +137,47 @@ describe("expandRecurringEvents", () => {
     expect(result.map((e) => e.start.getDate())).toEqual([1, 3, 5]);
   });
 
+  it("drops only the matching occurrence when a timed EXDATE targets one of two same-day starts", () => {
+    const event: CalendarEvent = {
+      ...base, // daily 09:00
+      recurrence: {
+        freq: "daily",
+        count: 3,
+        rdates: [at(2026, 0, 2, 15)], // a second occurrence on the 2nd
+        exdates: [at(2026, 0, 2, 15)], // cancel just that one
+      },
+    };
+    const result = expandRecurringEvents([event], at(2026, 0, 1), at(2026, 0, 31));
+    expect(result.map((e) => [e.start.getDate(), e.start.getHours()])).toEqual([
+      [1, 9],
+      [2, 9],
+      [3, 9],
+    ]);
+  });
+
+  it("drops every same-day occurrence for a date-only (midnight) EXDATE", () => {
+    const event: CalendarEvent = {
+      ...base,
+      recurrence: {
+        freq: "daily",
+        count: 3,
+        rdates: [at(2026, 0, 2, 15)],
+        exdates: [new Date(2026, 0, 2)], // whole-day exception
+      },
+    };
+    const result = expandRecurringEvents([event], at(2026, 0, 1), at(2026, 0, 31));
+    expect(result.map((e) => e.start.getDate())).toEqual([1, 3]);
+  });
+
+  it("does not let a timed EXDATE cancel an occurrence at a different time", () => {
+    const event: CalendarEvent = {
+      ...base, // daily 09:00
+      recurrence: { freq: "daily", count: 3, exdates: [at(2026, 0, 2, 10)] },
+    };
+    const result = expandRecurringEvents([event], at(2026, 0, 1), at(2026, 0, 31));
+    expect(result.map((e) => e.start.getDate())).toEqual([1, 2, 3]);
+  });
+
   it("repeats on specific days of the month (BYMONTHDAY), in order", () => {
     const event: CalendarEvent = {
       start: at(2026, 0, 1),

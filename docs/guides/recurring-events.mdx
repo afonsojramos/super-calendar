@@ -56,7 +56,10 @@ weekday: 5 }` (the last Friday).
   Days a month lacks (the 31st in February) are skipped.
 - `months` — for `yearly`, the month(s) to repeat in (1 = January … 12 = December),
   keeping the start date's day-of-month, e.g. `[3, 9]` (every March and September).
-- `exdates` — dates to skip (exceptions).
+- `exdates` — dates to skip (exceptions). A date at local midnight skips every
+  occurrence on that calendar day; a date with a time skips only the occurrence
+  starting at that exact instant, so two same-day occurrences can be cancelled
+  independently.
 - `rdates` — extra one-off dates added to the set, even ones the rule wouldn't
   produce.
 

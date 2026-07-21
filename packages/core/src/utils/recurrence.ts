@@ -221,9 +221,22 @@ export function expandRecurringEvents<T>(
       continue;
     }
     const durationMs = event.end.getTime() - event.start.getTime();
-    // Exception days (EXDATE): an occurrence landing on one of these is dropped.
+    // Exceptions (EXDATE): a date-only exception (local midnight) drops every
+    // occurrence on that calendar day (RFC 5545 VALUE=DATE); a timed exception
+    // drops only the occurrence starting at that exact instant, so two
+    // same-day occurrences can be cancelled independently.
     const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-    const excluded = new Set((event.recurrence.exdates ?? []).map(dayKey));
+    const excludedDays = new Set<string>();
+    const excludedInstants = new Set<number>();
+    for (const exdate of event.recurrence.exdates ?? []) {
+      const isMidnight =
+        exdate.getHours() === 0 &&
+        exdate.getMinutes() === 0 &&
+        exdate.getSeconds() === 0 &&
+        exdate.getMilliseconds() === 0;
+      if (isMidnight) excludedDays.add(dayKey(exdate));
+      else excludedInstants.add(exdate.getTime());
+    }
     // Union the rule's occurrences with any explicit RDATE additions, keyed by
     // exact start time so a date the rule already produces isn't duplicated.
     const starts = new Map<number, Date>();
@@ -239,7 +252,7 @@ export function expandRecurringEvents<T>(
     for (const start of ordered) {
       // Skip occurrences that end before the range opens, but keep iterating.
       if (start.getTime() + durationMs < rangeStart.getTime()) continue;
-      if (excluded.has(dayKey(start))) continue;
+      if (excludedDays.has(dayKey(start)) || excludedInstants.has(start.getTime())) continue;
       out.push(instanceAt(event, start, durationMs));
     }
   }
