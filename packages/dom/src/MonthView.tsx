@@ -442,7 +442,12 @@ export function MonthView<T = unknown>({
   useEffect(() => {
     if (!moreOpenFor) return;
     const onDocPointerDown = (e: PointerEvent) => {
-      if (!morePopoverRef.current?.contains(e.target as Node)) setMoreOpenFor(null);
+      if (!morePopoverRef.current?.contains(e.target as Node)) {
+        // A pointer dismissal moves focus to whatever was clicked; don't yank
+        // it back to the trigger (that's for Escape and event selection).
+        moreTriggerRef.current = null;
+        setMoreOpenFor(null);
+      }
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMoreOpenFor(null);
@@ -771,8 +776,10 @@ export function MonthView<T = unknown>({
                       {moreOpenFor === day.id ? (
                         <div
                           ref={morePopoverRef}
+                          // A non-modal dialog: Tab stays inside and Escape closes,
+                          // but the page behind is not inert (outside clicks work),
+                          // so no aria-modal claim.
                           role="dialog"
-                          aria-modal="true"
                           aria-label={dayLabel}
                           onPointerDown={(e) => e.stopPropagation()}
                           // Contain Tab inside the dialog; Escape (handled on the

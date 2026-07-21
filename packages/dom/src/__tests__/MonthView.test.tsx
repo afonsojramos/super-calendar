@@ -405,6 +405,20 @@ describe("dom MonthView built-in more popover", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  it("does not steal focus back to the trigger on an outside-pointer dismissal", () => {
+    const { getByText, queryByRole } = render(
+      <MonthView date={new Date(2026, 5, 15)} events={manyEvents} maxVisibleEventCount={2} />,
+    );
+    const trigger = getByText(/More/);
+    fireEvent.click(trigger);
+
+    // Click outside the popover; the browser has moved focus to the click target.
+    fireEvent.pointerDown(document.body);
+    expect(queryByRole("dialog")).toBeNull();
+    // Focus is left where the pointer put it, not yanked back to the trigger.
+    expect(document.activeElement).not.toBe(trigger);
+  });
+
   it("contains Tab within the dialog, wrapping in both directions", () => {
     const { getByText, getByRole } = render(
       <MonthView date={new Date(2026, 5, 15)} events={manyEvents} maxVisibleEventCount={2} />,
