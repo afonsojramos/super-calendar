@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.10.0](https://github.com/afonsojramos/super-calendar/compare/v2.9.1...v2.10.0) (2026-09-08)
+
+
+### Features
+
+* make time-grid event height floor and gap configurable ([#56](https://github.com/afonsojramos/super-calendar/issues/56)) ([53b4a79](https://github.com/afonsojramos/super-calendar/commit/53b4a799c2eb96f5f8ab1408f1e620d7fabbfa6d))
+
 ## [2.9.1](https://github.com/afonsojramos/super-calendar/compare/v2.9.0...v2.9.1) (2026-09-05)
 
 
