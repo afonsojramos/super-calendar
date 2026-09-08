@@ -80,6 +80,12 @@ export type TimeGridSlot =
 
 const GUTTER_WIDTH = 56;
 const HOURS_PER_DAY = 24;
+// Floor for a timed event box's height, so a very short event still shows a
+// sliver of its chip. Overridable per grid via `minEventHeight`.
+const DEFAULT_MIN_EVENT_HEIGHT = 14;
+// Horizontal inset of each event box from its column edges. Overridable per grid
+// via `eventGap`.
+const DEFAULT_EVENT_GAP = 1;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 // Edge auto-advance: how close to the day-columns edge (px) counts as "at the
@@ -151,6 +157,17 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   minHourHeight?: number;
   /** Upper bound for pixels per hour when zooming. */
   maxHourHeight?: number;
+  /**
+   * Minimum pixel height of a timed event box, so short events stay legible and
+   * clickable. Also the floor of the `boxHeight` handed to `renderEvent`. Default
+   * 14; pass 0 to size every box strictly by its duration.
+   */
+  minEventHeight?: number;
+  /**
+   * Inset in pixels between a timed event box and its column edges (each side).
+   * Default 1; pass 0 to let events fill their column.
+   */
+  eventGap?: number;
   /** Snap dragged events to this many minutes (default 15). */
   dragStepMinutes?: number;
   /** Render event time ranges in 12-hour AM/PM (default false, 24h). */
@@ -392,6 +409,8 @@ export function TimeGrid<T = unknown>({
   zoomable = true,
   minHourHeight = 24,
   maxHourHeight = 160,
+  minEventHeight = DEFAULT_MIN_EVENT_HEIGHT,
+  eventGap = DEFAULT_EVENT_GAP,
   dragStepMinutes = 15,
   ampm = false,
   timeslots = 1,
@@ -998,7 +1017,7 @@ export function TimeGrid<T = unknown>({
       event: dragged,
       mode,
       isAllDay: false,
-      boxHeight: Math.max(drag.spillHours * hourHeight, 14),
+      boxHeight: Math.max(drag.spillHours * hourHeight, minEventHeight),
       continuesBefore: true,
       continuesAfter: false,
       ampm,
@@ -1484,7 +1503,7 @@ export function TimeGrid<T = unknown>({
                   // them to the day, so the height doesn't jump on commit.
                   const boxHeight = Math.max(
                     Math.min(durationHours, HOURS_PER_DAY - startHours) * hourHeight,
-                    14,
+                    minEventHeight,
                   );
                   const widthPct = 100 / pe.columns;
                   const onPress = () => onPressEvent?.(pe.event);
@@ -1552,8 +1571,8 @@ export function TimeGrid<T = unknown>({
                           // is the renderer's concern: the built-in one clamps, and a
                           // custom renderer should adapt to the `boxHeight` it's given.
                           height: boxHeight,
-                          left: `calc(${pe.column * widthPct}% + 1px)`,
-                          width: `calc(${widthPct}% - 2px)`,
+                          left: `calc(${pe.column * widthPct}% + ${eventGap}px)`,
+                          width: `calc(${widthPct}% - ${eventGap * 2}px)`,
                           cursor: canMove ? "grab" : "pointer",
                           touchAction: canMove ? "none" : "auto",
                           zIndex: active ? 3 : 1,
@@ -1622,9 +1641,9 @@ export function TimeGrid<T = unknown>({
                       base: {
                         position: "absolute",
                         top: (moveSegment.startHours - windowStart) * hourHeight,
-                        left: 1,
-                        right: 1,
-                        height: Math.max(moveSegment.durationHours * hourHeight, 14),
+                        left: eventGap,
+                        right: eventGap,
+                        height: Math.max(moveSegment.durationHours * hourHeight, minEventHeight),
                         pointerEvents: "none",
                         zIndex: 3,
                         opacity: 0.85,
@@ -1636,7 +1655,7 @@ export function TimeGrid<T = unknown>({
                         event: moveSegment.event,
                         mode,
                         isAllDay: false,
-                        boxHeight: Math.max(moveSegment.durationHours * hourHeight, 14),
+                        boxHeight: Math.max(moveSegment.durationHours * hourHeight, minEventHeight),
                         continuesBefore: moveSegment.continuesBefore,
                         continuesAfter: moveSegment.continuesAfter,
                         ampm,
@@ -1662,8 +1681,8 @@ export function TimeGrid<T = unknown>({
                         // the preview is scrolled out of view, exactly like the
                         // continuation the drop will commit.
                         top: -windowStart * hourHeight,
-                        left: 1,
-                        right: 1,
+                        left: eventGap,
+                        right: eventGap,
                         height: spill.boxHeight,
                         pointerEvents: "none",
                         zIndex: 3,
@@ -1712,8 +1731,8 @@ export function TimeGrid<T = unknown>({
                     {...slot("createGhost", {
                       base: {
                         position: "absolute",
-                        left: 1,
-                        right: 1,
+                        left: eventGap,
+                        right: eventGap,
                         top: ghost.topPx,
                         height: Math.max(ghost.heightPx, 2),
                         opacity: 0.7,

@@ -39,6 +39,31 @@ choose.
   `[0, 6]` for a Monday–Friday business week. Count-based views keep their
   column count by skipping hidden days.
 
+## Event boxes
+
+A timed event's box is sized to its duration, with two guards you can tune:
+
+- `minEventHeight` — the floor on a box's pixel height, so a 5-minute event
+  stays legible and tappable. It is also the floor of the `boxHeight` passed to
+  your [`renderEvent`](/guides/events#render-your-own-event). Default 32 on
+  native, 14 on the dom renderer. Pass `0` to size every box strictly by its
+  duration.
+- `eventGap` — the inset in pixels between a box and its slot on each side, so
+  adjacent boxes and column edges get some breathing room. Default 2 on native,
+  1 on the dom renderer. Pass `0` to let events fill the full slot.
+
+```tsx
+<Calendar
+  mode="week"
+  date={date}
+  events={events}
+  minEventHeight={0}
+  eventGap={0}
+  renderEvent={MyEvent}
+  onChangeDate={setDate}
+/>
+```
+
 ## The all-day lane
 
 All-day events (flagged `allDay`, or spanning midnight-to-midnight) leave the

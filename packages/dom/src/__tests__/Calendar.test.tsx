@@ -200,3 +200,27 @@ describe("Calendar hiddenDays forwarding", () => {
     expect(container.querySelectorAll('[data-slot="columnHeader"]')).toHaveLength(5);
   });
 });
+
+describe("Calendar event box sizing forwarding", () => {
+  it("passes minEventHeight and eventGap through to the time grid", () => {
+    // 15 minutes at 48px/hour is 12px; without the override it would be 14px.
+    const quarter: CalendarEvent[] = [
+      { title: "Quarter", start: new Date(2026, 6, 15, 9, 0), end: new Date(2026, 6, 15, 9, 15) },
+    ];
+    const { getByText } = render(
+      <Calendar
+        mode="day"
+        date={new Date(2026, 6, 15)}
+        events={quarter}
+        hourHeight={48}
+        minEventHeight={0}
+        eventGap={0}
+        renderTimeEvent={() => <div>Quarter</div>}
+      />,
+    );
+    const box = getByText("Quarter").parentElement as HTMLElement;
+    expect(box.style.height).toBe("12px");
+    expect(box.style.left).toBe("calc(0% + 0px)");
+    expect(box.style.width).toBe("calc(100% - 0px)");
+  });
+});

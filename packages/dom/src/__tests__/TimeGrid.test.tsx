@@ -1323,3 +1323,58 @@ describe("dom TimeGrid edge auto-advance", () => {
     }
   });
 });
+
+describe("dom TimeGrid event box sizing", () => {
+  // 15 minutes at 48px/hour is 12px, under the default 14px floor.
+  const quarter: CalendarEvent[] = [
+    { title: "Quarter", start: new Date(2026, 5, 26, 9, 0), end: new Date(2026, 5, 26, 9, 15) },
+  ];
+  const probe = () => {
+    const seen: number[] = [];
+    const ProbeEvent = ({ boxHeight }: { boxHeight?: number }) => {
+      if (boxHeight !== undefined) seen.push(boxHeight);
+      return <div>Quarter</div>;
+    };
+    return { ProbeEvent, seen };
+  };
+
+  it("floors a short event's box and boxHeight at 14px by default", () => {
+    const { ProbeEvent, seen } = probe();
+    const { getByText } = render(
+      <TimeGrid date={day} mode="day" events={quarter} hourHeight={48} renderEvent={ProbeEvent} />,
+    );
+    expect(getByText("Quarter").parentElement!.style.height).toBe("14px");
+    // The renderer may run more than once per mount; every call sees the floor.
+    expect(new Set(seen)).toEqual(new Set([14]));
+  });
+
+  it("minEventHeight lowers the floor so the box follows the duration", () => {
+    const { ProbeEvent, seen } = probe();
+    const { getByText } = render(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={quarter}
+        hourHeight={48}
+        renderEvent={ProbeEvent}
+        minEventHeight={0}
+      />,
+    );
+    expect(getByText("Quarter").parentElement!.style.height).toBe("12px");
+    expect(new Set(seen)).toEqual(new Set([12]));
+  });
+
+  it("insets the box by eventGap (default 1px) and lets 0 fill the column", () => {
+    const boxInset = (eventGap?: number) => {
+      const { getByText, unmount } = render(
+        <TimeGrid date={day} mode="day" events={events} hourHeight={48} eventGap={eventGap} />,
+      );
+      const { left, width } = wrapperOf(getByText("Focus")).style;
+      unmount();
+      return { left, width };
+    };
+    expect(boxInset()).toEqual({ left: "calc(0% + 1px)", width: "calc(100% - 2px)" });
+    expect(boxInset(0)).toEqual({ left: "calc(0% + 0px)", width: "calc(100% - 0px)" });
+    expect(boxInset(4)).toEqual({ left: "calc(0% + 4px)", width: "calc(100% - 8px)" });
+  });
+});

@@ -641,3 +641,89 @@ describe("TimeGrid slot styling", () => {
     expect(flat.color).toBe("tomato");
   });
 });
+
+describe("TimeGrid event box sizing", () => {
+  const date = new Date(2026, 0, 6, 12, 0, 0);
+  // 15 minutes at 48px/hour is 12px, well under the default 32px floor.
+  const quarter: CalendarEvent<WithId> = {
+    id: "quarter",
+    title: "Quarter",
+    start: new Date(2026, 0, 6, 9, 0, 0),
+    end: new Date(2026, 0, 6, 9, 15, 0),
+  };
+  const gridProps = () => ({
+    mode: "day" as const,
+    date,
+    events: [quarter],
+    cellHeight: { value: 48 } as never,
+    hourHeight: 48,
+    weekStartsOn: 1 as const,
+    keyExtractor: (item: CalendarEvent<WithId>) => item.id,
+    onChangeDate: noop,
+    onPressEvent: noop,
+  });
+  const probe = () => {
+    let observed: { value: number } | undefined;
+    const ProbeEvent = ({ boxHeight }: RenderEventArgs<WithId>) => {
+      observed = boxHeight;
+      return <Text>Quarter</Text>;
+    };
+    return { ProbeEvent, boxHeight: () => observed?.value };
+  };
+
+  it("floors a short event's boxHeight at 32px by default", () => {
+    const { ProbeEvent, boxHeight } = probe();
+    render(<TimeGrid {...gridProps()} renderEvent={ProbeEvent} />);
+    expect(boxHeight()).toBe(32);
+  });
+
+  it("minEventHeight lowers the floor so boxHeight follows the duration", () => {
+    const { ProbeEvent, boxHeight } = probe();
+    render(<TimeGrid {...gridProps()} renderEvent={ProbeEvent} minEventHeight={0} />);
+    expect(boxHeight()).toBe(12);
+  });
+
+  it("minEventHeight can raise the floor too", () => {
+    const { ProbeEvent, boxHeight } = probe();
+    render(<TimeGrid {...gridProps()} renderEvent={ProbeEvent} minEventHeight={40} />);
+    expect(boxHeight()).toBe(40);
+  });
+
+  it("insets the event box by eventGap (default 2) and lets 0 fill the slot", () => {
+    const boxPadding = (eventGap?: number) => {
+      const { UNSAFE_getAllByProps } = render(
+        <TimeGrid
+          {...gridProps()}
+          renderEvent={DefaultEvent}
+          classNames={{ event: "event-slot" }}
+          eventGap={eventGap}
+        />,
+      );
+      const [box] = UNSAFE_getAllByProps({ className: "event-slot" });
+      return (StyleSheet.flatten(box.props.style) as Record<string, unknown>).padding;
+    };
+    expect(boxPadding()).toBe(2);
+    expect(boxPadding(0)).toBe(0);
+    expect(boxPadding(6)).toBe(6);
+  });
+
+  it("Calendar forwards minEventHeight and eventGap to the grid", () => {
+    const { ProbeEvent, boxHeight } = probe();
+    const { UNSAFE_getAllByProps } = render(
+      <Calendar
+        mode="day"
+        date={date}
+        events={[quarter]}
+        renderEvent={ProbeEvent}
+        minEventHeight={0}
+        eventGap={0}
+        classNames={{ event: "event-slot" }}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    expect(boxHeight()).toBe(12);
+    const [box] = UNSAFE_getAllByProps({ className: "event-slot" });
+    expect((StyleSheet.flatten(box.props.style) as Record<string, unknown>).padding).toBe(0);
+  });
+});

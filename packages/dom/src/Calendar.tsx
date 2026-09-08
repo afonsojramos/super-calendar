@@ -115,6 +115,17 @@ export interface CalendarProps<T = unknown>
   ampm?: boolean;
   /** Initial pixels per hour. */
   hourHeight?: number;
+  /**
+   * Minimum pixel height of a timed event box, so short events stay legible and
+   * clickable. Also the floor of the `boxHeight` handed to `renderTimeEvent`.
+   * Default 14; pass 0 to size every box strictly by its duration.
+   */
+  minEventHeight?: number;
+  /**
+   * Inset in pixels between a timed event box and its column edges (each side).
+   * Default 1; pass 0 to let events fill their column.
+   */
+  eventGap?: number;
   /** Initial scroll position, in minutes from midnight. */
   scrollOffsetMinutes?: number;
   /** Sub-divisions per hour for the grid lines. */
@@ -310,6 +321,8 @@ export function Calendar<T = unknown>({
   // time grid
   ampm,
   hourHeight,
+  minEventHeight,
+  eventGap,
   scrollOffsetMinutes,
   timeslots,
   minHour,
@@ -493,6 +506,8 @@ export function Calendar<T = unknown>({
         styles={styles}
         ampm={ampm}
         hourHeight={hourHeight}
+        minEventHeight={minEventHeight}
+        eventGap={eventGap}
         scrollOffsetMinutes={scrollOffsetMinutes}
         timeslots={timeslots}
         minHour={minHour}

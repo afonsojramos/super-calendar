@@ -129,11 +129,13 @@ const DEFAULT_MIN_HOUR_HEIGHT = 32;
 const DEFAULT_MAX_HOUR_HEIGHT = 160;
 const DEFAULT_HOUR_COLUMN_WIDTH = 56;
 // Short events would otherwise render only a few pixels tall and clip their
-// content; keep them tall enough to stay legible and tappable.
-const MIN_EVENT_HEIGHT = 32;
+// content; keep them tall enough to stay legible and tappable. Overridable per
+// grid via `minEventHeight`.
+const DEFAULT_MIN_EVENT_HEIGHT = 32;
 // Inset each event box within its slot so adjacent boxes (and column edges) get a
-// little breathing room instead of butting edge-to-edge.
-const EVENT_GAP = 2;
+// little breathing room instead of butting edge-to-edge. Overridable per grid via
+// `eventGap`.
+const DEFAULT_EVENT_GAP = 2;
 // Hold this long before drag-to-create (sweeping empty grid space) begins on
 // native, so a normal scroll/tap isn't hijacked.
 const DRAG_ACTIVATE_MS = 300;
@@ -208,6 +210,7 @@ function MoveSpillPreview<T>({
   event,
   mode,
   renderEvent,
+  eventGap,
   slotProps,
 }: {
   spillHeight: SharedValue<number>;
@@ -220,6 +223,7 @@ function MoveSpillPreview<T>({
   event: CalendarEvent<T>;
   mode: CalendarMode;
   renderEvent: RenderEvent<T>;
+  eventGap: number;
   slotProps: ResolvedSlot<ViewStyle>;
 }): ReactElement {
   const RenderEventComponent = renderEvent;
@@ -246,7 +250,7 @@ function MoveSpillPreview<T>({
       style={[
         styles.eventBox,
         styles.nonInteractive,
-        { left: dayLeftPx, width: dayWidth, top: 0 },
+        { left: dayLeftPx, width: dayWidth, top: 0, padding: eventGap },
         slotProps.style,
         style,
       ]}
@@ -278,6 +282,7 @@ function DragGhost<T>({
   event,
   mode,
   renderEvent,
+  eventGap,
 }: {
   x: SharedValue<number>;
   y: SharedValue<number>;
@@ -287,6 +292,7 @@ function DragGhost<T>({
   event: CalendarEvent<T>;
   mode: CalendarMode;
   renderEvent: RenderEvent<T>;
+  eventGap: number;
 }): ReactElement {
   const RenderEventComponent = renderEvent;
   const style = useAnimatedStyle(() => ({
@@ -296,7 +302,10 @@ function DragGhost<T>({
     opacity: visible.value,
   }));
   return (
-    <Animated.View style={[styles.eventBox, styles.dragGhost, style]} pointerEvents="none">
+    <Animated.View
+      style={[styles.eventBox, styles.dragGhost, { padding: eventGap }, style]}
+      pointerEvents="none"
+    >
       <RenderEventComponent event={event} mode={mode} boxHeight={h} onPress={noop} />
     </Animated.View>
   );
@@ -341,6 +350,10 @@ type AnimatedEventBoxProps<T> = {
   daysPerPage: number;
   renderEvent: RenderEvent<T>;
   snapMinutes: number;
+  // Floor for the box's pixel height (and the `boxHeight` handed to renderEvent).
+  minEventHeight: number;
+  // Inset between the box and its slot, applied as border-box padding.
+  eventGap: number;
   onPress: (event: CalendarEvent<T>) => void;
   onLongPress?: (event: CalendarEvent<T>) => void;
   onDragEvent?: EventDragHandler<T>;
@@ -375,6 +388,8 @@ function AnimatedEventBox<T>({
   daysPerPage,
   renderEvent,
   snapMinutes,
+  minEventHeight,
+  eventGap,
   onPress,
   onLongPress,
   onDragEvent,
@@ -475,9 +490,9 @@ function AnimatedEventBox<T>({
     () =>
       Math.max(
         durationHours * cellHeight.value + resizeDelta.value - resizeStartDelta.value,
-        MIN_EVENT_HEIGHT,
+        minEventHeight,
       ),
-    [durationHours],
+    [durationHours, minEventHeight],
   );
 
   // The source segment may stop at midnight while the full event continues in
@@ -488,8 +503,8 @@ function AnimatedEventBox<T>({
     const top =
       (startHours - minHour) * cellHeight.value + moveOffset.value + resizeStartDelta.value;
     const dayEnd = (HOURS_PER_DAY - minHour) * cellHeight.value;
-    return Math.max(Math.min(boxHeight.value, dayEnd - top), MIN_EVENT_HEIGHT);
-  }, [startHours, minHour]);
+    return Math.max(Math.min(boxHeight.value, dayEnd - top), minEventHeight);
+  }, [startHours, minHour, minEventHeight]);
 
   const boxStyle = useAnimatedStyle(() => {
     // A top-edge resize pushes the box down and shortens it (start moves later).
@@ -985,7 +1000,7 @@ function AnimatedEventBox<T>({
     : undefined;
 
   const eventSlot = slot("event", {
-    base: [styles.eventBox, { left, width }],
+    base: [styles.eventBox, { left, width, padding: eventGap }],
     themed: theme.containers.timeGridEvent,
   });
   const box = (
@@ -1047,6 +1062,7 @@ function AnimatedEventBox<T>({
           event={positioned.event}
           mode={mode}
           renderEvent={renderEvent}
+          eventGap={eventGap}
           slotProps={slot("event", { themed: theme.containers.timeGridEvent })}
         />
       ) : null}
@@ -1264,6 +1280,8 @@ type TimetablePageProps<T> = {
   renderEvent: RenderEvent<T>;
   keyExtractor: EventKeyExtractor<T>;
   snapMinutes: number;
+  minEventHeight: number;
+  eventGap: number;
   showDragHandle: boolean;
   eventStartEditable: boolean;
   eventDurationEditable: boolean;
@@ -1321,6 +1339,8 @@ function TimetablePageInner<T>({
   renderEvent,
   keyExtractor,
   snapMinutes,
+  minEventHeight,
+  eventGap,
   showDragHandle,
   eventStartEditable,
   eventDurationEditable,
@@ -1679,7 +1699,7 @@ function TimetablePageInner<T>({
   }));
 
   const ghostSlot = slot("createGhost", {
-    base: [styles.createGhost, { pointerEvents: "none" }],
+    base: [styles.createGhost, { marginHorizontal: eventGap, pointerEvents: "none" }],
     themed: {
       backgroundColor: theme.colors.eventBackground,
       borderColor: theme.colors.todayBackground,
@@ -1900,6 +1920,8 @@ function TimetablePageInner<T>({
                       daysPerPage={daysPerPage}
                       renderEvent={renderEvent}
                       snapMinutes={snapMinutes}
+                      minEventHeight={minEventHeight}
+                      eventGap={eventGap}
                       showDragHandle={showDragHandle}
                       eventStartEditable={eventStartEditable}
                       eventDurationEditable={eventDurationEditable}
@@ -1923,6 +1945,8 @@ function TimetablePageInner<T>({
                 minHour={minHour}
                 mode={mode}
                 renderEvent={renderEvent}
+                minEventHeight={minEventHeight}
+                eventGap={eventGap}
               />
             ) : null}
 
@@ -2048,6 +2072,18 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   isRTL?: boolean;
   minHourHeight?: number;
   maxHourHeight?: number;
+  /**
+   * Minimum pixel height of a timed event box, so short events stay legible and
+   * tappable. Also the floor of the `boxHeight` handed to `renderEvent`. Default
+   * 32; pass 0 to size every box strictly by its duration.
+   */
+  minEventHeight?: number;
+  /**
+   * Inset in pixels between a timed event box and its slot (each side), so
+   * adjacent boxes and column edges get some breathing room. Default 2; pass 0
+   * to let events fill their slot.
+   */
+  eventGap?: number;
   showNowIndicator?: boolean;
   locale?: Locale;
   freeSwipe?: boolean;
@@ -2128,6 +2164,8 @@ function TimeGridInner<T>({
   isRTL = false,
   minHourHeight = DEFAULT_MIN_HOUR_HEIGHT,
   maxHourHeight = DEFAULT_MAX_HOUR_HEIGHT,
+  minEventHeight = DEFAULT_MIN_EVENT_HEIGHT,
+  eventGap = DEFAULT_EVENT_GAP,
   showNowIndicator = true,
   locale,
   freeSwipe = false,
@@ -2618,6 +2656,8 @@ function TimeGridInner<T>({
           renderEvent={labeledRenderEvent}
           keyExtractor={keyExtractor}
           snapMinutes={Math.max(1, dragStepMinutes)}
+          minEventHeight={minEventHeight}
+          eventGap={eventGap}
           showDragHandle={showDragHandle}
           eventStartEditable={eventStartEditable}
           eventDurationEditable={eventDurationEditable}
@@ -2668,6 +2708,8 @@ function TimeGridInner<T>({
       labeledRenderEvent,
       keyExtractor,
       dragStepMinutes,
+      minEventHeight,
+      eventGap,
       showDragHandle,
       eventStartEditable,
       eventDurationEditable,
@@ -2778,6 +2820,7 @@ function TimeGridInner<T>({
                 event={liftedEvent}
                 mode={mode}
                 renderEvent={labeledRenderEvent}
+                eventGap={eventGap}
               />
             ) : null}
           </View>
@@ -3019,7 +3062,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     borderRadius: 6,
     borderWidth: StyleSheet.hairlineWidth,
-    marginHorizontal: EVENT_GAP,
   },
   weekendColumn: {
     position: "absolute",
@@ -3079,12 +3121,11 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     opacity: 0.4,
   },
+  // The `eventGap` inset is applied inline as border-box padding, so the visible
+  // box (the flex child) sits inside the slot without touching its geometry.
   eventBox: {
     position: "absolute",
     overflow: "hidden",
-    // Border-box padding insets the visible box (the flex child) on all sides,
-    // giving a small gap without touching the slot geometry above.
-    padding: EVENT_GAP,
   },
   // The cross-week drag ghost: pinned to the pager's top-left, moved into place by
   // its transform, and floated above every page so it stays visible across a page.

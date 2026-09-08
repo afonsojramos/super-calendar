@@ -217,6 +217,17 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   hourHeight?: number;
   minHourHeight?: number;
   maxHourHeight?: number;
+  /**
+   * Minimum pixel height of a timed event box on the week/day grid, so short
+   * events stay legible and tappable. Also the floor of the `boxHeight` handed to
+   * `renderEvent`. Default 32; pass 0 to size every box strictly by its duration.
+   */
+  minEventHeight?: number;
+  /**
+   * Inset in pixels between a timed event box and its slot on the week/day grid
+   * (each side). Default 2; pass 0 to let events fill their slot.
+   */
+  eventGap?: number;
   hourColumnWidth?: number;
   /** Hide the left hour-axis column on the week/day grid. Default false. */
   hideHours?: boolean;
@@ -451,6 +462,8 @@ export function Calendar<T>({
   hourHeight = DEFAULT_HOUR_HEIGHT,
   minHourHeight,
   maxHourHeight,
+  minEventHeight,
+  eventGap,
   hourColumnWidth,
   hideHours,
   timeslots,
@@ -709,6 +722,8 @@ export function Calendar<T>({
           ampm={ampm}
           minHourHeight={minHourHeight}
           maxHourHeight={maxHourHeight}
+          minEventHeight={minEventHeight}
+          eventGap={eventGap}
           showNowIndicator={showNowIndicator}
           locale={locale}
           activeDate={activeDate}
