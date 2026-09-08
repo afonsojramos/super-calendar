@@ -32,10 +32,11 @@ type PreviewProps<T> = {
   minHour: number;
   mode: CalendarMode;
   renderEvent: RenderEvent<T>;
+  minEventHeight: number;
+  eventGap: number;
 };
 
 const noop = () => {};
-const MIN_EVENT_HEIGHT = 32;
 
 // Mount once on grab. Only numbers and shared values cross to the UI thread;
 // moving the pointer does not rerender the page or rebuild its gestures.
@@ -65,6 +66,8 @@ function PreviewDay<T>({
   minHour,
   mode,
   renderEvent: RenderEventComponent,
+  minEventHeight,
+  eventGap,
   dayOffsets,
   index,
   dayStart,
@@ -99,10 +102,12 @@ function PreviewDay<T>({
       continuesAfter: end > dayEnd,
     };
   }, [dayWidth, dayIndex, dayOffsets, startTimestamp, duration, dayStart, dayEnd]);
-  const boxHeight = useDerivedValue(() =>
-    segment.value.hours > 0
-      ? Math.max(segment.value.hours * cellHeight.value, MIN_EVENT_HEIGHT)
-      : 0,
+  const boxHeight = useDerivedValue(
+    () =>
+      segment.value.hours > 0
+        ? Math.max(segment.value.hours * cellHeight.value, minEventHeight)
+        : 0,
+    [minEventHeight],
   );
   const style = useAnimatedStyle(
     () => ({
@@ -143,7 +148,7 @@ function PreviewDay<T>({
         {
           position: "absolute",
           overflow: "hidden",
-          padding: 2,
+          padding: eventGap,
           left: hourColumnWidth + index * dayWidth,
           width: dayWidth,
           zIndex: 100,
