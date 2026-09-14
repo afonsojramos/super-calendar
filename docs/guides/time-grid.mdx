@@ -10,7 +10,9 @@ description: The week, day, 3-day, and custom hour-by-hour views.
 
 `mode="week"`, `day`, `3days`, and `custom` all render the time grid: one
 column per day, hours down the side, events as positioned boxes, and an all-day
-lane on top. `week` pages by the calendar week (set `weekStartsOn`: 0 = Sunday,
+lane on top. On React Native the day header and the all-day lane page with the
+columns while the hour column stays fixed on the left, so the whole grid moves as
+one when you swipe. `week` pages by the calendar week (set `weekStartsOn`: 0 = Sunday,
 1 = Monday, and so on); `day` and `3days` page by their column count; [`custom`](/guides/views#custom-day-counts) renders any slice you
 choose.
 
@@ -70,9 +72,10 @@ A timed event's box is sized to its duration, with two guards you can tune:
 ## The all-day lane
 
 All-day events (flagged `allDay`, or spanning midnight-to-midnight) leave the
-timed columns and stack in a lane above the grid. On React Native the lane shows
-the active page's days, like the day header, and stays pinned above the grid while
-you scroll the hours. Turn it off with `showAllDayEventCell={false}`.
+timed columns and stack in a lane above the grid. On React Native the lane pages
+with the day columns and stays pinned above the hours while you scroll. It is
+always shown, at least one row tall, and its height follows the week under it as
+you swipe. Turn it off with `showAllDayEventCell={false}`.
 
 ## Now line and business hours
 
@@ -130,11 +133,13 @@ Three `Calendar` props customize the area above the grid; all are native-only
 [slots](/guides/styling) instead).
 
 - `renderTimeGridHeader={(days: Date[]) => ReactNode}` **replaces** the built-in
-  day-header row: the week-number gutter and the tappable weekday/date buttons
-  disappear, and your element renders full-width in their place. `days` is the
-  visible page's dates in column order. The all-day lane and the grid itself
-  stay. To line your columns up with the grid's, leave a leading spacer as wide
-  as the hour gutter (`hourColumnWidth`, default 56, or 0 with `hideHours`).
+  day-header row with a single fixed header above the grid (it does not page).
+  The week-number gutter and the tappable weekday/date buttons disappear, and
+  your element renders full-width in their place. `days` is the visible page's
+  dates in column order. The all-day lane and the grid itself stay. To line your
+  columns up with the grid's, leave a leading spacer as wide as the hour gutter
+  (`hourColumnWidth`, default 56, or 0 with `hideHours`). The built-in header,
+  by contrast, pages with the columns.
 - `headerComponent={<YourToolbar />}` **inserts** an element, unchanged,
   between the day-header row and the grid. It takes no arguments and replaces
   nothing; the built-in header stays above it, and it doesn't scroll with the
