@@ -140,10 +140,11 @@ Three `Calendar` props customize the area above the grid; all are native-only
   columns up with the grid's, leave a leading spacer as wide as the hour gutter
   (`hourColumnWidth`, default 56, or 0 with `hideHours`). The built-in header,
   by contrast, pages with the columns.
-- `headerComponent={<YourToolbar />}` **inserts** an element, unchanged,
-  between the day-header row and the grid. It takes no arguments and replaces
-  nothing; the built-in header stays above it, and it doesn't scroll with the
-  hours. Use it for a filter row, an avatar strip, or your own toolbar.
+- `headerComponent={<YourToolbar />}` **inserts** an element, unchanged, above
+  the grid. It takes no arguments and replaces nothing, and it doesn't scroll
+  with the hours. The built-in day header now pages with the columns, so
+  `headerComponent` sits above that paged weekday/date row. Use it for a filter
+  row, an avatar strip, or your own toolbar.
 - `renderHeaderForMonthView={(weekDays: Date[]) => ReactNode}` is the month-grid
   equivalent of `renderTimeGridHeader`: it replaces the weekday-label header;
   return `null` to hide it.

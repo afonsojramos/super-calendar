@@ -98,8 +98,8 @@ Differences from the web renderer:
 - **Event chips and cards are `renderEvent`'s job.** To restyle them with Tailwind,
   pass your own `renderEvent` (or `renderMonthEvent` etc.) built from classed
   components.
-- **Animated slots.** `gridLines`, `businessHours`, `weekendShade`, `daySeparator`,
-  `event`, `nowIndicator`, and `createGhost` render as Reanimated
+- **Animated slots.** `businessHours`, `weekendShade`, `daySeparator`, `event`,
+  `nowIndicator`, and `createGhost` render as Reanimated
   views. Their `styles` overrides always apply; whether `className` resolves there
   depends on your runtime's support for Animated components.
 - **Pass stable references.** Define the `classNames` / `styles` maps at module scope
@@ -175,7 +175,9 @@ Native's `TimeGrid` supports `header`, `weekNumber`, `columnHeader`,
 `columnHeaderWeekday`, `columnHeaderDate`, `columnHeaderDateText`, the `allDay*`
 slots, `hourGutter`, `hourLabel`, `gridLines`, `businessHours`, `backgroundEvent`,
 `weekendShade`, `daySeparator`,
-`event`, `nowIndicator`, and `createGhost`.
+`event`, `nowIndicator`, and `createGhost`. The day-header row is a fixed 56px
+tall so the columns, the all-day band, and the hour column line up; keep custom
+`columnHeader` content within that height.
 
 | Slot                  | Element                                   |
 | --------------------- | ----------------------------------------- |
