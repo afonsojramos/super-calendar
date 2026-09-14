@@ -93,13 +93,13 @@ Differences from the web renderer:
 - **Slot names differ where the structure does.** Native adds text slots
   (`dayBadgeText`, `columnHeaderDateText`) because text colour doesn't inherit from a
   parent view, plus `weekendShade` and `daySeparator` for layers the dom styles
-  through `dayColumn`. It omits dom-only slots (`hourGutter`, `dayColumn`, `events`,
-  `chipButton`, `chip`, `eventBox`).
+  through `dayColumn`. It omits dom-only slots (`dayColumn`, `events`, `chipButton`,
+  `chip`, `eventBox`).
 - **Event chips and cards are `renderEvent`'s job.** To restyle them with Tailwind,
   pass your own `renderEvent` (or `renderMonthEvent` etc.) built from classed
   components.
-- **Animated slots.** `gridLines` sub-hour dividers, `businessHours`, `weekendShade`,
-  `daySeparator`, `event`, `nowIndicator`, and `createGhost` render as Reanimated
+- **Animated slots.** `gridLines`, `businessHours`, `weekendShade`, `daySeparator`,
+  `event`, `nowIndicator`, and `createGhost` render as Reanimated
   views. Their `styles` overrides always apply; whether `className` resolves there
   depends on your runtime's support for Animated components.
 - **Pass stable references.** Define the `classNames` / `styles` maps at module scope
@@ -173,7 +173,8 @@ Native's `MonthView` supports `title`, `weekdays`, `weekday`, `grid`, `week`, `d
 
 Native's `TimeGrid` supports `header`, `weekNumber`, `columnHeader`,
 `columnHeaderWeekday`, `columnHeaderDate`, `columnHeaderDateText`, the `allDay*`
-slots, `hourLabel`, `gridLines`, `businessHours`, `backgroundEvent`, `weekendShade`, `daySeparator`,
+slots, `hourGutter`, `hourLabel`, `gridLines`, `businessHours`, `backgroundEvent`,
+`weekendShade`, `daySeparator`,
 `event`, `nowIndicator`, and `createGhost`.
 
 | Slot                  | Element                                   |

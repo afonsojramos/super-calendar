@@ -34,6 +34,9 @@ choose.
 - `timeslots` — sub-hour divider lines per hour (e.g. `2` for half-hours).
 - `ampm` — 12-hour labels; `hourComponent` replaces the label entirely.
 - `hideHours` — collapse the hour gutter (the grid lines stay).
+- The hour column is a single column beside the day columns, in the same
+  scroll view, so it scrolls and zooms with them and holds still while you
+  swipe between pages. Style it through the `hourGutter` [slot](/guides/styling).
 - `showWeekNumber` / `weekNumberPrefix` — ISO week number in the header gutter.
 - `hiddenDays` — weekdays (0=Sunday…6=Saturday) dropped from the view, e.g.
   `[0, 6]` for a Monday–Friday business week. Count-based views keep their
@@ -67,8 +70,9 @@ A timed event's box is sized to its duration, with two guards you can tune:
 ## The all-day lane
 
 All-day events (flagged `allDay`, or spanning midnight-to-midnight) leave the
-timed columns and stack in a lane above the grid. Turn it off with
-`showAllDayEventCell={false}`.
+timed columns and stack in a lane above the grid. On React Native the lane shows
+the active page's days, like the day header, and stays pinned above the grid while
+you scroll the hours. Turn it off with `showAllDayEventCell={false}`.
 
 ## Now line and business hours
 

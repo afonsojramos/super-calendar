@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render, within } from "@testing-library/react-native";
 import { Dimensions, StyleSheet, Text } from "react-native";
 import type { CalendarEvent, RenderEventArgs } from "../../types";
 
@@ -725,5 +725,183 @@ describe("TimeGrid event box sizing", () => {
     expect(boxHeight()).toBe(12);
     const [box] = UNSAFE_getAllByProps({ className: "event-slot" });
     expect((StyleSheet.flatten(box.props.style) as Record<string, unknown>).padding).toBe(0);
+  });
+});
+
+describe("TimeGrid hour column", () => {
+  const date = new Date(2026, 0, 6, 12, 0, 0);
+  const gridProps = () => ({
+    mode: "week" as const,
+    date,
+    events: [event],
+    cellHeight: { value: 48 } as never,
+    weekStartsOn: 1 as const,
+    renderEvent: DefaultEvent,
+    keyExtractor: (_e: CalendarEvent<WithId>, i: number) => String(i),
+    onChangeDate: noop,
+    onPressEvent: noop,
+  });
+  const flat = (node: { props: Record<string, unknown> }) =>
+    (StyleSheet.flatten(node.props.style as never) ?? {}) as Record<string, unknown>;
+  const isHost = (node: { type: unknown }) => typeof node.type === "string";
+  // The nearest ancestor positioned by the grid (its style carries a `top`).
+  type Positioned = { props: Record<string, unknown>; parent: Positioned | null };
+  const rowOf = (node: Positioned) => {
+    let current: Positioned | null = node;
+    while (current && flat(current).top === undefined) current = current.parent;
+    return current!;
+  };
+
+  it("draws the hour labels once, in the column beside the pager", () => {
+    const { getByTestId, getAllByText } = render(<TimeGrid {...gridProps()} />);
+    const gutter = getByTestId("hour-gutter");
+    expect(getAllByText("06:00")).toHaveLength(1);
+    expect(within(gutter).getAllByText("06:00")).toHaveLength(1);
+    expect(flat(gutter).width).toBe(56);
+  });
+
+  it("renders hourComponent in the hour column only", () => {
+    const { getByTestId, getAllByText } = render(
+      <TimeGrid {...gridProps()} hourComponent={(hour) => <Text>{`custom-${hour}`}</Text>} />,
+    );
+    expect(getAllByText("custom-6")).toHaveLength(1);
+    expect(within(getByTestId("hour-gutter")).getAllByText("custom-6")).toHaveLength(1);
+  });
+
+  it("renders no hour column, and no labels, when hours are hidden", () => {
+    const { queryByTestId, queryByText } = render(<TimeGrid {...gridProps()} hideHours />);
+    expect(queryByTestId("hour-gutter")).toBeNull();
+    expect(queryByText("06:00")).toBeNull();
+  });
+
+  it("lays the day columns out from the pager's left edge", () => {
+    const { UNSAFE_getAllByProps } = render(
+      <TimeGrid {...gridProps()} classNames={{ event: "event-slot" }} />,
+    );
+    const [box] = UNSAFE_getAllByProps({ className: "event-slot" });
+    // Tuesday is the second column of a Monday-start week; the hour column sits
+    // outside the pager, so the columns share the remaining width.
+    expect(flat(box).left).toBeCloseTo((Dimensions.get("window").width - 56) / 7);
+  });
+
+  it("keeps every hour line inside the page and none in the hour column", () => {
+    const { UNSAFE_getAllByProps, getByTestId } = render(
+      <TimeGrid {...gridProps()} classNames={{ gridLines: "grid-line" }} />,
+    );
+    expect(UNSAFE_getAllByProps({ className: "grid-line" }).filter(isHost)).toHaveLength(24);
+    expect(
+      within(getByTestId("hour-gutter")).UNSAFE_queryAllByProps({ className: "grid-line" }),
+    ).toHaveLength(0);
+  });
+
+  it("starts the labels and the lines from the same origin in a windowed grid", () => {
+    const { getByTestId, getAllByText, queryByText, UNSAFE_getAllByProps } = render(
+      <TimeGrid {...gridProps()} minHour={7} maxHour={20} classNames={{ gridLines: "line" }} />,
+    );
+    // 13 labels, 07:00 first at the top of the column and 06:00 absent.
+    expect(within(getByTestId("hour-gutter")).getAllByText(/^\d\d:00$/)).toHaveLength(13);
+    expect(queryByText("06:00")).toBeNull();
+    expect(flat(rowOf(getAllByText("07:00")[0])).top).toBe(0);
+    const [firstLine] = UNSAFE_getAllByProps({ className: "line" }).filter(isHost);
+    expect(flat(firstLine).top).toBe(0);
+    // The one hour window sizes both the row and the page: 13 rows of 48px.
+    expect(flat(getByTestId("time-grid-hours")).height).toBe(13 * 48);
+    expect(flat(getByTestId("time-grid-page")).height).toBe(13 * 48);
+  });
+
+  it("starts the first column at the pager's left edge when hours are hidden", () => {
+    const { UNSAFE_getAllByProps } = render(
+      <TimeGrid {...gridProps()} hideHours classNames={{ event: "event-slot" }} />,
+    );
+    const [box] = UNSAFE_getAllByProps({ className: "event-slot" });
+    expect(flat(box).left).toBeCloseTo(Dimensions.get("window").width / 7);
+  });
+
+  it("styles the hour column through the hourGutter slot", () => {
+    const { getByTestId } = render(
+      <TimeGrid {...gridProps()} styles={{ hourGutter: { backgroundColor: "white" } }} />,
+    );
+    expect(flat(getByTestId("hour-gutter")).backgroundColor).toBe("white");
+  });
+
+  it("scrolls the hour column and the pages in one seeded scroll view", () => {
+    const { UNSAFE_getAllByProps } = render(
+      <TimeGrid {...gridProps()} hourHeight={48} scrollOffsetMinutes={8 * 60} />,
+    );
+    const scrollers = UNSAFE_getAllByProps({ scrollEventThrottle: 16 }).filter(isHost);
+    expect(scrollers).toHaveLength(1);
+    expect(scrollers[0].props.contentOffset).toEqual({ x: 0, y: 384 });
+    const scroller = within(scrollers[0]);
+    expect(scroller.getByTestId("hour-gutter")).toBeTruthy();
+    expect(scroller.getAllByLabelText(/Standup/)).toHaveLength(1);
+  });
+
+  it("pins the all-day lane above the scroll view, once for the active page", () => {
+    const trip: CalendarEvent<WithId> = {
+      id: "trip",
+      title: "Trip",
+      start: new Date(2026, 0, 6),
+      end: new Date(2026, 0, 7),
+      allDay: true,
+    };
+    const { UNSAFE_getAllByProps, getAllByLabelText } = render(
+      <TimeGrid {...gridProps()} events={[event, trip]} />,
+    );
+    expect(getAllByLabelText(/Trip/)).toHaveLength(1);
+    const [scroller] = UNSAFE_getAllByProps({ scrollEventThrottle: 16 }).filter(isHost);
+    expect(within(scroller).queryAllByLabelText(/Trip/)).toHaveLength(0);
+  });
+});
+
+describe("TimeGrid cross-week drop", () => {
+  beforeEach(() => {
+    const gestureHandler = require("react-native-gesture-handler") as { __gestures: unknown[] };
+    gestureHandler.__gestures.length = 0;
+    animatedReactionHarness().__reactions.length = 0;
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("maps the lifted ghost's pager-local position to a day column and time", () => {
+    const onDragEvent = jest.fn();
+    const onChangeDate = jest.fn();
+    render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        hourHeight={48}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={onChangeDate}
+        onPressEvent={noop}
+        onDragEvent={onDragEvent}
+      />,
+    );
+    const move = moveGestureHarness();
+    // Grab the box 10px in, then hold the finger inside the pager's right edge zone.
+    act(() => {
+      move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 });
+      move.onUpdate?.({ translationX: 520, translationY: 0, absoluteX: 720, absoluteY: 694 });
+    });
+    // The edge dwell lifts the event into the floating ghost and pages the view.
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(onChangeDate).toHaveBeenCalledWith(new Date(2026, 0, 12));
+    act(() => {
+      move.onFinalize?.({}, true);
+    });
+    // The ghost's left edge is 710px into the pager (past the last of seven
+    // columns, so clamped to Sunday) and its top 672px down the grid: the pager's
+    // top is the viewport top plus the 12px label inset, and 672px is 14 rows.
+    expect(onDragEvent).toHaveBeenCalledTimes(1);
+    const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent<WithId>, Date, Date];
+    expect(start).toEqual(new Date(2026, 0, 11, 14, 0));
+    expect(end).toEqual(new Date(2026, 0, 11, 15, 0));
   });
 });

@@ -28,7 +28,6 @@ type PreviewProps<T> = {
   days: Date[];
   cellHeight: SharedValue<number>;
   dayWidth: number;
-  hourColumnWidth: number;
   minHour: number;
   mode: CalendarMode;
   renderEvent: RenderEvent<T>;
@@ -62,7 +61,6 @@ function PreviewDay<T>({
   move,
   cellHeight,
   dayWidth,
-  hourColumnWidth,
   minHour,
   mode,
   renderEvent: RenderEventComponent,
@@ -149,7 +147,7 @@ function PreviewDay<T>({
           position: "absolute",
           overflow: "hidden",
           padding: eventGap,
-          left: hourColumnWidth + index * dayWidth,
+          left: index * dayWidth,
           width: dayWidth,
           zIndex: 100,
         },

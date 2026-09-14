@@ -44,7 +44,6 @@ import {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
-  scrollTo,
   type SharedValue,
   useAnimatedReaction,
   useAnimatedRef,
@@ -173,8 +172,10 @@ const EDGE_ZONE_PX = 36;
 type EdgePaging = {
   // Pager frame in window space, so the worklet can find the edges and place the
   // ghost (its top-left is the window origin the finger coords are relative to).
+  // The pager scrolls with the grid, so its top is derived live from the scroll
+  // viewport's top and the current offset.
   pagerLeft: SharedValue<number>;
-  pagerTop: SharedValue<number>;
+  pagerTop: ReturnType<typeof useDerivedValue<number>>;
   pagerWidth: SharedValue<number>;
   lockScroll: (locked: boolean) => void;
   // The floating "held" copy of the dragged event: pager-local top-left, size, and
@@ -184,8 +185,8 @@ type EdgePaging = {
   ghostW: SharedValue<number>;
   ghostH: SharedValue<number>;
   ghostVisible: SharedValue<number>;
-  // Show the ghost for `event`, then drop it at pager-local `ghostLocalX` shifted
-  // in time by `minuteDelta` (clearing the ghost either way).
+  // Show the ghost for `event`, then drop it at its pager-local top-left
+  // (clearing the ghost either way).
   beginLift: (event: CalendarEvent<unknown>) => void;
   commitLiftedDrop: (ghostLocalX: number, minuteDelta: number) => void;
 };
@@ -1073,58 +1074,59 @@ function AnimatedEventBox<T>({
 /** Replace the hour-axis label. Receives the hour (0–23) and the `ampm` flag. */
 export type HourRenderer = (hour: number, ampm: boolean) => React.ReactNode;
 
-type HourRowProps = {
+// The hours (rows/labels) visible in the window [minHour, maxHour).
+const hourRange = (minHour: number, maxHour: number) =>
+  Array.from({ length: maxHour - minHour }, (_, index) => minHour + index);
+
+type HourLabelProps = {
   hour: number;
-  minHour: number;
-  cellHeight: SharedValue<number>;
-  hourColumnWidth: number;
+  width: number;
   label: string;
   ampm: boolean;
   hourComponent?: HourRenderer;
 };
 
-const HourRow = ({
-  hour,
-  minHour,
-  cellHeight,
-  hourColumnWidth,
-  label,
-  ampm,
-  hourComponent,
-}: HourRowProps) => {
+// The hour-axis label: the consumer's `hourComponent`, or the themed text.
+const HourLabel = ({ hour, width, label, ampm, hourComponent }: HourLabelProps) => {
+  const theme = useCalendarTheme();
+  const slot = useSlots<TimeGridSlot>();
+  return hourComponent ? (
+    <View style={{ width }}>{hourComponent(hour, ampm)}</View>
+  ) : (
+    <Text
+      {...slot<TextStyle>("hourLabel", {
+        base: [styles.hourLabel, { width }],
+        themed: [theme.text.hourLabel, { color: theme.colors.textMuted }],
+      })}
+      allowFontScaling={false}
+    >
+      {label}
+    </Text>
+  );
+};
+
+type HourLineProps = {
+  hour: number;
+  minHour: number;
+  cellHeight: SharedValue<number>;
+};
+
+// The grid line across the day columns at the top of one hour row.
+const HourLine = ({ hour, minHour, cellHeight }: HourLineProps) => {
   const theme = useCalendarTheme();
   const slot = useSlots<TimeGridSlot>();
   // Position via `top` (a layout prop), not a transform. The per-row layout pass
-  // as cellHeight animates keeps the ScrollView's content size in sync while
-  // zooming; a transform is composited and leaves the scroll range stale.
+  // as cellHeight animates keeps the scroll content's size in sync while zooming;
+  // a transform is composited and leaves the scroll range stale.
   const animatedStyle = useAnimatedStyle(
     () => ({ top: (hour - minHour) * cellHeight.value }),
     [hour, minHour],
   );
-
-  return (
-    <Animated.View style={[styles.hourRow, styles.nonInteractive, animatedStyle]}>
-      {hourComponent ? (
-        <View style={{ width: hourColumnWidth }}>{hourComponent(hour, ampm)}</View>
-      ) : (
-        <Text
-          {...slot<TextStyle>("hourLabel", {
-            base: [styles.hourLabel, { width: hourColumnWidth }],
-            themed: [theme.text.hourLabel, { color: theme.colors.textMuted }],
-          })}
-          allowFontScaling={false}
-        >
-          {label}
-        </Text>
-      )}
-      <View
-        {...slot("gridLines", {
-          base: styles.hourLine,
-          themed: { backgroundColor: theme.colors.gridLine },
-        })}
-      />
-    </Animated.View>
-  );
+  const lineSlot = slot("gridLines", {
+    base: [styles.hourLine, styles.nonInteractive],
+    themed: { backgroundColor: theme.colors.gridLine },
+  });
+  return <Animated.View {...lineSlot} style={[lineSlot.style, animatedStyle]} />;
 };
 
 type TimeslotLineProps = {
@@ -1132,17 +1134,10 @@ type TimeslotLineProps = {
   minHour: number;
   fraction: number;
   cellHeight: SharedValue<number>;
-  hourColumnWidth: number;
 };
 
 // A faint divider inside an hour row, marking a sub-hour slot (e.g. half hours).
-const TimeslotLine = ({
-  hour,
-  minHour,
-  fraction,
-  cellHeight,
-  hourColumnWidth,
-}: TimeslotLineProps) => {
+const TimeslotLine = ({ hour, minHour, fraction, cellHeight }: TimeslotLineProps) => {
   const theme = useCalendarTheme();
   const slot = useSlots<TimeGridSlot>();
   const animatedStyle = useAnimatedStyle(
@@ -1150,11 +1145,90 @@ const TimeslotLine = ({
     [hour, minHour, fraction],
   );
   const lineSlot = slot("gridLines", {
-    base: [styles.timeslotLine, styles.nonInteractive, { left: hourColumnWidth }],
+    base: [styles.timeslotLine, styles.nonInteractive],
     themed: { backgroundColor: theme.colors.gridLine },
   });
   return <Animated.View {...lineSlot} style={[lineSlot.style, animatedStyle]} />;
 };
+
+type HourGutterRowProps = {
+  hour: number;
+  minHour: number;
+  cellHeight: SharedValue<number>;
+  width: number;
+  label: string;
+  ampm: boolean;
+  hourComponent?: HourRenderer;
+};
+
+// One label row of the hour column, at the same `top` as the pages' hour line.
+const HourGutterRow = ({
+  hour,
+  minHour,
+  cellHeight,
+  width,
+  label,
+  ampm,
+  hourComponent,
+}: HourGutterRowProps) => {
+  const animatedStyle = useAnimatedStyle(
+    () => ({ top: (hour - minHour) * cellHeight.value }),
+    [hour, minHour],
+  );
+  return (
+    <Animated.View style={[styles.hourRow, styles.nonInteractive, animatedStyle]}>
+      <HourLabel
+        hour={hour}
+        width={width}
+        label={label}
+        ampm={ampm}
+        hourComponent={hourComponent}
+      />
+    </Animated.View>
+  );
+};
+
+type HourGutterProps = {
+  width: number;
+  minHour: number;
+  maxHour: number;
+  cellHeight: SharedValue<number>;
+  ampm: boolean;
+  hourComponent?: HourRenderer;
+};
+
+// The hour-axis column beside the pager. It is part of the grid's one vertical
+// scroll content, so it scrolls and zooms with the pages and holds still while
+// they swipe.
+const HourGutterInner = ({
+  width,
+  minHour,
+  maxHour,
+  cellHeight,
+  ampm,
+  hourComponent,
+}: HourGutterProps) => {
+  const slot = useSlots<TimeGridSlot>();
+  const hours = useMemo(() => hourRange(minHour, maxHour), [minHour, maxHour]);
+  return (
+    <View testID="hour-gutter" {...slot("hourGutter", { base: { width } })}>
+      {hours.map((hour) => (
+        <HourGutterRow
+          key={hour}
+          hour={hour}
+          minHour={minHour}
+          cellHeight={cellHeight}
+          width={width}
+          label={formatHour(hour, { ampm })}
+          ampm={ampm}
+          hourComponent={hourComponent}
+        />
+      ))}
+    </View>
+  );
+};
+
+const HourGutter = memo(HourGutterInner);
 
 type NowIndicatorProps = {
   cellHeight: SharedValue<number>;
@@ -1244,38 +1318,23 @@ type TimetablePageProps<T> = {
   date: Date;
   events: CalendarEvent<T>[];
   cellHeight: SharedValue<number>;
-  hourHeight: number;
   // The zoom committed at the end of the last pinch. Off-screen pages animate off
   // this (it changes once per gesture) instead of the live cellHeight (which
   // changes every frame), so a pinch only re-runs the visible page's worklets.
   committedCellHeight: SharedValue<number>;
-  scrollY: SharedValue<number>;
   isActive: boolean;
-  /** Initial vertical scroll position (px): the live shared offset, so a page that
-   * mounts after a scroll appears there rather than snapping from the default. */
-  initialScrollY: number;
-  /** Record the rested vertical offset (px) so later-mounted pages seed from it. */
-  onSettleOffset: (y: number) => void;
   weekStartsOn: WeekStartsOn;
   weekEndsOn?: WeekStartsOn;
-  /** Full grid width (hour gutter + day columns). Comes from the container, not the window. */
+  /** Width of the day columns: the pager's width (the hour column sits beside it). */
   width: number;
-  hourColumnWidth: number;
   minHour: number;
   maxHour: number;
-  ampm: boolean;
   timeslots: number;
   isRTL: boolean;
-  showAllDayEventCell: boolean;
   highlightWeekends: boolean;
-  showVerticalScrollIndicator: boolean;
-  verticalScrollEnabled: boolean;
-  hourComponent?: HourRenderer;
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
   businessHours?: BusinessHours;
   renderBusinessHours?: (band: BusinessHoursBand) => React.ReactNode;
-  minHourHeight: number;
-  maxHourHeight: number;
   showNowIndicator: boolean;
   renderEvent: RenderEvent<T>;
   keyExtractor: EventKeyExtractor<T>;
@@ -1293,14 +1352,12 @@ type TimetablePageProps<T> = {
   onLongPressCell?: (date: Date) => void;
   onCreateEvent?: (start: Date, end: Date) => void;
   onEdgeAdvance?: (dir: number) => void;
-  /** Report this page's hour-grid top (below the all-day lane), while it is the
-   * active page, so a cross-week drop can map a ghost's Y to the right time. */
-  onGridTop?: (y: number) => void;
 };
 
-// A single date's grid: the pinch-zoomable, vertically-scrolling time column.
-// Three of these are mounted side by side inside the pager so the previous and
-// next dates are ready to drag into view.
+// One page of day columns: the tall, non-scrolling content for a single date
+// range. Pages sit side by side in the horizontal pager, which itself lives in
+// the grid's one vertical scroll view, so every page and the hour column share
+// that scroll position and zoom.
 function TimetablePageInner<T>({
   mode,
   numberOfDays,
@@ -1310,29 +1367,17 @@ function TimetablePageInner<T>({
   date,
   events,
   cellHeight,
-  hourHeight,
   committedCellHeight,
-  scrollY,
   isActive,
-  initialScrollY,
-  onSettleOffset,
   weekStartsOn,
   weekEndsOn,
   width,
-  hourColumnWidth,
   minHour,
   maxHour,
-  ampm,
   timeslots,
   isRTL,
-  showAllDayEventCell,
   highlightWeekends,
-  showVerticalScrollIndicator,
-  verticalScrollEnabled,
-  hourComponent,
   calendarCellStyle,
-  minHourHeight,
-  maxHourHeight,
   showNowIndicator,
   businessHours,
   renderBusinessHours,
@@ -1352,101 +1397,13 @@ function TimetablePageInner<T>({
   onLongPressCell,
   onCreateEvent,
   onEdgeAdvance,
-  onGridTop,
 }: TimetablePageProps<T>) {
   const theme = useCalendarTheme();
   const slot = useSlots<TimeGridSlot>();
-  const scrollRef = useAnimatedRef<Animated.ScrollView>();
-  // The hour grid sits below the all-day lane; capture its top on layout and
-  // report it up while this page is active (the lane height differs per week).
-  const gridTopRef = useRef(0);
-  useEffect(() => {
-    if (isActive) onGridTop?.(gridTopRef.current);
-  }, [isActive, onGridTop]);
 
   // The visible page tracks the live cellHeight (animates every pinch frame);
   // off-screen pages track committedCellHeight (settles once per gesture).
   const heightSource = isActive ? cellHeight : committedCellHeight;
-
-  // Keep every page locked to the same vertical scroll position so the prev/next
-  // pages are already aligned before they drag into view — no post-swipe jump.
-  // Only a genuine user drag (and its momentum) updates the shared offset. The
-  // contentOffset seed and the programmatic scrolls that fire during paging also
-  // emit onScroll events; letting those write `scrollY` could broadcast a transient
-  // 0 to every page (the random "snaps to midnight" behaviour), so they're ignored.
-  const isDragging = useSharedValue(false);
-  // Mirror `isActive` to a shared value so the scroll worklet reads the *current*
-  // active state. A plain `isActive` captured in the worklet goes stale, so only the
-  // page active when the handler was first created would record its scrolls — which
-  // is why a position set on a later page was lost and an earlier one came back.
-  const isActiveShared = useSharedValue(isActive);
-  useEffect(() => {
-    isActiveShared.value = isActive;
-  }, [isActive, isActiveShared]);
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      // Native captures the active page's scroll on a real drag. (Web is handled by
-      // the container-level scroll listener in TimeGridInner, because LegendList
-      // recycles the page containers there and per-page `isActive` can't reliably
-      // tell which DOM node the user is actually scrolling.)
-      if (isActiveShared.value && isDragging.value) {
-        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-        scrollY.value = event.contentOffset.y;
-      }
-    },
-    onBeginDrag: () => {
-      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-      isDragging.value = true;
-    },
-    onEndDrag: (event) => {
-      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-      isDragging.value = false;
-      // Capture the rested position. The mid-drag onScroll above stops at the
-      // finger-lift point; without this, the momentum tail after it is lost and the
-      // saved offset falls short of where the page actually settles.
-      if (!isWeb && isActiveShared.value) {
-        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-        scrollY.value = event.contentOffset.y;
-        runOnJS(onSettleOffset)(event.contentOffset.y);
-      }
-    },
-    onMomentumEnd: (event) => {
-      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-      isDragging.value = false;
-      if (!isWeb && isActiveShared.value) {
-        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-        scrollY.value = event.contentOffset.y;
-        runOnJS(onSettleOffset)(event.contentOffset.y);
-      }
-    },
-  });
-
-  // Keep *inactive* pages aligned to the shared offset as it changes, so they're
-  // already in position before they drag into view. Reads `isActiveShared` (not the
-  // captured `isActive`) so the worklet sees the current state.
-  useAnimatedReaction(
-    () => scrollY.value,
-    (current, previous) => {
-      if (!isActiveShared.value && current !== previous) {
-        scrollTo(scrollRef, 0, current, false);
-      }
-    },
-  );
-
-  // When a page becomes the active one (paged or jumped to), align it to the shared
-  // offset. The reaction above only syncs *inactive* pages, and only when `scrollY`
-  // changes, so a page that paged in after the last change (the third page on from a
-  // drag, say) would keep its seeded default. Uses reanimated's `scrollTo` worklet:
-  // the imperative `scrollRef.current.scrollTo()` does not take effect on a
-  // useAnimatedRef, which is why that page stayed at the default. Native only; web is
-  // handled by the container-level effect in TimeGridInner.
-  useAnimatedReaction(
-    () => isActiveShared.value,
-    (active, previous) => {
-      if (isWeb || !active || active === previous) return;
-      scrollTo(scrollRef, 0, scrollY.value, false);
-    },
-  );
 
   const days = useMemo(
     () => getViewDays(mode, date, weekStartsOn, numberOfDays, isRTL, weekEndsOn, hiddenDays),
@@ -1460,8 +1417,8 @@ function TimetablePageInner<T>({
   // gesture worklet would capture the whole `days` array (of `Date`s), which
   // react-native-worklets >=0.10 refuses to copy to the UI thread.
   const dayCount = days.length;
-  const dayWidth = (width - hourColumnWidth) / dayCount;
-  const dayLeft = (dayIndex: number) => hourColumnWidth + dayIndex * dayWidth;
+  const dayWidth = width / dayCount;
+  const dayLeft = (dayIndex: number) => dayIndex * dayWidth;
 
   // Calendar-day offset of each column from the first, as plain numbers a drag
   // worklet can close over. Identity (0,1,2,…) for contiguous days; with
@@ -1513,11 +1470,7 @@ function TimetablePageInner<T>({
     if (date) onLongPressCell?.(date);
   };
 
-  // The hours (rows/labels) visible in the window [minHour, maxHour).
-  const hoursRange = useMemo(
-    () => Array.from({ length: maxHour - minHour }, (_, index) => minHour + index),
-    [minHour, maxHour],
-  );
+  const hoursRange = useMemo(() => hourRange(minHour, maxHour), [minHour, maxHour]);
 
   const now = useNow(showNowIndicator && isActive, { now: nowProp, timeZone: nowTimeZone });
   // "Today" follows the (possibly zone-shifted or overridden) now, so the line
@@ -1530,33 +1483,6 @@ function TimetablePageInner<T>({
     () => ({ height: (maxHour - minHour) * heightSource.value }),
     [minHour, maxHour, heightSource],
   );
-
-  // Capture the row height when the pinch starts and apply `event.scale`
-  // (relative to that start) rather than multiplying per-frame deltas — deltas
-  // compound float error and the zoom never settles on a clean level.
-  const pinchStartCellHeight = useSharedValue(hourHeight);
-  const zoomGesture = useMemo(() => {
-    const pinch = Gesture.Pinch()
-      .onStart(() => {
-        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-        pinchStartCellHeight.value = cellHeight.value;
-      })
-      .onUpdate((event) => {
-        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-        cellHeight.value = Math.min(
-          maxHourHeight,
-          Math.max(minHourHeight, pinchStartCellHeight.value * event.scale),
-        );
-      })
-      .onEnd(() => {
-        // Publish the final zoom to the off-screen pages in one update.
-        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-        committedCellHeight.value = cellHeight.value;
-      });
-    // Recognise the pinch and the ScrollView's native scroll together so the
-    // scroll never cancels an in-progress zoom.
-    return Gesture.Simultaneous(pinch, Gesture.Native());
-  }, [cellHeight, committedCellHeight, pinchStartCellHeight, minHourHeight, maxHourHeight]);
 
   // Drag-to-create: sweep out a new event on empty grid. Native long-presses
   // first (so a tap/scroll isn't hijacked); web uses a drag threshold like move,
@@ -1609,7 +1535,7 @@ function TimetablePageInner<T>({
         const idx = dayCount === 1 ? 0 : Math.floor(event.x / dayWidth);
         createDayIndex.value = idx;
         createStartY.value = event.y;
-        createLeft.value = hourColumnWidth + idx * dayWidth;
+        createLeft.value = idx * dayWidth;
         createWidth.value = dayWidth;
         createTop.value = event.y;
         createHeight.value = 0;
@@ -1644,7 +1570,6 @@ function TimetablePageInner<T>({
     createEnabled,
     dayCount,
     dayWidth,
-    hourColumnWidth,
     heightSource,
     snapMinutes,
     commitCreate,
@@ -1711,7 +1636,7 @@ function TimetablePageInner<T>({
   const cellLayer =
     onPressCell || onLongPressCell || createEnabled ? (
       <Pressable
-        style={[styles.cellPressLayer, { left: hourColumnWidth }]}
+        style={styles.cellPressLayer}
         onPress={onPressCell ? handleBackgroundPress : undefined}
         // When create is on, a long-press starts the create-drag, so don't also
         // fire the consumer's long-press handler.
@@ -1726,248 +1651,204 @@ function TimetablePageInner<T>({
     ) : null;
 
   return (
-    <View style={styles.container}>
-      {showAllDayEventCell ? (
-        <AllDayLane
-          days={days}
-          events={events}
-          mode={mode}
-          hourColumnWidth={hourColumnWidth}
-          dayWidth={dayWidth}
-          renderEvent={renderEvent}
-          keyExtractor={keyExtractor}
-          onPressEvent={onPressEvent}
-          onLongPressEvent={onLongPressEvent}
-        />
-      ) : null}
-      <GestureDetector gesture={zoomGesture}>
-        <Animated.ScrollView
-          ref={scrollRef}
-          showsVerticalScrollIndicator={showVerticalScrollIndicator}
-          scrollEnabled={verticalScrollEnabled}
-          onScroll={scrollHandler}
-          scrollEventThrottle={16}
-          onLayout={(event) => {
-            // The scroll view's offset within the page equals the all-day lane
-            // height above it: the hour grid's top. Report it while active.
-            gridTopRef.current = event.nativeEvent.layout.y;
-            if (isActive) onGridTop?.(gridTopRef.current);
-          }}
-          contentContainerStyle={{ paddingTop: HOUR_LABEL_TOP_INSET }}
-          contentOffset={{ x: 0, y: initialScrollY }}
-        >
-          <Animated.View style={[styles.content, fullHeightStyle]}>
-            {/* Behind the events, so empty-space taps/drags create while event
+    <Animated.View testID="time-grid-page" style={[styles.page, { width }, fullHeightStyle]}>
+      {/* Behind the events, so empty-space taps/drags create while event
                 taps still hit their box. */}
-            {cellLayer && backgroundGesture ? (
-              <GestureDetector gesture={backgroundGesture}>{cellLayer}</GestureDetector>
-            ) : (
-              cellLayer
-            )}
+      {cellLayer && backgroundGesture ? (
+        <GestureDetector gesture={backgroundGesture}>{cellLayer}</GestureDetector>
+      ) : (
+        cellLayer
+      )}
 
-            {days.map((day, dayIndex) => {
-              if (!highlightWeekends || !isWeekend(day)) return null;
-              const shadeSlot = slot("weekendShade", {
-                base: [
+      {days.map((day, dayIndex) => {
+        if (!highlightWeekends || !isWeekend(day)) return null;
+        const shadeSlot = slot("weekendShade", {
+          base: [
+            styles.weekendColumn,
+            styles.nonInteractive,
+            { left: dayLeft(dayIndex), width: dayWidth },
+          ],
+          themed: { backgroundColor: theme.colors.weekendBackground },
+        });
+        return (
+          <Animated.View
+            key={`weekend-${day.toISOString()}`}
+            testID="weekend-shade"
+            {...shadeSlot}
+            style={[shadeSlot.style, fullHeightStyle]}
+          />
+        );
+      })}
+
+      {calendarCellStyle
+        ? days.map((day, dayIndex) => {
+            const cellStyle = calendarCellStyle(day);
+            return cellStyle ? (
+              <Animated.View
+                key={`cell-${day.toISOString()}`}
+                style={[
                   styles.weekendColumn,
                   styles.nonInteractive,
                   { left: dayLeft(dayIndex), width: dayWidth },
-                ],
-                themed: { backgroundColor: theme.colors.weekendBackground },
-              });
-              return (
-                <Animated.View
-                  key={`weekend-${day.toISOString()}`}
-                  testID="weekend-shade"
-                  {...shadeSlot}
-                  style={[shadeSlot.style, fullHeightStyle]}
-                />
-              );
-            })}
+                  cellStyle,
+                  fullHeightStyle,
+                ]}
+              />
+            ) : null;
+          })
+        : null}
 
-            {calendarCellStyle
-              ? days.map((day, dayIndex) => {
-                  const cellStyle = calendarCellStyle(day);
-                  return cellStyle ? (
-                    <Animated.View
-                      key={`cell-${day.toISOString()}`}
-                      style={[
-                        styles.weekendColumn,
-                        styles.nonInteractive,
-                        { left: dayLeft(dayIndex), width: dayWidth },
-                        cellStyle,
-                        fullHeightStyle,
-                      ]}
-                    />
-                  ) : null;
-                })
-              : null}
+      {businessHours
+        ? days.flatMap((day, dayIndex) =>
+            closedHourBands(day, businessHours, minHour, maxHour).map((band, bandIndex) => (
+              <ShadeBand
+                key={`closed-${day.toISOString()}-${bandIndex}`}
+                cellHeight={heightSource}
+                startHour={band.start}
+                endHour={band.end}
+                minHour={minHour}
+                left={dayLeft(dayIndex)}
+                width={dayWidth}
+                color={renderBusinessHours ? undefined : theme.colors.outsideHoursBackground}
+              >
+                {renderBusinessHours?.({ date: day, start: band.start, end: band.end })}
+              </ShadeBand>
+            )),
+          )
+        : null}
 
-            {businessHours
-              ? days.flatMap((day, dayIndex) =>
-                  closedHourBands(day, businessHours, minHour, maxHour).map((band, bandIndex) => (
-                    <ShadeBand
-                      key={`closed-${day.toISOString()}-${bandIndex}`}
-                      cellHeight={heightSource}
-                      startHour={band.start}
-                      endHour={band.end}
-                      minHour={minHour}
-                      left={dayLeft(dayIndex)}
-                      width={dayWidth}
-                      color={renderBusinessHours ? undefined : theme.colors.outsideHoursBackground}
-                    >
-                      {renderBusinessHours?.({ date: day, start: band.start, end: band.end })}
-                    </ShadeBand>
-                  )),
-                )
-              : null}
+      {/* Background events: shaded, non-interactive time ranges. */}
+      {days.flatMap((day, dayIndex) =>
+        backgroundBandsForDay(events, day)
+          .map((b) => ({
+            ...b,
+            startHours: Math.max(b.startHours, minHour),
+            endHours: Math.min(b.endHours, maxHour),
+          }))
+          .filter((b) => b.endHours > b.startHours)
+          .map((b, bandIndex) => (
+            <ShadeBand
+              key={`bg-${day.toISOString()}-${bandIndex}`}
+              cellHeight={heightSource}
+              startHour={b.startHours}
+              endHour={b.endHours}
+              minHour={minHour}
+              left={dayLeft(dayIndex)}
+              width={dayWidth}
+              color={theme.colors.backgroundEvent}
+              slotName="backgroundEvent"
+              testID="background-event-shade"
+            />
+          )),
+      )}
 
-            {/* Background events: shaded, non-interactive time ranges. */}
-            {days.flatMap((day, dayIndex) =>
-              backgroundBandsForDay(events, day)
-                .map((b) => ({
-                  ...b,
-                  startHours: Math.max(b.startHours, minHour),
-                  endHours: Math.min(b.endHours, maxHour),
-                }))
-                .filter((b) => b.endHours > b.startHours)
-                .map((b, bandIndex) => (
-                  <ShadeBand
-                    key={`bg-${day.toISOString()}-${bandIndex}`}
-                    cellHeight={heightSource}
-                    startHour={b.startHours}
-                    endHour={b.endHours}
-                    minHour={minHour}
-                    left={dayLeft(dayIndex)}
-                    width={dayWidth}
-                    color={theme.colors.backgroundEvent}
-                    slotName="backgroundEvent"
-                    testID="background-event-shade"
-                  />
-                )),
-            )}
+      {days.map((day, dayIndex) => {
+        const separatorSlot = slot("daySeparator", {
+          base: [styles.daySeparator, styles.nonInteractive, { left: dayLeft(dayIndex) }],
+          themed: { backgroundColor: theme.colors.gridLine },
+        });
+        return (
+          <Animated.View
+            key={`separator-${day.toISOString()}`}
+            {...separatorSlot}
+            style={[separatorSlot.style, fullHeightStyle]}
+          />
+        );
+      })}
 
-            {days.map((day, dayIndex) => {
-              const separatorSlot = slot("daySeparator", {
-                base: [styles.daySeparator, styles.nonInteractive, { left: dayLeft(dayIndex) }],
-                themed: { backgroundColor: theme.colors.gridLine },
-              });
-              return (
-                <Animated.View
-                  key={`separator-${day.toISOString()}`}
-                  {...separatorSlot}
-                  style={[separatorSlot.style, fullHeightStyle]}
-                />
-              );
-            })}
+      {hoursRange.map((hour) => (
+        <HourLine key={hour} hour={hour} minHour={minHour} cellHeight={heightSource} />
+      ))}
 
-            {hoursRange.map((hour) => (
-              <HourRow
-                key={hour}
+      {timeslots > 1
+        ? hoursRange.flatMap((hour) =>
+            Array.from({ length: timeslots - 1 }, (_, i) => (
+              <TimeslotLine
+                key={`slot-${hour}-${i}`}
                 hour={hour}
                 minHour={minHour}
+                fraction={(i + 1) / timeslots}
                 cellHeight={heightSource}
-                hourColumnWidth={hourColumnWidth}
-                label={formatHour(hour, { ampm })}
-                ampm={ampm}
-                hourComponent={hourComponent}
               />
-            ))}
+            )),
+          )
+        : null}
 
-            {timeslots > 1
-              ? hoursRange.flatMap((hour) =>
-                  Array.from({ length: timeslots - 1 }, (_, i) => (
-                    <TimeslotLine
-                      key={`slot-${hour}-${i}`}
-                      hour={hour}
-                      minHour={minHour}
-                      fraction={(i + 1) / timeslots}
-                      cellHeight={heightSource}
-                      hourColumnWidth={hourColumnWidth}
-                    />
-                  )),
-                )
-              : null}
-
-            {dayLayouts.flatMap((layout, dayIndex) =>
-              layout
-                // Skip events that fall entirely outside the [minHour, maxHour) window.
-                .filter((p) => p.startHours < maxHour && p.startHours + p.durationHours > minHour)
-                .map((positioned, eventIndex) => {
-                  const columnWidth = dayWidth / positioned.columns;
-                  return (
-                    <AnimatedEventBox
-                      // Prefix with the day so a multi-day event's per-day segments
-                      // (which share the same event key) stay unique across the
-                      // flattened list of all days' boxes.
-                      key={`${dayIndex}:${keyExtractor(positioned.event, eventIndex)}`}
-                      positioned={positioned}
-                      eventIndex={events.indexOf(positioned.event)}
-                      movingEvent={movingEvent}
-                      onMovePreview={setMultiDayMove}
-                      cellHeight={heightSource}
-                      minHour={minHour}
-                      maxHour={maxHour}
-                      left={dayLeft(dayIndex) + positioned.column * columnWidth}
-                      width={columnWidth}
-                      dayLeftPx={dayLeft(dayIndex)}
-                      nextDayDirection={isRTL ? -1 : 1}
-                      dayWidth={dayWidth}
-                      dayIndex={dayIndex}
-                      dayCount={days.length}
-                      dayOrdinals={dayOrdinals}
-                      mode={mode}
-                      daysPerPage={daysPerPage}
-                      renderEvent={renderEvent}
-                      snapMinutes={snapMinutes}
-                      minEventHeight={minEventHeight}
-                      eventGap={eventGap}
-                      showDragHandle={showDragHandle}
-                      eventStartEditable={eventStartEditable}
-                      eventDurationEditable={eventDurationEditable}
-                      onPress={onPressEvent}
-                      onLongPress={onLongPressEvent}
-                      onDragEvent={onDragEvent}
-                      onDragStart={onDragStart}
-                      onEdgeAdvance={onEdgeAdvance}
-                    />
-                  );
-                }),
-            )}
-
-            {multiDayMove ? (
-              <MultiDayMovePreview
-                move={multiDayMove}
-                days={days}
+      {dayLayouts.flatMap((layout, dayIndex) =>
+        layout
+          // Skip events that fall entirely outside the [minHour, maxHour) window.
+          .filter((p) => p.startHours < maxHour && p.startHours + p.durationHours > minHour)
+          .map((positioned, eventIndex) => {
+            const columnWidth = dayWidth / positioned.columns;
+            return (
+              <AnimatedEventBox
+                // Prefix with the day so a multi-day event's per-day segments
+                // (which share the same event key) stay unique across the
+                // flattened list of all days' boxes.
+                key={`${dayIndex}:${keyExtractor(positioned.event, eventIndex)}`}
+                positioned={positioned}
+                eventIndex={events.indexOf(positioned.event)}
+                movingEvent={movingEvent}
+                onMovePreview={setMultiDayMove}
                 cellHeight={heightSource}
-                dayWidth={dayWidth}
-                hourColumnWidth={hourColumnWidth}
                 minHour={minHour}
+                maxHour={maxHour}
+                left={dayLeft(dayIndex) + positioned.column * columnWidth}
+                width={columnWidth}
+                dayLeftPx={dayLeft(dayIndex)}
+                nextDayDirection={isRTL ? -1 : 1}
+                dayWidth={dayWidth}
+                dayIndex={dayIndex}
+                dayCount={days.length}
+                dayOrdinals={dayOrdinals}
                 mode={mode}
+                daysPerPage={daysPerPage}
                 renderEvent={renderEvent}
+                snapMinutes={snapMinutes}
                 minEventHeight={minEventHeight}
                 eventGap={eventGap}
+                showDragHandle={showDragHandle}
+                eventStartEditable={eventStartEditable}
+                eventDurationEditable={eventDurationEditable}
+                onPress={onPressEvent}
+                onLongPress={onLongPressEvent}
+                onDragEvent={onDragEvent}
+                onDragStart={onDragStart}
+                onEdgeAdvance={onEdgeAdvance}
               />
-            ) : null}
+            );
+          }),
+      )}
 
-            {showNowIndicator && nowDayIndex >= 0 && nowInWindow ? (
-              <NowIndicator
-                cellHeight={heightSource}
-                nowHours={nowHours}
-                minHour={minHour}
-                left={dayLeft(nowDayIndex)}
-                width={dayWidth}
-                color={theme.colors.nowIndicator}
-              />
-            ) : null}
+      {multiDayMove ? (
+        <MultiDayMovePreview
+          move={multiDayMove}
+          days={days}
+          cellHeight={heightSource}
+          dayWidth={dayWidth}
+          minHour={minHour}
+          mode={mode}
+          renderEvent={renderEvent}
+          minEventHeight={minEventHeight}
+          eventGap={eventGap}
+        />
+      ) : null}
 
-            {createEnabled ? (
-              <Animated.View {...ghostSlot} style={[ghostSlot.style, createGhostStyle]} />
-            ) : null}
-          </Animated.View>
-        </Animated.ScrollView>
-      </GestureDetector>
-    </View>
+      {showNowIndicator && nowDayIndex >= 0 && nowInWindow ? (
+        <NowIndicator
+          cellHeight={heightSource}
+          nowHours={nowHours}
+          minHour={minHour}
+          left={dayLeft(nowDayIndex)}
+          width={dayWidth}
+          color={theme.colors.nowIndicator}
+        />
+      ) : null}
+
+      {createEnabled ? (
+        <Animated.View {...ghostSlot} style={[ghostSlot.style, createGhostStyle]} />
+      ) : null}
+    </Animated.View>
   );
 }
 
@@ -1978,10 +1859,10 @@ const TimetablePage = memo(TimetablePageInner) as typeof TimetablePageInner;
  * where the structure matches; `columnHeaderDateText`, `weekendShade` and
  * `daySeparator` are native-only (the dom grid styles those through its
  * `dayColumn`/`columnHeaderDate` elements). Slots rendered as Reanimated views
- * (`gridLines` sub-hour dividers, `businessHours`, `weekendShade`,
- * `daySeparator`, `event`, `nowIndicator`, `createGhost`) always honour the
- * `styles` map; their `className` reaches the element but needs a Tailwind
- * runtime that styles Animated components.
+ * (`gridLines`, `businessHours`, `weekendShade`, `daySeparator`, `event`,
+ * `nowIndicator`, `createGhost`) always honour the `styles` map; their
+ * `className` reaches the element but needs a Tailwind runtime that styles
+ * Animated components.
  */
 export type TimeGridSlot =
   | "header"
@@ -1994,6 +1875,7 @@ export type TimeGridSlot =
   | "allDayLabel"
   | "allDayColumn"
   | "allDayEvent"
+  | "hourGutter"
   | "hourLabel"
   | "gridLines"
   | "businessHours"
@@ -2220,7 +2102,7 @@ function TimeGridInner<T>({
       overlapsOtherEvents(events, event, start, end) ? false : onDragEventProp(event, start, end);
   }, [onDragEventProp, eventOverlap, events]);
 
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const listRef = useRef<LegendListRef>(null);
   // The pager's own view; measured in the window so an event drag can locate the
   // horizontal edges (its screen-space left and width) for cross-week paging.
@@ -2228,39 +2110,67 @@ function TimeGridInner<T>({
   // The grid's outer view; on web its ref resolves to the DOM node we attach the
   // Ctrl/Cmd + scroll zoom listener to.
   const containerRef = useRef<View>(null);
-  // Web: ignore scroll events until this time (ms). Set around a page change so the
-  // recycle-reset and the offset-restore aren't mistaken for a user scroll.
-  const suppressCaptureUntilRef = useRef(0);
-  // Horizontal list items need an explicit cross-axis height; seed it with the
-  // window height (so it renders immediately and in tests) and refine on layout.
-  const [pageHeight, setPageHeight] = useState(height);
+  // The scroll viewport; measured in the window so a lifted drag can map the
+  // finger into the scrolling content.
+  const viewportRef = useRef<View>(null);
+  // Width the pager last laid out at, so the zoom (which changes its height every
+  // frame) doesn't re-measure it.
+  const pagerLayoutWidthRef = useRef(-1);
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
   // The grid sizes to its container width, not the window, so it fits a
   // constrained layout on the web (e.g. a max-width card). On native the grid
   // fills the window, so this equals the window width and behaviour is unchanged.
   // Seeded with the window width for the first paint, refined on layout.
   const [containerWidth, setContainerWidth] = useState(width);
-  // The list must remount exactly once — when the real height replaces the
-  // window-height seed — or it keeps the oversized seed and clips. It must NOT
-  // remount on later height changes (e.g. a taller day header vs a shorter week
-  // header on a mode switch): a remount blanks the visible page for a frame.
+  // Width of the day columns: the pager's own, once it has laid out (on the web
+  // a classic scrollbar takes width inside the scroll view), else what the hour
+  // column leaves of the container.
+  const [pagerLayoutWidth, setPagerLayoutWidth] = useState<number | null>(null);
+  const columnsWidth = pagerLayoutWidth ?? containerWidth - hourColumnWidth;
+  // The list remounts exactly once, when the measured width replaces the window
+  // seed, so its fixed item size is right before any page is scrolled to.
   const [measured, setMeasured] = useState(false);
   // Week-anchored modes page by a full week and align pages to the week start:
   // `week`, and `custom` when a `weekEndsOn` defines a partial-week span.
   const weekAnchored = mode === "week" || (mode === "custom" && weekEndsOn != null);
   // Days advanced per page: a full week when week-anchored, else the column count.
   const step = weekAnchored ? 7 : viewDayCount(mode, numberOfDays);
-  // Shared vertical scroll offset so every mounted page stays aligned. Seeded
-  // from the numeric hourHeight rather than reading cellHeight.value (which
-  // would warn about reading a shared value during render).
+  // Initial vertical offset (`scrollOffsetMinutes`), from the numeric hourHeight
+  // rather than cellHeight.value (which would warn about reading a shared value
+  // during render).
   const seedDefaultY =
     Math.max(0, scrollOffsetMinutes / MINUTES_PER_HOUR - clampedMinHour) * hourHeight;
+  // The live offset of the one scroll view, for the drag worklets: the pager
+  // scrolls with the content, so a finger's window position maps into the grid
+  // through it.
   const scrollY = useSharedValue(seedDefaultY);
-  // Pager frame in window space (refined on layout) and a swipe-scroll freeze,
-  // shared with the event drag worklets through EdgePagingContext so a cross-week
-  // edge drag can detect the edges and page the view live under a held finger.
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+  // react-native-web ignores `contentOffset`; apply the initial offset once the
+  // viewport and the content have laid out instead.
+  const webSeededRef = useRef(!isWeb);
+  const seedWebScroll = useCallback(() => {
+    if (webSeededRef.current) return;
+    const node = scrollRef.current;
+    if (!node) return;
+    node.scrollTo({ y: seedDefaultY, animated: false });
+    // Latch only once the view can hold the offset: until both the viewport and
+    // the content have a size, the scroll clamps to 0 and would drop the seed.
+    const dom = node.getScrollableNode() as { scrollHeight: number; clientHeight: number } | null;
+    if (dom && dom.scrollHeight > dom.clientHeight) webSeededRef.current = true;
+  }, [scrollRef, seedDefaultY]);
+  // Window-space frames (refined on layout) and a swipe-scroll freeze, shared with
+  // the event drag worklets through EdgePagingContext so a cross-week edge drag can
+  // detect the edges and page the view live under a held finger. The pager's top
+  // follows the scroll: the viewport's top plus the label inset, less the offset.
+  const viewportTop = useSharedValue(0);
   const pagerLeft = useSharedValue(0);
-  const pagerTop = useSharedValue(0);
   const pagerWidth = useSharedValue(width);
+  const pagerTop = useDerivedValue(() => viewportTop.value + HOUR_LABEL_TOP_INSET - scrollY.value);
   const [edgePagingLock, setEdgePagingLock] = useState(false);
   // Floating "held" ghost that carries a dragged event across a page change (see
   // EdgePaging): pager-local top-left, size, visibility, and the event to draw.
@@ -2269,10 +2179,6 @@ function TimeGridInner<T>({
   const ghostW = useSharedValue(0);
   const ghostH = useSharedValue(0);
   const ghostVisible = useSharedValue(0);
-  // Pager-local top of the active page's hour grid (the all-day lane above it
-  // varies in height per week), so a cross-week drop maps the ghost's screen
-  // position to the right time on the page it lands on.
-  const gridTop = useSharedValue(0);
   const [liftedEvent, setLiftedEvent] = useState<CalendarEvent<T> | null>(null);
   const liftedEventRef = useRef<CalendarEvent<T> | null>(null);
   // The drop commit needs the live page's columns and handler; keep them in a ref
@@ -2281,8 +2187,7 @@ function TimeGridInner<T>({
   // drag (the gesture must outlive the page change to finish a cross-week drop).
   const dropRef = useRef({
     headerDays: [] as Date[],
-    containerWidth,
-    hourColumnWidth,
+    columnsWidth,
     minHour: clampedMinHour,
     maxHour: clampedMaxHour,
     snapMinutes: Math.max(1, dragStepMinutes),
@@ -2304,8 +2209,7 @@ function TimeGridInner<T>({
     (ghostLocalX: number, ghostLocalY: number) => {
       const {
         headerDays: days,
-        containerWidth: cw,
-        hourColumnWidth: hcw,
+        columnsWidth: cw,
         minHour: min,
         maxHour: max,
         snapMinutes: snap,
@@ -2317,16 +2221,12 @@ function TimeGridInner<T>({
       clearLift();
       if (!ev || !onDrag || days.length === 0) return;
       // Map the ghost's drawn position on the page it landed on back to a cell:
-      // its left edge picks the day column, its top edge picks the time. Reading
-      // the live grid geometry (the all-day lane pushes the grid down, the grid
-      // scrolls, pinch changes the row height) keeps the drop under the ghost.
-      const dayWidth = (cw - hcw) / days.length;
-      const col = Math.min(
-        Math.max(Math.floor((ghostLocalX - hcw) / dayWidth), 0),
-        days.length - 1,
-      );
-      const hoursFromMin =
-        (ghostLocalY - gridTop.value - HOUR_LABEL_TOP_INSET + scrollY.value) / cellHeight.value;
+      // its left edge picks the day column, its top edge picks the time. Both are
+      // pager-local, and the pager is the scrolling content itself, so the top
+      // edge is already grid space; only the live row height (pinch) is read.
+      const dayWidth = cw / days.length;
+      const col = Math.min(Math.max(Math.floor(ghostLocalX / dayWidth), 0), days.length - 1);
+      const hoursFromMin = ghostLocalY / cellHeight.value;
       const rawMinutes = (min + hoursFromMin) * MINUTES_PER_HOUR;
       // Same rule as an in-page move: the start stays in the day it landed on,
       // while the duration is free to carry the end past midnight.
@@ -2340,14 +2240,7 @@ function TimeGridInner<T>({
       // reads as a visible snap-back instead of the event seeming to vanish.
       if (onDrag(ev, start, end) === false) onDate(ev.start);
     },
-    [clearLift, gridTop, scrollY, cellHeight],
-  );
-  const handleGridTop = useCallback(
-    (y: number) => {
-      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-      gridTop.value = y;
-    },
-    [gridTop],
+    [clearLift, cellHeight],
   );
   const edgePaging = useMemo<EdgePaging>(
     () => ({
@@ -2376,18 +2269,65 @@ function TimeGridInner<T>({
       commitLiftedDrop,
     ],
   );
-  // Plain mirror of the last settled vertical offset. A page that mounts after a
-  // scroll seeds its contentOffset here instead of the default, so it appears at the
-  // saved time straight away rather than rendering at the default and snapping (the
-  // one-frame flash). Null until the first scroll, when `seedDefaultY` is used.
-  const offsetSeedRef = useRef<number | null>(null);
-  const captureOffsetSeed = useCallback((y: number) => {
-    offsetSeedRef.current = y;
-  }, []);
   // Zoom committed at the end of the last pinch; off-screen pages animate off
   // this so they don't re-run their worklets every frame while the visible page
   // zooms.
   const committedCellHeight = useSharedValue(hourHeight);
+  // Outside a pinch, any other writer of `cellHeight` (a consumer-owned shared
+  // value, the web wheel zoom) commits at once, so the hour column and the
+  // off-screen pages never disagree with the visible page.
+  const pinching = useSharedValue(false);
+  useAnimatedReaction(
+    () => cellHeight.value,
+    (value) => {
+      if (!pinching.value) committedCellHeight.value = value;
+    },
+  );
+
+  // Capture the row height when the pinch starts and apply `event.scale`
+  // (relative to that start) rather than multiplying per-frame deltas — deltas
+  // compound float error and the zoom never settles on a clean level.
+  const pinchStartCellHeight = useSharedValue(hourHeight);
+  const zoomGesture = useMemo(() => {
+    const pinch = Gesture.Pinch()
+      .onStart(() => {
+        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+        pinching.value = true;
+        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+        pinchStartCellHeight.value = cellHeight.value;
+      })
+      .onUpdate((event) => {
+        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+        cellHeight.value = Math.min(
+          maxHourHeight,
+          Math.max(minHourHeight, pinchStartCellHeight.value * event.scale),
+        );
+      })
+      // Finalize (not end) so a cancelled pinch still commits and reopens the
+      // reaction above.
+      .onFinalize(() => {
+        // Publish the final zoom to the off-screen pages in one update.
+        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+        pinching.value = false;
+        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+        committedCellHeight.value = cellHeight.value;
+      });
+    // Recognise the pinch and the scroll view's native scroll together so the
+    // scroll never cancels an in-progress zoom.
+    return Gesture.Simultaneous(pinch, Gesture.Native());
+  }, [
+    cellHeight,
+    committedCellHeight,
+    pinching,
+    pinchStartCellHeight,
+    minHourHeight,
+    maxHourHeight,
+  ]);
+  // Height of the hour grid (the hour column and every page), live with the pinch.
+  const gridHeightStyle = useAnimatedStyle(
+    () => ({ height: (clampedMaxHour - clampedMinHour) * cellHeight.value }),
+    [clampedMinHour, clampedMaxHour],
+  );
 
   // Web stand-in for pinch: Ctrl/Cmd + scroll zooms the grid via the same shared
   // values the pinch gesture drives.
@@ -2454,8 +2394,7 @@ function TimeGridInner<T>({
   // identity-stable EdgePaging callbacks (see dropRef).
   dropRef.current = {
     headerDays,
-    containerWidth,
-    hourColumnWidth,
+    columnsWidth,
     minHour: clampedMinHour,
     maxHour: clampedMaxHour,
     snapMinutes: Math.max(1, dragStepMinutes),
@@ -2497,71 +2436,6 @@ function TimeGridInner<T>({
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
   }, [activeIndex]);
 
-  // react-native-web only: paging recycles the page containers and resets their
-  // vertical scroll, so the on-screen page randomly lands at the top. After the
-  // page settles, restore the shared offset directly on the visible page's scroll
-  // node — the one lever that reliably works on the web. Deferred a frame (twice,
-  // for safety) so the paged-in grid has laid out before we scroll it.
-  useEffect(() => {
-    if (!isWeb) return;
-    const root = containerRef.current as unknown as HTMLElement | null;
-    if (!root) return;
-    const restoreVisiblePage = () => {
-      const vw = (root.ownerDocument?.defaultView ?? globalThis).innerWidth;
-      for (const el of root.querySelectorAll<HTMLElement>("*")) {
-        const style = getComputedStyle(el);
-        const scrollable =
-          (style.overflowY === "scroll" || style.overflowY === "auto") &&
-          el.scrollHeight > el.clientHeight + 20 &&
-          el.clientHeight > 100;
-        if (!scrollable) continue;
-        const rect = el.getBoundingClientRect();
-        if (rect.left > -50 && rect.right <= vw + 50) {
-          el.scrollTop = scrollY.value;
-          break;
-        }
-      }
-    };
-    // Don't capture the scroll events this transition emits (recycle-reset, restore).
-    suppressCaptureUntilRef.current = Date.now() + 400;
-    let raf2 = 0;
-    const raf1 = requestAnimationFrame(() => {
-      restoreVisiblePage();
-      raf2 = requestAnimationFrame(restoreVisiblePage);
-    });
-    return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-    };
-    // `pageHeight` is included so this also runs once the pager measures its real
-    // height on first open (the mount pass runs before the pages have laid out).
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- containerRef/scrollY are stable
-  }, [activeIndex, pageHeight]);
-
-  // Web: record the on-screen page's scroll into the shared offset on genuine user
-  // scrolls, so switching pages preserves the position. Programmatic scrolls (the
-  // recycle-reset and the restore above) are skipped via the suppression window, so
-  // they can't clobber it. Scoped to the visible page so off-screen sync is ignored.
-  useEffect(() => {
-    if (!isWeb) return;
-    const root = containerRef.current as unknown as HTMLElement | null;
-    if (!root) return;
-    const onScrollCapture = (event: Event) => {
-      if (Date.now() < suppressCaptureUntilRef.current) return;
-      const el = event.target as HTMLElement | null;
-      if (!el || typeof el.scrollTop !== "number" || el.clientHeight <= 100) return;
-      const rect = el.getBoundingClientRect();
-      const vw = (root.ownerDocument?.defaultView ?? globalThis).innerWidth;
-      if (rect.left <= -50 || rect.right > vw + 50) return;
-      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-      scrollY.value = el.scrollTop;
-      offsetSeedRef.current = el.scrollTop;
-    };
-    root.addEventListener("scroll", onScrollCapture, true);
-    return () => root.removeEventListener("scroll", onScrollCapture, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- containerRef/scrollY are stable
-  }, []);
-
   // Web: LegendList's horizontal scroll container is `overflow-x: auto`, so a
   // trackpad swipe or horizontal wheel would scroll between pages. Paging should be
   // arrow-keys/toolbar only, so disable user horizontal scrolling on it (programmatic
@@ -2583,8 +2457,9 @@ function TimeGridInner<T>({
     };
     const raf = requestAnimationFrame(lockHorizontal);
     return () => cancelAnimationFrame(raf);
+    // `measured` re-runs this once the list exists at its real size.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- containerRef is stable
-  }, [pageHeight]);
+  }, [containerWidth, measured]);
 
   // Web arrow-key paging (swipe is disabled there); the effect above scrolls to
   // the new page once `onChangeDate` updates `date`.
@@ -2614,96 +2489,68 @@ function TimeGridInner<T>({
 
   const snapToIndices = useMemo(() => pageDates.map((_, index) => index), [pageDates]);
   const keyExtractorList = useCallback((item: Date) => item.toISOString(), []);
-  const getFixedItemSize = useCallback(() => containerWidth, [containerWidth]);
+  const getFixedItemSize = useCallback(() => columnsWidth, [columnsWidth]);
   const renderItem = useCallback(
     ({ item, index }: LegendListRenderItemProps<Date>) => (
-      <View style={{ width: containerWidth, height: pageHeight }}>
-        <TimetablePage
-          mode={mode}
-          numberOfDays={numberOfDays}
-          hiddenDays={hiddenDays}
-          now={now}
-          nowTimeZone={timeZone}
-          date={item}
-          width={containerWidth}
-          events={events}
-          cellHeight={cellHeight}
-          hourHeight={hourHeight}
-          committedCellHeight={committedCellHeight}
-          scrollY={scrollY}
-          isActive={index === activeIndex}
-          initialScrollY={offsetSeedRef.current ?? seedDefaultY}
-          onSettleOffset={captureOffsetSeed}
-          weekStartsOn={weekStartsOn}
-          weekEndsOn={weekEndsOn}
-          hourColumnWidth={hourColumnWidth}
-          minHour={clampedMinHour}
-          maxHour={clampedMaxHour}
-          ampm={ampm}
-          timeslots={timeslots}
-          isRTL={isRTL}
-          showAllDayEventCell={showAllDayEventCell}
-          highlightWeekends={highlightWeekends}
-          showVerticalScrollIndicator={showVerticalScrollIndicator}
-          verticalScrollEnabled={verticalScrollEnabled}
-          hourComponent={hourComponent}
-          calendarCellStyle={calendarCellStyle}
-          businessHours={businessHours}
-          renderBusinessHours={renderBusinessHours}
-          minHourHeight={minHourHeight}
-          maxHourHeight={maxHourHeight}
-          showNowIndicator={showNowIndicator}
-          renderEvent={labeledRenderEvent}
-          keyExtractor={keyExtractor}
-          snapMinutes={Math.max(1, dragStepMinutes)}
-          minEventHeight={minEventHeight}
-          eventGap={eventGap}
-          showDragHandle={showDragHandle}
-          eventStartEditable={eventStartEditable}
-          eventDurationEditable={eventDurationEditable}
-          onPressEvent={onPressEvent}
-          onLongPressEvent={onLongPressEvent}
-          onDragEvent={onDragEvent}
-          onDragStart={onDragStart}
-          onPressCell={handlePressCell}
-          onLongPressCell={onLongPressCell}
-          onCreateEvent={onCreateEvent}
-          onEdgeAdvance={goToPage}
-          onGridTop={handleGridTop}
-        />
-      </View>
+      <TimetablePage
+        mode={mode}
+        numberOfDays={numberOfDays}
+        hiddenDays={hiddenDays}
+        now={now}
+        nowTimeZone={timeZone}
+        date={item}
+        width={columnsWidth}
+        events={events}
+        cellHeight={cellHeight}
+        committedCellHeight={committedCellHeight}
+        isActive={index === activeIndex}
+        weekStartsOn={weekStartsOn}
+        weekEndsOn={weekEndsOn}
+        minHour={clampedMinHour}
+        maxHour={clampedMaxHour}
+        timeslots={timeslots}
+        isRTL={isRTL}
+        highlightWeekends={highlightWeekends}
+        calendarCellStyle={calendarCellStyle}
+        businessHours={businessHours}
+        renderBusinessHours={renderBusinessHours}
+        showNowIndicator={showNowIndicator}
+        renderEvent={labeledRenderEvent}
+        keyExtractor={keyExtractor}
+        snapMinutes={Math.max(1, dragStepMinutes)}
+        minEventHeight={minEventHeight}
+        eventGap={eventGap}
+        showDragHandle={showDragHandle}
+        eventStartEditable={eventStartEditable}
+        eventDurationEditable={eventDurationEditable}
+        onPressEvent={onPressEvent}
+        onLongPressEvent={onLongPressEvent}
+        onDragEvent={onDragEvent}
+        onDragStart={onDragStart}
+        onPressCell={handlePressCell}
+        onLongPressCell={onLongPressCell}
+        onCreateEvent={onCreateEvent}
+        onEdgeAdvance={goToPage}
+      />
     ),
     [
-      containerWidth,
-      pageHeight,
-      handleGridTop,
+      columnsWidth,
       mode,
       numberOfDays,
       events,
       cellHeight,
-      hourHeight,
       committedCellHeight,
-      scrollY,
       activeIndex,
-      seedDefaultY,
-      captureOffsetSeed,
       weekStartsOn,
       weekEndsOn,
-      hourColumnWidth,
       clampedMinHour,
       clampedMaxHour,
-      ampm,
       timeslots,
       isRTL,
-      showAllDayEventCell,
       highlightWeekends,
-      showVerticalScrollIndicator,
-      verticalScrollEnabled,
-      hourComponent,
       calendarCellStyle,
       businessHours,
-      minHourHeight,
-      maxHourHeight,
+      renderBusinessHours,
       showNowIndicator,
       labeledRenderEvent,
       keyExtractor,
@@ -2731,20 +2578,31 @@ function TimeGridInner<T>({
   // and only re-renders them when `data` or `extraData` changes. Feed both `events`
   // (so a moved event repaints in place) and `activeIndex` (so each page's
   // `isActive` updates as you swipe). Without `activeIndex`, a page that pages in
-  // never learns it became active and stays at its seeded scroll offset.
-  const listExtraData = useMemo(() => ({ events, activeIndex }), [events, activeIndex]);
+  // never learns it became active, so its zoom source and now line would lag.
+  // `columnsWidth` resizes the mounted pages when the grid is re-measured.
+  const listExtraData = useMemo(
+    () => ({ events, activeIndex, columnsWidth }),
+    [events, activeIndex, columnsWidth],
+  );
 
   return (
     <SlotStylesProvider classNames={classNames} styles={styleOverrides}>
       <EdgePagingContext.Provider value={edgePaging}>
-        <View ref={containerRef} style={styles.container}>
+        <View
+          ref={containerRef}
+          style={styles.container}
+          onLayout={(event) => {
+            setContainerWidth(event.nativeEvent.layout.width);
+            setMeasured(true);
+          }}
+        >
           {renderHeader ? (
             renderHeader(headerDays)
           ) : (
             <DefaultHeader
               days={headerDays}
               mode={mode}
-              width={containerWidth}
+              width={columnsWidth + hourColumnWidth}
               hourColumnWidth={hourColumnWidth}
               showWeekNumber={showWeekNumber}
               weekNumberPrefix={weekNumberPrefix}
@@ -2757,72 +2615,128 @@ function TimeGridInner<T>({
 
           {headerComponent}
 
+          {showAllDayEventCell ? (
+            <AllDayLane
+              days={headerDays}
+              events={events}
+              mode={mode}
+              hourColumnWidth={hourColumnWidth}
+              dayWidth={columnsWidth / headerDays.length}
+              renderEvent={labeledRenderEvent}
+              keyExtractor={keyExtractor}
+              onPressEvent={onPressEvent}
+              onLongPressEvent={onLongPressEvent}
+            />
+          ) : null}
+
           <View
-            ref={pagerRef}
-            style={styles.pager}
-            onLayout={(event) => {
-              setPageHeight(event.nativeEvent.layout.height);
-              setContainerWidth(event.nativeEvent.layout.width);
-              setMeasured(true);
-              // Record the pager's window-space frame for the drag worklets' edge
-              // detection and ghost placement (layout gives parent-relative coords,
-              // not window).
-              pagerRef.current?.measureInWindow((x, y, w) => {
+            ref={viewportRef}
+            style={styles.viewport}
+            onLayout={() => {
+              seedWebScroll();
+              // Window-space top of the scroll viewport, for the drag worklets'
+              // ghost placement (layout gives parent-relative coords, not window).
+              viewportRef.current?.measureInWindow((_x, y) => {
                 // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-                pagerLeft.value = x;
-                // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-                pagerTop.value = y;
-                // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-                pagerWidth.value = w;
+                viewportTop.value = y;
               });
             }}
           >
-            <LegendList
-              // Remount only on the seed→measured transition (see `measured`), not on
-              // every height change, so a day↔week header-height difference resizes the
-              // items in place instead of remounting and blanking the page.
-              key={measured ? "grid" : "grid-seed"}
-              ref={listRef}
-              style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
-              data={pageDates}
-              extraData={listExtraData}
-              horizontal
-              recycleItems={false}
-              keyExtractor={keyExtractorList}
-              getFixedItemSize={getFixedItemSize}
-              // On web LegendList ignores these RN scroll props (it leaks them to the
-              // DOM as unknown attributes), so omit them there and disable horizontal
-              // scroll via `webNoScroll`; paging is driven by the arrow keys instead.
-              // Native: paging makes each swipe hard-stop at the adjacent page, while
-              // `freeSwipe` lets momentum carry across pages and snap to a boundary.
-              {...(isWeb
-                ? null
-                : {
-                    // Frozen mid-edge-page so the programmatic advance lands under
-                    // the held finger instead of waiting for the touch to end.
-                    scrollEnabled: swipeEnabled && !edgePagingLock,
-                    pagingEnabled: !freeSwipe,
-                    snapToIndices: freeSwipe ? snapToIndices : undefined,
-                  })}
-              initialScrollIndex={activeIndex}
-              showsHorizontalScrollIndicator={false}
-              viewabilityConfig={PAGE_VIEWABILITY}
-              onViewableItemsChanged={handleViewableItemsChanged}
-              renderItem={renderItem}
-            />
-            {liftedEvent ? (
-              <DragGhost
-                x={ghostX}
-                y={ghostY}
-                w={ghostW}
-                h={ghostH}
-                visible={ghostVisible}
-                event={liftedEvent}
-                mode={mode}
-                renderEvent={labeledRenderEvent}
-                eventGap={eventGap}
-              />
-            ) : null}
+            <GestureDetector gesture={zoomGesture}>
+              <Animated.ScrollView
+                ref={scrollRef}
+                showsVerticalScrollIndicator={showVerticalScrollIndicator}
+                scrollEnabled={verticalScrollEnabled}
+                onScroll={scrollHandler}
+                scrollEventThrottle={16}
+                contentContainerStyle={styles.scrollContent}
+                contentOffset={{ x: 0, y: seedDefaultY }}
+              >
+                <Animated.View
+                  testID="time-grid-hours"
+                  style={[styles.gridRow, gridHeightStyle]}
+                  onLayout={seedWebScroll}
+                >
+                  {hourColumnWidth > 0 ? (
+                    <HourGutter
+                      width={hourColumnWidth}
+                      minHour={clampedMinHour}
+                      maxHour={clampedMaxHour}
+                      cellHeight={cellHeight}
+                      ampm={ampm}
+                      hourComponent={hourComponent}
+                    />
+                  ) : null}
+                  <View
+                    ref={pagerRef}
+                    style={styles.pager}
+                    onLayout={(event) => {
+                      // Window-space frame of the pager for the drag worklets' edge
+                      // detection and ghost placement. Only a width change matters
+                      // (the grid's or the hour column's); the zoom changes the
+                      // height every frame, so those layouts are skipped.
+                      const laidOutWidth = event.nativeEvent.layout.width;
+                      if (laidOutWidth === pagerLayoutWidthRef.current) return;
+                      pagerLayoutWidthRef.current = laidOutWidth;
+                      setPagerLayoutWidth(laidOutWidth);
+                      pagerRef.current?.measureInWindow((x, _y, measuredWidth) => {
+                        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+                        pagerLeft.value = x;
+                        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+                        pagerWidth.value = measuredWidth;
+                      });
+                    }}
+                  >
+                    <LegendList
+                      // Remount only on the seed→measured transition (see `measured`), so the
+                      // pages lay out at the real width once; later width changes resize them
+                      // in place through `extraData` instead of blanking the page.
+                      key={measured ? "grid" : "grid-seed"}
+                      ref={listRef}
+                      style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
+                      data={pageDates}
+                      extraData={listExtraData}
+                      horizontal
+                      recycleItems={false}
+                      keyExtractor={keyExtractorList}
+                      getFixedItemSize={getFixedItemSize}
+                      // On web LegendList ignores these RN scroll props (it leaks them to the
+                      // DOM as unknown attributes), so omit them there and disable horizontal
+                      // scroll via `webNoScroll`; paging is driven by the arrow keys instead.
+                      // Native: paging makes each swipe hard-stop at the adjacent page, while
+                      // `freeSwipe` lets momentum carry across pages and snap to a boundary.
+                      {...(isWeb
+                        ? null
+                        : {
+                            // Frozen mid-edge-page so the programmatic advance lands under
+                            // the held finger instead of waiting for the touch to end.
+                            scrollEnabled: swipeEnabled && !edgePagingLock,
+                            pagingEnabled: !freeSwipe,
+                            snapToIndices: freeSwipe ? snapToIndices : undefined,
+                          })}
+                      initialScrollIndex={activeIndex}
+                      showsHorizontalScrollIndicator={false}
+                      viewabilityConfig={PAGE_VIEWABILITY}
+                      onViewableItemsChanged={handleViewableItemsChanged}
+                      renderItem={renderItem}
+                    />
+                    {liftedEvent ? (
+                      <DragGhost
+                        x={ghostX}
+                        y={ghostY}
+                        w={ghostW}
+                        h={ghostH}
+                        visible={ghostVisible}
+                        event={liftedEvent}
+                        mode={mode}
+                        renderEvent={labeledRenderEvent}
+                        eventGap={eventGap}
+                      />
+                    ) : null}
+                  </View>
+                </Animated.View>
+              </Animated.ScrollView>
+            </GestureDetector>
           </View>
         </View>
       </EdgePagingContext.Provider>
@@ -3023,6 +2937,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  viewport: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: HOUR_LABEL_TOP_INSET,
+  },
+  // The hour column and the pager, side by side, as tall as the hour window.
+  gridRow: {
+    flexDirection: "row",
+  },
   headerRow: {
     flexDirection: "row",
     // Center the weekday/number block vertically; the day header's own symmetric
@@ -3048,14 +2972,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  content: {
-    width: "100%",
+  page: {
     position: "relative",
   },
   cellPressLayer: {
     position: "absolute",
     top: 0,
     bottom: 0,
+    left: 0,
     right: 0,
   },
   createGhost: {
@@ -3088,11 +3012,14 @@ const styles = StyleSheet.create({
     paddingRight: 6,
   },
   hourLine: {
-    flex: 1,
+    position: "absolute",
+    left: 0,
+    right: 0,
     height: StyleSheet.hairlineWidth,
   },
   timeslotLine: {
     position: "absolute",
+    left: 0,
     right: 0,
     height: StyleSheet.hairlineWidth,
     opacity: 0.5,
