@@ -51,6 +51,16 @@ Jest has three projects: `node` (core logic + native non-component tests), `dom`
 
 `examples/native` and `examples/web` are runnable demos. The web build powers the live demo on the home/demo page of the docs site, deployed to GitHub Pages by `.github/workflows/demo.yml`.
 
+### Running the native example on a device or emulator
+
+Use the stock Expo CLI, one command, from `examples/native`:
+
+- `pnpm exec expo run:android` (or `run:ios`) builds the debug dev client, installs it, launches it, and starts Metro. That single process is the dev server; leave it running. It prints the Metro URL and opens the app at it.
+- Fast Refresh is on: save a file under `packages/*/src` or `examples/native` and the change pushes to the running app on its own. No reload step. Verified by editing a visible string and watching it update live, then revert.
+- Reload or the dev menu when you need them: press `r` (reload) or `m` (dev menu) in the Metro terminal, or shake the device. On a physical device the dev menu often will not open from `adb shell input keyevent 82`; use `m` from the terminal instead.
+
+Do not fight the setup by hand: no second Metro on the same port, and don't `adb reverse` + `am force-stop` + re-open to "reload". Re-opening the dev client serves its cached JS instead of fetching your latest bundle, so edits look like no-ops. If it gets into that state, `adb uninstall <package>` and re-run `expo run:android` for a clean slate. Web parity check is the same idea: `pnpm exec expo start --web` from `examples/native`.
+
 ## Documentation
 
 `docs/` is a Mintlify site. Pages are MDX with YAML frontmatter; configuration lives in `docs/docs.json`. Keep docs in sync with each package's `README.md` and the exported types (`packages/native/src/index.tsx`, `packages/core/src/index.ts`).
