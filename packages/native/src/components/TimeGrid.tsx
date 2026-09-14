@@ -1,9 +1,9 @@
 import {
-  LegendList,
   type LegendListRef,
   type LegendListRenderItemProps,
   type OnViewableItemsChangedInfo,
 } from "@legendapp/list/react-native";
+import { AnimatedLegendList } from "@legendapp/list/reanimated";
 import {
   addDays,
   differenceInCalendarDays,
@@ -31,6 +31,7 @@ import {
 import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
+  type LayoutChangeEvent,
   Platform,
   Pressable,
   StyleSheet,
@@ -96,7 +97,7 @@ import {
 import { useWebGridZoom } from "../utils/useWebGridZoom";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { withEventAccessibilityLabel } from "../utils/withEventAccessibilityLabel";
-import { AllDayLane } from "./AllDayLane";
+import { AllDayLane, MIN_ALL_DAY_LANE_HEIGHT } from "./AllDayLane";
 import { type MultiDayMove, MultiDayMovePreview } from "./MultiDayMovePreview";
 
 // Horizontal swipe paging doesn't translate to web; there we disable it and page
@@ -154,20 +155,22 @@ const DEFAULT_DRAG_STEP_MINUTES = 15;
 // moved over a later event would fall behind it).
 const DRAG_EVENT_Z = 100;
 // How long to hold the dragged event past the visible columns before the view
-// pages one period toward that edge.
-const EDGE_DWELL_MS = 500;
+// pages one period toward that edge, and the interval between further pages
+// while the finger stays there.
+const EDGE_DWELL_MS = 600;
+const EDGE_REPEAT_MS = 700;
 // How close (px) the dragging finger must get to the pager's left/right edge to
 // count as "past the columns". Detecting by finger position, not by how many
 // columns the drag has crossed, so an event in any column can reach either edge
-// (a column-delta test can't reach the far edge from a near-side column).
-const EDGE_ZONE_PX = 36;
+// (a column-delta test can't reach the far edge from a near-side column). Kept
+// narrow: on a phone the last column is only a few times this wide.
+const EDGE_ZONE_PX = 24;
 
 /**
  * Lets a per-event drag worklet, deep inside the pager, drive a cross-week drag:
- * locate the pager's edges, freeze the swipe scroll while paging (a native
- * programmatic scroll is otherwise deferred until the touch ends, so the view
- * would only advance once the finger lifts), and hand the event off to a floating
- * ghost that survives the source page paging away, then commit on release.
+ * locate the pager's edges, page the view under the held finger, and hand the
+ * event off to a floating ghost that survives the source page paging away, then
+ * commit on release.
  */
 type EdgePaging = {
   // Pager frame in window space, so the worklet can find the edges and place the
@@ -177,7 +180,6 @@ type EdgePaging = {
   pagerLeft: SharedValue<number>;
   pagerTop: ReturnType<typeof useDerivedValue<number>>;
   pagerWidth: SharedValue<number>;
-  lockScroll: (locked: boolean) => void;
   // The floating "held" copy of the dragged event: pager-local top-left, size, and
   // visibility, driven on the UI thread so it tracks the finger across the page.
   ghostX: SharedValue<number>;
@@ -320,6 +322,10 @@ export type { EventDragHandler, EventDragStartHandler } from "../types";
 // scroll content by the same amount so the top-most label is never clipped.
 const HOUR_LABEL_TOP_INSET = 12;
 const HOUR_LABEL_NUDGE = 6;
+// Fixed height of the day-header row. The header pages with the columns (it
+// lives inside each page), so the hour column's corner, the all-day band, and
+// the hours all offset by this without measuring the header per page.
+const DAY_HEADER_HEIGHT = 56;
 
 type AnimatedEventBoxProps<T> = {
   positioned: PositionedEvent<T>;
@@ -369,7 +375,7 @@ type AnimatedEventBoxProps<T> = {
   onEdgeAdvance?: (dir: number) => void;
 };
 
-function AnimatedEventBox<T>({
+function AnimatedEventBoxInner<T>({
   positioned,
   eventIndex,
   movingEvent,
@@ -516,13 +522,16 @@ function AnimatedEventBox<T>({
     // already renders. Purely geometric, so a resting box (already clipped to the
     // day by `layoutDayEvents`) is untouched and the height doesn't jump when a
     // drag commits.
+    // Hidden while lifted: the floating ghost stands in for the box until the
+    // drop commits (and, for a multi-day move, while the preview draws it).
     return {
       top,
       height: visibleBoxHeight.value,
       transform: [{ translateX: moveOffsetX.value }],
       zIndex: dragZ.value,
+      opacity: hiddenForMove || lifted.value ? 0 : 1,
     };
-  }, [startHours, minHour]);
+  }, [startHours, minHour, hiddenForMove]);
 
   // Pixel height of the part of a move that runs past midnight, or 0 when nothing
   // spills. Measured against the end of the day, not `maxHour`: a narrowed window
@@ -659,9 +668,9 @@ function AnimatedEventBox<T>({
 
   // Edge auto-advance dwell. Dragging the event past the visible columns and
   // holding there pages the view one period and carries the event onto it: same
-  // weekday, keeping whatever time the vertical drag has reached. It fires once
-  // per drag (the box unmounts as the page changes), matching "hold at the edge
-  // to move to the next/previous week"; the tested commit path does the move.
+  // weekday, keeping whatever time the vertical drag has reached. It keeps paging
+  // while the finger stays at the edge, matching "hold at the edge to move to the
+  // next/previous week"; the tested commit path does the move.
   const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const disarmEdge = useCallback(() => {
     if (dwellTimer.current) {
@@ -669,22 +678,14 @@ function AnimatedEventBox<T>({
       dwellTimer.current = null;
     }
   }, []);
-  // Cancel a pending dwell and hand the pager's swipe scroll back. Runs on every
-  // gesture end so a lock taken by an edge-page is always released.
-  const releaseEdge = useCallback(() => {
-    disarmEdge();
-    edgePaging?.lockScroll(false);
-  }, [disarmEdge, edgePaging]);
+  // Cancel a pending dwell. Runs on every gesture end.
+  const releaseEdge = disarmEdge;
   const armEdge = useCallback(
     (dir: number) => {
       disarmEdge();
-      dwellTimer.current = setTimeout(() => {
+      const fire = () => {
         dwellTimer.current = null;
         if (!edgePaging) return;
-        // Freeze the pager's own swipe before paging: on native a programmatic
-        // scroll is deferred while the touch is tracked, so without this the view
-        // wouldn't advance until the finger lifts.
-        edgePaging.lockScroll(true);
         // First edge fire: lift the event into the floating ghost. It must NOT
         // commit here — committing relocates the event off this page, which
         // unmounts the dragging box and kills the gesture. Instead the ghost
@@ -701,7 +702,9 @@ function AnimatedEventBox<T>({
           edgePaging.beginLift(latest.current.event as CalendarEvent<unknown>);
         }
         onEdgeAdvance?.(dir);
-      }, EDGE_DWELL_MS);
+        dwellTimer.current = setTimeout(fire, EDGE_REPEAT_MS);
+      };
+      dwellTimer.current = setTimeout(fire, EDGE_DWELL_MS);
     },
     [
       disarmEdge,
@@ -1005,10 +1008,7 @@ function AnimatedEventBox<T>({
     themed: theme.containers.timeGridEvent,
   });
   const box = (
-    <Animated.View
-      {...eventSlot}
-      style={[eventSlot.style, boxStyle, hiddenForMove ? { opacity: 0 } : null]}
-    >
+    <Animated.View {...eventSlot} style={[eventSlot.style, boxStyle]}>
       <RenderEventComponent
         event={positioned.event}
         mode={mode}
@@ -1071,6 +1071,10 @@ function AnimatedEventBox<T>({
   );
 }
 
+// A page re-renders on every drag preview and page change; the boxes only need
+// to when their own event, geometry, or zoom source changes.
+const AnimatedEventBox = memo(AnimatedEventBoxInner) as typeof AnimatedEventBoxInner;
+
 /** Replace the hour-axis label. Receives the hour (0–23) and the `ampm` flag. */
 export type HourRenderer = (hour: number, ampm: boolean) => React.ReactNode;
 
@@ -1105,125 +1109,155 @@ const HourLabel = ({ hour, width, label, ampm, hourComponent }: HourLabelProps) 
   );
 };
 
-type HourLineProps = {
-  hour: number;
-  minHour: number;
-  cellHeight: SharedValue<number>;
+type HourLinesProps = {
+  hours: number[];
+  timeslots: number;
 };
 
-// The grid line across the day columns at the top of one hour row.
-const HourLine = ({ hour, minHour, cellHeight }: HourLineProps) => {
+// The grid lines of one page: a column of equal hour cells filling the hour
+// window, each holding its line at the top and its sub-hour dividers inside.
+// Layout spreads the cells as the window's height animates, so no line needs a
+// worklet of its own.
+const HourLines = memo(function HourLines({ hours, timeslots }: HourLinesProps) {
   const theme = useCalendarTheme();
   const slot = useSlots<TimeGridSlot>();
-  // Position via `top` (a layout prop), not a transform. The per-row layout pass
-  // as cellHeight animates keeps the scroll content's size in sync while zooming;
-  // a transform is composited and leaves the scroll range stale.
-  const animatedStyle = useAnimatedStyle(
-    () => ({ top: (hour - minHour) * cellHeight.value }),
-    [hour, minHour],
-  );
-  const lineSlot = slot("gridLines", {
+  const hourLineSlot = slot("gridLines", {
     base: [styles.hourLine, styles.nonInteractive],
     themed: { backgroundColor: theme.colors.gridLine },
   });
-  return <Animated.View {...lineSlot} style={[lineSlot.style, animatedStyle]} />;
-};
-
-type TimeslotLineProps = {
-  hour: number;
-  minHour: number;
-  fraction: number;
-  cellHeight: SharedValue<number>;
-};
-
-// A faint divider inside an hour row, marking a sub-hour slot (e.g. half hours).
-const TimeslotLine = ({ hour, minHour, fraction, cellHeight }: TimeslotLineProps) => {
-  const theme = useCalendarTheme();
-  const slot = useSlots<TimeGridSlot>();
-  const animatedStyle = useAnimatedStyle(
-    () => ({ top: (hour - minHour + fraction) * cellHeight.value }),
-    [hour, minHour, fraction],
-  );
-  const lineSlot = slot("gridLines", {
+  const timeslotLineSlot = slot("gridLines", {
     base: [styles.timeslotLine, styles.nonInteractive],
     themed: { backgroundColor: theme.colors.gridLine },
   });
-  return <Animated.View {...lineSlot} style={[lineSlot.style, animatedStyle]} />;
-};
-
-type HourGutterRowProps = {
-  hour: number;
-  minHour: number;
-  cellHeight: SharedValue<number>;
-  width: number;
-  label: string;
-  ampm: boolean;
-  hourComponent?: HourRenderer;
-};
-
-// One label row of the hour column, at the same `top` as the pages' hour line.
-const HourGutterRow = ({
-  hour,
-  minHour,
-  cellHeight,
-  width,
-  label,
-  ampm,
-  hourComponent,
-}: HourGutterRowProps) => {
-  const animatedStyle = useAnimatedStyle(
-    () => ({ top: (hour - minHour) * cellHeight.value }),
-    [hour, minHour],
-  );
   return (
-    <Animated.View style={[styles.hourRow, styles.nonInteractive, animatedStyle]}>
-      <HourLabel
-        hour={hour}
-        width={width}
-        label={label}
-        ampm={ampm}
-        hourComponent={hourComponent}
-      />
-    </Animated.View>
+    <View style={[styles.fill, styles.nonInteractive]}>
+      {hours.map((hour) => (
+        <View key={hour} style={styles.hourCell}>
+          {Array.from({ length: Math.max(1, timeslots) }, (_, slotIndex) => (
+            <View key={slotIndex} style={styles.hourCell}>
+              <View {...(slotIndex === 0 ? hourLineSlot : timeslotLineSlot)} />
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
   );
-};
+});
 
 type HourGutterProps = {
   width: number;
   minHour: number;
   maxHour: number;
   cellHeight: SharedValue<number>;
+  /** Height of the all-day band shared with the pages (live, follows the swipe). */
+  laneHeight: SharedValue<number>;
+  /** The grid's vertical offset, so the "all-day" cell can hold still at the top. */
+  scrollY: SharedValue<number>;
+  showLane: boolean;
+  /** Height of the day-header corner above the "all-day" cell (0 when the header
+   * isn't paged, i.e. a custom `renderHeader` draws its own fixed header). */
+  headerHeight: number;
+  /** ISO week label for the corner, or null to leave it empty. */
+  weekNumber: string | null;
   ampm: boolean;
   hourComponent?: HourRenderer;
 };
 
 // The hour-axis column beside the pager. It is part of the grid's one vertical
 // scroll content, so it scrolls and zooms with the pages and holds still while
-// they swipe.
+// they swipe. Its "all-day" cell rides the scroll offset to stay pinned at the
+// top beside the pages' all-day bands, and its label rows are spread by layout
+// over the hour window, like the pages' lines.
 const HourGutterInner = ({
   width,
   minHour,
   maxHour,
   cellHeight,
+  laneHeight,
+  scrollY,
+  showLane,
+  headerHeight,
+  weekNumber,
   ampm,
   hourComponent,
 }: HourGutterProps) => {
+  const theme = useCalendarTheme();
   const slot = useSlots<TimeGridSlot>();
   const hours = useMemo(() => hourRange(minHour, maxHour), [minHour, maxHour]);
+  // Height and offset are separate styles: a style that returns a transform is
+  // re-applied every time it runs, so keeping the offset apart means a swipe
+  // (which only moves the band's height) sends nothing to the view.
+  const laneCellHeightStyle = useAnimatedStyle(() => ({ height: laneHeight.value }));
+  const pinStyle = useAnimatedStyle(() => ({ transform: [{ translateY: scrollY.value }] }));
+  const rowsStyle = useAnimatedStyle(
+    () => ({
+      top: headerHeight + laneHeight.value + HOUR_LABEL_TOP_INSET,
+      height: (maxHour - minHour) * cellHeight.value,
+    }),
+    [minHour, maxHour, headerHeight],
+  );
   return (
-    <View testID="hour-gutter" {...slot("hourGutter", { base: { width } })}>
-      {hours.map((hour) => (
-        <HourGutterRow
-          key={hour}
-          hour={hour}
-          minHour={minHour}
-          cellHeight={cellHeight}
-          width={width}
-          label={formatHour(hour, { ampm })}
-          ampm={ampm}
-          hourComponent={hourComponent}
-        />
-      ))}
+    <View testID="hour-gutter" {...slot("hourGutter", { base: [styles.hourGutter, { width }] })}>
+      {headerHeight > 0 ? (
+        <Animated.View
+          style={[
+            styles.gutterCorner,
+            {
+              height: headerHeight,
+              backgroundColor: theme.colors.surface,
+              borderBottomColor: theme.colors.gridLine,
+            },
+            pinStyle,
+          ]}
+        >
+          {weekNumber ? (
+            <Text
+              {...slot<TextStyle>("weekNumber", {
+                themed: [theme.text.hourLabel, { color: theme.colors.textMuted }],
+              })}
+              allowFontScaling={false}
+            >
+              {weekNumber}
+            </Text>
+          ) : null}
+        </Animated.View>
+      ) : null}
+      {showLane ? (
+        <Animated.View
+          style={[
+            styles.laneCell,
+            { top: headerHeight },
+            { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.gridLine },
+            laneCellHeightStyle,
+            pinStyle,
+          ]}
+        >
+          <Text
+            {...slot<TextStyle>("allDayLabel", {
+              base: styles.allDayLabel,
+              themed: { color: theme.colors.textMuted },
+            })}
+            allowFontScaling={false}
+          >
+            all-day
+          </Text>
+        </Animated.View>
+      ) : null}
+      <Animated.View style={[styles.gutterRows, rowsStyle]}>
+        {hours.map((hour) => (
+          <View key={hour} style={styles.hourCell}>
+            <View style={[styles.hourRow, styles.nonInteractive]}>
+              <HourLabel
+                hour={hour}
+                width={width}
+                label={formatHour(hour, { ampm })}
+                ampm={ampm}
+                hourComponent={hourComponent}
+              />
+            </View>
+          </View>
+        ))}
+      </Animated.View>
     </View>
   );
 };
@@ -1352,6 +1386,27 @@ type TimetablePageProps<T> = {
   onLongPressCell?: (date: Date) => void;
   onCreateEvent?: (start: Date, end: Date) => void;
   onEdgeAdvance?: (dir: number) => void;
+  /** This page's index in the pager: the key its all-day lane height is reported under. */
+  pageIndex: number;
+  /** Height of the all-day band shared by every page (live, follows the swipe). */
+  laneHeight: SharedValue<number>;
+  /** The grid's vertical offset, so the band can hold still at the top while the hours scroll. */
+  scrollY: SharedValue<number>;
+  showAllDayEventCell: boolean;
+  onLaneLayout: (index: number, height: number) => void;
+  /**
+   * Fixed height of the page (and the pager): tall enough for the fully zoomed
+   * hour window and the tallest lane seen, so neither the pager nor its item
+   * containers re-lay out while the band or the zoom animate inside.
+   */
+  height: number;
+  /** Draw this page's day-header row (pages with the columns). False when a custom
+   * `renderHeader` owns a fixed header above the pager. */
+  pagedHeader: boolean;
+  weekdayFormat?: WeekdayFormat;
+  locale?: Locale;
+  activeDate?: Date;
+  onPressDateHeader?: (date: Date) => void;
 };
 
 // One page of day columns: the tall, non-scrolling content for a single date
@@ -1397,6 +1452,17 @@ function TimetablePageInner<T>({
   onLongPressCell,
   onCreateEvent,
   onEdgeAdvance,
+  pageIndex,
+  laneHeight,
+  scrollY,
+  showAllDayEventCell,
+  onLaneLayout,
+  height,
+  pagedHeader,
+  weekdayFormat,
+  locale,
+  activeDate,
+  onPressDateHeader,
 }: TimetablePageProps<T>) {
   const theme = useCalendarTheme();
   const slot = useSlots<TimeGridSlot>();
@@ -1482,6 +1548,26 @@ function TimetablePageInner<T>({
   const fullHeightStyle = useAnimatedStyle(
     () => ({ height: (maxHour - minHour) * heightSource.value }),
     [minHour, maxHour, heightSource],
+  );
+  // The page stacks its all-day band, the label inset, then the hours. The band
+  // rides the scroll offset so it holds still at the top of the viewport while
+  // the hours pass beneath it, and it slides with the page during a swipe.
+  const headerOffset = pagedHeader ? DAY_HEADER_HEIGHT : 0;
+  const gridStyle = useAnimatedStyle(
+    () => ({
+      top: headerOffset + laneHeight.value + HOUR_LABEL_TOP_INSET,
+      height: (maxHour - minHour) * heightSource.value,
+    }),
+    [minHour, maxHour, heightSource, headerOffset],
+  );
+  // Split like the hour column's cell: the offset style only runs on a scroll,
+  // the height style only when the band resizes. Both the header and the band
+  // ride the scroll offset, so they hold still at the top while the hours pass.
+  const laneHeightStyle = useAnimatedStyle(() => ({ height: laneHeight.value }));
+  const pinStyle = useAnimatedStyle(() => ({ transform: [{ translateY: scrollY.value }] }));
+  const reportLaneLayout = useCallback(
+    (event: LayoutChangeEvent) => onLaneLayout(pageIndex, event.nativeEvent.layout.height),
+    [onLaneLayout, pageIndex],
   );
 
   // Drag-to-create: sweep out a new event on empty grid. Native long-presses
@@ -1651,204 +1737,233 @@ function TimetablePageInner<T>({
     ) : null;
 
   return (
-    <Animated.View testID="time-grid-page" style={[styles.page, { width }, fullHeightStyle]}>
-      {/* Behind the events, so empty-space taps/drags create while event
-                taps still hit their box. */}
-      {cellLayer && backgroundGesture ? (
-        <GestureDetector gesture={backgroundGesture}>{cellLayer}</GestureDetector>
-      ) : (
-        cellLayer
-      )}
-
-      {days.map((day, dayIndex) => {
-        if (!highlightWeekends || !isWeekend(day)) return null;
-        const shadeSlot = slot("weekendShade", {
-          base: [
-            styles.weekendColumn,
-            styles.nonInteractive,
-            { left: dayLeft(dayIndex), width: dayWidth },
-          ],
-          themed: { backgroundColor: theme.colors.weekendBackground },
-        });
-        return (
-          <Animated.View
-            key={`weekend-${day.toISOString()}`}
-            testID="weekend-shade"
-            {...shadeSlot}
-            style={[shadeSlot.style, fullHeightStyle]}
+    <View testID="time-grid-page" style={[styles.page, { width, height }]}>
+      {pagedHeader ? (
+        <Animated.View
+          testID="paged-header"
+          style={[
+            styles.pagedHeader,
+            { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.gridLine },
+            pinStyle,
+          ]}
+        >
+          <DayHeaderRow
+            days={days}
+            mode={mode}
+            dayWidth={dayWidth}
+            weekdayFormat={weekdayFormat}
+            locale={locale}
+            activeDate={activeDate}
+            onPressDateHeader={onPressDateHeader}
           />
-        );
-      })}
+        </Animated.View>
+      ) : null}
+      {showAllDayEventCell ? (
+        <Animated.View
+          testID="all-day-band"
+          style={[
+            styles.laneBand,
+            { top: headerOffset, backgroundColor: theme.colors.surface },
+            laneHeightStyle,
+            pinStyle,
+          ]}
+        >
+          <AllDayLane
+            days={days}
+            events={events}
+            mode={mode}
+            dayWidth={dayWidth}
+            renderEvent={renderEvent}
+            keyExtractor={keyExtractor}
+            onPressEvent={onPressEvent}
+            onLongPressEvent={onLongPressEvent}
+            onLayout={reportLaneLayout}
+          />
+        </Animated.View>
+      ) : null}
+      <Animated.View style={[styles.grid, gridStyle]}>
+        {/* Behind the events, so empty-space taps/drags create while event
+                taps still hit their box. */}
+        {cellLayer && backgroundGesture ? (
+          <GestureDetector gesture={backgroundGesture}>{cellLayer}</GestureDetector>
+        ) : (
+          cellLayer
+        )}
 
-      {calendarCellStyle
-        ? days.map((day, dayIndex) => {
-            const cellStyle = calendarCellStyle(day);
-            return cellStyle ? (
-              <Animated.View
-                key={`cell-${day.toISOString()}`}
-                style={[
-                  styles.weekendColumn,
-                  styles.nonInteractive,
-                  { left: dayLeft(dayIndex), width: dayWidth },
-                  cellStyle,
-                  fullHeightStyle,
-                ]}
-              />
-            ) : null;
-          })
-        : null}
+        {days.map((day, dayIndex) => {
+          if (!highlightWeekends || !isWeekend(day)) return null;
+          const shadeSlot = slot("weekendShade", {
+            base: [
+              styles.weekendColumn,
+              styles.nonInteractive,
+              { left: dayLeft(dayIndex), width: dayWidth },
+            ],
+            themed: { backgroundColor: theme.colors.weekendBackground },
+          });
+          return (
+            <Animated.View
+              key={`weekend-${day.toISOString()}`}
+              testID="weekend-shade"
+              {...shadeSlot}
+              style={[shadeSlot.style, fullHeightStyle]}
+            />
+          );
+        })}
 
-      {businessHours
-        ? days.flatMap((day, dayIndex) =>
-            closedHourBands(day, businessHours, minHour, maxHour).map((band, bandIndex) => (
+        {calendarCellStyle
+          ? days.map((day, dayIndex) => {
+              const cellStyle = calendarCellStyle(day);
+              return cellStyle ? (
+                <Animated.View
+                  key={`cell-${day.toISOString()}`}
+                  style={[
+                    styles.weekendColumn,
+                    styles.nonInteractive,
+                    { left: dayLeft(dayIndex), width: dayWidth },
+                    cellStyle,
+                    fullHeightStyle,
+                  ]}
+                />
+              ) : null;
+            })
+          : null}
+
+        {businessHours
+          ? days.flatMap((day, dayIndex) =>
+              closedHourBands(day, businessHours, minHour, maxHour).map((band, bandIndex) => (
+                <ShadeBand
+                  key={`closed-${day.toISOString()}-${bandIndex}`}
+                  cellHeight={heightSource}
+                  startHour={band.start}
+                  endHour={band.end}
+                  minHour={minHour}
+                  left={dayLeft(dayIndex)}
+                  width={dayWidth}
+                  color={renderBusinessHours ? undefined : theme.colors.outsideHoursBackground}
+                >
+                  {renderBusinessHours?.({ date: day, start: band.start, end: band.end })}
+                </ShadeBand>
+              )),
+            )
+          : null}
+
+        {/* Background events: shaded, non-interactive time ranges. */}
+        {days.flatMap((day, dayIndex) =>
+          backgroundBandsForDay(events, day)
+            .map((b) => ({
+              ...b,
+              startHours: Math.max(b.startHours, minHour),
+              endHours: Math.min(b.endHours, maxHour),
+            }))
+            .filter((b) => b.endHours > b.startHours)
+            .map((b, bandIndex) => (
               <ShadeBand
-                key={`closed-${day.toISOString()}-${bandIndex}`}
+                key={`bg-${day.toISOString()}-${bandIndex}`}
                 cellHeight={heightSource}
-                startHour={band.start}
-                endHour={band.end}
+                startHour={b.startHours}
+                endHour={b.endHours}
                 minHour={minHour}
                 left={dayLeft(dayIndex)}
                 width={dayWidth}
-                color={renderBusinessHours ? undefined : theme.colors.outsideHoursBackground}
-              >
-                {renderBusinessHours?.({ date: day, start: band.start, end: band.end })}
-              </ShadeBand>
+                color={theme.colors.backgroundEvent}
+                slotName="backgroundEvent"
+                testID="background-event-shade"
+              />
             )),
-          )
-        : null}
+        )}
 
-      {/* Background events: shaded, non-interactive time ranges. */}
-      {days.flatMap((day, dayIndex) =>
-        backgroundBandsForDay(events, day)
-          .map((b) => ({
-            ...b,
-            startHours: Math.max(b.startHours, minHour),
-            endHours: Math.min(b.endHours, maxHour),
-          }))
-          .filter((b) => b.endHours > b.startHours)
-          .map((b, bandIndex) => (
-            <ShadeBand
-              key={`bg-${day.toISOString()}-${bandIndex}`}
-              cellHeight={heightSource}
-              startHour={b.startHours}
-              endHour={b.endHours}
-              minHour={minHour}
-              left={dayLeft(dayIndex)}
-              width={dayWidth}
-              color={theme.colors.backgroundEvent}
-              slotName="backgroundEvent"
-              testID="background-event-shade"
+        {days.map((day, dayIndex) => {
+          const separatorSlot = slot("daySeparator", {
+            base: [styles.daySeparator, styles.nonInteractive, { left: dayLeft(dayIndex) }],
+            themed: { backgroundColor: theme.colors.gridLine },
+          });
+          return (
+            <Animated.View
+              key={`separator-${day.toISOString()}`}
+              {...separatorSlot}
+              style={[separatorSlot.style, fullHeightStyle]}
             />
-          )),
-      )}
+          );
+        })}
 
-      {days.map((day, dayIndex) => {
-        const separatorSlot = slot("daySeparator", {
-          base: [styles.daySeparator, styles.nonInteractive, { left: dayLeft(dayIndex) }],
-          themed: { backgroundColor: theme.colors.gridLine },
-        });
-        return (
-          <Animated.View
-            key={`separator-${day.toISOString()}`}
-            {...separatorSlot}
-            style={[separatorSlot.style, fullHeightStyle]}
+        <HourLines hours={hoursRange} timeslots={timeslots} />
+
+        {dayLayouts.flatMap((layout, dayIndex) =>
+          layout
+            // Skip events that fall entirely outside the [minHour, maxHour) window.
+            .filter((p) => p.startHours < maxHour && p.startHours + p.durationHours > minHour)
+            .map((positioned, eventIndex) => {
+              const columnWidth = dayWidth / positioned.columns;
+              return (
+                <AnimatedEventBox
+                  // Prefix with the day so a multi-day event's per-day segments
+                  // (which share the same event key) stay unique across the
+                  // flattened list of all days' boxes.
+                  key={`${dayIndex}:${keyExtractor(positioned.event, eventIndex)}`}
+                  positioned={positioned}
+                  eventIndex={events.indexOf(positioned.event)}
+                  movingEvent={movingEvent}
+                  onMovePreview={setMultiDayMove}
+                  cellHeight={heightSource}
+                  minHour={minHour}
+                  maxHour={maxHour}
+                  left={dayLeft(dayIndex) + positioned.column * columnWidth}
+                  width={columnWidth}
+                  dayLeftPx={dayLeft(dayIndex)}
+                  nextDayDirection={isRTL ? -1 : 1}
+                  dayWidth={dayWidth}
+                  dayIndex={dayIndex}
+                  dayCount={days.length}
+                  dayOrdinals={dayOrdinals}
+                  mode={mode}
+                  daysPerPage={daysPerPage}
+                  renderEvent={renderEvent}
+                  snapMinutes={snapMinutes}
+                  minEventHeight={minEventHeight}
+                  eventGap={eventGap}
+                  showDragHandle={showDragHandle}
+                  eventStartEditable={eventStartEditable}
+                  eventDurationEditable={eventDurationEditable}
+                  onPress={onPressEvent}
+                  onLongPress={onLongPressEvent}
+                  onDragEvent={onDragEvent}
+                  onDragStart={onDragStart}
+                  onEdgeAdvance={onEdgeAdvance}
+                />
+              );
+            }),
+        )}
+
+        {multiDayMove ? (
+          <MultiDayMovePreview
+            move={multiDayMove}
+            days={days}
+            cellHeight={heightSource}
+            dayWidth={dayWidth}
+            minHour={minHour}
+            mode={mode}
+            renderEvent={renderEvent}
+            minEventHeight={minEventHeight}
+            eventGap={eventGap}
           />
-        );
-      })}
+        ) : null}
 
-      {hoursRange.map((hour) => (
-        <HourLine key={hour} hour={hour} minHour={minHour} cellHeight={heightSource} />
-      ))}
+        {showNowIndicator && nowDayIndex >= 0 && nowInWindow ? (
+          <NowIndicator
+            cellHeight={heightSource}
+            nowHours={nowHours}
+            minHour={minHour}
+            left={dayLeft(nowDayIndex)}
+            width={dayWidth}
+            color={theme.colors.nowIndicator}
+          />
+        ) : null}
 
-      {timeslots > 1
-        ? hoursRange.flatMap((hour) =>
-            Array.from({ length: timeslots - 1 }, (_, i) => (
-              <TimeslotLine
-                key={`slot-${hour}-${i}`}
-                hour={hour}
-                minHour={minHour}
-                fraction={(i + 1) / timeslots}
-                cellHeight={heightSource}
-              />
-            )),
-          )
-        : null}
-
-      {dayLayouts.flatMap((layout, dayIndex) =>
-        layout
-          // Skip events that fall entirely outside the [minHour, maxHour) window.
-          .filter((p) => p.startHours < maxHour && p.startHours + p.durationHours > minHour)
-          .map((positioned, eventIndex) => {
-            const columnWidth = dayWidth / positioned.columns;
-            return (
-              <AnimatedEventBox
-                // Prefix with the day so a multi-day event's per-day segments
-                // (which share the same event key) stay unique across the
-                // flattened list of all days' boxes.
-                key={`${dayIndex}:${keyExtractor(positioned.event, eventIndex)}`}
-                positioned={positioned}
-                eventIndex={events.indexOf(positioned.event)}
-                movingEvent={movingEvent}
-                onMovePreview={setMultiDayMove}
-                cellHeight={heightSource}
-                minHour={minHour}
-                maxHour={maxHour}
-                left={dayLeft(dayIndex) + positioned.column * columnWidth}
-                width={columnWidth}
-                dayLeftPx={dayLeft(dayIndex)}
-                nextDayDirection={isRTL ? -1 : 1}
-                dayWidth={dayWidth}
-                dayIndex={dayIndex}
-                dayCount={days.length}
-                dayOrdinals={dayOrdinals}
-                mode={mode}
-                daysPerPage={daysPerPage}
-                renderEvent={renderEvent}
-                snapMinutes={snapMinutes}
-                minEventHeight={minEventHeight}
-                eventGap={eventGap}
-                showDragHandle={showDragHandle}
-                eventStartEditable={eventStartEditable}
-                eventDurationEditable={eventDurationEditable}
-                onPress={onPressEvent}
-                onLongPress={onLongPressEvent}
-                onDragEvent={onDragEvent}
-                onDragStart={onDragStart}
-                onEdgeAdvance={onEdgeAdvance}
-              />
-            );
-          }),
-      )}
-
-      {multiDayMove ? (
-        <MultiDayMovePreview
-          move={multiDayMove}
-          days={days}
-          cellHeight={heightSource}
-          dayWidth={dayWidth}
-          minHour={minHour}
-          mode={mode}
-          renderEvent={renderEvent}
-          minEventHeight={minEventHeight}
-          eventGap={eventGap}
-        />
-      ) : null}
-
-      {showNowIndicator && nowDayIndex >= 0 && nowInWindow ? (
-        <NowIndicator
-          cellHeight={heightSource}
-          nowHours={nowHours}
-          minHour={minHour}
-          left={dayLeft(nowDayIndex)}
-          width={dayWidth}
-          color={theme.colors.nowIndicator}
-        />
-      ) : null}
-
-      {createEnabled ? (
-        <Animated.View {...ghostSlot} style={[ghostSlot.style, createGhostStyle]} />
-      ) : null}
-    </Animated.View>
+        {createEnabled ? (
+          <Animated.View {...ghostSlot} style={[ghostSlot.style, createGhostStyle]} />
+        ) : null}
+      </Animated.View>
+    </View>
   );
 }
 
@@ -2084,6 +2199,11 @@ function TimeGridInner<T>({
   const clampedMaxHour = Math.max(clampedMinHour + 1, Math.min(maxHour, HOURS_PER_DAY));
   // Collapse the hour gutter to zero when hours are hidden.
   const hourColumnWidth = hideHours ? 0 : hourColumnWidthProp;
+  // The built-in day header pages with the columns (rendered inside each page). A
+  // custom `renderHeader` keeps a single fixed header above the pager instead, so
+  // the pages carry no header and nothing offsets by its height.
+  const pagedHeader = renderHeader == null;
+  const headerOffset = pagedHeader ? DAY_HEADER_HEIGHT : 0;
 
   // Inject a consumer's `eventAccessibilityLabel` override into every event once,
   // so the timed columns and the all-day lane share it without threading a prop
@@ -2127,9 +2247,9 @@ function TimeGridInner<T>({
   // column leaves of the container.
   const [pagerLayoutWidth, setPagerLayoutWidth] = useState<number | null>(null);
   const columnsWidth = pagerLayoutWidth ?? containerWidth - hourColumnWidth;
-  // The list remounts exactly once, when the measured width replaces the window
-  // seed, so its fixed item size is right before any page is scrolled to.
-  const [measured, setMeasured] = useState(false);
+  // The tallest all-day lane reported so far, so the fixed pager height below
+  // always has room for the band.
+  const [tallestLane, setTallestLane] = useState(MIN_ALL_DAY_LANE_HEIGHT);
   // Week-anchored modes page by a full week and align pages to the week start:
   // `week`, and `custom` when a `weekEndsOn` defines a partial-week span.
   const weekAnchored = mode === "week" || (mode === "custom" && weekEndsOn != null);
@@ -2163,15 +2283,47 @@ function TimeGridInner<T>({
     const dom = node.getScrollableNode() as { scrollHeight: number; clientHeight: number } | null;
     if (dom && dom.scrollHeight > dom.clientHeight) webSeededRef.current = true;
   }, [scrollRef, seedDefaultY]);
-  // Window-space frames (refined on layout) and a swipe-scroll freeze, shared with
-  // the event drag worklets through EdgePagingContext so a cross-week edge drag can
-  // detect the edges and page the view live under a held finger. The pager's top
-  // follows the scroll: the viewport's top plus the label inset, less the offset.
+  // Height of the all-day band, shared by the hour column and every page. Each
+  // page reports its lane's natural height under its index, and the band follows
+  // the pager's live offset (kept on the UI thread by the list), interpolating
+  // between the outgoing and incoming pages' heights so it resizes on the fly
+  // during a swipe. The list opens on the anchor page.
+  const laneHeights = useSharedValue<Record<number, number>>({});
+  const pagerOffset = useSharedValue(PAGE_WINDOW * columnsWidth);
+  const pagerSharedValues = useMemo(() => ({ scrollOffset: pagerOffset }), [pagerOffset]);
+  // The committed page, for the worklet below: the list only reports its offset
+  // as it scrolls, and seeds it from its own scroll state at mount, which can
+  // still be zero. An offset more than a page and a half from the committed
+  // page is that stale seed, so the band reads as resting on the page.
+  const activeIndexShared = useSharedValue(PAGE_WINDOW);
+  const laneHeight = useDerivedValue(() => {
+    if (!showAllDayEventCell || columnsWidth <= 0) return 0;
+    const heights = laneHeights.value;
+    let progress = pagerOffset.value / columnsWidth;
+    if (Math.abs(progress - activeIndexShared.value) > 1.5) progress = activeIndexShared.value;
+    const from = Math.floor(progress);
+    const fraction = progress - from;
+    const start = heights[from] ?? MIN_ALL_DAY_LANE_HEIGHT;
+    const end = heights[from + 1] ?? start;
+    return start + (end - start) * fraction;
+  }, [showAllDayEventCell, columnsWidth]);
+  const reportLaneHeight = useCallback(
+    (index: number, height: number) => {
+      setTallestLane((tallest) => (height > tallest ? height : tallest));
+      if (laneHeights.value[index] === height) return;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      laneHeights.value = { ...laneHeights.value, [index]: height };
+    },
+    [laneHeights],
+  );
+  // Window-space frames (refined on layout), shared with the event drag worklets
+  // through EdgePagingContext so a cross-week edge drag can detect the edges and
+  // page the view live under a held finger. The pager's top follows the scroll:
+  // the viewport's top, less the offset.
   const viewportTop = useSharedValue(0);
   const pagerLeft = useSharedValue(0);
   const pagerWidth = useSharedValue(width);
-  const pagerTop = useDerivedValue(() => viewportTop.value + HOUR_LABEL_TOP_INSET - scrollY.value);
-  const [edgePagingLock, setEdgePagingLock] = useState(false);
+  const pagerTop = useDerivedValue(() => viewportTop.value - scrollY.value);
   // Floating "held" ghost that carries a dragged event across a page change (see
   // EdgePaging): pager-local top-left, size, visibility, and the event to draw.
   const ghostX = useSharedValue(0);
@@ -2203,7 +2355,6 @@ function TimeGridInner<T>({
     ghostVisible.value = 0;
     liftedEventRef.current = null;
     setLiftedEvent(null);
-    setEdgePagingLock(false);
   }, [ghostVisible]);
   const commitLiftedDrop = useCallback(
     (ghostLocalX: number, ghostLocalY: number) => {
@@ -2223,10 +2374,12 @@ function TimeGridInner<T>({
       // Map the ghost's drawn position on the page it landed on back to a cell:
       // its left edge picks the day column, its top edge picks the time. Both are
       // pager-local, and the pager is the scrolling content itself, so the top
-      // edge is already grid space; only the live row height (pinch) is read.
+      // edge only needs the page's all-day band and label inset taken off before
+      // the live row height (pinch) converts it to hours.
       const dayWidth = cw / days.length;
       const col = Math.min(Math.max(Math.floor(ghostLocalX / dayWidth), 0), days.length - 1);
-      const hoursFromMin = ghostLocalY / cellHeight.value;
+      const hoursFromMin =
+        (ghostLocalY - headerOffset - laneHeight.value - HOUR_LABEL_TOP_INSET) / cellHeight.value;
       const rawMinutes = (min + hoursFromMin) * MINUTES_PER_HOUR;
       // Same rule as an in-page move: the start stays in the day it landed on,
       // while the duration is free to carry the end past midnight.
@@ -2240,14 +2393,13 @@ function TimeGridInner<T>({
       // reads as a visible snap-back instead of the event seeming to vanish.
       if (onDrag(ev, start, end) === false) onDate(ev.start);
     },
-    [clearLift, cellHeight],
+    [clearLift, cellHeight, laneHeight, headerOffset],
   );
   const edgePaging = useMemo<EdgePaging>(
     () => ({
       pagerLeft,
       pagerTop,
       pagerWidth,
-      lockScroll: setEdgePagingLock,
       ghostX,
       ghostY,
       ghostW,
@@ -2323,10 +2475,26 @@ function TimeGridInner<T>({
     minHourHeight,
     maxHourHeight,
   ]);
-  // Height of the hour grid (the hour column and every page), live with the pinch.
+  // The pager and its pages keep one fixed height, big enough for the fully
+  // zoomed hour window plus the tallest lane, so the list and its item
+  // containers (which report every layout to JS) never re-lay out while the
+  // band or the zoom animate. Only the scroll content's own height is live.
+  const pagerHeight =
+    headerOffset +
+    HOUR_LABEL_TOP_INSET +
+    (clampedMaxHour - clampedMinHour) * maxHourHeight +
+    tallestLane;
+  // Height of the scroll content (the hour column and every page): the all-day
+  // band, the label inset, then the hours, live with the pinch and the swipe.
   const gridHeightStyle = useAnimatedStyle(
-    () => ({ height: (clampedMaxHour - clampedMinHour) * cellHeight.value }),
-    [clampedMinHour, clampedMaxHour],
+    () => ({
+      height:
+        headerOffset +
+        laneHeight.value +
+        HOUR_LABEL_TOP_INSET +
+        (clampedMaxHour - clampedMinHour) * cellHeight.value,
+    }),
+    [clampedMinHour, clampedMaxHour, headerOffset],
   );
 
   // Web stand-in for pinch: Ctrl/Cmd + scroll zooms the grid via the same shared
@@ -2367,12 +2535,47 @@ function TimeGridInner<T>({
   // The committed date's page is the centred/active one. `viewedIndexRef` tracks
   // where the list actually sits, telling swipe-driven changes from external ones.
   const activeIndex = indexOfDate(date);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+    activeIndexShared.value = activeIndex;
+  }, [activeIndex, activeIndexShared]);
   const viewedIndexRef = useRef(activeIndex);
   // While a programmatic scroll (a "today" button, prev/next, or any date set from
   // outside) is settling, this holds its target index. Viewability ticks for the
   // intermediate pages it crosses are ignored until it lands, so they can't report
   // a page in between back as the new date — which made jumps land one page short.
   const pendingScrollIndexRef = useRef<number | null>(null);
+
+  // ISO week label for the hour column's corner (the visible page's Thursday
+  // defines the week). Null unless the header is paged and week numbers are on.
+  const weekNumber = useMemo(() => {
+    if (!pagedHeader || !showWeekNumber || hourColumnWidth === 0) return null;
+    const days = getViewDays(
+      mode,
+      pageDates[activeIndex] ?? date,
+      weekStartsOn,
+      numberOfDays,
+      isRTL,
+      weekEndsOn,
+      hiddenDays,
+    );
+    const thursday = days.find((d) => d.getDay() === 4) ?? days[0];
+    return thursday ? `${weekNumberPrefix}${getISOWeek(thursday)}` : null;
+  }, [
+    pagedHeader,
+    showWeekNumber,
+    hourColumnWidth,
+    mode,
+    pageDates,
+    activeIndex,
+    date,
+    weekStartsOn,
+    numberOfDays,
+    isRTL,
+    weekEndsOn,
+    hiddenDays,
+    weekNumberPrefix,
+  ]);
 
   // Header days track the active page (page-aligned), so they always match the
   // columns below and a swipe never flashes another day's label.
@@ -2436,6 +2639,28 @@ function TimeGridInner<T>({
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
   }, [activeIndex]);
 
+  // The list reports its offset only as it scrolls; seed it whenever the list is
+  // (re)laid out at a new width, where it opens on the active page.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+    pagerOffset.value = activeIndex * columnsWidth;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reseed on width only; scroll events track index changes
+  }, [columnsWidth, pagerOffset]);
+
+  // react-native-web ignores `contentOffset`: retry the seed each frame until the
+  // scroll view can hold it (the viewport's `onLayout` also tries).
+  useEffect(() => {
+    if (!isWeb) return;
+    let attempts = 0;
+    let frame = 0;
+    const attempt = () => {
+      seedWebScroll();
+      if (!webSeededRef.current && attempts++ < 120) frame = requestAnimationFrame(attempt);
+    };
+    frame = requestAnimationFrame(attempt);
+    return () => cancelAnimationFrame(frame);
+  }, [seedWebScroll]);
+
   // Web: LegendList's horizontal scroll container is `overflow-x: auto`, so a
   // trackpad swipe or horizontal wheel would scroll between pages. Paging should be
   // arrow-keys/toolbar only, so disable user horizontal scrolling on it (programmatic
@@ -2457,24 +2682,31 @@ function TimeGridInner<T>({
     };
     const raf = requestAnimationFrame(lockHorizontal);
     return () => cancelAnimationFrame(raf);
-    // `measured` re-runs this once the list exists at its real size.
+    // Re-run once the list exists at its real size (it remounts per width).
     // eslint-disable-next-line react-hooks/exhaustive-deps -- containerRef is stable
-  }, [containerWidth, measured]);
+  }, [columnsWidth]);
 
-  // Web arrow-key paging (swipe is disabled there); the effect above scrolls to
-  // the new page once `onChangeDate` updates `date`.
+  // Honour the OS "reduce motion" setting: the pager's animated transitions
+  // (paging from an edge drag, the snap-back after a cell press) become instant
+  // jumps when it's on.
+  const reduceMotion = useReducedMotion();
+
+  // Page by `delta` (edge drags, web arrow keys): move the list at once and
+  // report the date, rather than waiting for the reported date to come back
+  // through props. The realign effect then finds the list already there.
   const goToPage = useCallback(
     (delta: number) => {
-      const target = pageDates[activeIndex + delta];
-      if (target) onChangeDate(target);
+      const index = viewedIndexRef.current + delta;
+      const target = pageDates[index];
+      if (!target) return;
+      viewedIndexRef.current = index;
+      pendingScrollIndexRef.current = index;
+      void listRef.current?.scrollToIndex({ index, animated: !isWeb && !reduceMotion });
+      onChangeDate(target);
     },
-    [pageDates, activeIndex, onChangeDate],
+    [pageDates, reduceMotion, onChangeDate],
   );
   useWebPagerKeys(swipeEnabled, goToPage);
-
-  // Honour the OS "reduce motion" setting: the pager's one animated transition
-  // (the snap-back below) becomes an instant jump when it's on.
-  const reduceMotion = useReducedMotion();
 
   // Optionally snap the pager back to the active page after an empty-cell press
   // (so tapping a far-swiped page returns to the committed date).
@@ -2531,10 +2763,31 @@ function TimeGridInner<T>({
         onLongPressCell={onLongPressCell}
         onCreateEvent={onCreateEvent}
         onEdgeAdvance={goToPage}
+        pageIndex={index}
+        laneHeight={laneHeight}
+        scrollY={scrollY}
+        showAllDayEventCell={showAllDayEventCell}
+        onLaneLayout={reportLaneHeight}
+        height={pagerHeight}
+        pagedHeader={pagedHeader}
+        weekdayFormat={weekdayFormat}
+        locale={locale}
+        activeDate={activeDate}
+        onPressDateHeader={onPressDateHeader}
       />
     ),
     [
       columnsWidth,
+      pagerHeight,
+      pagedHeader,
+      weekdayFormat,
+      locale,
+      activeDate,
+      onPressDateHeader,
+      laneHeight,
+      scrollY,
+      showAllDayEventCell,
+      reportLaneHeight,
       mode,
       numberOfDays,
       events,
@@ -2591,43 +2844,11 @@ function TimeGridInner<T>({
         <View
           ref={containerRef}
           style={styles.container}
-          onLayout={(event) => {
-            setContainerWidth(event.nativeEvent.layout.width);
-            setMeasured(true);
-          }}
+          onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
         >
-          {renderHeader ? (
-            renderHeader(headerDays)
-          ) : (
-            <DefaultHeader
-              days={headerDays}
-              mode={mode}
-              width={columnsWidth + hourColumnWidth}
-              hourColumnWidth={hourColumnWidth}
-              showWeekNumber={showWeekNumber}
-              weekNumberPrefix={weekNumberPrefix}
-              weekdayFormat={weekdayFormat}
-              locale={locale}
-              activeDate={activeDate}
-              onPressDateHeader={onPressDateHeader}
-            />
-          )}
+          {renderHeader ? renderHeader(headerDays) : null}
 
           {headerComponent}
-
-          {showAllDayEventCell ? (
-            <AllDayLane
-              days={headerDays}
-              events={events}
-              mode={mode}
-              hourColumnWidth={hourColumnWidth}
-              dayWidth={columnsWidth / headerDays.length}
-              renderEvent={labeledRenderEvent}
-              keyExtractor={keyExtractor}
-              onPressEvent={onPressEvent}
-              onLongPressEvent={onLongPressEvent}
-            />
-          ) : null}
 
           <View
             ref={viewportRef}
@@ -2649,27 +2870,27 @@ function TimeGridInner<T>({
                 scrollEnabled={verticalScrollEnabled}
                 onScroll={scrollHandler}
                 scrollEventThrottle={16}
-                contentContainerStyle={styles.scrollContent}
                 contentOffset={{ x: 0, y: seedDefaultY }}
               >
-                <Animated.View
-                  testID="time-grid-hours"
-                  style={[styles.gridRow, gridHeightStyle]}
-                  onLayout={seedWebScroll}
-                >
+                <Animated.View testID="time-grid-hours" style={[styles.gridRow, gridHeightStyle]}>
                   {hourColumnWidth > 0 ? (
                     <HourGutter
                       width={hourColumnWidth}
                       minHour={clampedMinHour}
                       maxHour={clampedMaxHour}
                       cellHeight={cellHeight}
+                      laneHeight={laneHeight}
+                      scrollY={scrollY}
+                      showLane={showAllDayEventCell}
+                      headerHeight={headerOffset}
+                      weekNumber={weekNumber}
                       ampm={ampm}
                       hourComponent={hourComponent}
                     />
                   ) : null}
                   <View
                     ref={pagerRef}
-                    style={styles.pager}
+                    style={[styles.pager, { left: hourColumnWidth, height: pagerHeight }]}
                     onLayout={(event) => {
                       // Window-space frame of the pager for the drag worklets' edge
                       // detection and ghost placement. Only a width change matters
@@ -2687,11 +2908,11 @@ function TimeGridInner<T>({
                       });
                     }}
                   >
-                    <LegendList
-                      // Remount only on the seed→measured transition (see `measured`), so the
-                      // pages lay out at the real width once; later width changes resize them
-                      // in place through `extraData` instead of blanking the page.
-                      key={measured ? "grid" : "grid-seed"}
+                    <AnimatedLegendList
+                      // Remount when the width changes (a re-measured container, a
+                      // rotation), so the fixed item size is right from the first layout;
+                      // the usual case, where the seed already matches, mounts once.
+                      key={`grid-${columnsWidth}`}
                       ref={listRef}
                       style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
                       data={pageDates}
@@ -2700,6 +2921,11 @@ function TimeGridInner<T>({
                       recycleItems={false}
                       keyExtractor={keyExtractorList}
                       getFixedItemSize={getFixedItemSize}
+                      // Mount the next pages either side while idle, not mid-swipe.
+                      drawDistance={columnsWidth * 2}
+                      // The live horizontal offset, kept on the UI thread, drives the
+                      // all-day band's height.
+                      sharedValues={pagerSharedValues}
                       // On web LegendList ignores these RN scroll props (it leaks them to the
                       // DOM as unknown attributes), so omit them there and disable horizontal
                       // scroll via `webNoScroll`; paging is driven by the arrow keys instead.
@@ -2708,11 +2934,17 @@ function TimeGridInner<T>({
                       {...(isWeb
                         ? null
                         : {
-                            // Frozen mid-edge-page so the programmatic advance lands under
-                            // the held finger instead of waiting for the touch to end.
-                            scrollEnabled: swipeEnabled && !edgePagingLock,
+                            scrollEnabled: swipeEnabled,
                             pagingEnabled: !freeSwipe,
                             snapToIndices: freeSwipe ? snapToIndices : undefined,
+                            // Paging: snap to the adjacent page quickly instead of the
+                            // slow platform glide, and stop at that page rather than
+                            // drifting, so rapid one-week swipes land crisply instead of
+                            // queuing a long chain of drawn-out snaps. `freeSwipe` keeps
+                            // its momentum, so it can still fling across several pages.
+                            decelerationRate: freeSwipe ? ("normal" as const) : ("fast" as const),
+                            disableIntervalMomentum: !freeSwipe,
+                            scrollEventThrottle: 16,
                           })}
                       initialScrollIndex={activeIndex}
                       showsHorizontalScrollIndicator={false}
@@ -2765,58 +2997,30 @@ function TimeGridInner<T>({
  */
 export const TimeGrid = memo(TimeGridInner) as typeof TimeGridInner;
 
-type DefaultHeaderProps = {
+type DayHeaderRowProps = {
   days: Date[];
   mode: CalendarMode;
-  width: number;
-  hourColumnWidth: number;
-  showWeekNumber?: boolean;
-  weekNumberPrefix?: string;
+  dayWidth: number;
   weekdayFormat?: WeekdayFormat;
   locale?: Locale;
   activeDate?: Date;
   onPressDateHeader?: (date: Date) => void;
 };
 
-const DefaultHeader = ({
+// The row of weekday/date columns, rendered once per page so it pages with the
+// grid. The header slot is the wrapper in the page; this fills it.
+const DayHeaderRow = ({
   days,
   mode,
-  width,
-  hourColumnWidth,
-  showWeekNumber,
-  weekNumberPrefix = "W",
+  dayWidth,
   weekdayFormat,
   locale,
   activeDate,
   onPressDateHeader,
-}: DefaultHeaderProps) => {
-  const theme = useCalendarTheme();
+}: DayHeaderRowProps) => {
   const slot = useSlots<TimeGridSlot>();
-  // Match the grid below: an hour-column spacer, then one column per day.
-  const dayWidth = (width - hourColumnWidth) / days.length;
-
   return (
-    <View
-      {...slot("header", {
-        base: styles.headerRow,
-        themed: { borderBottomColor: theme.colors.gridLine },
-      })}
-    >
-      <View style={[styles.weekNumberGutter, { width: hourColumnWidth }]}>
-        {showWeekNumber && hourColumnWidth > 0 && days[0] ? (
-          <Text
-            {...slot<TextStyle>("weekNumber", {
-              themed: [theme.text.hourLabel, { color: theme.colors.textMuted }],
-            })}
-            allowFontScaling={false}
-          >
-            {/* Reference the visible Thursday: an ISO week is defined by its Thursday,
-                so a Sunday-start week still shows the week number its Mon–Sat body
-                belongs to. */}
-            {`${weekNumberPrefix}${getISOWeek(days.find((d) => d.getDay() === 4) ?? days[0])}`}
-          </Text>
-        ) : null}
-      </View>
+    <View {...slot("header", { base: styles.headerRow })}>
       {days.map((day) => (
         <DayHeader
           key={day.toISOString()}
@@ -2928,8 +3132,11 @@ const DayHeader = ({
 };
 
 const styles = StyleSheet.create({
+  // Beside the hour column, at the fixed pager height (see `pagerHeight`).
   pager: {
-    flex: 1,
+    position: "absolute",
+    top: 0,
+    right: 0,
   },
   pagerList: {
     flex: 1,
@@ -2940,24 +3147,60 @@ const styles = StyleSheet.create({
   viewport: {
     flex: 1,
   },
-  scrollContent: {
-    paddingTop: HOUR_LABEL_TOP_INSET,
-  },
-  // The hour column and the pager, side by side, as tall as the hour window.
+  // The scroll content: the hour column and the pager sit inside it, absolutely.
+  // Clipped, so the pager's fixed extra height neither draws nor (on the web)
+  // extends the scroll range below the hours.
   gridRow: {
-    flexDirection: "row",
+    position: "relative",
+    overflow: "hidden",
   },
+  hourGutter: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    bottom: 0,
+  },
+  fill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  // One hour (or sub-hour slot) of a flex column spanning the hour window.
+  hourCell: {
+    flex: 1,
+  },
+  // The day-header row fills the pinned header wrapper in a page.
   headerRow: {
+    flex: 1,
     flexDirection: "row",
-    // Center the weekday/number block vertically; the day header's own symmetric
-    // paddingVertical provides the spacing, matching the dom renderer (no extra
-    // bottom padding that would push the content up).
+    alignItems: "center",
+  },
+  // The pinned day-header row at the top of a page; rides the scroll offset so it
+  // holds still while the hours pass, and slides with the page during a swipe.
+  pagedHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: DAY_HEADER_HEIGHT,
+    zIndex: 2,
+    flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  weekNumberGutter: {
+  // The hour column's corner above the "all-day" cell, aligned with the header.
+  gutterCorner: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 2,
     alignItems: "center",
     justifyContent: "flex-end",
+    paddingBottom: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   dayHeader: {
     alignItems: "center",
@@ -2974,6 +3217,42 @@ const styles = StyleSheet.create({
   },
   page: {
     position: "relative",
+  },
+  // The hours of one page, below its all-day band and the label inset.
+  grid: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+  },
+  // A page's all-day band: pinned to the top of the viewport by riding the scroll
+  // offset, painted over the hours that pass beneath it.
+  laneBand: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    overflow: "hidden",
+    zIndex: 2,
+  },
+  // The hour column's "all-day" cell, pinned like the pages' bands.
+  laneCell: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 2,
+    justifyContent: "center",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  allDayLabel: {
+    fontSize: 10,
+    textAlign: "right",
+    paddingRight: 6,
+  },
+  gutterRows: {
+    position: "absolute",
+    left: 0,
+    right: 0,
   },
   cellPressLayer: {
     position: "absolute",
@@ -3001,6 +3280,7 @@ const styles = StyleSheet.create({
   },
   hourRow: {
     position: "absolute",
+    top: 0,
     left: 0,
     right: 0,
     flexDirection: "row",
@@ -3011,14 +3291,17 @@ const styles = StyleSheet.create({
     textAlign: "right",
     paddingRight: 6,
   },
+  // A line sits at the top of its hour or sub-hour cell.
   hourLine: {
     position: "absolute",
+    top: 0,
     left: 0,
     right: 0,
     height: StyleSheet.hairlineWidth,
   },
   timeslotLine: {
     position: "absolute",
+    top: 0,
     left: 0,
     right: 0,
     height: StyleSheet.hairlineWidth,

@@ -1,5 +1,5 @@
 import { addDays, startOfDay } from "date-fns";
-import { StyleSheet, Text, type TextStyle, View } from "react-native";
+import { type LayoutChangeEvent, StyleSheet, View } from "react-native";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, CalendarMode, EventKeyExtractor, RenderEvent } from "../types";
 import { useSlots } from "../utils/slots";
@@ -7,36 +7,41 @@ import { isAllDayEvent, isBackgroundEvent } from "@super-calendar/core";
 
 // The lane's slots are a subset of the TimeGrid slot union; typed locally so
 // this file doesn't import the full TimeGrid type.
-type AllDayLaneSlot = "allDayLane" | "allDayLabel" | "allDayColumn" | "allDayEvent";
+type AllDayLaneSlot = "allDayLane" | "allDayColumn" | "allDayEvent";
+
+/** Height of a lane with no all-day events: one empty chip row. */
+export const MIN_ALL_DAY_LANE_HEIGHT = 24;
 
 type AllDayLaneProps<T> = {
   days: Date[];
   events: CalendarEvent<T>[];
   mode: CalendarMode;
-  hourColumnWidth: number;
   dayWidth: number;
   renderEvent: RenderEvent<T>;
   keyExtractor: EventKeyExtractor<T>;
   onPressEvent: (event: CalendarEvent<T>) => void;
   onLongPressEvent?: (event: CalendarEvent<T>) => void;
+  /** Reports the lane's natural height, which the grid's all-day band follows. */
+  onLayout?: (event: LayoutChangeEvent) => void;
 };
 
 /**
- * The all-day lane that sits above the scrolling time grid. All-day events are
- * excluded from the timed columns (see `layoutDayEvents`) and shown here,
- * stacked under their day(s). Renders nothing when no day has an all-day event,
- * so timed-only calendars are unaffected.
+ * The all-day lane of one page, pinned above the scrolling hours. All-day
+ * events are excluded from the timed columns (see `layoutDayEvents`) and shown
+ * here, stacked under their day(s). Always rendered, at least one chip row
+ * tall, so the band above the grid never jumps between pages; the "all-day"
+ * label lives in the hour column.
  */
 export function AllDayLane<T>({
   days,
   events,
   mode,
-  hourColumnWidth,
   dayWidth,
   renderEvent,
   keyExtractor,
   onPressEvent,
   onLongPressEvent,
+  onLayout,
 }: AllDayLaneProps<T>) {
   const theme = useCalendarTheme();
   const slot = useSlots<AllDayLaneSlot>();
@@ -50,29 +55,14 @@ export function AllDayLane<T>({
     return allDay.filter((event) => event.start < next && event.end > start);
   });
 
-  if (perDay.every((list) => list.length === 0)) return null;
-
   return (
     <View
       {...slot("allDayLane", {
         base: styles.lane,
         themed: [{ borderBottomColor: theme.colors.gridLine }, theme.containers.allDayLane],
       })}
+      onLayout={onLayout}
     >
-      <View style={[styles.gutter, { width: hourColumnWidth }]}>
-        {/* The "all-day" gutter label, mirroring the dom renderer: small, muted,
-            and right-aligned against the timed columns. Centered vertically so it
-            lines up with the chips whether the lane holds one event or several. */}
-        <Text
-          {...slot<TextStyle>("allDayLabel", {
-            base: styles.label,
-            themed: { color: theme.colors.textMuted },
-          })}
-          allowFontScaling={false}
-        >
-          all-day
-        </Text>
-      </View>
       {days.map((day, dayIndex) => (
         <View
           key={day.toISOString()}
@@ -102,14 +92,7 @@ const styles = StyleSheet.create({
   lane: {
     flexDirection: "row",
     borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  gutter: {
-    justifyContent: "center",
-  },
-  label: {
-    fontSize: 10,
-    textAlign: "right",
-    paddingRight: 6,
+    minHeight: MIN_ALL_DAY_LANE_HEIGHT,
   },
   column: {
     paddingVertical: 2,

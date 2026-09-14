@@ -89,3 +89,17 @@ jest.mock("react-native-reanimated", () => {
     __flushAnimatedReactions: flushAnimatedReactions,
   };
 });
+
+// The time grid's pager is LegendList's Reanimated flavour. Like the plain
+// LegendList stand-ins in the component tests, render only the initial page
+// through `renderItem` (the real list can't lay out under Jest) and expose the
+// props on `globalThis.__listProps` for assertions.
+jest.mock("@legendapp/list/reanimated", () => ({
+  __esModule: true,
+  AnimatedLegendList: (props) => {
+    globalThis.__listProps = props;
+    const index = props.initialScrollIndex ?? 0;
+    const item = props.data?.[index];
+    return item === undefined ? null : props.renderItem({ item, index });
+  },
+}));

@@ -728,6 +728,52 @@ describe("TimeGrid event box sizing", () => {
   });
 });
 
+describe("TimeGrid paged header", () => {
+  const date = new Date(2026, 0, 6, 12, 0, 0);
+  const base = () => ({
+    mode: "week" as const,
+    date,
+    events: [event],
+    cellHeight: { value: 48 } as never,
+    weekStartsOn: 1 as const,
+    renderEvent: DefaultEvent,
+    keyExtractor: (_e: CalendarEvent<WithId>, i: number) => String(i),
+    onChangeDate: noop,
+    onPressEvent: noop,
+  });
+
+  it("renders the day header inside the page, so it pages with the columns", () => {
+    const { getByTestId } = render(<TimeGrid {...base()} />);
+    const paged = getByTestId("paged-header");
+    // The weekday/date columns live inside the paged header, above the band.
+    expect(within(paged).getByRole("header", { name: /Tuesday 6 January/ })).toBeTruthy();
+  });
+
+  it("keeps a fixed header (no paged header) when renderHeader is supplied", () => {
+    const { queryByTestId, getByText } = render(
+      <TimeGrid {...base()} renderHeader={() => <Text>custom header</Text>} />,
+    );
+    expect(queryByTestId("paged-header")).toBeNull();
+    expect(getByText("custom header")).toBeTruthy();
+  });
+
+  it("shows the week number in the hour-column corner, not a fixed row", () => {
+    const { getByTestId } = render(<TimeGrid {...base()} showWeekNumber weekNumberPrefix="W" />);
+    // ISO week of the visible Monday-start week containing 6 Jan 2026 is 2.
+    expect(within(getByTestId("hour-gutter")).getByText("W2")).toBeTruthy();
+  });
+
+  it("drops the paged header (and its offset) when a custom header is fixed", () => {
+    const flat = (node: { props: Record<string, unknown> }) =>
+      StyleSheet.flatten(node.props.style as never) as Record<string, unknown>;
+    const { getByTestId } = render(
+      <TimeGrid {...base()} minHour={7} maxHour={20} renderHeader={() => <Text>h</Text>} />,
+    );
+    // No 56px header band in the page height: empty lane + inset + 13 rows of 160.
+    expect(flat(getByTestId("time-grid-page")).height).toBe(24 + 12 + 13 * 160);
+  });
+});
+
 describe("TimeGrid hour column", () => {
   const date = new Date(2026, 0, 6, 12, 0, 0);
   const gridProps = () => ({
@@ -804,9 +850,11 @@ describe("TimeGrid hour column", () => {
     expect(flat(rowOf(getAllByText("07:00")[0])).top).toBe(0);
     const [firstLine] = UNSAFE_getAllByProps({ className: "line" }).filter(isHost);
     expect(flat(firstLine).top).toBe(0);
-    // The one hour window sizes both the row and the page: 13 rows of 48px.
-    expect(flat(getByTestId("time-grid-hours")).height).toBe(13 * 48);
-    expect(flat(getByTestId("time-grid-page")).height).toBe(13 * 48);
+    // The one hour window sizes the scroll content: the paged day header, the
+    // empty all-day band, the label inset, then 13 rows of 48px. The page keeps a
+    // fixed height with room for the fully zoomed window (13 rows of 160px).
+    expect(flat(getByTestId("time-grid-hours")).height).toBe(56 + 24 + 12 + 13 * 48);
+    expect(flat(getByTestId("time-grid-page")).height).toBe(56 + 24 + 12 + 13 * 160);
   });
 
   it("starts the first column at the pager's left edge when hours are hidden", () => {
@@ -836,7 +884,7 @@ describe("TimeGrid hour column", () => {
     expect(scroller.getAllByLabelText(/Standup/)).toHaveLength(1);
   });
 
-  it("pins the all-day lane above the scroll view, once for the active page", () => {
+  it("gives each page an all-day band that rides the scroll offset and follows its lane", () => {
     const trip: CalendarEvent<WithId> = {
       id: "trip",
       title: "Trip",
@@ -844,12 +892,83 @@ describe("TimeGrid hour column", () => {
       end: new Date(2026, 0, 7),
       allDay: true,
     };
-    const { UNSAFE_getAllByProps, getAllByLabelText } = render(
-      <TimeGrid {...gridProps()} events={[event, trip]} />,
+    const grid = (ampm: boolean) => (
+      <TimeGrid
+        {...gridProps()}
+        events={[event, trip]}
+        hourHeight={48}
+        scrollOffsetMinutes={8 * 60}
+        classNames={{ allDayLane: "lane" }}
+        ampm={ampm}
+      />
     );
-    expect(getAllByLabelText(/Trip/)).toHaveLength(1);
+    const { UNSAFE_getAllByProps, getByTestId, getAllByLabelText, rerender } = render(grid(false));
+    // The lane lives inside the page, so it pages with the columns; the label
+    // sits once in the hour column.
     const [scroller] = UNSAFE_getAllByProps({ scrollEventThrottle: 16 }).filter(isHost);
-    expect(within(scroller).queryAllByLabelText(/Trip/)).toHaveLength(0);
+    expect(getAllByLabelText(/Trip/)).toHaveLength(1);
+    expect(within(scroller).getAllByLabelText(/Trip/)).toHaveLength(1);
+    expect(within(getByTestId("hour-gutter")).getByText("all-day")).toBeTruthy();
+    // Unmeasured, the band is one empty row tall and counter-translated by the
+    // scroll offset so it holds still at the top of the viewport.
+    const band = getByTestId("all-day-band");
+    expect(flat(band).height).toBe(24);
+    expect(flat(band).transform).toEqual([{ translateY: 384 }]);
+    // The page reports its lane's natural height; the band and the page follow.
+    const [lane] = UNSAFE_getAllByProps({ className: "lane" }).filter(isHost);
+    fireEvent(lane, "layout", { nativeEvent: { layout: { height: 46 } } });
+    rerender(grid(true));
+    expect(flat(getByTestId("all-day-band")).height).toBe(46);
+    expect(flat(getByTestId("time-grid-hours")).height).toBe(56 + 46 + 12 + 24 * 48);
+    // The fixed page height grows with the tallest lane seen.
+    expect(flat(getByTestId("time-grid-page")).height).toBe(56 + 46 + 12 + 24 * 160);
+  });
+});
+
+describe("TimeGrid all-day band during a swipe", () => {
+  it("interpolates the band's height between the outgoing and incoming pages", () => {
+    const trip: CalendarEvent<WithId> = {
+      id: "trip",
+      title: "Trip",
+      start: new Date(2026, 0, 6),
+      end: new Date(2026, 0, 7),
+      allDay: true,
+    };
+    const grid = (ampm: boolean) => (
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event, trip]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        classNames={{ allDayLane: "lane" }}
+        ampm={ampm}
+      />
+    );
+    const { UNSAFE_getAllByProps, getByTestId, rerender } = render(grid(false));
+    const flat = (node: { props: Record<string, unknown> }) =>
+      StyleSheet.flatten(node.props.style as never) as Record<string, unknown>;
+    const [lane] = UNSAFE_getAllByProps({ className: "lane" }).filter(
+      (node) => typeof node.type === "string",
+    );
+    fireEvent(lane, "layout", { nativeEvent: { layout: { height: 64 } } });
+    rerender(grid(true));
+    expect(flat(getByTestId("all-day-band")).height).toBe(64);
+    // The list keeps its offset on the UI thread. Three quarters of the way in
+    // from the previous page (unmeasured, so one empty row) the band is three
+    // quarters of the way up to this page's height.
+    const listProps = lastListProps() as {
+      sharedValues: { scrollOffset: { value: number } };
+      getFixedItemSize: () => number;
+    };
+    const pageWidth = listProps.getFixedItemSize();
+    listProps.sharedValues.scrollOffset.value = (179 + 0.75) * pageWidth;
+    rerender(grid(false));
+    expect(flat(getByTestId("all-day-band")).height).toBeCloseTo(24 + (64 - 24) * 0.75);
   });
 });
 
@@ -886,19 +1005,23 @@ describe("TimeGrid cross-week drop", () => {
     // Grab the box 10px in, then hold the finger inside the pager's right edge zone.
     act(() => {
       move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 });
-      move.onUpdate?.({ translationX: 520, translationY: 0, absoluteX: 720, absoluteY: 694 });
+      move.onUpdate?.({ translationX: 535, translationY: 0, absoluteX: 735, absoluteY: 774 });
     });
     // The edge dwell lifts the event into the floating ghost and pages the view.
     act(() => {
-      jest.advanceTimersByTime(500);
+      jest.advanceTimersByTime(600);
     });
     expect(onChangeDate).toHaveBeenCalledWith(new Date(2026, 0, 12));
+    // The pager keeps swiping enabled throughout: toggling it made the list
+    // re-apply its initial offset on release and jump back a page.
+    expect((lastListProps() as { scrollEnabled?: boolean }).scrollEnabled).toBe(true);
     act(() => {
       move.onFinalize?.({}, true);
     });
-    // The ghost's left edge is 710px into the pager (past the last of seven
-    // columns, so clamped to Sunday) and its top 672px down the grid: the pager's
-    // top is the viewport top plus the 12px label inset, and 672px is 14 rows.
+    // The ghost's left edge is 725px into the pager (past the last of seven
+    // columns, so clamped to Sunday) and its top 764px down the page: past the
+    // 56px paged header, the 24px empty all-day band and the 12px label inset,
+    // 672px is 14 rows.
     expect(onDragEvent).toHaveBeenCalledTimes(1);
     const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent<WithId>, Date, Date];
     expect(start).toEqual(new Date(2026, 0, 11, 14, 0));
