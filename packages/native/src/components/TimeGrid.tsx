@@ -411,8 +411,8 @@ function AnimatedEventBoxInner<T>({
   const RenderEventComponent = renderEvent;
   const theme = useCalendarTheme();
   const slot = useSlots<TimeGridSlot>();
-  // Pager geometry + scroll lock, so a cross-week edge drag can find the edges
-  // and page the view live under the finger (see EdgePaging). The two edge
+  // Pager geometry, so a cross-week edge drag can find the edges and page the
+  // view live under the finger (see EdgePaging). The two edge
   // shared values are pulled out so the move worklet closes over them directly
   // rather than over the whole context object (which also holds a JS callback).
   const edgePaging = useContext(EdgePagingContext);
@@ -1739,7 +1739,14 @@ function TimetablePageInner<T>({
     ) : null;
 
   return (
-    <View testID="time-grid-page" style={[styles.page, { width, height }]}>
+    <View
+      testID="time-grid-page"
+      style={[styles.page, { width, height }]}
+      // Only the active page is on screen; keep the pre-mounted neighbours out of
+      // the screen-reader traversal so their events and headers aren't announced.
+      accessibilityElementsHidden={!isActive}
+      importantForAccessibility={isActive ? "auto" : "no-hide-descendants"}
+    >
       {pagedHeader ? (
         <Animated.View
           testID="paged-header"
@@ -1976,7 +1983,7 @@ const TimetablePage = memo(TimetablePageInner) as typeof TimetablePageInner;
  * where the structure matches; `columnHeaderDateText`, `weekendShade` and
  * `daySeparator` are native-only (the dom grid styles those through its
  * `dayColumn`/`columnHeaderDate` elements). Slots rendered as Reanimated views
- * (`gridLines`, `businessHours`, `weekendShade`, `daySeparator`, `event`,
+ * (`businessHours`, `weekendShade`, `daySeparator`, `event`,
  * `nowIndicator`, `createGhost`) always honour the `styles` map; their
  * `className` reaches the element but needs a Tailwind runtime that styles
  * Animated components.
@@ -2289,7 +2296,11 @@ function TimeGridInner<T>({
   // page reports its lane's natural height under its index, and the band follows
   // the pager's live offset (kept on the UI thread by the list), interpolating
   // between the outgoing and incoming pages' heights so it resizes on the fly
-  // during a swipe. The list opens on the anchor page.
+  // during a swipe. The list opens on the anchor page. A guard below clamps the
+  // interpolation to the committed page when the offset is more than 1.5 pages
+  // away (a stale mount seed), so a multi-page `freeSwipe` fling holds the band
+  // at the committed height and it snaps to the destination on settle rather than
+  // animating the whole way; single-page paging (the default) interpolates fully.
   const laneHeights = useSharedValue<Record<number, number>>({});
   const pagerOffset = useSharedValue(PAGE_WINDOW * columnsWidth);
   const pagerSharedValues = useMemo(() => ({ scrollOffset: pagerOffset }), [pagerOffset]);
@@ -2342,6 +2353,7 @@ function TimeGridInner<T>({
   const dropRef = useRef({
     headerDays: [] as Date[],
     columnsWidth,
+    headerOffset,
     minHour: clampedMinHour,
     maxHour: clampedMaxHour,
     snapMinutes: Math.max(1, dragStepMinutes),
@@ -2363,6 +2375,7 @@ function TimeGridInner<T>({
       const {
         headerDays: days,
         columnsWidth: cw,
+        headerOffset: headerH,
         minHour: min,
         maxHour: max,
         snapMinutes: snap,
@@ -2381,7 +2394,7 @@ function TimeGridInner<T>({
       const dayWidth = cw / days.length;
       const col = Math.min(Math.max(Math.floor(ghostLocalX / dayWidth), 0), days.length - 1);
       const hoursFromMin =
-        (ghostLocalY - headerOffset - laneHeight.value - HOUR_LABEL_TOP_INSET) / cellHeight.value;
+        (ghostLocalY - headerH - laneHeight.value - HOUR_LABEL_TOP_INSET) / cellHeight.value;
       const rawMinutes = (min + hoursFromMin) * MINUTES_PER_HOUR;
       // Same rule as an in-page move: the start stays in the day it landed on,
       // while the duration is free to carry the end past midnight.
@@ -2395,7 +2408,7 @@ function TimeGridInner<T>({
       // reads as a visible snap-back instead of the event seeming to vanish.
       if (onDrag(ev, start, end) === false) onDate(ev.start);
     },
-    [clearLift, cellHeight, laneHeight, headerOffset],
+    [clearLift, cellHeight, laneHeight],
   );
   const edgePaging = useMemo<EdgePaging>(
     () => ({
@@ -2600,6 +2613,7 @@ function TimeGridInner<T>({
   dropRef.current = {
     headerDays,
     columnsWidth,
+    headerOffset,
     minHour: clampedMinHour,
     maxHour: clampedMaxHour,
     snapMinutes: Math.max(1, dragStepMinutes),
@@ -2638,7 +2652,12 @@ function TimeGridInner<T>({
     if (activeIndex === viewedIndexRef.current) return;
     viewedIndexRef.current = activeIndex;
     pendingScrollIndexRef.current = activeIndex;
+    // Keep the all-day band's interpolation source in step with the jump; the
+    // list reports its offset only as it scrolls, not on a programmatic one.
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+    pagerOffset.value = activeIndex * columnsWidth;
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- columnsWidth/pagerOffset are stable per width
   }, [activeIndex]);
 
   // The list reports its offset only as it scrolls; seed it whenever the list is
@@ -2703,10 +2722,12 @@ function TimeGridInner<T>({
       if (!target) return;
       viewedIndexRef.current = index;
       pendingScrollIndexRef.current = index;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      pagerOffset.value = index * columnsWidth;
       void listRef.current?.scrollToIndex({ index, animated: !isWeb && !reduceMotion });
       onChangeDate(target);
     },
-    [pageDates, reduceMotion, onChangeDate],
+    [pageDates, reduceMotion, onChangeDate, columnsWidth, pagerOffset],
   );
   useWebPagerKeys(swipeEnabled, goToPage);
 
@@ -2719,12 +2740,17 @@ function TimeGridInner<T>({
   const handlePagerSettled = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (columnsWidth <= 0) return;
-      const index = Math.round(event.nativeEvent.contentOffset.x / columnsWidth);
+      // Only a user fling can leave the pager blank; a programmatic scroll
+      // (goToPage, realign) sets `pendingScrollIndexRef` and repaints itself, so
+      // skip those to avoid a redundant re-anchor during held edge paging.
+      if (pendingScrollIndexRef.current != null) return;
+      const raw = Math.round(event.nativeEvent.contentOffset.x / columnsWidth);
+      const index = Math.min(Math.max(raw, 0), pageDates.length - 1);
       requestAnimationFrame(() => {
         void listRef.current?.scrollToIndex({ index, animated: false });
       });
     },
-    [columnsWidth],
+    [columnsWidth, pageDates.length],
   );
 
   // Optionally snap the pager back to the active page after an empty-cell press
