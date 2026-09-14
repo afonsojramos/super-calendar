@@ -94,12 +94,22 @@ jest.mock("react-native-reanimated", () => {
 // LegendList stand-ins in the component tests, render only the initial page
 // through `renderItem` (the real list can't lay out under Jest) and expose the
 // props on `globalThis.__listProps` for assertions.
-jest.mock("@legendapp/list/reanimated", () => ({
-  __esModule: true,
-  AnimatedLegendList: (props) => {
-    globalThis.__listProps = props;
-    const index = props.initialScrollIndex ?? 0;
-    const item = props.data?.[index];
-    return item === undefined ? null : props.renderItem({ item, index });
-  },
-}));
+jest.mock("@legendapp/list/reanimated", () => {
+  const React = require("react");
+  return {
+    __esModule: true,
+    AnimatedLegendList: React.forwardRef((props, ref) => {
+      globalThis.__listProps = props;
+      // Expose the imperative API the grid drives (scrollToIndex), recording calls
+      // on globalThis so a test can assert the fast-fling re-anchor.
+      React.useImperativeHandle(ref, () => ({
+        scrollToIndex: (arg) => {
+          (globalThis.__scrollToIndexCalls = globalThis.__scrollToIndexCalls || []).push(arg);
+        },
+      }));
+      const index = props.initialScrollIndex ?? 0;
+      const item = props.data?.[index];
+      return item === undefined ? null : props.renderItem({ item, index });
+    }),
+  };
+});

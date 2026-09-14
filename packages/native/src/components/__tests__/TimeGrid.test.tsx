@@ -972,6 +972,69 @@ describe("TimeGrid all-day band during a swipe", () => {
   });
 });
 
+describe("TimeGrid fast-fling repaint", () => {
+  const flushFrame = async () => {
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+  };
+
+  const settle = (x: number) => {
+    const onEnd = (lastListProps() as { onMomentumScrollEnd?: (e: unknown) => void })
+      .onMomentumScrollEnd;
+    act(() => onEnd?.({ nativeEvent: { contentOffset: { x } } }));
+  };
+
+  beforeEach(() => {
+    (globalThis as { __scrollToIndexCalls?: unknown[] }).__scrollToIndexCalls = [];
+  });
+
+  it("re-anchors the list to the page the fling settled on", async () => {
+    render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    const pageWidth = (lastListProps() as { getFixedItemSize: () => number }).getFixedItemSize();
+    settle(5 * pageWidth);
+    await flushFrame();
+    const calls = (globalThis as { __scrollToIndexCalls?: { index: number }[] })
+      .__scrollToIndexCalls;
+    expect(calls?.at(-1)).toEqual({ index: 5, animated: false });
+  });
+
+  it("clamps an overscrolled settle to the page window", async () => {
+    render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    const pageCount = (lastListProps() as { data: unknown[] }).data.length;
+    // A rubber-band overscroll past the last page must not pass an out-of-range index.
+    settle(1e9);
+    await flushFrame();
+    const calls = (globalThis as { __scrollToIndexCalls?: { index: number }[] })
+      .__scrollToIndexCalls;
+    expect(calls?.at(-1)).toEqual({ index: pageCount - 1, animated: false });
+  });
+});
+
 describe("TimeGrid cross-week drop", () => {
   beforeEach(() => {
     const gestureHandler = require("react-native-gesture-handler") as { __gestures: unknown[] };
@@ -986,10 +1049,10 @@ describe("TimeGrid cross-week drop", () => {
   it("maps the lifted ghost's pager-local position to a day column and time", () => {
     const onDragEvent = jest.fn();
     const onChangeDate = jest.fn();
-    render(
+    const grid = (date: Date) => (
       <TimeGrid
         mode="week"
-        date={new Date(2026, 0, 6, 12, 0, 0)}
+        date={date}
         events={[event]}
         cellHeight={{ value: 48 } as never}
         hourHeight={48}
@@ -999,8 +1062,9 @@ describe("TimeGrid cross-week drop", () => {
         onChangeDate={onChangeDate}
         onPressEvent={noop}
         onDragEvent={onDragEvent}
-      />,
+      />
     );
+    const { rerender } = render(grid(new Date(2026, 0, 6, 12, 0, 0)));
     const move = moveGestureHarness();
     // Grab the box 10px in, then hold the finger inside the pager's right edge zone.
     act(() => {
@@ -1015,16 +1079,19 @@ describe("TimeGrid cross-week drop", () => {
     // The pager keeps swiping enabled throughout: toggling it made the list
     // re-apply its initial offset on release and jump back a page.
     expect((lastListProps() as { scrollEnabled?: boolean }).scrollEnabled).toBe(true);
+    // A controlled app advances the page in response, so the drop's target week
+    // becomes Jan 12-18 (not the un-advanced Jan 5-11).
+    rerender(grid(new Date(2026, 0, 12)));
     act(() => {
       move.onFinalize?.({}, true);
     });
     // The ghost's left edge is 725px into the pager (past the last of seven
-    // columns, so clamped to Sunday) and its top 764px down the page: past the
-    // 56px paged header, the 24px empty all-day band and the 12px label inset,
-    // 672px is 14 rows.
+    // columns, so clamped to the advanced week's Sunday, Jan 18) and its top 764px
+    // down the page: past the 56px paged header, the 24px empty all-day band and
+    // the 12px label inset, 672px is 14 rows.
     expect(onDragEvent).toHaveBeenCalledTimes(1);
     const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent<WithId>, Date, Date];
-    expect(start).toEqual(new Date(2026, 0, 11, 14, 0));
-    expect(end).toEqual(new Date(2026, 0, 11, 15, 0));
+    expect(start).toEqual(new Date(2026, 0, 18, 14, 0));
+    expect(end).toEqual(new Date(2026, 0, 18, 15, 0));
   });
 });
