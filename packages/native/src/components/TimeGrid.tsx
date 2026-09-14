@@ -32,6 +32,8 @@ import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
   type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Platform,
   Pressable,
   StyleSheet,
@@ -2708,6 +2710,23 @@ function TimeGridInner<T>({
   );
   useWebPagerKeys(swipeEnabled, goToPage);
 
+  // A fast fling can outrun the list's on-demand mounting and leave the pager
+  // blank until something nudges it. When momentum ends, re-anchor the list on
+  // the page the offset landed on: `scrollToIndex` forces it to recompute its
+  // container positions and repaint, which a plain React re-render (from the
+  // date change) does not. The index comes from the settled offset, not the
+  // viewability ref, so it is right regardless of which fires first.
+  const handlePagerSettled = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (columnsWidth <= 0) return;
+      const index = Math.round(event.nativeEvent.contentOffset.x / columnsWidth);
+      requestAnimationFrame(() => {
+        void listRef.current?.scrollToIndex({ index, animated: false });
+      });
+    },
+    [columnsWidth],
+  );
+
   // Optionally snap the pager back to the active page after an empty-cell press
   // (so tapping a far-swiped page returns to the committed date).
   const handlePressCell = useMemo(() => {
@@ -2945,6 +2964,7 @@ function TimeGridInner<T>({
                             decelerationRate: freeSwipe ? ("normal" as const) : ("fast" as const),
                             disableIntervalMomentum: !freeSwipe,
                             scrollEventThrottle: 16,
+                            onMomentumScrollEnd: handlePagerSettled,
                           })}
                       initialScrollIndex={activeIndex}
                       showsHorizontalScrollIndicator={false}
