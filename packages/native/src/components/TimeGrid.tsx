@@ -1156,6 +1156,9 @@ type HourGutterProps = {
   /** The grid's vertical offset, so the "all-day" cell can hold still at the top. */
   scrollY: SharedValue<number>;
   showLane: boolean;
+  /** Draw the "all-day" text in the lane cell. Default off, so an empty lane reads
+   * as neutral space rather than a labelled-but-empty row. */
+  showAllDayLabel: boolean;
   /** Height of the day-header corner above the "all-day" cell (0 when the header
    * isn't paged, i.e. a custom `renderHeader` draws its own fixed header). */
   headerHeight: number;
@@ -1178,6 +1181,7 @@ const HourGutterInner = ({
   laneHeight,
   scrollY,
   showLane,
+  showAllDayLabel,
   headerHeight,
   weekNumber,
   ampm,
@@ -1234,15 +1238,17 @@ const HourGutterInner = ({
             pinStyle,
           ]}
         >
-          <Text
-            {...slot<TextStyle>("allDayLabel", {
-              base: styles.allDayLabel,
-              themed: { color: theme.colors.textMuted },
-            })}
-            allowFontScaling={false}
-          >
-            all-day
-          </Text>
+          {showAllDayLabel ? (
+            <Text
+              {...slot<TextStyle>("allDayLabel", {
+                base: styles.allDayLabel,
+                themed: { color: theme.colors.textMuted },
+              })}
+              allowFontScaling={false}
+            >
+              all-day
+            </Text>
+          ) : null}
         </Animated.View>
       ) : null}
       <Animated.View style={[styles.gutterRows, rowsStyle]}>
@@ -2051,6 +2057,9 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   timeslots?: number;
   /** Show the all-day lane above the grid. Default true. */
   showAllDayEventCell?: boolean;
+  /** Show the "all-day" text label in the hour column. Default false; the lane
+   * still reserves its row, it just isn't labelled. */
+  showAllDayLabel?: boolean;
   /** Tint Saturday/Sunday columns with the weekend background. Default true. Set
    * false to treat weekends like any other day. */
   highlightWeekends?: boolean;
@@ -2158,6 +2167,7 @@ function TimeGridInner<T>({
   hideHours = false,
   timeslots = 1,
   showAllDayEventCell = true,
+  showAllDayLabel = false,
   highlightWeekends = true,
   calendarCellStyle,
   businessHours,
@@ -2927,6 +2937,7 @@ function TimeGridInner<T>({
                       laneHeight={laneHeight}
                       scrollY={scrollY}
                       showLane={showAllDayEventCell}
+                      showAllDayLabel={showAllDayLabel}
                       headerHeight={headerOffset}
                       weekNumber={weekNumber}
                       ampm={ampm}

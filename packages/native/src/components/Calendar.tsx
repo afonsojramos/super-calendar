@@ -241,6 +241,12 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
    * shown on the time grid.
    */
   showAllDayEventCell?: boolean;
+  /**
+   * Show the "all-day" text label in the week/day hour column. Default false: the
+   * lane still reserves its row, it just isn't labelled, so an empty all-day row
+   * reads as neutral space instead of a labelled-but-empty one.
+   */
+  showAllDayLabel?: boolean;
   /** Tint weekend columns (default true). Set false to treat weekends normally. */
   highlightWeekends?: boolean;
   /** Allow moving events by default (per-event `startEditable` overrides). Default true. */
@@ -470,6 +476,7 @@ export function Calendar<T>({
   hideHours,
   timeslots,
   showAllDayEventCell,
+  showAllDayLabel,
   highlightWeekends,
   eventStartEditable,
   eventDurationEditable,
@@ -706,6 +713,7 @@ export function Calendar<T>({
           hideHours={hideHours}
           timeslots={timeslots}
           showAllDayEventCell={showAllDayEventCell}
+          showAllDayLabel={showAllDayLabel}
           highlightWeekends={highlightWeekends}
           eventStartEditable={eventStartEditable}
           eventDurationEditable={eventDurationEditable}

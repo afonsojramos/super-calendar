@@ -908,7 +908,8 @@ describe("TimeGrid hour column", () => {
     const [scroller] = UNSAFE_getAllByProps({ scrollEventThrottle: 16 }).filter(isHost);
     expect(getAllByLabelText(/Trip/)).toHaveLength(1);
     expect(within(scroller).getAllByLabelText(/Trip/)).toHaveLength(1);
-    expect(within(getByTestId("hour-gutter")).getByText("all-day")).toBeTruthy();
+    // The "all-day" label is off by default; the lane still shows a band.
+    expect(within(getByTestId("hour-gutter")).queryByText("all-day")).toBeNull();
     // Unmeasured, the band is one empty row tall and counter-translated by the
     // scroll offset so it holds still at the top of the viewport.
     const band = getByTestId("all-day-band");
