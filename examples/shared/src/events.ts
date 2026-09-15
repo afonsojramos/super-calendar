@@ -92,8 +92,8 @@ export function buildEvents(): CalendarEvent<EventMeta>[] {
       end: at(-6, 0),
       allDay: true,
     },
-    // A background event: a shaded range behind the grid. The native example
-    // draws it with renderBackgroundEvent, so it carries a label and can be pressed.
+    // A background event: a shaded range behind the grid. Both examples draw it
+    // with renderBackgroundEvent, so it carries a label and can be pressed.
     {
       id: "16",
       kind: "work",

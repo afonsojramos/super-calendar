@@ -139,9 +139,11 @@ use hooks, and receives the `event`, the `mode`, the band's `boxHeight`, the
 `onPress`, which fires `onPressEvent`; React Native adds `onLongPress` and makes
 `boxHeight` a live shared value that follows a pinch. The themed tint is
 dropped, the band lets touches or pointer events through to what you render, and
-it is no longer hidden from assistive tech. Cell presses and drag-to-create are
-unreachable underneath such a band. Define the component outside your render so
-it keeps its identity (on the web the args type is
+it is no longer hidden from assistive tech. On the web the band itself takes no
+focus, so render a focusable control such as a button for keyboard users. Cell
+presses and drag-to-create are unreachable underneath such a band. Define the
+component outside your render so it keeps its identity (on the web the args
+type is
 `DomRenderEventArgs` from `@super-calendar/dom`):
 
 ```tsx
