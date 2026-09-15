@@ -1180,20 +1180,30 @@ describe("TimeGrid cross-week drop", () => {
 });
 
 describe("TimeGrid short-event press", () => {
+  type Chain = {
+    kind: string;
+    args: Chain[];
+    calls: Record<string, unknown[]>;
+    handlers: {
+      onEnd?: (event: unknown, success: boolean) => void;
+      onStart?: (event: unknown) => void;
+    };
+  };
+  const chains = () =>
+    (require("react-native-gesture-handler") as { __gestures: Chain[] }).__gestures;
+  const brief: CalendarEvent<WithId> = {
+    id: "brief",
+    title: "Brief",
+    start: new Date(2026, 0, 6, 9, 0, 0),
+    end: new Date(2026, 0, 6, 9, 15, 0),
+  };
   beforeEach(() => {
-    const gestureHandler = require("react-native-gesture-handler") as { __gestures: unknown[] };
-    gestureHandler.__gestures.length = 0;
+    chains().length = 0;
   });
 
-  it("presses the event from a tap on a resize handle", () => {
+  it("presses the event from a tap on either resize handle", () => {
     const onPressEvent = jest.fn();
-    const brief: CalendarEvent<WithId> = {
-      id: "brief",
-      title: "Brief",
-      start: new Date(2026, 0, 6, 9, 0, 0),
-      end: new Date(2026, 0, 6, 9, 15, 0),
-    };
-    render(
+    const { getByTestId } = render(
       <TimeGrid
         mode="week"
         date={new Date(2026, 0, 6, 12, 0, 0)}
@@ -1204,22 +1214,51 @@ describe("TimeGrid short-event press", () => {
         keyExtractor={(item) => item.id}
         onChangeDate={noop}
         onPressEvent={onPressEvent}
+        onDragEvent={noop}
       />,
     );
-    // The handles' taps are the only gestures that run their callbacks on JS.
-    const { __gestures } = require("react-native-gesture-handler") as {
-      __gestures: Array<{
-        calls: Record<string, unknown[]>;
-        handlers: { onEnd?: (event: unknown, success: boolean) => void };
-      }>;
-    };
-    const taps = __gestures.filter((gesture) => gesture.calls.runOnJS?.[0] === true);
-    expect(taps.length).toBeGreaterThan(0);
-    // A tap that failed (the finger moved, so the pan took over) is not a press.
-    taps[0].handlers.onEnd?.({}, false);
-    expect(onPressEvent).not.toHaveBeenCalled();
-    taps[0].handlers.onEnd?.({}, true);
-    expect(onPressEvent).toHaveBeenCalledTimes(1);
+    // Both handles mount on an editable event.
+    expect(getByTestId("resize-handle")).toBeTruthy();
+    expect(getByTestId("resize-handle-top")).toBeTruthy();
+    // Each handle races its pan against a tap and a long press.
+    const races = chains().filter((chain) => chain.kind === "Race");
+    expect(races).toHaveLength(2);
+    for (const race of races) {
+      const [pan, tap, longPress] = race.args;
+      expect(pan.kind).toBe("Pan");
+      expect(tap.kind).toBe("Tap");
+      expect(tap.calls.runOnJS?.[0]).toBe(true);
+      expect(longPress.kind).toBe("LongPress");
+      // A tap the pan took over is not a press; a completed tap is.
+      tap.handlers.onEnd?.({}, false);
+      tap.handlers.onEnd?.({}, true);
+    }
+    expect(onPressEvent).toHaveBeenCalledTimes(2);
     expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "brief" }));
+  });
+
+  it("long-presses a handle on an event that a long press cannot move", () => {
+    const onLongPressEvent = jest.fn();
+    const pinned: CalendarEvent<WithId> = { ...brief, startEditable: false };
+    render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[pinned]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        onLongPressEvent={onLongPressEvent}
+        onDragEvent={noop}
+      />,
+    );
+    const longPresses = chains().filter((chain) => chain.kind === "LongPress");
+    expect(longPresses.length).toBeGreaterThan(0);
+    expect(longPresses[0].calls.enabled?.[0]).toBe(true);
+    longPresses[0].handlers.onStart?.({});
+    expect(onLongPressEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "brief" }));
   });
 });

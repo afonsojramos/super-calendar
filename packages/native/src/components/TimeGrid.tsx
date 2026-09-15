@@ -607,8 +607,22 @@ function AnimatedEventBoxInner<T>({
 
   // Keep the latest event/handler in a ref so the gestures stay memoized but
   // never call into a stale closure.
-  const latest = useRef({ event: positioned.event, eventIndex, onDragEvent, onDragStart });
-  latest.current = { event: positioned.event, eventIndex, onDragEvent, onDragStart };
+  const latest = useRef({
+    event: positioned.event,
+    eventIndex,
+    onDragEvent,
+    onDragStart,
+    onPress,
+    onLongPress,
+  });
+  latest.current = {
+    event: positioned.event,
+    eventIndex,
+    onDragEvent,
+    onDragStart,
+    onPress,
+    onLongPress,
+  };
 
   // Snap the box back to where it started (drop rejected or degenerate).
   const snapBack = useCallback(() => {
@@ -884,7 +898,19 @@ function AnimatedEventBoxInner<T>({
     releaseEdge,
   ]);
 
-  const handlePress = useCallback(() => onPress(positioned.event), [onPress, positioned.event]);
+  // Stable callbacks that read the event and handlers from the ref, so the
+  // resize gestures below keep their identity across renders.
+  const handlePress = useCallback(() => {
+    const { event, onPress: press } = latest.current;
+    press(event);
+  }, []);
+  // A handle also takes the consumer's long press, unless a long press already
+  // grabs the event to move it.
+  const canLongPress = !canMove && onLongPress != null;
+  const handleLongPressFromHandle = useCallback(() => {
+    const { event, onLongPress: press } = latest.current;
+    press?.(event);
+  }, []);
 
   // A plain tap on a resize handle is a press on the event. The two handles cover
   // almost all of a box at the minimum height, so without this a 5- to 30-minute
@@ -917,7 +943,13 @@ function AnimatedEventBoxInner<T>({
       .onEnd((_event, success) => {
         if (success) handlePress();
       });
-    return Gesture.Race(pan, tap);
+    const longPress = Gesture.LongPress()
+      .enabled(canLongPress)
+      .runOnJS(true)
+      .onStart(() => {
+        handleLongPressFromHandle();
+      });
+    return Gesture.Race(pan, tap, longPress);
   }, [
     resizable,
     snapMinutes,
@@ -927,6 +959,8 @@ function AnimatedEventBoxInner<T>({
     commitDrag,
     notifyDragStart,
     handlePress,
+    canLongPress,
+    handleLongPressFromHandle,
   ]);
 
   // Top-edge resize: dragging the top changes the start (end fixed). Mirrors the
@@ -958,7 +992,13 @@ function AnimatedEventBoxInner<T>({
       .onEnd((_event, success) => {
         if (success) handlePress();
       });
-    return Gesture.Race(pan, tap);
+    const longPress = Gesture.LongPress()
+      .enabled(canLongPress)
+      .runOnJS(true)
+      .onStart(() => {
+        handleLongPressFromHandle();
+      });
+    return Gesture.Race(pan, tap, longPress);
   }, [
     resizableFromStart,
     snapMinutes,
@@ -968,6 +1008,8 @@ function AnimatedEventBoxInner<T>({
     commitDrag,
     notifyDragStart,
     handlePress,
+    canLongPress,
+    handleLongPressFromHandle,
   ]);
 
   // When movable, a long press grabs the event to move it, so don't also fire
@@ -1050,7 +1092,7 @@ function AnimatedEventBoxInner<T>({
       />
       {resizableFromStart ? (
         <GestureDetector gesture={resizeStartGesture}>
-          <Animated.View style={styles.resizeHandleTop}>
+          <Animated.View testID="resize-handle-top" style={styles.resizeHandleTop}>
             {showDragHandle ? (
               <View style={[styles.resizeGrip, { backgroundColor: theme.colors.eventText }]} />
             ) : null}
@@ -1059,7 +1101,7 @@ function AnimatedEventBoxInner<T>({
       ) : null}
       {resizable ? (
         <GestureDetector gesture={resizeGesture}>
-          <Animated.View style={styles.resizeHandle}>
+          <Animated.View testID="resize-handle" style={styles.resizeHandle}>
             {/* The grip is the only visible drag affordance; hiding it keeps the
                 resize gesture working but removes the indicator. */}
             {showDragHandle ? (

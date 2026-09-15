@@ -11,7 +11,10 @@
 jest.mock("react-native-gesture-handler", () => {
   const { View } = require("react-native");
   const gestures = [];
-  const makeChain = () => {
+  // `kind` and `args` are the constructor name and arguments (`Gesture.Race(pan,
+  // tap)` records kind "Race" with the two chains), so a test can check how
+  // gestures were composed.
+  const makeChain = (kind, args) => {
     const handlers = {};
     const calls = {};
     const chain = new Proxy(() => chain, {
@@ -20,12 +23,16 @@ jest.mock("react-native-gesture-handler", () => {
           ? handlers
           : prop === "calls"
             ? calls
-            : (...args) => {
-                calls[prop] = args;
-                const callback = args.find((arg) => typeof arg === "function");
-                if (callback) handlers[prop] = callback;
-                return chain;
-              },
+            : prop === "kind"
+              ? kind
+              : prop === "args"
+                ? args
+                : (...methodArgs) => {
+                    calls[prop] = methodArgs;
+                    const callback = methodArgs.find((arg) => typeof arg === "function");
+                    if (callback) handlers[prop] = callback;
+                    return chain;
+                  },
     });
     gestures.push(chain);
     return chain;
@@ -34,7 +41,15 @@ jest.mock("react-native-gesture-handler", () => {
     __esModule: true,
     GestureDetector: ({ children }) => children,
     GestureHandlerRootView: View,
-    Gesture: new Proxy({}, { get: () => () => makeChain() }),
+    Gesture: new Proxy(
+      {},
+      {
+        get:
+          (_target, kind) =>
+          (...args) =>
+            makeChain(kind, args),
+      },
+    ),
     __gestures: gestures,
   };
 });
