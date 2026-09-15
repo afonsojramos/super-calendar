@@ -1035,6 +1035,53 @@ describe("TimeGrid fast-fling repaint", () => {
       .__scrollToIndexCalls;
     expect(calls?.at(-1)).toEqual({ index: pageCount - 1, animated: false });
   });
+
+  it("commits the page a fling settles on, even one viewability never reported", () => {
+    const onChangeDate = jest.fn();
+    render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={onChangeDate}
+        onPressEvent={noop}
+      />,
+    );
+    const list = lastListProps() as { getFixedItemSize: () => number; initialScrollIndex: number };
+    const pageWidth = list.getFixedItemSize();
+    // Rest 60% into the next page: under the 90% viewability threshold, so only
+    // the settle can report it.
+    settle((list.initialScrollIndex + 0.6) * pageWidth);
+    expect(onChangeDate).toHaveBeenCalledTimes(1);
+    const [committed] = onChangeDate.mock.calls[0] as [Date];
+    expect([committed.getFullYear(), committed.getMonth(), committed.getDate()]).toEqual([
+      2026, 0, 12,
+    ]);
+  });
+
+  it("does not re-commit a settle on the page already shown", () => {
+    const onChangeDate = jest.fn();
+    render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={onChangeDate}
+        onPressEvent={noop}
+      />,
+    );
+    const list = lastListProps() as { getFixedItemSize: () => number; initialScrollIndex: number };
+    settle(list.initialScrollIndex * list.getFixedItemSize());
+    expect(onChangeDate).not.toHaveBeenCalled();
+  });
 });
 
 describe("TimeGrid cross-week drop", () => {

@@ -2760,11 +2760,21 @@ function TimeGridInner<T>({
       if (pendingScrollIndexRef.current != null) return;
       const raw = Math.round(event.nativeEvent.contentOffset.x / columnsWidth);
       const index = Math.min(Math.max(raw, 0), pageDates.length - 1);
+      // Commit the page the pager snaps to. Viewability only reports a page that
+      // is nearly all on screen, so a fling that rests between pages would
+      // otherwise move the grid without moving the date behind the header.
+      if (index !== viewedIndexRef.current) {
+        viewedIndexRef.current = index;
+        const target = pageDates[index];
+        if (target) onChangeDate(target);
+      }
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      pagerOffset.value = index * columnsWidth;
       requestAnimationFrame(() => {
         void listRef.current?.scrollToIndex({ index, animated: false });
       });
     },
-    [columnsWidth, pageDates.length],
+    [columnsWidth, pageDates, onChangeDate, pagerOffset],
   );
 
   // Optionally snap the pager back to the active page after an empty-cell press
