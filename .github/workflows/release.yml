@@ -21,6 +21,24 @@ jobs:
       - uses: googleapis/release-please-action@v4
         id: release
 
+  # Comments on every issue and PR closed between the previous release and this
+  # one, naming the release that carries the change. Items labelled
+  # "dependencies" are skipped, and an issue closed by hand (no closing keyword
+  # in a merged PR) gets no comment.
+  comment:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: apexskier/github-release-commenter@v1.4.1
+        with:
+          comment-template: |
+            Released in {release_link}.
+
   publish:
     needs: release-please
     if: ${{ needs.release-please.outputs.releases_created == 'true' }}
