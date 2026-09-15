@@ -1,7 +1,7 @@
 // Uniwind's CSS entry point: enables Tailwind classes on native components,
 // powering the "tailwind" demo tab.
 import "./global.css";
-import { addDays, addMonths, addWeeks, addYears, format } from "date-fns";
+import { addDays, addMonths, addWeeks, addYears, endOfMonth, format, startOfMonth } from "date-fns";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -177,8 +177,9 @@ export default function App() {
     }
   }, [icsText]);
 
-  // Rules for the "recurring" tab, expanded to concrete occurrences around the
-  // visible month so paging re-materialises them. Mirrors the dom example.
+  // Rules for the "recurring" tab. Expand across the visible month and a whole
+  // month either side, so the pager's neighbour pages show occurrences at once
+  // and the trailing week's next-month days aren't clipped at the window edge.
   const recurringEvents = useMemo(() => {
     const rules: CalendarEvent[] = [
       {
@@ -200,7 +201,11 @@ export default function App() {
         recurrence: { freq: "yearly", months: [1, 4, 7, 10] },
       },
     ];
-    return expandRecurringEvents(rules, addMonths(date, -1), addMonths(date, 1));
+    return expandRecurringEvents(
+      rules,
+      startOfMonth(addMonths(date, -2)),
+      endOfMonth(addMonths(date, 2)),
+    );
   }, [date]);
 
   // Download the current events as an .ics file; the button only renders on the

@@ -1,4 +1,4 @@
-import { addDays, addMonths, addWeeks, addYears, format } from "date-fns";
+import { addDays, addMonths, addWeeks, addYears, endOfMonth, format, startOfMonth } from "date-fns";
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import {
   Calendar,
@@ -154,9 +154,9 @@ export function App() {
       return [];
     }
   }, [icsText]);
-  // Rules for the "recurring" tab, expanded to concrete occurrences around the
-  // visible month so paging re-materialises them. Shows BYMONTHDAY, weekly BYDAY,
-  // and yearly BYMONTH from the recurrence engine.
+  // Rules for the "recurring" tab. Expand across the visible month and a whole
+  // month either side so next-month days in the trailing week aren't clipped.
+  // Shows BYMONTHDAY, weekly BYDAY, and yearly BYMONTH from the recurrence engine.
   const recurringEvents = useMemo(() => {
     const rules: CalendarEvent[] = [
       {
@@ -178,7 +178,11 @@ export function App() {
         recurrence: { freq: "yearly", months: [1, 4, 7, 10] },
       },
     ];
-    return expandRecurringEvents(rules, addMonths(date, -1), addMonths(date, 1));
+    return expandRecurringEvents(
+      rules,
+      startOfMonth(addMonths(date, -2)),
+      endOfMonth(addMonths(date, 2)),
+    );
   }, [date]);
 
   const exportIcs = () => {
