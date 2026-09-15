@@ -1,7 +1,7 @@
 import { act, fireEvent, render } from "@testing-library/react";
 import { useState } from "react";
 import type { CalendarEvent } from "@super-calendar/core";
-import { TimeGrid } from "../TimeGrid";
+import { type DomRenderEventArgs, TimeGrid } from "../TimeGrid";
 
 const day = new Date(2026, 5, 26);
 const events: CalendarEvent[] = [
@@ -740,7 +740,7 @@ describe("dom TimeGrid", () => {
     const { queryByText, rerender } = render(
       <TimeGrid date={day} mode="day" events={allDay} hourHeight={48} />,
     );
-    expect(queryByText("all-day")).toBeTruthy();
+    expect(queryByText("Holiday")).toBeTruthy();
     rerender(
       <TimeGrid
         date={day}
@@ -750,7 +750,7 @@ describe("dom TimeGrid", () => {
         showAllDayEventCell={false}
       />,
     );
-    expect(queryByText("all-day")).toBeNull();
+    expect(queryByText("Holiday")).toBeNull();
   });
 
   it("uses eventAccessibilityLabel to override an event's aria-label", () => {
@@ -1376,5 +1376,185 @@ describe("dom TimeGrid event box sizing", () => {
     expect(boxInset()).toEqual({ left: "calc(0% + 1px)", width: "calc(100% - 2px)" });
     expect(boxInset(0)).toEqual({ left: "calc(0% + 0px)", width: "calc(100% - 0px)" });
     expect(boxInset(4)).toEqual({ left: "calc(0% + 4px)", width: "calc(100% - 8px)" });
+  });
+});
+
+describe("dom TimeGrid short-event press", () => {
+  const handlesOf = (box: HTMLElement) =>
+    Array.from(box.querySelectorAll<HTMLElement>('div[style*="ns-resize"]'));
+
+  it("presses a movable event from a click on either resize handle", () => {
+    const onPressEvent = jest.fn();
+    const { getByText } = render(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={events}
+        hourHeight={48}
+        onDragEvent={() => {}}
+        onPressEvent={onPressEvent}
+      />,
+    );
+    // A movable box has no click handler of its own: the press comes from a
+    // release without movement, which both resize handles report as well.
+    const handles = handlesOf(wrapperOf(getByText("Focus")));
+    expect(handles).toHaveLength(2);
+    for (const handle of handles) {
+      onPressEvent.mockClear();
+      fireEvent.pointerDown(handle, { clientY: 300, pointerId: 1 });
+      fireEvent.pointerUp(handle, { clientY: 300, pointerId: 1 });
+      expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "Focus" }));
+    }
+  });
+
+  it("presses once when the box is resizable but not movable", () => {
+    const onPressEvent = jest.fn();
+    const { getByText } = render(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={events}
+        hourHeight={48}
+        onDragEvent={() => {}}
+        eventStartEditable={false}
+        onPressEvent={onPressEvent}
+      />,
+    );
+    // An immovable box presses on click, and the click bubbles up from the
+    // handle: the handle must not report the release as a press as well.
+    const handle = handlesOf(wrapperOf(getByText("Focus")))[0];
+    fireEvent.pointerDown(handle, { clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(handle, { clientY: 300, pointerId: 1 });
+    fireEvent.click(handle);
+    expect(onPressEvent).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("dom TimeGrid background events", () => {
+  const blocked: CalendarEvent = {
+    title: "Blocked",
+    start: new Date(2026, 5, 26, 9, 0),
+    end: new Date(2026, 5, 26, 12, 0),
+    display: "background",
+  };
+
+  it("shades a background event without rendering it as an event", () => {
+    const { container, queryByText } = render(
+      <TimeGrid date={day} mode="day" events={[blocked, ...events]} hourHeight={48} />,
+    );
+    const band = container.querySelector<HTMLElement>('[data-slot="backgroundEvent"]');
+    expect(band?.style.pointerEvents).toBe("none");
+    expect(band?.getAttribute("aria-hidden")).toBe("true");
+    expect(queryByText("Blocked")).toBeNull();
+  });
+
+  it("renders a background event through renderBackgroundEvent and lets it press", () => {
+    const onPressEvent = jest.fn();
+    const BlockedBand = ({ event, onPress }: DomRenderEventArgs) => (
+      <button type="button" onClick={onPress}>
+        {event.title}
+      </button>
+    );
+    const { container, getByText } = render(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={[blocked, ...events]}
+        hourHeight={48}
+        renderBackgroundEvent={BlockedBand}
+        onPressEvent={onPressEvent}
+      />,
+    );
+    const band = container.querySelector<HTMLElement>('[data-slot="backgroundEvent"]');
+    expect(band?.style.pointerEvents).toBe("auto");
+    expect(band?.getAttribute("aria-hidden")).toBeNull();
+    fireEvent.click(getByText("Blocked"));
+    expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "Blocked" }));
+  });
+
+  it("gives the band renderer the band's pixel height and the clock format", () => {
+    const seen: DomRenderEventArgs[] = [];
+    const Band = (args: DomRenderEventArgs) => {
+      seen.push(args);
+      return null;
+    };
+    render(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={[blocked]}
+        hourHeight={48}
+        ampm
+        renderBackgroundEvent={Band}
+      />,
+    );
+    // 09:00-12:00 at 48px per hour.
+    expect(seen[0]?.boxHeight).toBe(144);
+    expect(seen[0]?.ampm).toBe(true);
+  });
+});
+
+describe("dom TimeGrid all-day label", () => {
+  const trip: CalendarEvent = {
+    title: "Trip",
+    start: new Date(2026, 5, 26),
+    end: new Date(2026, 5, 27),
+    allDay: true,
+  };
+
+  it("keeps the gutter cell but shows no text by default", () => {
+    const { getByText, queryByText } = render(
+      <TimeGrid date={day} mode="day" events={[trip]} hourHeight={48} />,
+    );
+    expect(getByText("Trip")).toBeTruthy();
+    expect(queryByText("all-day")).toBeNull();
+  });
+
+  it("shows the text with showAllDayLabel", () => {
+    const { getByText } = render(
+      <TimeGrid date={day} mode="day" events={[trip]} hourHeight={48} showAllDayLabel />,
+    );
+    expect(getByText("all-day")).toBeTruthy();
+  });
+});
+
+describe("dom TimeGrid background band keys", () => {
+  it("keeps a later band mounted when an earlier one is removed", () => {
+    const mounts: string[] = [];
+    const Band = ({ event }: DomRenderEventArgs) => {
+      useState(() => mounts.push(event.title ?? ""));
+      return <span>{event.title}</span>;
+    };
+    const first: CalendarEvent = {
+      title: "First",
+      start: new Date(2026, 5, 26, 8),
+      end: new Date(2026, 5, 26, 9),
+      display: "background",
+    };
+    const second: CalendarEvent = {
+      title: "Second",
+      start: new Date(2026, 5, 26, 10),
+      end: new Date(2026, 5, 26, 11),
+      display: "background",
+    };
+    const { rerender } = render(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={[first, second]}
+        hourHeight={48}
+        renderBackgroundEvent={Band}
+      />,
+    );
+    rerender(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={[second]}
+        hourHeight={48}
+        renderBackgroundEvent={Band}
+      />,
+    );
+    expect(mounts).toEqual(["First", "Second"]);
   });
 });

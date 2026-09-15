@@ -195,6 +195,15 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
    * band stays non-interactive and hidden from assistive tech.
    */
   renderBusinessHours?: (band: BusinessHoursBand) => ReactNode;
+  /**
+   * A component that draws a `display: "background"` event's band in place of
+   * the themed shade. Rendered like `renderEvent`, it receives the event, the
+   * mode, `continuesBefore` / `continuesAfter` for a multi-day event, and
+   * `onPress`, which fires `onPressEvent`. The band then takes pointer events and
+   * is no longer hidden from assistive tech; cell clicks and drag-to-create are
+   * unreachable underneath it. Without it the band stays a shaded, inert range.
+   */
+  renderBackgroundEvent?: DomRenderEvent<T>;
   /** Show the current-time indicator on today's column (default true). */
   showNowIndicator?: boolean;
   /** Fixed "now" instant for the indicator (doesn't tick). Defaults to the device clock. */
@@ -203,6 +212,8 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   timeZone?: string;
   /** Show the all-day lane above the grid (default true). */
   showAllDayEventCell?: boolean;
+  /** Show the "all-day" text beside the lane (default false). */
+  showAllDayLabel?: boolean;
   /** Tint Saturday/Sunday columns with the weekend background (default true). Set
    * false to treat weekends like any other day. */
   highlightWeekends?: boolean;
@@ -423,6 +434,7 @@ export function TimeGrid<T = unknown>({
   keyboardEventNavigation = false,
   businessHours,
   renderBusinessHours,
+  renderBackgroundEvent,
   showNowIndicator = true,
   highlightWeekends = true,
   eventStartEditable = true,
@@ -431,6 +443,7 @@ export function TimeGrid<T = unknown>({
   now: nowProp,
   timeZone,
   showAllDayEventCell = true,
+  showAllDayLabel = false,
   locale,
   theme: themeOverrides,
   height = 600,
@@ -464,6 +477,7 @@ export function TimeGrid<T = unknown>({
   const windowEnd = Math.max(windowStart + 1, Math.min(maxHour, 24));
   const windowHours = windowEnd - windowStart;
   const gutterWidth = hideHours ? 0 : GUTTER_WIDTH;
+  const RenderBackground = renderBackgroundEvent;
   const visibleHours = useMemo(
     () => Array.from({ length: windowHours }, (_, i) => windowStart + i),
     [windowStart, windowHours],
@@ -1110,15 +1124,22 @@ export function TimeGrid<T = unknown>({
   // `display: "background"` events, sliced per day and clipped to the window.
   const backgroundByDay = useMemo(
     () =>
-      days.map((day) =>
-        backgroundBandsForDay(events, day)
+      days.map((day) => {
+        const seen = new Map<string, number>();
+        return backgroundBandsForDay(events, day)
           .map((b) => ({
             ...b,
             startHours: Math.max(b.startHours, windowStart),
             endHours: Math.min(b.endHours, windowEnd),
           }))
-          .filter((b) => b.endHours > b.startHours),
-      ),
+          .filter((b) => b.endHours > b.startHours)
+          .map((b) => {
+            const base = `bg-${b.event.start.toISOString()}-${b.event.end.toISOString()}`;
+            const nth = (seen.get(base) ?? 0) + 1;
+            seen.set(base, nth);
+            return { ...b, key: nth === 1 ? base : `${base}-${nth}` };
+          });
+      }),
     [days, events, windowStart, windowEnd],
   );
   const gridLines = useMemo(() => {
@@ -1261,7 +1282,7 @@ export function TimeGrid<T = unknown>({
               themed: { fontSize: 10, color: theme.textMuted, padding: "4px 6px 0 0" },
             })}
           >
-            all-day
+            {showAllDayLabel ? "all-day" : null}
           </div>
           {allDayByDay.map((list, i) => {
             const dayStart = startOfDay(days[i]);
@@ -1449,26 +1470,50 @@ export function TimeGrid<T = unknown>({
                     {renderBusinessHours?.({ date: day, start: b.start, end: b.end })}
                   </div>
                 ))}
-                {/* Background events: shaded, non-interactive time ranges. */}
-                {backgroundByDay[dayIndex].map((b, bandIndex) => (
-                  <div
-                    key={`bg-${bandIndex}`}
-                    aria-hidden
-                    title={b.event.title}
-                    {...slot("backgroundEvent", {
-                      base: {
-                        position: "absolute",
-                        left: 0,
-                        right: 0,
-                        top: (b.startHours - windowStart) * hourHeight,
-                        height: (b.endHours - b.startHours) * hourHeight,
-                        pointerEvents: "none",
-                        zIndex: 0,
-                      },
-                      themed: { background: theme.backgroundEvent },
-                    })}
-                  />
-                ))}
+                {/* Background events: shaded time ranges, or the consumer's own band. */}
+                {backgroundByDay[dayIndex].map((b) => {
+                  const { key } = b;
+                  const geometry = {
+                    position: "absolute" as const,
+                    left: 0,
+                    right: 0,
+                    top: (b.startHours - windowStart) * hourHeight,
+                    height: (b.endHours - b.startHours) * hourHeight,
+                    zIndex: 0,
+                    overflow: "hidden" as const,
+                  };
+                  if (!RenderBackground) {
+                    return (
+                      <div
+                        key={key}
+                        aria-hidden
+                        title={b.event.title}
+                        {...slot("backgroundEvent", {
+                          base: { ...geometry, pointerEvents: "none" },
+                          themed: { background: theme.backgroundEvent },
+                        })}
+                      />
+                    );
+                  }
+                  const dayStart = startOfDay(days[dayIndex]);
+                  return (
+                    <div
+                      key={key}
+                      {...slot("backgroundEvent", { base: { ...geometry, pointerEvents: "auto" } })}
+                    >
+                      <RenderBackground
+                        event={b.event}
+                        mode={mode}
+                        isAllDay={false}
+                        boxHeight={geometry.height}
+                        continuesBefore={b.event.start < dayStart}
+                        continuesAfter={b.event.end > addDays(dayStart, 1)}
+                        ampm={ampm}
+                        onPress={() => onPressEvent?.(b.event)}
+                      />
+                    </div>
+                  );
+                })}
                 {/* Grid lines, painted over the shade so they stay visible. */}
                 <div
                   aria-hidden
@@ -1591,11 +1636,21 @@ export function TimeGrid<T = unknown>({
                       ) : (
                         <DefaultDomEvent {...args} theme={theme} boxProps={slot("eventBox")} />
                       )}
+                      {/* A release without movement on a handle presses the event, like
+                          the box itself. Only when the box can move: otherwise it carries
+                          its own `onClick`, which would press the event a second time. */}
                       {canResize && !pe.continuesBefore ? (
                         <div
                           onPointerDown={(e) => {
                             e.stopPropagation();
-                            beginDrag(e, pe, key, "resize-start", dayIndex);
+                            beginDrag(
+                              e,
+                              pe,
+                              key,
+                              "resize-start",
+                              dayIndex,
+                              canMove ? onPress : undefined,
+                            );
                           }}
                           style={{
                             position: "absolute",
@@ -1617,7 +1672,14 @@ export function TimeGrid<T = unknown>({
                         <div
                           onPointerDown={(e) => {
                             e.stopPropagation();
-                            beginDrag(e, pe, key, "resize", dayIndex);
+                            beginDrag(
+                              e,
+                              pe,
+                              key,
+                              "resize",
+                              dayIndex,
+                              canMove ? onPress : undefined,
+                            );
                           }}
                           style={{
                             position: "absolute",

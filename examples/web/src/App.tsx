@@ -14,6 +14,7 @@ import {
   ResourceTimeline,
   toICalendar,
   useDateRange,
+  type DomRenderEventArgs,
 } from "@super-calendar/dom";
 
 import { type EventMenuActions, EventMenuProvider } from "@super-calendar/example-shared";
@@ -127,6 +128,30 @@ function shiftedDate(date: Date, minutes: number): Date {
   next.setMinutes(next.getMinutes() + minutes);
   return next;
 }
+
+// The demo's background event band: labelled and clickable, unlike the default
+// shade. Defined once so the grid keeps the same component across renders.
+const FocusBand = ({ event, onPress }: DomRenderEventArgs) => (
+  <button
+    type="button"
+    onClick={onPress}
+    style={{
+      display: "block",
+      width: "100%",
+      height: "100%",
+      border: 0,
+      padding: 4,
+      textAlign: "left",
+      background: "#fef3c7",
+      color: "#92400e",
+      font: "inherit",
+      fontSize: 11,
+      cursor: "pointer",
+    }}
+  >
+    {event.title}
+  </button>
+);
 
 export function App() {
   const [mode, setMode] = useState<DemoTab>("week");
@@ -501,6 +526,7 @@ export function App() {
           <div style={styles.card}>
             <Calendar
               mode={mode}
+              renderBackgroundEvent={FocusBand}
               date={date}
               events={events}
               weekStartsOn={1}

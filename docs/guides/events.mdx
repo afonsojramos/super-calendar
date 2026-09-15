@@ -132,15 +132,19 @@ dot. Restyle the band with the `backgroundEvent` slot or the theme's
 `backgroundEvent` colour token.
 
 To draw a band yourself, or make it pressable, pass a component as
-`renderBackgroundEvent` to `Calendar` or `TimeGrid` (React Native; the resource
-timeline keeps the shade). It is rendered like `renderEvent`, so it may use
-hooks, and receives the `event`, the `mode`, a live `boxHeight`,
-`continuesBefore` / `continuesAfter` for a multi-day event, and `onPress` /
-`onLongPress`, which fire `onPressEvent` / `onLongPressEvent`. The themed tint is
-dropped, the band lets touches through to what you render, and it is no longer
-hidden from assistive tech. Cell presses and drag-to-create are unreachable
-underneath such a band. Define the component outside your render so it keeps
-its identity:
+`renderBackgroundEvent` to `Calendar` or `TimeGrid` on either renderer (the
+resource timeline keeps the shade). It is rendered like `renderEvent`, so it may
+use hooks, and receives the `event`, the `mode`, the band's `boxHeight`, the
+`ampm` flag, `continuesBefore` / `continuesAfter` for a multi-day event, and
+`onPress`, which fires `onPressEvent`; React Native adds `onLongPress` and makes
+`boxHeight` a live shared value that follows a pinch. The themed tint is
+dropped, the band lets touches or pointer events through to what you render, and
+it is no longer hidden from assistive tech. On the web the band itself takes no
+focus, so render a focusable control such as a button for keyboard users. Cell
+presses and drag-to-create are unreachable underneath such a band. Define the
+component outside your render so it keeps its identity (on the web the args
+type is
+`DomRenderEventArgs` from `@super-calendar/dom`):
 
 ```tsx
 import { Pressable, Text } from "react-native";
