@@ -15,6 +15,7 @@ import {
   useWindowDimensions,
   View,
   type ViewStyle,
+  RefreshControl,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -157,6 +158,16 @@ export default function App() {
   const [mode, setMode] = useState<DemoTab>("week");
   const [date, setDate] = useState(() => new Date());
   const [events, setEvents] = useState<CalendarEvent<EventMeta>[]>(buildEvents);
+  // Pull-to-refresh on the schedule list and the time grid: rebuild the demo
+  // events after a short pause, the way a fetch would.
+  const [refreshing, setRefreshing] = useState(false);
+  const reloadEvents = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setEvents(buildEvents());
+      setRefreshing(false);
+    }, 800);
+  };
   // Range selection for the "picker" tab; onPressDate wires to month-cell taps.
   // Disallow past dates so the picker also demonstrates disabled days.
   const pickerMinDate = useMemo(() => new Date(), []);
@@ -521,6 +532,9 @@ export default function App() {
                     mode={activeMode}
                     date={date}
                     events={events}
+                    refreshControl={
+                      <RefreshControl refreshing={refreshing} onRefresh={reloadEvents} />
+                    }
                     weekStartsOn={1}
                     scrollOffsetMinutes={8 * 60}
                     businessHours={(date) => {
