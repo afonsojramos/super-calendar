@@ -9,9 +9,6 @@ import { isAllDayEvent, isBackgroundEvent } from "@super-calendar/core";
 // this file doesn't import the full TimeGrid type.
 type AllDayLaneSlot = "allDayLane" | "allDayColumn" | "allDayEvent";
 
-/** Height of a lane with no all-day events: one empty chip row. */
-export const MIN_ALL_DAY_LANE_HEIGHT = 24;
-
 type AllDayLaneProps<T> = {
   days: Date[];
   events: CalendarEvent<T>[];
@@ -28,9 +25,9 @@ type AllDayLaneProps<T> = {
 /**
  * The all-day lane of one page, pinned above the scrolling hours. All-day
  * events are excluded from the timed columns (see `layoutDayEvents`) and shown
- * here, stacked under their day(s). Always rendered, at least one chip row
- * tall, so the band above the grid never jumps between pages; the "all-day"
- * label lives in the hour column.
+ * here, stacked under their day(s). Always rendered so every page reports a
+ * height, zero when the week has none, which the band above the grid follows
+ * live as you swipe; the "all-day" label lives in the hour column.
  */
 export function AllDayLane<T>({
   days,
@@ -59,31 +56,36 @@ export function AllDayLane<T>({
     <View
       {...slot("allDayLane", {
         base: styles.lane,
-        themed: [{ borderBottomColor: theme.colors.gridLine }, theme.containers.allDayLane],
+        themed: theme.containers.allDayLane,
       })}
       onLayout={onLayout}
     >
-      {days.map((day, dayIndex) => (
-        <View
-          key={day.toISOString()}
-          {...slot("allDayColumn", {
-            base: [styles.column, { width: dayWidth }],
-            themed: theme.containers.allDayColumn,
-          })}
-        >
-          {perDay[dayIndex].map((event, index) => (
-            <View key={keyExtractor(event, index)} {...slot("allDayEvent", { base: styles.chip })}>
-              <RenderEventComponent
-                event={event}
-                mode={mode}
-                isAllDay
-                onPress={() => onPressEvent(event)}
-                onLongPress={onLongPressEvent ? () => onLongPressEvent(event) : undefined}
-              />
+      {allDay.length === 0
+        ? null
+        : days.map((day, dayIndex) => (
+            <View
+              key={day.toISOString()}
+              {...slot("allDayColumn", {
+                base: [styles.column, { width: dayWidth }],
+                themed: theme.containers.allDayColumn,
+              })}
+            >
+              {perDay[dayIndex].map((event, index) => (
+                <View
+                  key={keyExtractor(event, index)}
+                  {...slot("allDayEvent", { base: styles.chip })}
+                >
+                  <RenderEventComponent
+                    event={event}
+                    mode={mode}
+                    isAllDay
+                    onPress={() => onPressEvent(event)}
+                    onLongPress={onLongPressEvent ? () => onLongPressEvent(event) : undefined}
+                  />
+                </View>
+              ))}
             </View>
           ))}
-        </View>
-      ))}
     </View>
   );
 }
@@ -91,8 +93,6 @@ export function AllDayLane<T>({
 const styles = StyleSheet.create({
   lane: {
     flexDirection: "row",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    minHeight: MIN_ALL_DAY_LANE_HEIGHT,
   },
   column: {
     paddingVertical: 2,

@@ -771,7 +771,7 @@ describe("TimeGrid paged header", () => {
       <TimeGrid {...base()} minHour={7} maxHour={20} renderHeader={() => <Text>h</Text>} />,
     );
     // No 56px header band in the page height: empty lane + inset + 13 rows of 160.
-    expect(flat(getByTestId("time-grid-page")).height).toBe(24 + 12 + 13 * 160);
+    expect(flat(getByTestId("time-grid-page")).height).toBe(12 + 13 * 160);
   });
 });
 
@@ -854,8 +854,8 @@ describe("TimeGrid hour column", () => {
     // The one hour window sizes the scroll content: the paged day header, the
     // empty all-day band, the label inset, then 13 rows of 48px. The page keeps a
     // fixed height with room for the fully zoomed window (13 rows of 160px).
-    expect(flat(getByTestId("time-grid-hours")).height).toBe(56 + 24 + 12 + 13 * 48);
-    expect(flat(getByTestId("time-grid-page")).height).toBe(56 + 24 + 12 + 13 * 160);
+    expect(flat(getByTestId("time-grid-hours")).height).toBe(56 + 12 + 13 * 48);
+    expect(flat(getByTestId("time-grid-page")).height).toBe(56 + 12 + 13 * 160);
   });
 
   it("starts the first column at the pager's left edge when hours are hidden", () => {
@@ -909,12 +909,12 @@ describe("TimeGrid hour column", () => {
     const [scroller] = UNSAFE_getAllByProps({ scrollEventThrottle: 16 }).filter(isHost);
     expect(getAllByLabelText(/Trip/)).toHaveLength(1);
     expect(within(scroller).getAllByLabelText(/Trip/)).toHaveLength(1);
-    // The "all-day" label is off by default; the lane still shows a band.
+    // The "all-day" label is off by default.
     expect(within(getByTestId("hour-gutter")).queryByText("all-day")).toBeNull();
-    // Unmeasured, the band is one empty row tall and counter-translated by the
+    // Unmeasured, the band has no height yet and is counter-translated by the
     // scroll offset so it holds still at the top of the viewport.
     const band = getByTestId("all-day-band");
-    expect(flat(band).height).toBe(24);
+    expect(flat(band).height).toBe(0);
     expect(flat(band).transform).toEqual([{ translateY: 384 }]);
     // The page reports its lane's natural height; the band and the page follow.
     const [lane] = UNSAFE_getAllByProps({ className: "lane" }).filter(isHost);
@@ -923,6 +923,12 @@ describe("TimeGrid hour column", () => {
     expect(flat(getByTestId("all-day-band")).height).toBe(46);
     expect(flat(getByTestId("time-grid-hours")).height).toBe(56 + 46 + 12 + 24 * 48);
     // The fixed page height grows with the tallest lane seen.
+    expect(flat(getByTestId("time-grid-page")).height).toBe(56 + 46 + 12 + 24 * 160);
+    // A week with no all-day events reports zero and the band collapses to it;
+    // the page keeps the tallest lane it has seen.
+    fireEvent(lane, "layout", { nativeEvent: { layout: { height: 0 } } });
+    rerender(grid(false));
+    expect(flat(getByTestId("all-day-band")).height).toBe(0);
     expect(flat(getByTestId("time-grid-page")).height).toBe(56 + 46 + 12 + 24 * 160);
   });
 });
@@ -961,7 +967,7 @@ describe("TimeGrid all-day band during a swipe", () => {
     rerender(grid(true));
     expect(flat(getByTestId("all-day-band")).height).toBe(64);
     // The list keeps its offset on the UI thread. Three quarters of the way in
-    // from the previous page (unmeasured, so one empty row) the band is three
+    // from the previous page (unmeasured, so no height) the band is three
     // quarters of the way up to this page's height.
     const listProps = lastListProps() as {
       sharedValues: { scrollOffset: { value: number } };
@@ -970,7 +976,7 @@ describe("TimeGrid all-day band during a swipe", () => {
     const pageWidth = listProps.getFixedItemSize();
     listProps.sharedValues.scrollOffset.value = (179 + 0.75) * pageWidth;
     rerender(grid(false));
-    expect(flat(getByTestId("all-day-band")).height).toBeCloseTo(24 + (64 - 24) * 0.75);
+    expect(flat(getByTestId("all-day-band")).height).toBeCloseTo(64 * 0.75);
   });
 });
 
@@ -1118,7 +1124,7 @@ describe("TimeGrid cross-week drop", () => {
     // Grab the box 10px in, then hold the finger inside the pager's right edge zone.
     act(() => {
       move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 });
-      move.onUpdate?.({ translationX: 535, translationY: 0, absoluteX: 735, absoluteY: 774 });
+      move.onUpdate?.({ translationX: 535, translationY: 0, absoluteX: 735, absoluteY: 750 });
     });
     // The edge dwell lifts the event into the floating ghost and pages the view.
     act(() => {
@@ -1136,8 +1142,8 @@ describe("TimeGrid cross-week drop", () => {
     });
     // The ghost's left edge is 725px into the pager (past the last of seven
     // columns, so clamped to the advanced week's Sunday, Jan 18) and its top 764px
-    // down the page: past the 56px paged header, the 24px empty all-day band and
-    // the 12px label inset, 672px is 14 rows.
+    // down the page: past the 56px paged header (this week has no all-day band)
+    // and the 12px label inset, 672px is 14 rows.
     expect(onDragEvent).toHaveBeenCalledTimes(1);
     const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent<WithId>, Date, Date];
     expect(start).toEqual(new Date(2026, 0, 18, 14, 0));

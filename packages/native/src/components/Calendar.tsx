@@ -234,17 +234,18 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   /** Sub-hour divider lines per hour on the week/day grid (e.g. 2 = half-hours). Default 1. */
   timeslots?: number;
   /**
-   * Show the all-day lane above the week/day grid. Default true: the lane always
-   * shows (a slim empty row when no day has an all-day event) and its height
-   * follows the week as you swipe. When false the lane is never rendered, so
+   * Show the all-day lane above the week/day grid. Default true: the lane is
+   * sized to the week's all-day events, collapsing to nothing when there are
+   * none, and its height follows the week as you swipe. When false the lane is
+   * never rendered, so
    * all-day events (see `ICalendarEvent.allDay` and whole-day spans) are not
    * shown on the time grid.
    */
   showAllDayEventCell?: boolean;
   /**
-   * Show the "all-day" text label in the week/day hour column. Default false: the
-   * lane still reserves its row, it just isn't labelled, so an empty all-day row
-   * reads as neutral space instead of a labelled-but-empty one.
+   * Show the "all-day" text label in the week/day hour column. Default false: a
+   * week with no all-day events then shows no lane at all, rather than a label
+   * beside an empty row; with the label on, it slides away with the lane.
    */
   showAllDayLabel?: boolean;
   /** Tint weekend columns (default true). Set false to treat weekends normally. */

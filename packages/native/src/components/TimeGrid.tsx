@@ -99,7 +99,7 @@ import {
 import { useWebGridZoom } from "../utils/useWebGridZoom";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { withEventAccessibilityLabel } from "../utils/withEventAccessibilityLabel";
-import { AllDayLane, MIN_ALL_DAY_LANE_HEIGHT } from "./AllDayLane";
+import { AllDayLane } from "./AllDayLane";
 import { type MultiDayMove, MultiDayMovePreview } from "./MultiDayMovePreview";
 
 // Horizontal swipe paging doesn't translate to web; there we disable it and page
@@ -1778,7 +1778,11 @@ function TimetablePageInner<T>({
           testID="all-day-band"
           style={[
             styles.laneBand,
-            { top: headerOffset, backgroundColor: theme.colors.surface },
+            {
+              top: headerOffset,
+              backgroundColor: theme.colors.surface,
+              borderBottomColor: theme.colors.gridLine,
+            },
             laneHeightStyle,
             pinStyle,
           ]}
@@ -2272,7 +2276,7 @@ function TimeGridInner<T>({
   const pagerReady = pagerLayoutWidth != null && pagerLayoutWidth > 0;
   // The tallest all-day lane reported so far, so the fixed pager height below
   // always has room for the band.
-  const [tallestLane, setTallestLane] = useState(MIN_ALL_DAY_LANE_HEIGHT);
+  const [tallestLane, setTallestLane] = useState(0);
   // Week-anchored modes page by a full week and align pages to the week start:
   // `week`, and `custom` when a `weekEndsOn` defines a partial-week span.
   const weekAnchored = mode === "week" || (mode === "custom" && weekEndsOn != null);
@@ -2330,7 +2334,7 @@ function TimeGridInner<T>({
     if (Math.abs(progress - activeIndexShared.value) > 1.5) progress = activeIndexShared.value;
     const from = Math.floor(progress);
     const fraction = progress - from;
-    const start = heights[from] ?? MIN_ALL_DAY_LANE_HEIGHT;
+    const start = heights[from] ?? 0;
     const end = heights[from + 1] ?? start;
     return start + (end - start) * fraction;
   }, [showAllDayEventCell, columnsWidth]);
@@ -3299,7 +3303,9 @@ const styles = StyleSheet.create({
     right: 0,
   },
   // A page's all-day band: pinned to the top of the viewport by riding the scroll
-  // offset, painted over the hours that pass beneath it.
+  // offset, painted over the hours that pass beneath it. It draws the lane's
+  // bottom rule at its live height, so the rule stays level with the hour
+  // column's cell while a swipe interpolates between two weeks.
   laneBand: {
     position: "absolute",
     top: 0,
@@ -3307,6 +3313,7 @@ const styles = StyleSheet.create({
     right: 0,
     overflow: "hidden",
     zIndex: 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   // The hour column's "all-day" cell, pinned like the pages' bands.
   laneCell: {
@@ -3316,6 +3323,7 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 2,
     justifyContent: "center",
+    overflow: "hidden",
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   allDayLabel: {
