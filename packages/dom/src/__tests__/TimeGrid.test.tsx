@@ -1517,3 +1517,44 @@ describe("dom TimeGrid all-day label", () => {
     expect(getByText("all-day")).toBeTruthy();
   });
 });
+
+describe("dom TimeGrid background band keys", () => {
+  it("keeps a later band mounted when an earlier one is removed", () => {
+    const mounts: string[] = [];
+    const Band = ({ event }: DomRenderEventArgs) => {
+      useState(() => mounts.push(event.title ?? ""));
+      return <span>{event.title}</span>;
+    };
+    const first: CalendarEvent = {
+      title: "First",
+      start: new Date(2026, 5, 26, 8),
+      end: new Date(2026, 5, 26, 9),
+      display: "background",
+    };
+    const second: CalendarEvent = {
+      title: "Second",
+      start: new Date(2026, 5, 26, 10),
+      end: new Date(2026, 5, 26, 11),
+      display: "background",
+    };
+    const { rerender } = render(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={[first, second]}
+        hourHeight={48}
+        renderBackgroundEvent={Band}
+      />,
+    );
+    rerender(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={[second]}
+        hourHeight={48}
+        renderBackgroundEvent={Band}
+      />,
+    );
+    expect(mounts).toEqual(["First", "Second"]);
+  });
+});

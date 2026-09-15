@@ -1124,15 +1124,22 @@ export function TimeGrid<T = unknown>({
   // `display: "background"` events, sliced per day and clipped to the window.
   const backgroundByDay = useMemo(
     () =>
-      days.map((day) =>
-        backgroundBandsForDay(events, day)
+      days.map((day) => {
+        const seen = new Map<string, number>();
+        return backgroundBandsForDay(events, day)
           .map((b) => ({
             ...b,
             startHours: Math.max(b.startHours, windowStart),
             endHours: Math.min(b.endHours, windowEnd),
           }))
-          .filter((b) => b.endHours > b.startHours),
-      ),
+          .filter((b) => b.endHours > b.startHours)
+          .map((b) => {
+            const base = `bg-${b.event.start.toISOString()}-${b.event.end.toISOString()}`;
+            const nth = (seen.get(base) ?? 0) + 1;
+            seen.set(base, nth);
+            return { ...b, key: nth === 1 ? base : `${base}-${nth}` };
+          });
+      }),
     [days, events, windowStart, windowEnd],
   );
   const gridLines = useMemo(() => {
@@ -1464,8 +1471,8 @@ export function TimeGrid<T = unknown>({
                   </div>
                 ))}
                 {/* Background events: shaded time ranges, or the consumer's own band. */}
-                {backgroundByDay[dayIndex].map((b, bandIndex) => {
-                  const key = `bg-${b.event.start.toISOString()}-${b.event.end.toISOString()}-${bandIndex}`;
+                {backgroundByDay[dayIndex].map((b) => {
+                  const { key } = b;
                   const geometry = {
                     position: "absolute" as const,
                     left: 0,
