@@ -1627,11 +1627,21 @@ export function TimeGrid<T = unknown>({
                       ) : (
                         <DefaultDomEvent {...args} theme={theme} boxProps={slot("eventBox")} />
                       )}
+                      {/* A release without movement on a handle presses the event, like
+                          the box itself. Only when the box can move: otherwise it carries
+                          its own `onClick`, which would press the event a second time. */}
                       {canResize && !pe.continuesBefore ? (
                         <div
                           onPointerDown={(e) => {
                             e.stopPropagation();
-                            beginDrag(e, pe, key, "resize-start", dayIndex, onPress);
+                            beginDrag(
+                              e,
+                              pe,
+                              key,
+                              "resize-start",
+                              dayIndex,
+                              canMove ? onPress : undefined,
+                            );
                           }}
                           style={{
                             position: "absolute",
@@ -1653,7 +1663,14 @@ export function TimeGrid<T = unknown>({
                         <div
                           onPointerDown={(e) => {
                             e.stopPropagation();
-                            beginDrag(e, pe, key, "resize", dayIndex, onPress);
+                            beginDrag(
+                              e,
+                              pe,
+                              key,
+                              "resize",
+                              dayIndex,
+                              canMove ? onPress : undefined,
+                            );
                           }}
                           style={{
                             position: "absolute",

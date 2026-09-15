@@ -1380,9 +1380,12 @@ describe("dom TimeGrid event box sizing", () => {
 });
 
 describe("dom TimeGrid short-event press", () => {
-  it("presses a movable event from a click on its resize handle", () => {
+  const handlesOf = (box: HTMLElement) =>
+    Array.from(box.querySelectorAll<HTMLElement>('div[style*="ns-resize"]'));
+
+  it("presses a movable event from a click on either resize handle", () => {
     const onPressEvent = jest.fn();
-    const { container } = render(
+    const { getByText } = render(
       <TimeGrid
         date={day}
         mode="day"
@@ -1393,12 +1396,37 @@ describe("dom TimeGrid short-event press", () => {
       />,
     );
     // A movable box has no click handler of its own: the press comes from a
-    // release without movement, which the resize handles report as well.
-    const handle = container.querySelector<HTMLElement>('div[style*="ns-resize"]');
-    expect(handle).not.toBeNull();
-    fireEvent.pointerDown(handle!, { clientY: 300, pointerId: 1 });
-    fireEvent.pointerUp(handle!, { clientY: 300, pointerId: 1 });
-    expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "Focus" }));
+    // release without movement, which both resize handles report as well.
+    const handles = handlesOf(wrapperOf(getByText("Focus")));
+    expect(handles).toHaveLength(2);
+    for (const handle of handles) {
+      onPressEvent.mockClear();
+      fireEvent.pointerDown(handle, { clientY: 300, pointerId: 1 });
+      fireEvent.pointerUp(handle, { clientY: 300, pointerId: 1 });
+      expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "Focus" }));
+    }
+  });
+
+  it("presses once when the box is resizable but not movable", () => {
+    const onPressEvent = jest.fn();
+    const { getByText } = render(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={events}
+        hourHeight={48}
+        onDragEvent={() => {}}
+        eventStartEditable={false}
+        onPressEvent={onPressEvent}
+      />,
+    );
+    // An immovable box presses on click, and the click bubbles up from the
+    // handle: the handle must not report the release as a press as well.
+    const handle = handlesOf(wrapperOf(getByText("Focus")))[0];
+    fireEvent.pointerDown(handle, { clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(handle, { clientY: 300, pointerId: 1 });
+    fireEvent.click(handle);
+    expect(onPressEvent).toHaveBeenCalledTimes(1);
   });
 });
 
