@@ -740,7 +740,7 @@ describe("dom TimeGrid", () => {
     const { queryByText, rerender } = render(
       <TimeGrid date={day} mode="day" events={allDay} hourHeight={48} />,
     );
-    expect(queryByText("all-day")).toBeTruthy();
+    expect(queryByText("Holiday")).toBeTruthy();
     rerender(
       <TimeGrid
         date={day}
@@ -750,7 +750,7 @@ describe("dom TimeGrid", () => {
         showAllDayEventCell={false}
       />,
     );
-    expect(queryByText("all-day")).toBeNull();
+    expect(queryByText("Holiday")).toBeNull();
   });
 
   it("uses eventAccessibilityLabel to override an event's aria-label", () => {
@@ -1442,5 +1442,29 @@ describe("dom TimeGrid background events", () => {
     expect(band?.getAttribute("aria-hidden")).toBeNull();
     fireEvent.click(getByText("Blocked"));
     expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "Blocked" }));
+  });
+});
+
+describe("dom TimeGrid all-day label", () => {
+  const trip: CalendarEvent = {
+    title: "Trip",
+    start: new Date(2026, 5, 26),
+    end: new Date(2026, 5, 27),
+    allDay: true,
+  };
+
+  it("keeps the gutter cell but shows no text by default", () => {
+    const { getByText, queryByText } = render(
+      <TimeGrid date={day} mode="day" events={[trip]} hourHeight={48} />,
+    );
+    expect(getByText("Trip")).toBeTruthy();
+    expect(queryByText("all-day")).toBeNull();
+  });
+
+  it("shows the text with showAllDayLabel", () => {
+    const { getByText } = render(
+      <TimeGrid date={day} mode="day" events={[trip]} hourHeight={48} showAllDayLabel />,
+    );
+    expect(getByText("all-day")).toBeTruthy();
   });
 });

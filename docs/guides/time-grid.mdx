@@ -81,12 +81,13 @@ refreshes instead of paging.
 ## The all-day lane
 
 All-day events (flagged `allDay`, or spanning midnight-to-midnight) leave the
-timed columns and stack in a lane above the grid. On React Native the lane pages
-with the day columns and stays pinned above the hours while you scroll. Its
-height follows the week under it as you swipe, and it collapses to nothing for a
-week with no all-day events. The "all-day" text label is off by default so the
-lane can come and go without a stranded label; set `showAllDayLabel` to bring it
-back. Turn the lane off entirely with `showAllDayEventCell={false}`.
+timed columns and stack in a lane above the grid, which both renderers drop
+entirely for a week with no all-day events. On React Native the lane pages with
+the day columns and stays pinned above the hours while you scroll, and its
+height follows the week under it as you swipe. The "all-day" text label is off
+by default so the lane can come and go without a stranded label; set
+`showAllDayLabel` to bring it back. Turn the lane off entirely with
+`showAllDayEventCell={false}`.
 
 ## Now line and business hours
 

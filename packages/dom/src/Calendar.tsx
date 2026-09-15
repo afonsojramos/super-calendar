@@ -158,6 +158,8 @@ export interface CalendarProps<T = unknown>
   showNowIndicator?: boolean;
   /** Show the all-day lane (default true). */
   showAllDayEventCell?: boolean;
+  /** Show the "all-day" text beside the lane (default false). */
+  showAllDayLabel?: boolean;
   /** Tint weekend columns (default true). Set false to treat weekends normally. */
   highlightWeekends?: boolean;
   /** Allow moving events by default (per-event `startEditable` overrides). Default true. */
@@ -340,6 +342,7 @@ export function Calendar<T = unknown>({
   renderBackgroundEvent,
   showNowIndicator,
   showAllDayEventCell,
+  showAllDayLabel,
   highlightWeekends,
   eventStartEditable,
   eventDurationEditable,
@@ -526,6 +529,7 @@ export function Calendar<T = unknown>({
         renderBackgroundEvent={renderBackgroundEvent}
         showNowIndicator={showNowIndicator}
         showAllDayEventCell={showAllDayEventCell}
+        showAllDayLabel={showAllDayLabel}
         highlightWeekends={highlightWeekends}
         eventStartEditable={eventStartEditable}
         eventDurationEditable={eventDurationEditable}

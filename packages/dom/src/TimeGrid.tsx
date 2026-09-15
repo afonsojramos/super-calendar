@@ -212,6 +212,8 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   timeZone?: string;
   /** Show the all-day lane above the grid (default true). */
   showAllDayEventCell?: boolean;
+  /** Show the "all-day" text beside the lane (default false). */
+  showAllDayLabel?: boolean;
   /** Tint Saturday/Sunday columns with the weekend background (default true). Set
    * false to treat weekends like any other day. */
   highlightWeekends?: boolean;
@@ -441,6 +443,7 @@ export function TimeGrid<T = unknown>({
   now: nowProp,
   timeZone,
   showAllDayEventCell = true,
+  showAllDayLabel = false,
   locale,
   theme: themeOverrides,
   height = 600,
@@ -1272,7 +1275,7 @@ export function TimeGrid<T = unknown>({
               themed: { fontSize: 10, color: theme.textMuted, padding: "4px 6px 0 0" },
             })}
           >
-            all-day
+            {showAllDayLabel ? "all-day" : null}
           </div>
           {allDayByDay.map((list, i) => {
             const dayStart = startOfDay(days[i]);
