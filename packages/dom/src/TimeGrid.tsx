@@ -1498,8 +1498,10 @@ export function TimeGrid<T = unknown>({
                         event={b.event}
                         mode={mode}
                         isAllDay={false}
+                        boxHeight={geometry.height}
                         continuesBefore={b.event.start < dayStart}
                         continuesAfter={b.event.end > addDays(dayStart, 1)}
+                        ampm={ampm}
                         onPress={() => onPressEvent?.(b.event)}
                       />
                     </div>

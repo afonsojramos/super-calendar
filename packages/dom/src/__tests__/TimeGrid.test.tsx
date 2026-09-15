@@ -1471,6 +1471,27 @@ describe("dom TimeGrid background events", () => {
     fireEvent.click(getByText("Blocked"));
     expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "Blocked" }));
   });
+
+  it("gives the band renderer the band's pixel height and the clock format", () => {
+    const seen: DomRenderEventArgs[] = [];
+    const Band = (args: DomRenderEventArgs) => {
+      seen.push(args);
+      return null;
+    };
+    render(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={[blocked]}
+        hourHeight={48}
+        ampm
+        renderBackgroundEvent={Band}
+      />,
+    );
+    // 09:00-12:00 at 48px per hour.
+    expect(seen[0]?.boxHeight).toBe(144);
+    expect(seen[0]?.ampm).toBe(true);
+  });
 });
 
 describe("dom TimeGrid all-day label", () => {
