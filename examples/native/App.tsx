@@ -162,6 +162,7 @@ export default function App() {
   // events after a short pause, the way a fetch would.
   const [refreshing, setRefreshing] = useState(false);
   const reloadEvents = () => {
+    if (refreshing) return;
     setRefreshing(true);
     setTimeout(() => {
       setEvents(buildEvents());

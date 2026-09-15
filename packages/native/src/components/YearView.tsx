@@ -9,6 +9,7 @@ import {
   Text,
   type TextStyle,
   View,
+  type ScrollViewProps,
 } from "react-native";
 import { Gesture, GestureDetector, type PanGesture } from "react-native-gesture-handler";
 import { useCalendarTheme } from "../theme";
@@ -103,6 +104,8 @@ export type YearViewProps<T = unknown> = SlotStyleProps<YearViewSlot> & {
    * the last, exclusive). A plain tap still fires `onPressDay`, not this.
    */
   onCreateEvent?: (start: Date, end: Date) => void;
+  /** Pull-to-refresh control, mounted on the year's scroll view. */
+  refreshControl?: ScrollViewProps["refreshControl"];
 };
 
 // Seed before the first layout pass so the grid renders immediately (and in
@@ -126,6 +129,7 @@ function YearViewInner<T>({
   onPressMonth,
   onSelectDrag,
   onCreateEvent,
+  refreshControl,
   classNames,
   styles: styleOverrides,
 }: YearViewProps<T>): ReactElement {
@@ -244,6 +248,7 @@ function YearViewInner<T>({
       // under the finger. On the web a press arms it immediately, so freezing
       // there would cost every touch scroll; the browser arbitrates instead.
       scrollEnabled={isWeb || sweep == null}
+      refreshControl={refreshControl}
     >
       <View {...slot("grid", { base: styles.grid })}>
         {months.map((month, monthIndex) => {

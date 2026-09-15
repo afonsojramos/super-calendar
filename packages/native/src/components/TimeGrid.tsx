@@ -2964,7 +2964,7 @@ function TimeGridInner<T>({
                 scrollEnabled={verticalScrollEnabled}
                 onScroll={scrollHandler}
                 scrollEventThrottle={16}
-                refreshControl={refreshControl}
+                refreshControl={verticalScrollEnabled ? refreshControl : undefined}
                 contentOffset={{ x: 0, y: seedDefaultY }}
               >
                 <Animated.View testID="time-grid-hours" style={[styles.gridRow, gridHeightStyle]}>

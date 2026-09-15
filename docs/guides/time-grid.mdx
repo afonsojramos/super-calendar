@@ -69,8 +69,14 @@ A timed event's box is sized to its duration, with two guards you can tune:
 />
 ```
 
+## Pull to refresh
+
 On React Native, `refreshControl` takes a `RefreshControl` element and wraps the
-grid's vertical scroll view, so a pull from the top can reload the events.
+grid's vertical scroll view, so a pull from the top can reload the events. The
+pull is only reachable with the grid scrolled to its very top, which the default
+`scrollOffsetMinutes` starts you away from. On Android that same layout also
+catches a page swipe with a downward component while sitting at the top, so it
+refreshes instead of paging.
 
 ## The all-day lane
 

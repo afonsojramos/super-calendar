@@ -250,8 +250,8 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   showAllDayLabel?: boolean;
   /**
    * Pull-to-refresh for the modes that scroll vertically: pass a `RefreshControl`
-   * element and it wraps the schedule list or the week/day grid's scroll view.
-   * Month and year pages scroll sideways, so it has no effect there.
+   * element and it wraps the schedule list, the week/day grid's scroll view or
+   * the year view. Month pages scroll sideways, so it has no effect there.
    */
   refreshControl?: ScrollViewProps["refreshControl"];
   /** Tint weekend columns (default true). Set false to treat weekends normally. */
@@ -670,6 +670,7 @@ export function Calendar<T>({
         <YearView
           date={date}
           events={displayEvents}
+          refreshControl={refreshControl}
           weekStartsOn={weekStartsOn}
           hiddenDays={hiddenDays}
           locale={locale}
