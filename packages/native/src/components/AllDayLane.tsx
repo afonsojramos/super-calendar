@@ -60,7 +60,7 @@ export function AllDayLane<T>({
       })}
       onLayout={onLayout}
     >
-      {allDay.length === 0
+      {perDay.every((list) => list.length === 0)
         ? null
         : days.map((day, dayIndex) => (
             <View

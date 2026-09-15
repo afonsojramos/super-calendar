@@ -931,6 +931,34 @@ describe("TimeGrid hour column", () => {
     expect(flat(getByTestId("all-day-band")).height).toBe(0);
     expect(flat(getByTestId("time-grid-page")).height).toBe(56 + 46 + 12 + 24 * 160);
   });
+
+  it("renders no all-day columns for a week whose all-day events fall elsewhere", () => {
+    const away: CalendarEvent<WithId> = {
+      id: "away",
+      title: "Away",
+      start: new Date(2026, 1, 3),
+      end: new Date(2026, 1, 4),
+      allDay: true,
+    };
+    const { UNSAFE_queryAllByProps } = render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[away]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        classNames={{ allDayLane: "lane", allDayColumn: "col" }}
+      />,
+    );
+    // The lane itself renders (it reports its height), but with no columns to
+    // pad it, so the week measures as empty rather than as a row of padding.
+    expect(UNSAFE_queryAllByProps({ className: "lane" }).filter(isHost)).toHaveLength(1);
+    expect(UNSAFE_queryAllByProps({ className: "col" }).filter(isHost)).toHaveLength(0);
+  });
 });
 
 describe("TimeGrid all-day band during a swipe", () => {
