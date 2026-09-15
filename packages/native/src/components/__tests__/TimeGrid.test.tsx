@@ -1,5 +1,5 @@
 import { act, fireEvent, within } from "@testing-library/react-native";
-import { Dimensions, StyleSheet, Text } from "react-native";
+import { Dimensions, Pressable, StyleSheet, Text } from "react-native";
 import type { CalendarEvent, RenderEventArgs } from "../../types";
 import { render } from "./renderGrid";
 
@@ -1260,5 +1260,79 @@ describe("TimeGrid short-event press", () => {
     expect(longPresses[0].calls.enabled?.[0]).toBe(true);
     longPresses[0].handlers.onStart?.({});
     expect(onLongPressEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "brief" }));
+  });
+});
+
+describe("TimeGrid background events", () => {
+  const blocked: CalendarEvent<WithId> = {
+    id: "blocked",
+    title: "Blocked",
+    start: new Date(2026, 0, 6, 9, 0, 0),
+    end: new Date(2026, 0, 6, 12, 0, 0),
+    display: "background",
+  };
+  const flat = (node: { props: { style?: unknown } }) =>
+    StyleSheet.flatten(node.props.style as never) as Record<string, unknown>;
+  const BlockedBand = ({ event: band, onPress, onLongPress }: RenderEventArgs<WithId>) => (
+    <Pressable testID="bg-press" onPress={onPress} onLongPress={onLongPress}>
+      <Text>{band.title}</Text>
+    </Pressable>
+  );
+  const grid = (props: Partial<React.ComponentProps<typeof TimeGrid<WithId>>>) => (
+    <TimeGrid
+      mode="week"
+      date={new Date(2026, 0, 6, 12, 0, 0)}
+      events={[blocked, event]}
+      cellHeight={{ value: 48 } as never}
+      weekStartsOn={1}
+      renderEvent={DefaultEvent}
+      keyExtractor={(item) => item.id}
+      onChangeDate={noop}
+      onPressEvent={noop}
+      {...props}
+    />
+  );
+
+  it("shades a background event without rendering it as an event", () => {
+    const { getByTestId, queryByText } = render(grid({}));
+    // The default band is hidden from assistive tech, so ask for hidden elements.
+    const band = getByTestId("background-event-shade", { includeHiddenElements: true });
+    expect(flat(band).pointerEvents).toBe("none");
+    expect(flat(band).backgroundColor).toBeDefined();
+    expect(queryByText("Blocked")).toBeNull();
+  });
+
+  it("renders a background event through the component and lets it press", () => {
+    const onPressEvent = jest.fn();
+    const onLongPressEvent = jest.fn();
+    const { getByTestId, getByText } = render(
+      grid({ renderBackgroundEvent: BlockedBand, onPressEvent, onLongPressEvent }),
+    );
+    expect(getByText("Blocked")).toBeTruthy();
+    const band = getByTestId("background-event-shade");
+    expect(flat(band).pointerEvents).toBe("box-none");
+    // The themed tint gives way to the component's own look.
+    expect(flat(band).backgroundColor).toBeUndefined();
+    fireEvent.press(getByTestId("bg-press"));
+    expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "blocked" }));
+    fireEvent(getByTestId("bg-press"), "longPress");
+    expect(onLongPressEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "blocked" }));
+  });
+
+  it("tells the component when a multi-day background continues past the column", () => {
+    const span: CalendarEvent<WithId> = {
+      id: "span",
+      title: "Span",
+      start: new Date(2026, 0, 5, 22, 0, 0),
+      end: new Date(2026, 0, 7, 2, 0, 0),
+      display: "background",
+    };
+    const Edges = ({ continuesBefore, continuesAfter }: RenderEventArgs<WithId>) => (
+      <Text>{`${continuesBefore ? "<" : "-"}${continuesAfter ? ">" : "-"}`}</Text>
+    );
+    const { getByText } = render(grid({ events: [span, event], renderBackgroundEvent: Edges }));
+    expect(getByText("->")).toBeTruthy(); // Jan 5 runs on into Jan 6
+    expect(getByText("<>")).toBeTruthy(); // Jan 6 is covered end to end
+    expect(getByText("<-")).toBeTruthy(); // Jan 7 carries the tail
   });
 });

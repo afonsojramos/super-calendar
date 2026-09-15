@@ -1377,6 +1377,8 @@ type ShadeBandProps = {
   /** Which slot/testID the band belongs to (closed hours vs background events). */
   slotName?: "businessHours" | "backgroundEvent";
   testID?: string;
+  /** Let touches reach the band's content; the band itself stays transparent to them. */
+  interactive?: boolean;
   children?: React.ReactNode;
 };
 
@@ -1392,6 +1394,7 @@ const ShadeBand = ({
   color,
   slotName = "businessHours",
   testID = "business-hours-shade",
+  interactive = false,
   children,
 }: ShadeBandProps) => {
   const slot = useSlots<TimeGridSlot>();
@@ -1403,15 +1406,20 @@ const ShadeBand = ({
     [startHour, endHour, minHour],
   );
   const bandSlot = slot(slotName, {
-    base: [styles.shadeBand, styles.nonInteractive, { left, width }],
+    base: [
+      styles.shadeBand,
+      interactive ? styles.passThrough : styles.nonInteractive,
+      { left, width },
+    ],
     themed: color === undefined ? undefined : { backgroundColor: color },
   });
   return (
     <Animated.View
       testID={testID}
-      // Decorative, like the dom bands' aria-hidden: never announced or focused.
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+      // Decorative unless interactive, like the dom bands' aria-hidden: never
+      // announced or focused. An interactive band exposes its content instead.
+      accessibilityElementsHidden={!interactive}
+      importantForAccessibility={interactive ? "auto" : "no-hide-descendants"}
       {...bandSlot}
       style={[bandSlot.style, animatedStyle]}
     >
@@ -1419,6 +1427,73 @@ const ShadeBand = ({
     </Animated.View>
   );
 };
+
+type BackgroundEventBandProps<T> = {
+  event: CalendarEvent<T>;
+  cellHeight: SharedValue<number>;
+  startHour: number;
+  endHour: number;
+  minHour: number;
+  left: number;
+  width: number;
+  mode: TimeGridMode;
+  continuesBefore: boolean;
+  continuesAfter: boolean;
+  render: RenderEvent<T>;
+  onPress: (event: CalendarEvent<T>) => void;
+  onLongPress?: (event: CalendarEvent<T>) => void;
+};
+
+// A background event's band drawn by the consumer's component instead of the
+// themed shade. The band lets touches reach that content, and the component is
+// rendered as an element (like `renderEvent`, so it may use hooks) with the
+// event, the mode, a live boxHeight, the multi-day continuation flags and the
+// press handlers.
+function BackgroundEventBand<T>({
+  event,
+  cellHeight,
+  startHour,
+  endHour,
+  minHour,
+  left,
+  width,
+  mode,
+  continuesBefore,
+  continuesAfter,
+  render: Render,
+  onPress,
+  onLongPress,
+}: BackgroundEventBandProps<T>) {
+  const boxHeight = useDerivedValue(
+    () => (endHour - startHour) * cellHeight.value,
+    [startHour, endHour, cellHeight],
+  );
+  const handlePress = useCallback(() => onPress(event), [onPress, event]);
+  const handleLongPress = useCallback(() => onLongPress?.(event), [onLongPress, event]);
+  return (
+    <ShadeBand
+      cellHeight={cellHeight}
+      startHour={startHour}
+      endHour={endHour}
+      minHour={minHour}
+      left={left}
+      width={width}
+      slotName="backgroundEvent"
+      testID="background-event-shade"
+      interactive
+    >
+      <Render
+        event={event}
+        mode={mode}
+        boxHeight={boxHeight}
+        continuesBefore={continuesBefore}
+        continuesAfter={continuesAfter}
+        onPress={handlePress}
+        onLongPress={onLongPress ? handleLongPress : undefined}
+      />
+    </ShadeBand>
+  );
+}
 
 type TimetablePageProps<T> = {
   mode: TimeGridMode;
@@ -1446,6 +1521,8 @@ type TimetablePageProps<T> = {
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
   businessHours?: BusinessHours;
   renderBusinessHours?: (band: BusinessHoursBand) => React.ReactNode;
+  /** A component that draws a background event's band; see `Calendar`. */
+  renderBackgroundEvent?: RenderEvent<T>;
   showNowIndicator: boolean;
   renderEvent: RenderEvent<T>;
   keyExtractor: EventKeyExtractor<T>;
@@ -1513,6 +1590,7 @@ function TimetablePageInner<T>({
   showNowIndicator,
   businessHours,
   renderBusinessHours,
+  renderBackgroundEvent,
   renderEvent,
   keyExtractor,
   snapMinutes,
@@ -1944,30 +2022,52 @@ function TimetablePageInner<T>({
             )
           : null}
 
-        {/* Background events: shaded, non-interactive time ranges. */}
-        {days.flatMap((day, dayIndex) =>
-          backgroundBandsForDay(events, day)
+        {/* Background events: shaded time ranges, or the consumer's own band. */}
+        {days.flatMap((day, dayIndex) => {
+          const dayStart = startOfDay(day);
+          const nextDayStart = addDays(dayStart, 1);
+          return backgroundBandsForDay(events, day)
             .map((b) => ({
               ...b,
               startHours: Math.max(b.startHours, minHour),
               endHours: Math.min(b.endHours, maxHour),
             }))
             .filter((b) => b.endHours > b.startHours)
-            .map((b, bandIndex) => (
-              <ShadeBand
-                key={`bg-${day.toISOString()}-${bandIndex}`}
-                cellHeight={heightSource}
-                startHour={b.startHours}
-                endHour={b.endHours}
-                minHour={minHour}
-                left={dayLeft(dayIndex)}
-                width={dayWidth}
-                color={theme.colors.backgroundEvent}
-                slotName="backgroundEvent"
-                testID="background-event-shade"
-              />
-            )),
-        )}
+            .map((b, bandIndex) => {
+              const key = `bg-${day.toISOString()}-${keyExtractor(b.event, bandIndex)}`;
+              return renderBackgroundEvent ? (
+                <BackgroundEventBand
+                  key={key}
+                  event={b.event}
+                  cellHeight={heightSource}
+                  startHour={b.startHours}
+                  endHour={b.endHours}
+                  minHour={minHour}
+                  left={dayLeft(dayIndex)}
+                  width={dayWidth}
+                  mode={mode}
+                  continuesBefore={b.event.start < dayStart}
+                  continuesAfter={b.event.end > nextDayStart}
+                  render={renderBackgroundEvent}
+                  onPress={onPressEvent}
+                  onLongPress={onLongPressEvent}
+                />
+              ) : (
+                <ShadeBand
+                  key={key}
+                  cellHeight={heightSource}
+                  startHour={b.startHours}
+                  endHour={b.endHours}
+                  minHour={minHour}
+                  left={dayLeft(dayIndex)}
+                  width={dayWidth}
+                  color={theme.colors.backgroundEvent}
+                  slotName="backgroundEvent"
+                  testID="background-event-shade"
+                />
+              );
+            });
+        })}
 
         {days.map((day, dayIndex) => {
           const separatorSlot = slot("daySeparator", {
@@ -2157,6 +2257,8 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
    * band stays non-interactive and hidden from assistive tech.
    */
   renderBusinessHours?: (band: BusinessHoursBand) => React.ReactNode;
+  /** A component that draws a background event's band; see `Calendar`. */
+  renderBackgroundEvent?: RenderEvent<T>;
   /** Show the ISO week number in the header gutter. Default false. */
   showWeekNumber?: boolean;
   /** Element rendered between the day header and the grid. */
@@ -2257,6 +2359,7 @@ function TimeGridInner<T>({
   calendarCellStyle,
   businessHours,
   renderBusinessHours,
+  renderBackgroundEvent,
   showWeekNumber = false,
   headerComponent,
   minHour = 0,
@@ -2905,6 +3008,7 @@ function TimeGridInner<T>({
         calendarCellStyle={calendarCellStyle}
         businessHours={businessHours}
         renderBusinessHours={renderBusinessHours}
+        renderBackgroundEvent={renderBackgroundEvent}
         showNowIndicator={showNowIndicator}
         renderEvent={labeledRenderEvent}
         keyExtractor={keyExtractor}
@@ -2963,6 +3067,7 @@ function TimeGridInner<T>({
       calendarCellStyle,
       businessHours,
       renderBusinessHours,
+      renderBackgroundEvent,
       showNowIndicator,
       labeledRenderEvent,
       keyExtractor,
@@ -3440,6 +3545,7 @@ const styles = StyleSheet.create({
   },
   shadeBand: {
     position: "absolute",
+    overflow: "hidden",
   },
   daySeparator: {
     position: "absolute",
@@ -3519,6 +3625,10 @@ const styles = StyleSheet.create({
   // `pointerEvents` as a style (not a prop) — the prop form is deprecated on web.
   nonInteractive: {
     pointerEvents: "none",
+  },
+  // Touches pass through the view itself but still reach its children.
+  passThrough: {
+    pointerEvents: "box-none",
   },
   // Disable user-driven horizontal scroll on web; programmatic paging still works.
   webNoScroll: {

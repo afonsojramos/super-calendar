@@ -22,6 +22,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   Calendar,
   type CalendarEvent,
+  type RenderEventArgs,
   type CalendarMode,
   type CalendarSlot,
   expandRecurringEvents,
@@ -153,6 +154,14 @@ const PageContainer = ({
 // hide the title and date-nav chrome (keeping only the tab bar), so a screenshot
 // frames just the calendar. Leave it null to drive the calendar interactively.
 const DEMO_MODE: CalendarMode | null = null;
+
+// The demo's background event band: labelled and pressable, unlike the default
+// shade. Defined once so the grid keeps the same component across renders.
+const FocusBand = ({ event, onPress }: RenderEventArgs<EventMeta>) => (
+  <Pressable onPress={onPress} style={styles.backgroundBand}>
+    <Text style={styles.backgroundBandText}>{event.title}</Text>
+  </Pressable>
+);
 
 export default function App() {
   const [mode, setMode] = useState<DemoTab>("week");
@@ -537,6 +546,7 @@ export default function App() {
                       <RefreshControl refreshing={refreshing} onRefresh={reloadEvents} />
                     }
                     weekStartsOn={1}
+                    renderBackgroundEvent={FocusBand}
                     scrollOffsetMinutes={8 * 60}
                     businessHours={(date) => {
                       const weekday = date.getDay();
@@ -591,6 +601,16 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  backgroundBand: {
+    flex: 1,
+    justifyContent: "flex-end",
+    padding: 4,
+    backgroundColor: "#fef3c7",
+  },
+  backgroundBandText: {
+    fontSize: 11,
+    color: "#92400e",
+  },
   root: { flex: 1, backgroundColor: "#fff" },
   // Center the demo and cap its width on wide (web) viewports, like the dom example.
   page: { flex: 1, width: "100%", maxWidth: 900, alignSelf: "center", paddingHorizontal: 16 },

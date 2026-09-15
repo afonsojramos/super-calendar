@@ -131,6 +131,39 @@ column, render no chip in the month grid or agenda, and produce no year-view
 dot. Restyle the band with the `backgroundEvent` slot or the theme's
 `backgroundEvent` colour token.
 
+To draw a band yourself, or make it pressable, pass a component as
+`renderBackgroundEvent` to `Calendar` or `TimeGrid` (React Native; the resource
+timeline keeps the shade). It is rendered like `renderEvent`, so it may use
+hooks, and receives the `event`, the `mode`, a live `boxHeight`,
+`continuesBefore` / `continuesAfter` for a multi-day event, and `onPress` /
+`onLongPress`, which fire `onPressEvent` / `onLongPressEvent`. The themed tint is
+dropped, the band lets touches through to what you render, and it is no longer
+hidden from assistive tech. Cell presses and drag-to-create are unreachable
+underneath such a band. Define the component outside your render so it keeps
+its identity:
+
+```tsx
+import { Pressable, Text } from "react-native";
+import { Calendar, type RenderEventArgs } from "@super-calendar/native";
+
+function BlockedBand({ event, onPress }: RenderEventArgs) {
+  return (
+    <Pressable onPress={onPress} style={{ flex: 1, backgroundColor: "#fde68a" }}>
+      <Text>{event.title}</Text>
+    </Pressable>
+  );
+}
+
+<Calendar
+  mode="week"
+  date={date}
+  events={events}
+  renderBackgroundEvent={BlockedBand}
+  onChangeDate={setDate}
+  onPressEvent={(event) => console.log(event.title)}
+/>;
+```
+
 ## Loading events from a feed
 
 `useEventSource` (from `@super-calendar/core`) owns the fetching for you: point

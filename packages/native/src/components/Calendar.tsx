@@ -207,6 +207,18 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
    * band stays non-interactive and hidden from assistive tech.
    */
   renderBusinessHours?: (band: BusinessHoursBand) => React.ReactNode;
+  /**
+   * Week/day grid only: a component that draws a `display: "background"` event's
+   * band in place of the themed shade. Rendered as a real component, like
+   * `renderEvent`, so it may use hooks. It receives `event`, `mode`, a live
+   * `boxHeight`, `continuesBefore` / `continuesAfter` for a multi-day event, and
+   * `onPress` / `onLongPress`, which fire `onPressEvent` / `onLongPressEvent`.
+   * The band lets touches through to what you render and stops hiding itself
+   * from assistive tech, so a pressable there works; cell presses and
+   * drag-to-create are unreachable underneath it. Without this prop the band
+   * stays a shaded, non-interactive range. The resource timeline keeps the shade.
+   */
+  renderBackgroundEvent?: RenderEvent<T>;
   /** Stable key per event. Defaults to start-time + index. */
   keyExtractor?: EventKeyExtractor<T>;
   /** Partial theme merged over the defaults. */
@@ -471,6 +483,7 @@ export function Calendar<T>({
   calendarCellStyle,
   businessHours,
   renderBusinessHours,
+  renderBackgroundEvent,
   keyExtractor = defaultKeyExtractor as EventKeyExtractor<T>,
   theme,
   cellHeight: cellHeightProp,
@@ -732,6 +745,7 @@ export function Calendar<T>({
           calendarCellStyle={calendarCellStyle}
           businessHours={businessHours}
           renderBusinessHours={renderBusinessHours}
+          renderBackgroundEvent={renderBackgroundEvent}
           showWeekNumber={showWeekNumber}
           weekNumberPrefix={weekNumberPrefix}
           hourComponent={hourComponent}
