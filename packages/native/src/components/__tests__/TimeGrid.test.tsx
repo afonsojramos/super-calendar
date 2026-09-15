@@ -1,6 +1,7 @@
-import { act, fireEvent, render, within } from "@testing-library/react-native";
+import { act, fireEvent, within } from "@testing-library/react-native";
 import { Dimensions, StyleSheet, Text } from "react-native";
 import type { CalendarEvent, RenderEventArgs } from "../../types";
+import { render } from "./renderGrid";
 
 // Capture the props handed to the virtualized list, and render only the active
 // page through `renderItem`. The real LegendList can't lay out under Jest (no

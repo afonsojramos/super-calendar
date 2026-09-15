@@ -2259,13 +2259,17 @@ function TimeGridInner<T>({
   // The grid sizes to its container width, not the window, so it fits a
   // constrained layout on the web (e.g. a max-width card). On native the grid
   // fills the window, so this equals the window width and behaviour is unchanged.
-  // Seeded with the window width for the first paint, refined on layout.
+  // Seeded with the window width so width-derived values exist before the first
+  // layout, then refined on layout.
   const [containerWidth, setContainerWidth] = useState(width);
   // Width of the day columns: the pager's own, once it has laid out (on the web
   // a classic scrollbar takes width inside the scroll view), else what the hour
   // column leaves of the container.
   const [pagerLayoutWidth, setPagerLayoutWidth] = useState<number | null>(null);
   const columnsWidth = pagerLayoutWidth ?? containerWidth - hourColumnWidth;
+  // The pager mounts only once its container has laid out, so the list's fixed
+  // item size is the measured width rather than the window-based estimate.
+  const pagerReady = pagerLayoutWidth != null && pagerLayoutWidth > 0;
   // The tallest all-day lane reported so far, so the fixed pager height below
   // always has room for the band.
   const [tallestLane, setTallestLane] = useState(MIN_ALL_DAY_LANE_HEIGHT);
@@ -2946,6 +2950,7 @@ function TimeGridInner<T>({
                   ) : null}
                   <View
                     ref={pagerRef}
+                    testID="time-grid-pager"
                     style={[styles.pager, { left: hourColumnWidth, height: pagerHeight }]}
                     onLayout={(event) => {
                       // Window-space frame of the pager for the drag worklets' edge
@@ -2964,51 +2969,53 @@ function TimeGridInner<T>({
                       });
                     }}
                   >
-                    <AnimatedLegendList
-                      // Remount when the width changes (a re-measured container, a
-                      // rotation), so the fixed item size is right from the first layout;
-                      // the usual case, where the seed already matches, mounts once.
-                      key={`grid-${columnsWidth}`}
-                      ref={listRef}
-                      style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
-                      data={pageDates}
-                      extraData={listExtraData}
-                      horizontal
-                      recycleItems={false}
-                      keyExtractor={keyExtractorList}
-                      getFixedItemSize={getFixedItemSize}
-                      // Mount the next pages either side while idle, not mid-swipe.
-                      drawDistance={columnsWidth * 2}
-                      // The live horizontal offset, kept on the UI thread, drives the
-                      // all-day band's height.
-                      sharedValues={pagerSharedValues}
-                      // On web LegendList ignores these RN scroll props (it leaks them to the
-                      // DOM as unknown attributes), so omit them there and disable horizontal
-                      // scroll via `webNoScroll`; paging is driven by the arrow keys instead.
-                      // Native: paging makes each swipe hard-stop at the adjacent page, while
-                      // `freeSwipe` lets momentum carry across pages and snap to a boundary.
-                      {...(isWeb
-                        ? null
-                        : {
-                            scrollEnabled: swipeEnabled,
-                            pagingEnabled: !freeSwipe,
-                            snapToIndices: freeSwipe ? snapToIndices : undefined,
-                            // Paging: snap to the adjacent page quickly instead of the
-                            // slow platform glide, and stop at that page rather than
-                            // drifting, so rapid one-week swipes land crisply instead of
-                            // queuing a long chain of drawn-out snaps. `freeSwipe` keeps
-                            // its momentum, so it can still fling across several pages.
-                            decelerationRate: freeSwipe ? ("normal" as const) : ("fast" as const),
-                            disableIntervalMomentum: !freeSwipe,
-                            scrollEventThrottle: 16,
-                            onMomentumScrollEnd: handlePagerSettled,
-                          })}
-                      initialScrollIndex={activeIndex}
-                      showsHorizontalScrollIndicator={false}
-                      viewabilityConfig={PAGE_VIEWABILITY}
-                      onViewableItemsChanged={handleViewableItemsChanged}
-                      renderItem={renderItem}
-                    />
+                    {pagerReady ? (
+                      <AnimatedLegendList
+                        // Mounts once the pager has measured, so the fixed item size is
+                        // right from the list's first layout; the key remounts it on a
+                        // later width change (a rotation, a re-measured container).
+                        key={`grid-${columnsWidth}`}
+                        ref={listRef}
+                        style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
+                        data={pageDates}
+                        extraData={listExtraData}
+                        horizontal
+                        recycleItems={false}
+                        keyExtractor={keyExtractorList}
+                        getFixedItemSize={getFixedItemSize}
+                        // Mount the next pages either side while idle, not mid-swipe.
+                        drawDistance={columnsWidth * 2}
+                        // The live horizontal offset, kept on the UI thread, drives the
+                        // all-day band's height.
+                        sharedValues={pagerSharedValues}
+                        // On web LegendList ignores these RN scroll props (it leaks them to the
+                        // DOM as unknown attributes), so omit them there and disable horizontal
+                        // scroll via `webNoScroll`; paging is driven by the arrow keys instead.
+                        // Native: paging makes each swipe hard-stop at the adjacent page, while
+                        // `freeSwipe` lets momentum carry across pages and snap to a boundary.
+                        {...(isWeb
+                          ? null
+                          : {
+                              scrollEnabled: swipeEnabled,
+                              pagingEnabled: !freeSwipe,
+                              snapToIndices: freeSwipe ? snapToIndices : undefined,
+                              // Paging: snap to the adjacent page quickly instead of the
+                              // slow platform glide, and stop at that page rather than
+                              // drifting, so rapid one-week swipes land crisply instead of
+                              // queuing a long chain of drawn-out snaps. `freeSwipe` keeps
+                              // its momentum, so it can still fling across several pages.
+                              decelerationRate: freeSwipe ? ("normal" as const) : ("fast" as const),
+                              disableIntervalMomentum: !freeSwipe,
+                              scrollEventThrottle: 16,
+                              onMomentumScrollEnd: handlePagerSettled,
+                            })}
+                        initialScrollIndex={activeIndex}
+                        showsHorizontalScrollIndicator={false}
+                        viewabilityConfig={PAGE_VIEWABILITY}
+                        onViewableItemsChanged={handleViewableItemsChanged}
+                        renderItem={renderItem}
+                      />
+                    ) : null}
                     {liftedEvent ? (
                       <DragGhost
                         x={ghostX}

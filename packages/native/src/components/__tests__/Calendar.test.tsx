@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react-native";
+import { render } from "./renderGrid";
 import type { CalendarEvent } from "../../types";
 
 // The real LegendList can't lay out under Jest (no measured dimensions). This
