@@ -884,69 +884,92 @@ function AnimatedEventBoxInner<T>({
     releaseEdge,
   ]);
 
-  const resizeGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .enabled(resizable)
-        .onStart(() => {
-          dragZ.value = DRAG_EVENT_Z;
-          runOnJS(notifyDragStart)();
-        })
-        .onUpdate((event) => {
-          resizeDelta.value = event.translationY;
-        })
-        .onEnd((event) => {
-          const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
-          if (delta === 0) {
-            resizeDelta.value = 0;
-            return;
-          }
-          resizeDelta.value = (delta / MINUTES_PER_HOUR) * cellHeight.value;
-          runOnJS(commitDrag)(0, delta);
-        })
-        .onFinalize(() => {
-          dragZ.value = 0;
-        }),
-    [resizable, snapMinutes, cellHeight, resizeDelta, dragZ, commitDrag, notifyDragStart],
-  );
+  const handlePress = useCallback(() => onPress(positioned.event), [onPress, positioned.event]);
+
+  // A plain tap on a resize handle is a press on the event. The two handles cover
+  // almost all of a box at the minimum height, so without this a 5- to 30-minute
+  // event has next to no tappable surface. A drag from a handle still resizes:
+  // the pan wins the race as soon as the finger moves.
+  const resizeGesture = useMemo(() => {
+    const pan = Gesture.Pan()
+      .enabled(resizable)
+      .onStart(() => {
+        dragZ.value = DRAG_EVENT_Z;
+        runOnJS(notifyDragStart)();
+      })
+      .onUpdate((event) => {
+        resizeDelta.value = event.translationY;
+      })
+      .onEnd((event) => {
+        const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
+        if (delta === 0) {
+          resizeDelta.value = 0;
+          return;
+        }
+        resizeDelta.value = (delta / MINUTES_PER_HOUR) * cellHeight.value;
+        runOnJS(commitDrag)(0, delta);
+      })
+      .onFinalize(() => {
+        dragZ.value = 0;
+      });
+    const tap = Gesture.Tap()
+      .runOnJS(true)
+      .onEnd((_event, success) => {
+        if (success) handlePress();
+      });
+    return Gesture.Race(pan, tap);
+  }, [
+    resizable,
+    snapMinutes,
+    cellHeight,
+    resizeDelta,
+    dragZ,
+    commitDrag,
+    notifyDragStart,
+    handlePress,
+  ]);
 
   // Top-edge resize: dragging the top changes the start (end fixed). Mirrors the
   // bottom resize but commits a start-delta and previews via resizeStartDelta.
-  const resizeStartGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .enabled(resizableFromStart)
-        .onStart(() => {
-          dragZ.value = DRAG_EVENT_Z;
-          runOnJS(notifyDragStart)();
-        })
-        .onUpdate((event) => {
-          resizeStartDelta.value = event.translationY;
-        })
-        .onEnd((event) => {
-          const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
-          if (delta === 0) {
-            resizeStartDelta.value = 0;
-            return;
-          }
-          resizeStartDelta.value = (delta / MINUTES_PER_HOUR) * cellHeight.value;
-          runOnJS(commitDrag)(delta, 0);
-        })
-        .onFinalize(() => {
-          dragZ.value = 0;
-        }),
-    [
-      resizableFromStart,
-      snapMinutes,
-      cellHeight,
-      resizeStartDelta,
-      dragZ,
-      commitDrag,
-      notifyDragStart,
-    ],
-  );
+  const resizeStartGesture = useMemo(() => {
+    const pan = Gesture.Pan()
+      .enabled(resizableFromStart)
+      .onStart(() => {
+        dragZ.value = DRAG_EVENT_Z;
+        runOnJS(notifyDragStart)();
+      })
+      .onUpdate((event) => {
+        resizeStartDelta.value = event.translationY;
+      })
+      .onEnd((event) => {
+        const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
+        if (delta === 0) {
+          resizeStartDelta.value = 0;
+          return;
+        }
+        resizeStartDelta.value = (delta / MINUTES_PER_HOUR) * cellHeight.value;
+        runOnJS(commitDrag)(delta, 0);
+      })
+      .onFinalize(() => {
+        dragZ.value = 0;
+      });
+    const tap = Gesture.Tap()
+      .runOnJS(true)
+      .onEnd((_event, success) => {
+        if (success) handlePress();
+      });
+    return Gesture.Race(pan, tap);
+  }, [
+    resizableFromStart,
+    snapMinutes,
+    cellHeight,
+    resizeStartDelta,
+    dragZ,
+    commitDrag,
+    notifyDragStart,
+    handlePress,
+  ]);
 
-  const handlePress = () => onPress(positioned.event);
   // When movable, a long press grabs the event to move it, so don't also fire
   // the consumer's long-press handler.
   const handleLongPress = !canMove && onLongPress ? () => onLongPress(positioned.event) : undefined;

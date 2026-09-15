@@ -1178,3 +1178,48 @@ describe("TimeGrid cross-week drop", () => {
     expect(end).toEqual(new Date(2026, 0, 18, 15, 0));
   });
 });
+
+describe("TimeGrid short-event press", () => {
+  beforeEach(() => {
+    const gestureHandler = require("react-native-gesture-handler") as { __gestures: unknown[] };
+    gestureHandler.__gestures.length = 0;
+  });
+
+  it("presses the event from a tap on a resize handle", () => {
+    const onPressEvent = jest.fn();
+    const brief: CalendarEvent<WithId> = {
+      id: "brief",
+      title: "Brief",
+      start: new Date(2026, 0, 6, 9, 0, 0),
+      end: new Date(2026, 0, 6, 9, 15, 0),
+    };
+    render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[brief]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={onPressEvent}
+      />,
+    );
+    // The handles' taps are the only gestures that run their callbacks on JS.
+    const { __gestures } = require("react-native-gesture-handler") as {
+      __gestures: Array<{
+        calls: Record<string, unknown[]>;
+        handlers: { onEnd?: (event: unknown, success: boolean) => void };
+      }>;
+    };
+    const taps = __gestures.filter((gesture) => gesture.calls.runOnJS?.[0] === true);
+    expect(taps.length).toBeGreaterThan(0);
+    // A tap that failed (the finger moved, so the pan took over) is not a press.
+    taps[0].handlers.onEnd?.({}, false);
+    expect(onPressEvent).not.toHaveBeenCalled();
+    taps[0].handlers.onEnd?.({}, true);
+    expect(onPressEvent).toHaveBeenCalledTimes(1);
+    expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "brief" }));
+  });
+});
