@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.11.0](https://github.com/afonsojramos/super-calendar/compare/v2.10.0...v2.11.0) (2026-09-15)
+
+
+### Features
+
+* **dom:** match the native time grid's background overrides, label option, and handle presses ([3c757ea](https://github.com/afonsojramos/super-calendar/commit/3c757eac96def6d8aa9b9ad0f5a84e623c2ec71e))
+* **native:** forward refreshControl for pull-to-refresh ([#64](https://github.com/afonsojramos/super-calendar/issues/64)) ([5cb8fa0](https://github.com/afonsojramos/super-calendar/commit/5cb8fa03d89a2935c9203345cb940f6aee7daa71))
+* **native:** make the time-grid all-day label opt-in via showAllDayLabel ([d9a2a13](https://github.com/afonsojramos/super-calendar/commit/d9a2a13893a0a98befd6ea3a19973bb3a78aba8a))
+* **native:** page the time-grid header and all-day lane with the columns ([cade974](https://github.com/afonsojramos/super-calendar/commit/cade9748e470886729f7d05610f7d15146754b76))
+* **native:** render background events yourself with renderBackgroundEvent ([#66](https://github.com/afonsojramos/super-calendar/issues/66)) ([11f789f](https://github.com/afonsojramos/super-calendar/commit/11f789f56e89cfe3d2f5671825313069bbbb378b))
+* **native:** scroll the time grid as one view with a fixed hour column ([f929a24](https://github.com/afonsojramos/super-calendar/commit/f929a2402e30501e168b0ae874f890e4ea5a7c91))
+
+
+### Bug Fixes
+
+* **native:** collapse an empty all-day lane and draw its rule at the band's live height ([01d2f2e](https://github.com/afonsojramos/super-calendar/commit/01d2f2ea8119fb88fe39cc96efb1fbfe12f78fd7))
+* **native:** commit the page the time-grid pager settles on after a fling ([a466439](https://github.com/afonsojramos/super-calendar/commit/a46643907b4637f7d2bb698f99b95ac92b6baa7e))
+* **native:** harden time-grid paging from review (a11y, band offset, drop clamp) ([bf16d8b](https://github.com/afonsojramos/super-calendar/commit/bf16d8b3c7e5f5f41d02c38fb67b996fa8690b58))
+* **native:** keep a 1px all-day band floor so a clipped lane keeps reporting ([9a33869](https://github.com/afonsojramos/super-calendar/commit/9a3386912a688c05e2b89c339d7fa857cd92f029))
+* **native:** measure an all-day lane with no events in its week as empty ([a8aea00](https://github.com/afonsojramos/super-calendar/commit/a8aea0027d3d2a80aad29dc6610d464a591fe84b))
+* **native:** merge all-day lane heights that several pages report in one tick ([bf17e7b](https://github.com/afonsojramos/super-calendar/commit/bf17e7bfec03e4f2fbf1b9487f7cb1cfcfdb29cd))
+* **native:** press a time-grid event from a tap on its resize handle ([#65](https://github.com/afonsojramos/super-calendar/issues/65)) ([5d58095](https://github.com/afonsojramos/super-calendar/commit/5d5809590fbfd2caa154e798e51c7cccc3f1aa7b))
+* **native:** repaint the time-grid pager after a fast fling ([418e55e](https://github.com/afonsojramos/super-calendar/commit/418e55e6642143532aabad353e821ca0453ff230))
+
+
+### Performance Improvements
+
+* **native:** mount the time-grid pager once its width is measured ([5dfb185](https://github.com/afonsojramos/super-calendar/commit/5dfb18565fb6973ec315253d24bb871ba23186a8))
+
 ## [2.10.0](https://github.com/afonsojramos/super-calendar/compare/v2.9.1...v2.10.0) (2026-09-08)
 
 
