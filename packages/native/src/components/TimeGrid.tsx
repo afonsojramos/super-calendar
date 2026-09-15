@@ -2320,6 +2320,10 @@ function TimeGridInner<T>({
   // at the committed height and it snaps to the destination on settle rather than
   // animating the whole way; single-page paging (the default) interpolates fully.
   const laneHeights = useSharedValue<Record<number, number>>({});
+  // Mirrored on the JS side: several pages report in one tick, and a read of the
+  // shared value inside that tick still sees the previous batch, so building the
+  // next map from `.value` would keep only the last report.
+  const laneHeightsRef = useRef<Record<number, number>>({});
   const pagerOffset = useSharedValue(PAGE_WINDOW * columnsWidth);
   const pagerSharedValues = useMemo(() => ({ scrollOffset: pagerOffset }), [pagerOffset]);
   // The committed page, for the worklet below: the list only reports its offset
@@ -2341,9 +2345,10 @@ function TimeGridInner<T>({
   const reportLaneHeight = useCallback(
     (index: number, height: number) => {
       setTallestLane((tallest) => (height > tallest ? height : tallest));
-      if (laneHeights.value[index] === height) return;
+      if (laneHeightsRef.current[index] === height) return;
+      laneHeightsRef.current = { ...laneHeightsRef.current, [index]: height };
       // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-      laneHeights.value = { ...laneHeights.value, [index]: height };
+      laneHeights.value = laneHeightsRef.current;
     },
     [laneHeights],
   );
