@@ -323,6 +323,9 @@ export type { EventDragHandler, EventDragStartHandler } from "../types";
 // Hour labels are nudged up so the number sits centred on its grid line. Pad the
 // scroll content by the same amount so the top-most label is never clipped.
 const HOUR_LABEL_TOP_INSET = 12;
+// Least height the all-day band keeps, so the lane inside stays measurable (see
+// the band's height style).
+const LANE_BAND_FLOOR = 1;
 const HOUR_LABEL_NUDGE = 6;
 // Fixed height of the day-header row. The header pages with the columns (it
 // lives inside each page), so the hour column's corner, the all-day band, and
@@ -1571,10 +1574,19 @@ function TimetablePageInner<T>({
   // Split like the hour column's cell: the offset style only runs on a scroll,
   // the height style only when the band resizes. Both the header and the band
   // ride the scroll offset, so they hold still at the top while the hours pass.
-  const laneHeightStyle = useAnimatedStyle(() => ({ height: laneHeight.value }));
+  // The band keeps a 1px floor when the lane measures nothing, so the lane inside
+  // is never clipped to nothing: Android stops reporting the layout of a view
+  // clipped away entirely, which would leave all-day events that arrive later
+  // unmeasured. The bottom rule only draws once the band has real height.
+  const laneHeightStyle = useAnimatedStyle(() => ({
+    height: Math.max(LANE_BAND_FLOOR, laneHeight.value),
+    borderBottomWidth: laneHeight.value >= LANE_BAND_FLOOR ? StyleSheet.hairlineWidth : 0,
+  }));
   const pinStyle = useAnimatedStyle(() => ({ transform: [{ translateY: scrollY.value }] }));
   const reportLaneLayout = useCallback(
-    (event: LayoutChangeEvent) => onLaneLayout(pageIndex, event.nativeEvent.layout.height),
+    (event: LayoutChangeEvent) => {
+      onLaneLayout(pageIndex, event.nativeEvent.layout.height);
+    },
     [onLaneLayout, pageIndex],
   );
 
@@ -3318,7 +3330,6 @@ const styles = StyleSheet.create({
     right: 0,
     overflow: "hidden",
     zIndex: 2,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   // The hour column's "all-day" cell, pinned like the pages' bands.
   laneCell: {

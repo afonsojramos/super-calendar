@@ -911,10 +911,10 @@ describe("TimeGrid hour column", () => {
     expect(within(scroller).getAllByLabelText(/Trip/)).toHaveLength(1);
     // The "all-day" label is off by default.
     expect(within(getByTestId("hour-gutter")).queryByText("all-day")).toBeNull();
-    // Unmeasured, the band has no height yet and is counter-translated by the
-    // scroll offset so it holds still at the top of the viewport.
+    // Unmeasured, the band sits at its 1px floor and is counter-translated by
+    // the scroll offset so it holds still at the top of the viewport.
     const band = getByTestId("all-day-band");
-    expect(flat(band).height).toBe(0);
+    expect(flat(band).height).toBe(1);
     expect(flat(band).transform).toEqual([{ translateY: 384 }]);
     // The page reports its lane's natural height; the band and the page follow.
     const [lane] = UNSAFE_getAllByProps({ className: "lane" }).filter(isHost);
@@ -924,11 +924,11 @@ describe("TimeGrid hour column", () => {
     expect(flat(getByTestId("time-grid-hours")).height).toBe(56 + 46 + 12 + 24 * 48);
     // The fixed page height grows with the tallest lane seen.
     expect(flat(getByTestId("time-grid-page")).height).toBe(56 + 46 + 12 + 24 * 160);
-    // A week with no all-day events reports zero and the band collapses to it;
-    // the page keeps the tallest lane it has seen.
+    // A week with no all-day events reports zero and the band collapses to its
+    // 1px floor; the page keeps the tallest lane it has seen.
     fireEvent(lane, "layout", { nativeEvent: { layout: { height: 0 } } });
     rerender(grid(false));
-    expect(flat(getByTestId("all-day-band")).height).toBe(0);
+    expect(flat(getByTestId("all-day-band")).height).toBe(1);
     expect(flat(getByTestId("time-grid-page")).height).toBe(56 + 46 + 12 + 24 * 160);
   });
 
