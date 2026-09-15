@@ -1,7 +1,7 @@
 import { LegendList, type LegendListRenderItemProps } from "@legendapp/list/react-native";
 import { format, isSameDay, type Locale, startOfDay } from "date-fns";
 import { type ComponentType, type ReactElement, useCallback, useMemo } from "react";
-import { StyleSheet, Text, type TextStyle, View } from "react-native";
+import { StyleSheet, Text, type TextStyle, View, type ScrollViewProps } from "react-native";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent } from "../types";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
@@ -27,6 +27,8 @@ export type AgendaProps<T> = SlotStyleProps<AgendaSlot> & {
   activeDate?: Date;
   /** Drawn between rows of the agenda list. */
   itemSeparatorComponent?: ComponentType<unknown> | null;
+  /** Pull-to-refresh control, mounted on the list's scroll view. */
+  refreshControl?: ScrollViewProps["refreshControl"];
 };
 
 type Row<T> =
@@ -48,6 +50,7 @@ export function Agenda<T>({
   onPressDay,
   activeDate,
   itemSeparatorComponent,
+  refreshControl,
   classNames,
   styles: styleOverrides,
 }: AgendaProps<T>): ReactElement {
@@ -145,6 +148,7 @@ export function Agenda<T>({
         (itemSeparatorComponent ?? undefined) as ComponentType<{ leadingItem: Row<T> }> | undefined
       }
       recycleItems={false}
+      refreshControl={refreshControl}
     />
   );
 }

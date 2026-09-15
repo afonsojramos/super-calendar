@@ -43,6 +43,7 @@ import {
   useWindowDimensions,
   View,
   type ViewStyle,
+  type ScrollViewProps,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -2073,6 +2074,8 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   timeslots?: number;
   /** Show the all-day lane above the grid. Default true. */
   showAllDayEventCell?: boolean;
+  /** Pull-to-refresh control, mounted on the grid's vertical scroll view. */
+  refreshControl?: ScrollViewProps["refreshControl"];
   /** Show the "all-day" text label in the hour column. Default false; the lane
    * still reserves its row, it just isn't labelled. */
   showAllDayLabel?: boolean;
@@ -2184,6 +2187,7 @@ function TimeGridInner<T>({
   timeslots = 1,
   showAllDayEventCell = true,
   showAllDayLabel = false,
+  refreshControl,
   highlightWeekends = true,
   calendarCellStyle,
   businessHours,
@@ -2960,6 +2964,7 @@ function TimeGridInner<T>({
                 scrollEnabled={verticalScrollEnabled}
                 onScroll={scrollHandler}
                 scrollEventThrottle={16}
+                refreshControl={verticalScrollEnabled ? refreshControl : undefined}
                 contentOffset={{ x: 0, y: seedDefaultY }}
               >
                 <Animated.View testID="time-grid-hours" style={[styles.gridRow, gridHeightStyle]}>

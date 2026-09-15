@@ -13,7 +13,7 @@ import {
   startOfYear,
 } from "date-fns";
 import { type ReactElement, useCallback, useMemo } from "react";
-import type { StyleProp, ViewStyle } from "react-native";
+import type { ScrollViewProps, StyleProp, ViewStyle } from "react-native";
 import { useSharedValue } from "react-native-reanimated";
 import { CalendarThemeProvider, mergeTheme, type PartialCalendarTheme } from "../theme";
 import type {
@@ -248,6 +248,12 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
    * beside an empty row; with the label on, it slides away with the lane.
    */
   showAllDayLabel?: boolean;
+  /**
+   * Pull-to-refresh for the modes that scroll vertically: pass a `RefreshControl`
+   * element and it wraps the schedule list, the week/day grid's scroll view or
+   * the year view. Month pages scroll sideways, so it has no effect there.
+   */
+  refreshControl?: ScrollViewProps["refreshControl"];
   /** Tint weekend columns (default true). Set false to treat weekends normally. */
   highlightWeekends?: boolean;
   /** Allow moving events by default (per-event `startEditable` overrides). Default true. */
@@ -478,6 +484,7 @@ export function Calendar<T>({
   timeslots,
   showAllDayEventCell,
   showAllDayLabel,
+  refreshControl,
   highlightWeekends,
   eventStartEditable,
   eventDurationEditable,
@@ -663,6 +670,7 @@ export function Calendar<T>({
         <YearView
           date={date}
           events={displayEvents}
+          refreshControl={refreshControl}
           weekStartsOn={weekStartsOn}
           hiddenDays={hiddenDays}
           locale={locale}
@@ -690,6 +698,7 @@ export function Calendar<T>({
           onPressDay={onPressDay}
           activeDate={activeDate}
           itemSeparatorComponent={itemSeparatorComponent}
+          refreshControl={refreshControl}
           classNames={classNames}
           styles={styleOverrides}
         />
@@ -715,6 +724,7 @@ export function Calendar<T>({
           timeslots={timeslots}
           showAllDayEventCell={showAllDayEventCell}
           showAllDayLabel={showAllDayLabel}
+          refreshControl={refreshControl}
           highlightWeekends={highlightWeekends}
           eventStartEditable={eventStartEditable}
           eventDurationEditable={eventDurationEditable}

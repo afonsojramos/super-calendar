@@ -1,3 +1,4 @@
+import { RefreshControl, ScrollView } from "react-native";
 import { render } from "./renderGrid";
 import type { CalendarEvent } from "../../types";
 
@@ -157,5 +158,62 @@ describe("Calendar slot styling", () => {
     expect(UNSAFE_getAllByProps({ className: "text-lg font-bold" }).length).toBeGreaterThanOrEqual(
       1,
     );
+  });
+});
+
+describe("Calendar refreshControl", () => {
+  const standup: CalendarEvent = {
+    title: "Standup",
+    start: new Date(2026, 0, 6, 9, 0),
+    end: new Date(2026, 0, 6, 9, 30),
+  };
+  const control = <RefreshControl refreshing={false} onRefresh={noop} />;
+
+  it("hands the control to the schedule list", () => {
+    const { UNSAFE_getAllByProps } = render(
+      <Calendar
+        mode="schedule"
+        date={new Date(2026, 0, 6)}
+        events={[standup]}
+        refreshControl={control}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    // The schedule list is the only element that turns recycling off; the control
+    // must reach it, not just sit on the Calendar element.
+    const [list] = UNSAFE_getAllByProps({ recycleItems: false });
+    expect(list.props.refreshControl).toBe(control);
+  });
+
+  it("hands the control to the week grid's scroll view", () => {
+    const { UNSAFE_getAllByProps } = render(
+      <Calendar
+        mode="week"
+        date={new Date(2026, 0, 6)}
+        events={[standup]}
+        refreshControl={control}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    // The grid's vertical scroll view is the one with a scroll throttle.
+    const scrollers = UNSAFE_getAllByProps({ scrollEventThrottle: 16 });
+    expect(scrollers.some((node) => node.props.refreshControl === control)).toBe(true);
+  });
+
+  it("hands the control to the year view's scroll view", () => {
+    const { UNSAFE_getAllByType } = render(
+      <Calendar
+        mode="year"
+        date={new Date(2026, 0, 6)}
+        events={[standup]}
+        refreshControl={control}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    const scrollers = UNSAFE_getAllByType(ScrollView);
+    expect(scrollers.some((node) => node.props.refreshControl === control)).toBe(true);
   });
 });
