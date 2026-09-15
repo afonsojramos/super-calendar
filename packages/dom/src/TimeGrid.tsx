@@ -195,6 +195,15 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
    * band stays non-interactive and hidden from assistive tech.
    */
   renderBusinessHours?: (band: BusinessHoursBand) => ReactNode;
+  /**
+   * A component that draws a `display: "background"` event's band in place of
+   * the themed shade. Rendered like `renderEvent`, it receives the event, the
+   * mode, `continuesBefore` / `continuesAfter` for a multi-day event, and
+   * `onPress`, which fires `onPressEvent`. The band then takes pointer events and
+   * is no longer hidden from assistive tech; cell clicks and drag-to-create are
+   * unreachable underneath it. Without it the band stays a shaded, inert range.
+   */
+  renderBackgroundEvent?: DomRenderEvent<T>;
   /** Show the current-time indicator on today's column (default true). */
   showNowIndicator?: boolean;
   /** Fixed "now" instant for the indicator (doesn't tick). Defaults to the device clock. */
@@ -423,6 +432,7 @@ export function TimeGrid<T = unknown>({
   keyboardEventNavigation = false,
   businessHours,
   renderBusinessHours,
+  renderBackgroundEvent,
   showNowIndicator = true,
   highlightWeekends = true,
   eventStartEditable = true,
@@ -464,6 +474,7 @@ export function TimeGrid<T = unknown>({
   const windowEnd = Math.max(windowStart + 1, Math.min(maxHour, 24));
   const windowHours = windowEnd - windowStart;
   const gutterWidth = hideHours ? 0 : GUTTER_WIDTH;
+  const RenderBackground = renderBackgroundEvent;
   const visibleHours = useMemo(
     () => Array.from({ length: windowHours }, (_, i) => windowStart + i),
     [windowStart, windowHours],
@@ -1449,26 +1460,48 @@ export function TimeGrid<T = unknown>({
                     {renderBusinessHours?.({ date: day, start: b.start, end: b.end })}
                   </div>
                 ))}
-                {/* Background events: shaded, non-interactive time ranges. */}
-                {backgroundByDay[dayIndex].map((b, bandIndex) => (
-                  <div
-                    key={`bg-${bandIndex}`}
-                    aria-hidden
-                    title={b.event.title}
-                    {...slot("backgroundEvent", {
-                      base: {
-                        position: "absolute",
-                        left: 0,
-                        right: 0,
-                        top: (b.startHours - windowStart) * hourHeight,
-                        height: (b.endHours - b.startHours) * hourHeight,
-                        pointerEvents: "none",
-                        zIndex: 0,
-                      },
-                      themed: { background: theme.backgroundEvent },
-                    })}
-                  />
-                ))}
+                {/* Background events: shaded time ranges, or the consumer's own band. */}
+                {backgroundByDay[dayIndex].map((b, bandIndex) => {
+                  const key = `bg-${b.event.start.toISOString()}-${b.event.end.toISOString()}-${bandIndex}`;
+                  const geometry = {
+                    position: "absolute" as const,
+                    left: 0,
+                    right: 0,
+                    top: (b.startHours - windowStart) * hourHeight,
+                    height: (b.endHours - b.startHours) * hourHeight,
+                    zIndex: 0,
+                    overflow: "hidden" as const,
+                  };
+                  if (!RenderBackground) {
+                    return (
+                      <div
+                        key={key}
+                        aria-hidden
+                        title={b.event.title}
+                        {...slot("backgroundEvent", {
+                          base: { ...geometry, pointerEvents: "none" },
+                          themed: { background: theme.backgroundEvent },
+                        })}
+                      />
+                    );
+                  }
+                  const dayStart = startOfDay(days[dayIndex]);
+                  return (
+                    <div
+                      key={key}
+                      {...slot("backgroundEvent", { base: { ...geometry, pointerEvents: "auto" } })}
+                    >
+                      <RenderBackground
+                        event={b.event}
+                        mode={mode}
+                        isAllDay={false}
+                        continuesBefore={b.event.start < dayStart}
+                        continuesAfter={b.event.end > addDays(dayStart, 1)}
+                        onPress={() => onPressEvent?.(b.event)}
+                      />
+                    </div>
+                  );
+                })}
                 {/* Grid lines, painted over the shade so they stay visible. */}
                 <div
                   aria-hidden

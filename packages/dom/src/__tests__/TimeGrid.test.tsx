@@ -1,7 +1,7 @@
 import { act, fireEvent, render } from "@testing-library/react";
 import { useState } from "react";
 import type { CalendarEvent } from "@super-calendar/core";
-import { TimeGrid } from "../TimeGrid";
+import { type DomRenderEventArgs, TimeGrid } from "../TimeGrid";
 
 const day = new Date(2026, 5, 26);
 const events: CalendarEvent[] = [
@@ -1399,5 +1399,48 @@ describe("dom TimeGrid short-event press", () => {
     fireEvent.pointerDown(handle!, { clientY: 300, pointerId: 1 });
     fireEvent.pointerUp(handle!, { clientY: 300, pointerId: 1 });
     expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "Focus" }));
+  });
+});
+
+describe("dom TimeGrid background events", () => {
+  const blocked: CalendarEvent = {
+    title: "Blocked",
+    start: new Date(2026, 5, 26, 9, 0),
+    end: new Date(2026, 5, 26, 12, 0),
+    display: "background",
+  };
+
+  it("shades a background event without rendering it as an event", () => {
+    const { container, queryByText } = render(
+      <TimeGrid date={day} mode="day" events={[blocked, ...events]} hourHeight={48} />,
+    );
+    const band = container.querySelector<HTMLElement>('[data-slot="backgroundEvent"]');
+    expect(band?.style.pointerEvents).toBe("none");
+    expect(band?.getAttribute("aria-hidden")).toBe("true");
+    expect(queryByText("Blocked")).toBeNull();
+  });
+
+  it("renders a background event through renderBackgroundEvent and lets it press", () => {
+    const onPressEvent = jest.fn();
+    const BlockedBand = ({ event, onPress }: DomRenderEventArgs) => (
+      <button type="button" onClick={onPress}>
+        {event.title}
+      </button>
+    );
+    const { container, getByText } = render(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={[blocked, ...events]}
+        hourHeight={48}
+        renderBackgroundEvent={BlockedBand}
+        onPressEvent={onPressEvent}
+      />,
+    );
+    const band = container.querySelector<HTMLElement>('[data-slot="backgroundEvent"]');
+    expect(band?.style.pointerEvents).toBe("auto");
+    expect(band?.getAttribute("aria-hidden")).toBeNull();
+    fireEvent.click(getByText("Blocked"));
+    expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "Blocked" }));
   });
 });

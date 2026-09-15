@@ -149,6 +149,11 @@ export interface CalendarProps<T = unknown>
    * band stays non-interactive and hidden from assistive tech.
    */
   renderBusinessHours?: (band: BusinessHoursBand) => ReactNode;
+  /**
+   * A component that draws a `display: "background"` event's band in place of
+   * the themed shade; see `TimeGrid`'s prop of the same name.
+   */
+  renderBackgroundEvent?: DomRenderEvent<T>;
   /** Show the current-time indicator (default true). */
   showNowIndicator?: boolean;
   /** Show the all-day lane (default true). */
@@ -332,6 +337,7 @@ export function Calendar<T = unknown>({
   weekNumberPrefix,
   businessHours,
   renderBusinessHours,
+  renderBackgroundEvent,
   showNowIndicator,
   showAllDayEventCell,
   highlightWeekends,
@@ -517,6 +523,7 @@ export function Calendar<T = unknown>({
         weekNumberPrefix={weekNumberPrefix}
         businessHours={businessHours}
         renderBusinessHours={renderBusinessHours}
+        renderBackgroundEvent={renderBackgroundEvent}
         showNowIndicator={showNowIndicator}
         showAllDayEventCell={showAllDayEventCell}
         highlightWeekends={highlightWeekends}
