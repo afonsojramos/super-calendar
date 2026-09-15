@@ -1595,7 +1595,7 @@ export function TimeGrid<T = unknown>({
                         <div
                           onPointerDown={(e) => {
                             e.stopPropagation();
-                            beginDrag(e, pe, key, "resize-start", dayIndex);
+                            beginDrag(e, pe, key, "resize-start", dayIndex, onPress);
                           }}
                           style={{
                             position: "absolute",
@@ -1617,7 +1617,7 @@ export function TimeGrid<T = unknown>({
                         <div
                           onPointerDown={(e) => {
                             e.stopPropagation();
-                            beginDrag(e, pe, key, "resize", dayIndex);
+                            beginDrag(e, pe, key, "resize", dayIndex, onPress);
                           }}
                           style={{
                             position: "absolute",

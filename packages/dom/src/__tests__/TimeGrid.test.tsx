@@ -1378,3 +1378,26 @@ describe("dom TimeGrid event box sizing", () => {
     expect(boxInset(4)).toEqual({ left: "calc(0% + 4px)", width: "calc(100% - 8px)" });
   });
 });
+
+describe("dom TimeGrid short-event press", () => {
+  it("presses a movable event from a click on its resize handle", () => {
+    const onPressEvent = jest.fn();
+    const { container } = render(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={events}
+        hourHeight={48}
+        onDragEvent={() => {}}
+        onPressEvent={onPressEvent}
+      />,
+    );
+    // A movable box has no click handler of its own: the press comes from a
+    // release without movement, which the resize handles report as well.
+    const handle = container.querySelector<HTMLElement>('div[style*="ns-resize"]');
+    expect(handle).not.toBeNull();
+    fireEvent.pointerDown(handle!, { clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(handle!, { clientY: 300, pointerId: 1 });
+    expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "Focus" }));
+  });
+});
