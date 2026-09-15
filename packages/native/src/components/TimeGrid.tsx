@@ -608,8 +608,22 @@ function AnimatedEventBoxInner<T>({
 
   // Keep the latest event/handler in a ref so the gestures stay memoized but
   // never call into a stale closure.
-  const latest = useRef({ event: positioned.event, eventIndex, onDragEvent, onDragStart });
-  latest.current = { event: positioned.event, eventIndex, onDragEvent, onDragStart };
+  const latest = useRef({
+    event: positioned.event,
+    eventIndex,
+    onDragEvent,
+    onDragStart,
+    onPress,
+    onLongPress,
+  });
+  latest.current = {
+    event: positioned.event,
+    eventIndex,
+    onDragEvent,
+    onDragStart,
+    onPress,
+    onLongPress,
+  };
 
   // Snap the box back to where it started (drop rejected or degenerate).
   const snapBack = useCallback(() => {
@@ -885,69 +899,120 @@ function AnimatedEventBoxInner<T>({
     releaseEdge,
   ]);
 
-  const resizeGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .enabled(resizable)
-        .onStart(() => {
-          dragZ.value = DRAG_EVENT_Z;
-          runOnJS(notifyDragStart)();
-        })
-        .onUpdate((event) => {
-          resizeDelta.value = event.translationY;
-        })
-        .onEnd((event) => {
-          const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
-          if (delta === 0) {
-            resizeDelta.value = 0;
-            return;
-          }
-          resizeDelta.value = (delta / MINUTES_PER_HOUR) * cellHeight.value;
-          runOnJS(commitDrag)(0, delta);
-        })
-        .onFinalize(() => {
-          dragZ.value = 0;
-        }),
-    [resizable, snapMinutes, cellHeight, resizeDelta, dragZ, commitDrag, notifyDragStart],
-  );
+  // Stable callbacks that read the event and handlers from the ref, so the
+  // resize gestures below keep their identity across renders.
+  const handlePress = useCallback(() => {
+    const { event, onPress: press } = latest.current;
+    press(event);
+  }, []);
+  // A handle also takes the consumer's long press, unless a long press already
+  // grabs the event to move it.
+  const canLongPress = !canMove && onLongPress != null;
+  const handleLongPressFromHandle = useCallback(() => {
+    const { event, onLongPress: press } = latest.current;
+    press?.(event);
+  }, []);
+
+  // A plain tap on a resize handle is a press on the event. The two handles cover
+  // almost all of a box at the minimum height, so without this a 5- to 30-minute
+  // event has next to no tappable surface. A drag from a handle still resizes:
+  // the pan wins the race as soon as the finger moves.
+  const resizeGesture = useMemo(() => {
+    const pan = Gesture.Pan()
+      .enabled(resizable)
+      .onStart(() => {
+        dragZ.value = DRAG_EVENT_Z;
+        runOnJS(notifyDragStart)();
+      })
+      .onUpdate((event) => {
+        resizeDelta.value = event.translationY;
+      })
+      .onEnd((event) => {
+        const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
+        if (delta === 0) {
+          resizeDelta.value = 0;
+          return;
+        }
+        resizeDelta.value = (delta / MINUTES_PER_HOUR) * cellHeight.value;
+        runOnJS(commitDrag)(0, delta);
+      })
+      .onFinalize(() => {
+        dragZ.value = 0;
+      });
+    const tap = Gesture.Tap()
+      .runOnJS(true)
+      .onEnd((_event, success) => {
+        if (success) handlePress();
+      });
+    const longPress = Gesture.LongPress()
+      .enabled(canLongPress)
+      .runOnJS(true)
+      .onStart(() => {
+        handleLongPressFromHandle();
+      });
+    return Gesture.Race(pan, tap, longPress);
+  }, [
+    resizable,
+    snapMinutes,
+    cellHeight,
+    resizeDelta,
+    dragZ,
+    commitDrag,
+    notifyDragStart,
+    handlePress,
+    canLongPress,
+    handleLongPressFromHandle,
+  ]);
 
   // Top-edge resize: dragging the top changes the start (end fixed). Mirrors the
   // bottom resize but commits a start-delta and previews via resizeStartDelta.
-  const resizeStartGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .enabled(resizableFromStart)
-        .onStart(() => {
-          dragZ.value = DRAG_EVENT_Z;
-          runOnJS(notifyDragStart)();
-        })
-        .onUpdate((event) => {
-          resizeStartDelta.value = event.translationY;
-        })
-        .onEnd((event) => {
-          const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
-          if (delta === 0) {
-            resizeStartDelta.value = 0;
-            return;
-          }
-          resizeStartDelta.value = (delta / MINUTES_PER_HOUR) * cellHeight.value;
-          runOnJS(commitDrag)(delta, 0);
-        })
-        .onFinalize(() => {
-          dragZ.value = 0;
-        }),
-    [
-      resizableFromStart,
-      snapMinutes,
-      cellHeight,
-      resizeStartDelta,
-      dragZ,
-      commitDrag,
-      notifyDragStart,
-    ],
-  );
+  const resizeStartGesture = useMemo(() => {
+    const pan = Gesture.Pan()
+      .enabled(resizableFromStart)
+      .onStart(() => {
+        dragZ.value = DRAG_EVENT_Z;
+        runOnJS(notifyDragStart)();
+      })
+      .onUpdate((event) => {
+        resizeStartDelta.value = event.translationY;
+      })
+      .onEnd((event) => {
+        const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
+        if (delta === 0) {
+          resizeStartDelta.value = 0;
+          return;
+        }
+        resizeStartDelta.value = (delta / MINUTES_PER_HOUR) * cellHeight.value;
+        runOnJS(commitDrag)(delta, 0);
+      })
+      .onFinalize(() => {
+        dragZ.value = 0;
+      });
+    const tap = Gesture.Tap()
+      .runOnJS(true)
+      .onEnd((_event, success) => {
+        if (success) handlePress();
+      });
+    const longPress = Gesture.LongPress()
+      .enabled(canLongPress)
+      .runOnJS(true)
+      .onStart(() => {
+        handleLongPressFromHandle();
+      });
+    return Gesture.Race(pan, tap, longPress);
+  }, [
+    resizableFromStart,
+    snapMinutes,
+    cellHeight,
+    resizeStartDelta,
+    dragZ,
+    commitDrag,
+    notifyDragStart,
+    handlePress,
+    canLongPress,
+    handleLongPressFromHandle,
+  ]);
 
-  const handlePress = () => onPress(positioned.event);
   // When movable, a long press grabs the event to move it, so don't also fire
   // the consumer's long-press handler.
   const handleLongPress = !canMove && onLongPress ? () => onLongPress(positioned.event) : undefined;
@@ -1028,7 +1093,7 @@ function AnimatedEventBoxInner<T>({
       />
       {resizableFromStart ? (
         <GestureDetector gesture={resizeStartGesture}>
-          <Animated.View style={styles.resizeHandleTop}>
+          <Animated.View testID="resize-handle-top" style={styles.resizeHandleTop}>
             {showDragHandle ? (
               <View style={[styles.resizeGrip, { backgroundColor: theme.colors.eventText }]} />
             ) : null}
@@ -1037,7 +1102,7 @@ function AnimatedEventBoxInner<T>({
       ) : null}
       {resizable ? (
         <GestureDetector gesture={resizeGesture}>
-          <Animated.View style={styles.resizeHandle}>
+          <Animated.View testID="resize-handle" style={styles.resizeHandle}>
             {/* The grip is the only visible drag affordance; hiding it keeps the
                 resize gesture working but removes the indicator. */}
             {showDragHandle ? (
