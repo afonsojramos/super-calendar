@@ -82,5 +82,15 @@ export function buildEvents(): CalendarEvent<EventMeta>[] {
       end: at(2, 0),
       allDay: true,
     },
+    // One all-day event a week earlier, so swiping back reaches a one-row lane
+    // and swiping forward an empty one.
+    {
+      id: "15",
+      kind: "social",
+      title: "🎬 Film festival",
+      start: at(-7, 0),
+      end: at(-6, 0),
+      allDay: true,
+    },
   ];
 }
