@@ -1,3 +1,4 @@
+import { RefreshControl } from "react-native";
 import { render } from "./renderGrid";
 import type { CalendarEvent } from "../../types";
 
@@ -157,5 +158,42 @@ describe("Calendar slot styling", () => {
     expect(UNSAFE_getAllByProps({ className: "text-lg font-bold" }).length).toBeGreaterThanOrEqual(
       1,
     );
+  });
+});
+
+describe("Calendar refreshControl", () => {
+  const standup: CalendarEvent = {
+    title: "Standup",
+    start: new Date(2026, 0, 6, 9, 0),
+    end: new Date(2026, 0, 6, 9, 30),
+  };
+  const control = <RefreshControl testID="pull" refreshing={false} onRefresh={noop} />;
+
+  it("hands the control to the schedule list", () => {
+    const { UNSAFE_getAllByProps } = render(
+      <Calendar
+        mode="schedule"
+        date={new Date(2026, 0, 6)}
+        events={[standup]}
+        refreshControl={control}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    expect(UNSAFE_getAllByProps({ refreshControl: control }).length).toBeGreaterThan(0);
+  });
+
+  it("hands the control to the week grid's scroll view", () => {
+    const { UNSAFE_getAllByProps } = render(
+      <Calendar
+        mode="week"
+        date={new Date(2026, 0, 6)}
+        events={[standup]}
+        refreshControl={control}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    expect(UNSAFE_getAllByProps({ refreshControl: control }).length).toBeGreaterThan(0);
   });
 });
