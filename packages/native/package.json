@@ -73,7 +73,7 @@
     "@legendapp/list": ">=3",
     "date-fns": ">=3",
     "react": ">=18",
-    "react-native": ">=0.74",
+    "react-native": ">=0.74 <2",
     "react-native-gesture-handler": ">=2.16",
     "react-native-reanimated": ">=4.0.0 <5",
     "react-native-worklets": ">=0.5"

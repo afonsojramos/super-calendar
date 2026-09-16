@@ -20,7 +20,7 @@ npm install @super-calendar/native
 
 Also on [JSR](https://jsr.io/@super-calendar/native): `deno add jsr:@super-calendar/native`.
 
-Peer dependencies: `@legendapp/list` (>=3), `date-fns` (>=3), `react` (>=19), `react-native` (>=0.85), `react-native-gesture-handler` (>=2), `react-native-reanimated` (>=4), and `react-native-worklets` (>=0.8).
+Peer dependencies: `@legendapp/list` (>=3), `date-fns` (>=3), `react` (>=19), `react-native` (>=0.74 <2), `react-native-gesture-handler` (>=2), `react-native-reanimated` (>=4), and `react-native-worklets` (>=0.8).
 
 For a picker-only bundle that does not require Reanimated, import from the `@super-calendar/native/picker` subpath.
 
