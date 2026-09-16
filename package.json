@@ -56,5 +56,5 @@
     "tsdown": "^0.23.0",
     "typescript": "^7.0.2"
   },
-  "packageManager": "pnpm@11.21.0"
+  "packageManager": "pnpm@12.4.1"
 }
