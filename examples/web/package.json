@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@legendapp/list": "^3.3.2",
+    "@legendapp/list": "^3.3.11",
     "@super-calendar/dom": "workspace:*",
     "@super-calendar/example-shared": "workspace:*",
     "date-fns": "4.4.0",
