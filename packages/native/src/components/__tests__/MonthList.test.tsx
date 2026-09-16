@@ -7,8 +7,8 @@ beforeEach(() => {
   jest.useFakeTimers();
 });
 
-afterEach(() => {
-  cleanup();
+afterEach(async () => {
+  await cleanup();
   jest.runOnlyPendingTimers();
   jest.useRealTimers();
 });
@@ -27,16 +27,16 @@ describe("MonthList", () => {
   // is verified in the example app; here we just guard mounting + the static
   // weekday header. The grid/selection logic is covered by MonthView and
   // buildMonthGrid tests.
-  it("mounts and renders the weekday header", () => {
-    const { getAllByText } = render(<MonthList {...baseProps} />);
+  it("mounts and renders the weekday header", async () => {
+    const { getAllByText } = await render(<MonthList {...baseProps} />);
     expect(getAllByText("Mon").length).toBeGreaterThan(0);
     expect(getAllByText("Sun").length).toBeGreaterThan(0);
   });
 });
 
 describe("MonthList slot styling", () => {
-  it("classes its weekday header slots and keeps the structural layout", () => {
-    const { getAllByText } = render(
+  it("classes its weekday header slots and keeps the structural layout", async () => {
+    const { getAllByText } = await render(
       <MonthList {...baseProps} classNames={{ weekday: "text-indigo-400 uppercase" }} />,
     );
     const label = getAllByText("Mon")[0];

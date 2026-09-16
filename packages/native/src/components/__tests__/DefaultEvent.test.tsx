@@ -15,28 +15,30 @@ const event: CalendarEvent = {
 };
 
 describe("DefaultEvent", () => {
-  it("renders the title on the timed grid", () => {
-    const { getByText } = render(<DefaultEvent event={event} mode="week" onPress={() => {}} />);
+  it("renders the title on the timed grid", async () => {
+    const { getByText } = await render(
+      <DefaultEvent event={event} mode="week" onPress={() => {}} />,
+    );
     expect(getByText("Standup")).toBeTruthy();
   });
 
-  it("announces the title and time range to screen readers", () => {
-    const { getByLabelText } = render(
+  it("announces the title and time range to screen readers", async () => {
+    const { getByLabelText } = await render(
       <DefaultEvent event={event} mode="week" onPress={() => {}} />,
     );
     expect(getByLabelText("Standup, 09:00 to 10:30")).toBeTruthy();
   });
 
-  it("announces all-day events and renders the title in month cells", () => {
-    const { getByText, getByLabelText } = render(
+  it("announces all-day events and renders the title in month cells", async () => {
+    const { getByText, getByLabelText } = await render(
       <DefaultEvent event={{ ...event, allDay: true }} mode="month" isAllDay onPress={() => {}} />,
     );
     expect(getByText("Standup")).toBeTruthy();
     expect(getByLabelText("Standup, all day")).toBeTruthy();
   });
 
-  it("shows 'All day' instead of a time range for an all-day event in the schedule", () => {
-    const { getByText, queryByText } = render(
+  it("shows 'All day' instead of a time range for an all-day event in the schedule", async () => {
+    const { getByText, queryByText } = await render(
       <DefaultEvent
         event={{ ...event, allDay: true }}
         mode="schedule"
@@ -48,8 +50,8 @@ describe("DefaultEvent", () => {
     expect(queryByText(/09:00/)).toBeNull();
   });
 
-  it("honours a custom allDayLabel in the schedule, visibly and for screen readers", () => {
-    const { getByText, getByLabelText } = render(
+  it("honours a custom allDayLabel in the schedule, visibly and for screen readers", async () => {
+    const { getByText, getByLabelText } = await render(
       <DefaultEvent
         event={{ ...event, allDay: true }}
         mode="schedule"
@@ -62,17 +64,17 @@ describe("DefaultEvent", () => {
     expect(getByLabelText("Standup, Ganztägig")).toBeTruthy();
   });
 
-  it("centers a lone title line vertically and keeps taller chips top-aligned", () => {
-    const justifyOf = (boxHeight: SharedValue<number>) => {
-      const { getByTestId } = render(
+  it("centers a lone title line vertically and keeps taller chips top-aligned", async () => {
+    const justifyOf = async (boxHeight: SharedValue<number>) => {
+      const { getByTestId } = await render(
         <DefaultEvent event={event} mode="day" boxHeight={boxHeight} onPress={() => {}} />,
       );
       const style = StyleSheet.flatten(getByTestId("event-chip-content").props.style) as ViewStyle;
       return style.justifyContent;
     };
     // A 24px box fits exactly one title line and no time line: centered.
-    expect(justifyOf(boxHeightOf(24))).toBe("center");
+    expect(await justifyOf(boxHeightOf(24))).toBe("center");
     // A 96px box fits the title and the time: top-aligned as before.
-    expect(justifyOf(boxHeightOf(96))).toBe("flex-start");
+    expect(await justifyOf(boxHeightOf(96))).toBe("flex-start");
   });
 });

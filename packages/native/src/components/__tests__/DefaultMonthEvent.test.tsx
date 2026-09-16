@@ -9,15 +9,15 @@ const event: CalendarEvent = {
 };
 
 describe("DefaultMonthEvent", () => {
-  it("renders the event title", () => {
-    const { getByText } = render(
+  it("renders the event title", async () => {
+    const { getByText } = await render(
       <DefaultMonthEvent event={event} mode="month" onPress={() => {}} />,
     );
     expect(getByText("Standup")).toBeTruthy();
   });
 
-  it("announces the event to screen readers", () => {
-    const { getByLabelText } = render(
+  it("announces the event to screen readers", async () => {
+    const { getByLabelText } = await render(
       <DefaultMonthEvent event={event} mode="month" onPress={() => {}} />,
     );
     expect(getByLabelText(/Standup/)).toBeTruthy();

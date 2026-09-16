@@ -18,8 +18,8 @@ const events: ResourceEvent[] = [
 ];
 
 describe("ResourceTimeline", () => {
-  it("renders a labelled row per resource and each event in its lane", () => {
-    const { getByText } = render(
+  it("renders a labelled row per resource and each event in its lane", async () => {
+    const { getByText } = await render(
       <ResourceTimeline date={at(0)} resources={resources} events={events} />,
     );
     expect(getByText("Room A")).toBeTruthy();
@@ -28,15 +28,15 @@ describe("ResourceTimeline", () => {
     expect(getByText("Interview")).toBeTruthy();
   });
 
-  it("falls back to the resource id when it has no title", () => {
-    const { getByText } = render(
+  it("falls back to the resource id when it has no title", async () => {
+    const { getByText } = await render(
       <ResourceTimeline date={at(0)} resources={[{ id: "solo" }]} events={[]} />,
     );
     expect(getByText("solo")).toBeTruthy();
   });
 
-  it("renders a custom resource header, receiving the resource and index", () => {
-    const { getByText, queryByText } = render(
+  it("renders a custom resource header, receiving the resource and index", async () => {
+    const { getByText, queryByText } = await render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}
@@ -50,8 +50,8 @@ describe("ResourceTimeline", () => {
     expect(queryByText("Room A")).toBeNull();
   });
 
-  it("uses the custom resource header in the vertical orientation too", () => {
-    const { getByText } = render(
+  it("uses the custom resource header in the vertical orientation too", async () => {
+    const { getByText } = await render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}
@@ -64,9 +64,9 @@ describe("ResourceTimeline", () => {
     expect(getByText("H:b")).toBeTruthy();
   });
 
-  it("fires onPressEvent with the tapped event", () => {
+  it("fires onPressEvent with the tapped event", async () => {
     const onPressEvent = jest.fn();
-    const { getByText } = render(
+    const { getByText } = await render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}
@@ -74,15 +74,15 @@ describe("ResourceTimeline", () => {
         onPressEvent={onPressEvent}
       />,
     );
-    fireEvent.press(getByText("Interview"));
+    await fireEvent.press(getByText("Interview"));
     expect(onPressEvent).toHaveBeenCalledTimes(1);
     expect(onPressEvent.mock.calls[0][0].title).toBe("Interview");
   });
 
-  it("renders a resize grip per event and still taps when onDragEvent is set", () => {
+  it("renders a resize grip per event and still taps when onDragEvent is set", async () => {
     const onDragEvent = jest.fn();
     const onPressEvent = jest.fn();
-    const { getByLabelText, getAllByTestId } = render(
+    const { getByLabelText, getAllByTestId } = await render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}
@@ -98,13 +98,13 @@ describe("ResourceTimeline", () => {
       events.length,
     );
     // Tapping the bar still fires onPressEvent (long-press is what starts a drag).
-    fireEvent.press(getByLabelText("Standup"));
+    await fireEvent.press(getByLabelText("Standup"));
     expect(onPressEvent).toHaveBeenCalledTimes(1);
   });
 
-  it("exposes screen-reader move and resize actions on the draggable bar", () => {
+  it("exposes screen-reader move and resize actions on the draggable bar", async () => {
     const onDragEvent = jest.fn();
-    const { getByLabelText } = render(
+    const { getByLabelText } = await render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}
@@ -125,20 +125,20 @@ describe("ResourceTimeline", () => {
     ]);
 
     // "Move later" reschedules via onDragEvent, preserving the duration.
-    fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "move-later" } });
+    await fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "move-later" } });
     const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent, Date, Date];
     expect(start.getTime()).toBeGreaterThan(at(9).getTime());
     expect(end.getTime() - start.getTime()).toBe(60 * 60 * 1000);
 
     // "Extend" grows the end only.
-    fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "extend" } });
+    await fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "extend" } });
     const [, s2, e2] = onDragEvent.mock.calls[1] as [CalendarEvent, Date, Date];
     expect(s2.getTime()).toBe(at(9).getTime());
     expect(e2.getTime()).toBeGreaterThan(at(10).getTime());
   });
 
-  it("renders the hour axis with the configured window", () => {
-    const { getByText, queryByText } = render(
+  it("renders the hour axis with the configured window", async () => {
+    const { getByText, queryByText } = await render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}
@@ -156,8 +156,8 @@ describe("ResourceTimeline", () => {
 });
 
 describe("ResourceTimeline vertical orientation", () => {
-  it("renders resource columns with the hour axis down the side", () => {
-    const { getByText } = render(
+  it("renders resource columns with the hour axis down the side", async () => {
+    const { getByText } = await render(
       <ResourceTimeline
         date={at(0)}
         orientation="vertical"
@@ -174,9 +174,9 @@ describe("ResourceTimeline vertical orientation", () => {
     expect(getByText("17:00")).toBeTruthy();
   });
 
-  it("keeps the screen-reader move and resize actions on vertical bars", () => {
+  it("keeps the screen-reader move and resize actions on vertical bars", async () => {
     const onDragEvent = jest.fn();
-    const { getAllByRole } = render(
+    const { getAllByRole } = await render(
       <ResourceTimeline
         date={at(0)}
         orientation="vertical"
@@ -188,13 +188,13 @@ describe("ResourceTimeline vertical orientation", () => {
     const bar = getAllByRole("button")[0];
     const names = (bar.props.accessibilityActions ?? []).map((a: { name: string }) => a.name);
     expect(names).toEqual(["move-later", "move-earlier", "extend", "shrink", "move-next-lane"]);
-    fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "move-later" } });
+    await fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "move-later" } });
     expect(onDragEvent).toHaveBeenCalledTimes(1);
   });
 
-  it("fires onPressEvent for a tapped vertical bar", () => {
+  it("fires onPressEvent for a tapped vertical bar", async () => {
     const onPressEvent = jest.fn();
-    const { getByText } = render(
+    const { getByText } = await render(
       <ResourceTimeline
         date={at(0)}
         orientation="vertical"
@@ -203,13 +203,13 @@ describe("ResourceTimeline vertical orientation", () => {
         onPressEvent={onPressEvent}
       />,
     );
-    fireEvent.press(getByText("Standup"));
+    await fireEvent.press(getByText("Standup"));
     expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "Standup" }));
   });
 
-  it("lays a draggable vertical bar out by time with the resize grip at the bottom", () => {
+  it("lays a draggable vertical bar out by time with the resize grip at the bottom", async () => {
     const onDragEvent = jest.fn();
-    const { getAllByTestId, getByText } = render(
+    const { getAllByTestId, getByText } = await render(
       <ResourceTimeline
         date={at(0)}
         orientation="vertical"
@@ -241,9 +241,9 @@ describe("ResourceTimeline vertical orientation", () => {
 });
 
 describe("ResourceTimeline cell interactions", () => {
-  it("fires onPressCell with the snapped time and the lane's resource", () => {
+  it("fires onPressCell with the snapped time and the lane's resource", async () => {
     const onPressCell = jest.fn();
-    const { getAllByTestId } = render(
+    const { getAllByTestId } = await render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}
@@ -256,7 +256,7 @@ describe("ResourceTimeline cell interactions", () => {
     const layers = getAllByTestId("resource-cell-layer", { includeHiddenElements: true });
     expect(layers).toHaveLength(2);
     // 120px at 80px/hour from 08:00 → 09:30.
-    fireEvent.press(layers[1], { nativeEvent: { locationX: 120, locationY: 0 } });
+    await fireEvent.press(layers[1], { nativeEvent: { locationX: 120, locationY: 0 } });
     expect(onPressCell).toHaveBeenCalledTimes(1);
     const [pressedAt, resource] = onPressCell.mock.calls[0];
     expect(pressedAt.getHours()).toBe(9);
@@ -264,8 +264,8 @@ describe("ResourceTimeline cell interactions", () => {
     expect(resource.id).toBe("b");
   });
 
-  it("shades closed hours per lane in the vertical orientation", () => {
-    const { getAllByTestId } = render(
+  it("shades closed hours per lane in the vertical orientation", async () => {
+    const { getAllByTestId } = await render(
       <ResourceTimeline
         date={at(0)}
         orientation="vertical"
@@ -280,8 +280,8 @@ describe("ResourceTimeline cell interactions", () => {
     expect(getAllByTestId("resource-hours-shade", { includeHiddenElements: true })).toHaveLength(3);
   });
 
-  it("hands each closed band and its resource to renderBusinessHours, dropping the tint", () => {
-    const { getAllByTestId, getByText } = render(
+  it("hands each closed band and its resource to renderBusinessHours, dropping the tint", async () => {
+    const { getAllByTestId, getByText } = await render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}
@@ -302,9 +302,9 @@ describe("ResourceTimeline cell interactions", () => {
     }
   });
 
-  it("fires onLongPressEvent for a non-draggable bar", () => {
+  it("fires onLongPressEvent for a non-draggable bar", async () => {
     const onLongPressEvent = jest.fn();
-    const { getByText } = render(
+    const { getByText } = await render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}
@@ -312,13 +312,13 @@ describe("ResourceTimeline cell interactions", () => {
         onLongPressEvent={onLongPressEvent}
       />,
     );
-    fireEvent(getByText("Standup"), "longPress");
+    await fireEvent(getByText("Standup"), "longPress");
     expect(onLongPressEvent).toHaveBeenCalledWith(expect.objectContaining({ title: "Standup" }));
   });
 
-  it("fires onPressCell from a vertical lane using locationY", () => {
+  it("fires onPressCell from a vertical lane using locationY", async () => {
     const onPressCell = jest.fn();
-    const { getAllByTestId } = render(
+    const { getAllByTestId } = await render(
       <ResourceTimeline
         date={at(0)}
         orientation="vertical"
@@ -331,7 +331,7 @@ describe("ResourceTimeline cell interactions", () => {
     );
     const layers = getAllByTestId("resource-cell-layer", { includeHiddenElements: true });
     // Second column (Room B), 72px down at 48px/hour from 08:00 → 09:30.
-    fireEvent.press(layers[1], { nativeEvent: { locationX: 0, locationY: 72 } });
+    await fireEvent.press(layers[1], { nativeEvent: { locationX: 0, locationY: 72 } });
     expect(onPressCell).toHaveBeenCalledTimes(1);
     const [pressedAt, resource] = onPressCell.mock.calls[0];
     expect(pressedAt.getHours()).toBe(9);
@@ -339,8 +339,8 @@ describe("ResourceTimeline cell interactions", () => {
     expect(resource.id).toBe("b");
   });
 
-  it("renders a create ghost per lane when onCreateEvent is set", () => {
-    const { getAllByTestId } = render(
+  it("renders a create ghost per lane when onCreateEvent is set", async () => {
+    const { getAllByTestId } = await render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}
@@ -353,9 +353,9 @@ describe("ResourceTimeline cell interactions", () => {
     );
   });
 
-  it("fires onLongPressCell with the snapped time when create is off", () => {
+  it("fires onLongPressCell with the snapped time when create is off", async () => {
     const onLongPressCell = jest.fn();
-    const { getAllByTestId } = render(
+    const { getAllByTestId } = await render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}
@@ -367,7 +367,7 @@ describe("ResourceTimeline cell interactions", () => {
     );
     const layers = getAllByTestId("resource-cell-layer", { includeHiddenElements: true });
     // 120px at 80px/hour from 08:00 → 09:30, in Room B's lane.
-    fireEvent(layers[1], "longPress", { nativeEvent: { locationX: 120, locationY: 0 } });
+    await fireEvent(layers[1], "longPress", { nativeEvent: { locationX: 120, locationY: 0 } });
     expect(onLongPressCell).toHaveBeenCalledTimes(1);
     const [pressedAt, resource] = onLongPressCell.mock.calls[0];
     expect(pressedAt.getHours()).toBe(9);
@@ -375,9 +375,9 @@ describe("ResourceTimeline cell interactions", () => {
     expect(resource.id).toBe("b");
   });
 
-  it("suppresses onLongPressCell when onCreateEvent is set (long-press starts the create drag)", () => {
+  it("suppresses onLongPressCell when onCreateEvent is set (long-press starts the create drag)", async () => {
     const onLongPressCell = jest.fn();
-    const { getAllByTestId } = render(
+    const { getAllByTestId } = await render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}
@@ -389,15 +389,15 @@ describe("ResourceTimeline cell interactions", () => {
       />,
     );
     const layers = getAllByTestId("resource-cell-layer", { includeHiddenElements: true });
-    fireEvent(layers[0], "longPress", { nativeEvent: { locationX: 40, locationY: 0 } });
+    await fireEvent(layers[0], "longPress", { nativeEvent: { locationX: 40, locationY: 0 } });
     expect(onLongPressCell).not.toHaveBeenCalled();
   });
 });
 
 describe("ResourceTimeline now indicator", () => {
-  it("draws the line when the board shows the now instant's day", () => {
+  it("draws the line when the board shows the now instant's day", async () => {
     const now = new Date(2026, 0, 1, 10, 30);
-    const { getAllByTestId } = render(
+    const { getAllByTestId } = await render(
       <ResourceTimeline date={at(0)} resources={resources} events={events} now={now} />,
     );
     // One line per lane, visually continuous across the board.
@@ -406,9 +406,9 @@ describe("ResourceTimeline now indicator", () => {
     );
   });
 
-  it("hides the line when the board shows another day", () => {
+  it("hides the line when the board shows another day", async () => {
     const now = new Date(2026, 5, 10, 10, 30);
-    const { queryAllByTestId } = render(
+    const { queryAllByTestId } = await render(
       <ResourceTimeline date={at(0)} resources={resources} events={events} now={now} />,
     );
     expect(
@@ -425,8 +425,8 @@ describe("ResourceTimeline resource paging", () => {
     { id: "d", title: "Room D" },
   ];
 
-  it("shows only the first page of lanes by default", () => {
-    const { getByText, queryByText } = render(
+  it("shows only the first page of lanes by default", async () => {
+    const { getByText, queryByText } = await render(
       <ResourceTimeline
         date={at(0)}
         orientation="vertical"
@@ -440,8 +440,8 @@ describe("ResourceTimeline resource paging", () => {
     expect(queryByText("Room C")).toBeNull();
   });
 
-  it("shows the lanes of the controlled resourcePage", () => {
-    const { getByText, queryByText } = render(
+  it("shows the lanes of the controlled resourcePage", async () => {
+    const { getByText, queryByText } = await render(
       <ResourceTimeline
         date={at(0)}
         orientation="vertical"
@@ -456,8 +456,8 @@ describe("ResourceTimeline resource paging", () => {
     expect(queryByText("Room A")).toBeNull();
   });
 
-  it("clamps an out-of-range page to the last one, in either orientation", () => {
-    const vertical = render(
+  it("clamps an out-of-range page to the last one, in either orientation", async () => {
+    const vertical = await render(
       <ResourceTimeline
         date={at(0)}
         orientation="vertical"
@@ -471,7 +471,7 @@ describe("ResourceTimeline resource paging", () => {
     expect(vertical.getByText("Room D")).toBeTruthy();
     expect(vertical.queryByText("Room A")).toBeNull();
 
-    const horizontal = render(
+    const horizontal = await render(
       <ResourceTimeline
         date={at(0)}
         resources={four}
@@ -487,9 +487,9 @@ describe("ResourceTimeline resource paging", () => {
 });
 
 describe("ResourceTimeline cross-lane drag", () => {
-  it("retargets the resource via the cross-lane screen-reader action, keeping the time", () => {
+  it("retargets the resource via the cross-lane screen-reader action, keeping the time", async () => {
     const onDragEvent = jest.fn();
-    const { getByLabelText } = render(
+    const { getByLabelText } = await render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}
@@ -499,7 +499,7 @@ describe("ResourceTimeline cross-lane drag", () => {
     );
     // Standup is in lane "a" (index 0); moving it to the next lane targets "b".
     const bar = getByLabelText("Standup");
-    fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "move-next-lane" } });
+    await fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "move-next-lane" } });
     const call = onDragEvent.mock.calls[0] as [CalendarEvent, Date, Date, { id: string }];
     expect(call[3]).toEqual(expect.objectContaining({ id: "b" }));
     // A pure lane move preserves start/end.
@@ -507,8 +507,8 @@ describe("ResourceTimeline cross-lane drag", () => {
     expect(call[2].getTime()).toBe(at(10).getTime());
   });
 
-  it("only offers the lane moves that exist at each edge", () => {
-    const { getByLabelText } = render(
+  it("only offers the lane moves that exist at each edge", async () => {
+    const { getByLabelText } = await render(
       <ResourceTimeline
         date={at(0)}
         resources={resources}

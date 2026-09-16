@@ -43,7 +43,7 @@ module.exports = {
       moduleNameMapper,
     },
     {
-      // React Native component tests via react-test-renderer + the RN preset.
+      // React Native component tests via Test Renderer + the RN preset.
       displayName: "native",
       preset: "@react-native/jest-preset",
       testMatch: ["<rootDir>/packages/native/src/**/*.test.tsx"],

@@ -64,7 +64,7 @@ describe("TimeGrid midnight drag", () => {
     animatedReactionHarness().__reactions.length = 0;
   });
 
-  it("commits an overnight move and exposes only the clipped source height", () => {
+  it("commits an overnight move and exposes only the clipped source height", async () => {
     const onDragEvent = jest.fn();
     let observedBoxHeight: { value: number } | undefined;
     const ProbeEvent = ({ boxHeight, continuesBefore }: RenderEventArgs<WithId>) => {
@@ -77,7 +77,7 @@ describe("TimeGrid midnight drag", () => {
       start: new Date(2026, 0, 6, 19, 0, 0),
       end: new Date(2026, 0, 6, 23, 0, 0),
     };
-    const { getAllByText } = render(
+    const { getAllByText } = await render(
       <TimeGrid
         mode="week"
         date={new Date(2026, 0, 6, 12, 0, 0)}
@@ -94,7 +94,7 @@ describe("TimeGrid midnight drag", () => {
     );
     const move = moveGestureHarness();
 
-    act(() => {
+    await act(() => {
       move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 });
       move.onUpdate?.({ translationX: 0, translationY: 1200, absoluteX: 200, absoluteY: 1500 });
       animatedReactionHarness().__flushAnimatedReactions();
@@ -104,7 +104,7 @@ describe("TimeGrid midnight drag", () => {
     // source renderer receives the same 32px minimum as its clipped wrapper.
     expect(observedBoxHeight?.value).toBe(32);
 
-    act(() => {
+    await act(() => {
       move.onEnd?.({ translationX: 0, translationY: 1200 });
       move.onFinalize?.();
       animatedReactionHarness().__flushAnimatedReactions();
@@ -119,7 +119,7 @@ describe("TimeGrid midnight drag", () => {
 
   it.each([0, 1, 2])(
     "moves every multi-day preview segment when segment %i is grabbed",
-    (segment) => {
+    async (segment) => {
       const trip: CalendarEvent<WithId> = {
         id: "trip",
         title: "Trip",
@@ -148,17 +148,17 @@ describe("TimeGrid midnight drag", () => {
           onDragEvent={onDragEvent}
         />
       );
-      const { getAllByTestId, queryAllByTestId, rerender, UNSAFE_getAllByType } = render(
+      const { getAllByTestId, queryAllByTestId, rerender, getAllByText } = await render(
         grid([trip]),
       );
       const move = moveGestureHarness(segment);
-      act(() => move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 }));
+      await act(() => move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 }));
       expect(
         getAllByTestId("multi-day-move-preview", { includeHiddenElements: true }),
       ).toHaveLength(7);
       const previews = observed.slice(-7);
       const translationX = Dimensions.get("window").width / 7;
-      act(() => {
+      await act(() => {
         move.onUpdate?.({ translationX, translationY: 48, absoluteX: 300, absoluteY: 348 });
         animatedReactionHarness().__flushAnimatedReactions();
       });
@@ -167,13 +167,13 @@ describe("TimeGrid midnight drag", () => {
         0, 0, 288, 1152, 1056, 0, 0,
       ]);
       expect(onDragEvent).not.toHaveBeenCalled();
-      rerender(grid([{ ...trip }]));
+      await rerender(grid([{ ...trip }]));
       expect(
-        UNSAFE_getAllByType(ProbeEvent)
+        getAllByText("Trip", { includeHiddenElements: true })
           .slice(0, 3)
           .map((node) => StyleSheet.flatten(node.parent!.props.style).opacity),
       ).toEqual([0, 0, 0]);
-      act(() => {
+      await act(() => {
         move.onEnd?.({ translationX, translationY: 48 });
         move.onFinalize?.({}, true);
       });
@@ -190,17 +190,19 @@ describe("TimeGrid midnight drag", () => {
       expect(previews.map((preview) => preview.boxHeight?.value)).toEqual([
         0, 0, 288, 1152, 1056, 0, 0,
       ]);
-      rerender(grid([{ ...trip, start: new Date(2026, 0, 7, 18), end: new Date(2026, 0, 9, 22) }]));
+      await rerender(
+        grid([{ ...trip, start: new Date(2026, 0, 7, 18), end: new Date(2026, 0, 9, 22) }]),
+      );
       expect(
         queryAllByTestId("multi-day-move-preview", { includeHiddenElements: true }),
       ).toHaveLength(0);
     },
   );
 
-  it.each(["cancel", "reject"])("clears the multi-day preview on %s", (finish) => {
+  it.each(["cancel", "reject"])("clears the multi-day preview on %s", async (finish) => {
     const trip: CalendarEvent<WithId> = { ...event, end: new Date(2026, 0, 8, 10) };
     const onDragEvent = jest.fn(() => false);
-    const { queryAllByTestId } = render(
+    const { queryAllByTestId } = await render(
       <TimeGrid
         mode="week"
         date={trip.start}
@@ -216,14 +218,14 @@ describe("TimeGrid midnight drag", () => {
       />,
     );
     const move = moveGestureHarness();
-    act(() => {
+    await act(() => {
       move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 });
       move.onUpdate?.({ translationX: 0, translationY: 48, absoluteX: 200, absoluteY: 348 });
     });
     expect(
       queryAllByTestId("multi-day-move-preview", { includeHiddenElements: true }),
     ).toHaveLength(7);
-    act(() => {
+    await act(() => {
       if (finish === "reject") move.onEnd?.({ translationX: 0, translationY: 48 });
       move.onFinalize?.({}, finish === "reject");
     });
@@ -233,7 +235,7 @@ describe("TimeGrid midnight drag", () => {
     ).toHaveLength(0);
   });
 
-  it("previews the committed end when vertical movement crosses a clock change", () => {
+  it("previews the committed end when vertical movement crosses a clock change", async () => {
     const trip: CalendarEvent<WithId> = {
       id: "trip",
       title: "Trip",
@@ -247,7 +249,7 @@ describe("TimeGrid midnight drag", () => {
       observed.push(args);
       return <Text>Trip</Text>;
     };
-    render(
+    await render(
       <TimeGrid
         mode="3days"
         date={date}
@@ -263,9 +265,9 @@ describe("TimeGrid midnight drag", () => {
       />,
     );
     const move = moveGestureHarness();
-    act(() => move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 }));
+    await act(() => move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 }));
     const previews = observed.slice(-3);
-    act(() => {
+    await act(() => {
       move.onUpdate?.({ translationX: 0, translationY: 96, absoluteX: 200, absoluteY: 396 });
       move.onEnd?.({ translationX: 0, translationY: 96 });
       move.onFinalize?.({}, true);
@@ -286,10 +288,10 @@ describe("TimeGrid event updates", () => {
   // feeding `events` to the list as extraData, a committed drag/menu move leaves
   // the stale position on screen (the box only appears to move until the next
   // grab snaps it back). Guard the wiring that makes external updates repaint.
-  it("feeds the current events to the list as extraData", () => {
+  it("feeds the current events to the list as extraData", async () => {
     const date = new Date(2026, 0, 6, 12, 0, 0);
     const events = [event];
-    const { rerender, getByLabelText, queryByLabelText } = render(
+    const { rerender, getByLabelText, queryByLabelText } = await render(
       <Calendar mode="day" date={date} events={events} onChangeDate={noop} onPressEvent={noop} />,
     );
     expect((lastListProps()?.extraData as { events?: unknown })?.events).toBe(events);
@@ -301,7 +303,7 @@ describe("TimeGrid event updates", () => {
       end: new Date(2026, 0, 6, 12, 0, 0),
     };
     const movedEvents = [moved];
-    rerender(
+    await rerender(
       <Calendar
         mode="day"
         date={date}
@@ -327,8 +329,8 @@ describe("TimeGrid all-day lane", () => {
     allDay: true,
   };
 
-  it("renders the all-day lane by default", () => {
-    const { getByText } = render(
+  it("renders the all-day lane by default", async () => {
+    const { getByText } = await render(
       <Calendar
         mode="day"
         date={date}
@@ -340,8 +342,8 @@ describe("TimeGrid all-day lane", () => {
     expect(getByText("Holiday")).toBeTruthy();
   });
 
-  it("hides the lane (and its events) when showAllDayEventCell is false", () => {
-    const { queryByText } = render(
+  it("hides the lane (and its events) when showAllDayEventCell is false", async () => {
+    const { queryByText } = await render(
       <Calendar
         mode="day"
         date={date}
@@ -358,8 +360,8 @@ describe("TimeGrid all-day lane", () => {
 describe("TimeGrid business hours", () => {
   const date = new Date(2026, 0, 6, 12, 0, 0);
 
-  it("shades the closed hours around the open window (two bands)", () => {
-    const { getAllByTestId } = render(
+  it("shades the closed hours around the open window (two bands)", async () => {
+    const { getAllByTestId } = await render(
       <Calendar
         mode="day"
         date={date}
@@ -373,8 +375,8 @@ describe("TimeGrid business hours", () => {
     expect(getAllByTestId("business-hours-shade", { includeHiddenElements: true })).toHaveLength(2);
   });
 
-  it("shades the whole day when closed (null)", () => {
-    const { getAllByTestId } = render(
+  it("shades the whole day when closed (null)", async () => {
+    const { getAllByTestId } = await render(
       <Calendar
         mode="day"
         date={date}
@@ -387,8 +389,8 @@ describe("TimeGrid business hours", () => {
     expect(getAllByTestId("business-hours-shade", { includeHiddenElements: true })).toHaveLength(1);
   });
 
-  it("shades nothing without a businessHours callback", () => {
-    const { queryAllByTestId } = render(
+  it("shades nothing without a businessHours callback", async () => {
+    const { queryAllByTestId } = await render(
       <Calendar mode="day" date={date} events={[]} onChangeDate={noop} onPressEvent={noop} />,
     );
     expect(queryAllByTestId("business-hours-shade", { includeHiddenElements: true })).toHaveLength(
@@ -396,8 +398,8 @@ describe("TimeGrid business hours", () => {
     );
   });
 
-  it("hands each closed band to renderBusinessHours and drops the themed tint", () => {
-    const { getAllByTestId, getByText } = render(
+  it("hands each closed band to renderBusinessHours and drops the themed tint", async () => {
+    const { getAllByTestId, getByText } = await render(
       <Calendar
         mode="day"
         date={date}
@@ -417,9 +419,9 @@ describe("TimeGrid business hours", () => {
     }
   });
 
-  it("uses eventAccessibilityLabel to override a timed event's label", () => {
+  it("uses eventAccessibilityLabel to override a timed event's label", async () => {
     const date = new Date(2026, 0, 6, 12, 0, 0);
-    const { getByLabelText, queryByLabelText } = render(
+    const { getByLabelText, queryByLabelText } = await render(
       <Calendar
         mode="day"
         date={date}
@@ -437,9 +439,9 @@ describe("TimeGrid business hours", () => {
 describe("TimeGrid cross-page accessibility actions", () => {
   const date = new Date(2026, 0, 6, 12, 0, 0); // Tue 6 Jan 2026
 
-  it("moves an event a whole page via the screen-reader actions, keeping its time", () => {
+  it("moves an event a whole page via the screen-reader actions, keeping its time", async () => {
     const onDragEvent = jest.fn();
-    const { getByLabelText } = render(
+    const { getByLabelText } = await render(
       <Calendar
         mode="week"
         date={date}
@@ -455,19 +457,21 @@ describe("TimeGrid cross-page accessibility actions", () => {
     expect(names).toContain("move-previous-page");
 
     // "Move to next week" shifts +7 days, preserving the 09:00-10:00 time.
-    fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "move-next-page" } });
+    await fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "move-next-page" } });
     const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent<WithId>, Date, Date];
     expect(start.getTime()).toBe(new Date(2026, 0, 13, 9, 0, 0).getTime());
     expect(end.getTime()).toBe(new Date(2026, 0, 13, 10, 0, 0).getTime());
 
     // "Move to previous week" shifts -7 days from the original.
-    fireEvent(bar, "accessibilityAction", { nativeEvent: { actionName: "move-previous-page" } });
+    await fireEvent(bar, "accessibilityAction", {
+      nativeEvent: { actionName: "move-previous-page" },
+    });
     const [, prevStart] = onDragEvent.mock.calls[1] as [CalendarEvent<WithId>, Date, Date];
     expect(prevStart.getTime()).toBe(new Date(2025, 11, 30, 9, 0, 0).getTime());
   });
 
-  it("locks an event with draggable:false: no drag actions even when onDragEvent is set", () => {
-    const { getByLabelText } = render(
+  it("locks an event with draggable:false: no drag actions even when onDragEvent is set", async () => {
+    const { getByLabelText } = await render(
       <Calendar
         mode="week"
         date={date}
@@ -483,12 +487,12 @@ describe("TimeGrid cross-page accessibility actions", () => {
     expect(bar.props.accessibilityActions ?? []).toHaveLength(0);
   });
 
-  it("splits move vs resize with startEditable/durationEditable", () => {
+  it("splits move vs resize with startEditable/durationEditable", async () => {
     const names = (el: { props: { accessibilityActions?: { name: string }[] } }) =>
       (el.props.accessibilityActions ?? []).map((a) => a.name);
 
     // startEditable: false -> resize-only (no move actions, resize actions stay).
-    const moveOnly = render(
+    const moveOnly = await render(
       <Calendar
         mode="week"
         date={date}
@@ -503,7 +507,7 @@ describe("TimeGrid cross-page accessibility actions", () => {
     expect(a).toContain("extend");
 
     // durationEditable: false -> move-only (move actions stay, no resize actions).
-    const resizeless = render(
+    const resizeless = await render(
       <Calendar
         mode="week"
         date={date}
@@ -522,13 +526,13 @@ describe("TimeGrid cross-page accessibility actions", () => {
 describe("TimeGrid weekend shading", () => {
   const date = new Date(2026, 0, 6, 12, 0, 0); // Tue 6 Jan 2026 -> week has Sat + Sun
 
-  it("tints weekend columns by default and drops them with highlightWeekends=false", () => {
-    const { queryAllByTestId, rerender } = render(
+  it("tints weekend columns by default and drops them with highlightWeekends=false", async () => {
+    const { queryAllByTestId, rerender } = await render(
       <Calendar mode="week" date={date} events={[]} onChangeDate={noop} onPressEvent={noop} />,
     );
     expect(queryAllByTestId("weekend-shade")).toHaveLength(2);
 
-    rerender(
+    await rerender(
       <Calendar
         mode="week"
         date={date}
@@ -545,8 +549,8 @@ describe("TimeGrid weekend shading", () => {
 describe("TimeGrid column header", () => {
   const date = new Date(2026, 0, 6, 12, 0, 0); // Tue 6 Jan 2026
 
-  it("themes the header weekday, day number, and badge", () => {
-    const { getByText, getAllByTestId } = render(
+  it("themes the header weekday, day number, and badge", async () => {
+    const { getByText, getAllByTestId } = await render(
       <Calendar
         mode="week"
         date={date}
@@ -574,9 +578,9 @@ describe("TimeGrid column header", () => {
     expect(StyleSheet.flatten(badge.props.style).width).toBe(40);
   });
 
-  it("announces the full date on a pressable header and fires onPressDateHeader", () => {
+  it("announces the full date on a pressable header and fires onPressDateHeader", async () => {
     const onPressDateHeader = jest.fn();
-    const { getByLabelText } = render(
+    const { getByLabelText } = await render(
       <Calendar
         mode="week"
         date={date}
@@ -587,13 +591,13 @@ describe("TimeGrid column header", () => {
       />,
     );
     const { fireEvent } = require("@testing-library/react-native");
-    fireEvent.press(getByLabelText("Tuesday 6 January"));
+    await fireEvent.press(getByLabelText("Tuesday 6 January"));
     expect(onPressDateHeader).toHaveBeenCalledTimes(1);
     expect((onPressDateHeader.mock.calls[0][0] as Date).getDate()).toBe(6);
   });
 
-  it("exposes each day column as a labelled header when not interactive", () => {
-    const { getByRole } = render(
+  it("exposes each day column as a labelled header when not interactive", async () => {
+    const { getByRole } = await render(
       <Calendar mode="week" date={date} events={[]} onChangeDate={noop} onPressEvent={noop} />,
     );
     // A screen reader still perceives the column's date (previously the static
@@ -616,8 +620,8 @@ describe("TimeGrid slot styling", () => {
     onPressEvent: noop,
   });
 
-  it("passes slot classes to the header and hour labels, dropping their themed styles", () => {
-    const { UNSAFE_getAllByProps, getAllByText } = render(
+  it("passes slot classes to the header and hour labels, dropping their themed styles", async () => {
+    const { container, getAllByText } = await render(
       <TimeGrid
         {...gridProps()}
         classNames={{ hourLabel: "text-slate-400", columnHeaderWeekday: "uppercase" }}
@@ -629,11 +633,13 @@ describe("TimeGrid slot styling", () => {
     const flat = StyleSheet.flatten(hourLabel.props.style) as Record<string, unknown>;
     expect(flat.color).toBeUndefined();
     expect(flat.width).toBeGreaterThan(0);
-    expect(UNSAFE_getAllByProps({ className: "uppercase" }).length).toBeGreaterThan(0);
+    expect(
+      container.queryAll((node) => node.props.className === "uppercase").length,
+    ).toBeGreaterThan(0);
   });
 
-  it("merges per-slot style overrides over the themed look", () => {
-    const { getAllByText } = render(
+  it("merges per-slot style overrides over the themed look", async () => {
+    const { getAllByText } = await render(
       <TimeGrid {...gridProps()} styles={{ hourLabel: { color: "tomato" } }} />,
     );
     const hourLabel = getAllByText("06:00")[0];
@@ -672,27 +678,27 @@ describe("TimeGrid event box sizing", () => {
     return { ProbeEvent, boxHeight: () => observed?.value };
   };
 
-  it("floors a short event's boxHeight at 32px by default", () => {
+  it("floors a short event's boxHeight at 32px by default", async () => {
     const { ProbeEvent, boxHeight } = probe();
-    render(<TimeGrid {...gridProps()} renderEvent={ProbeEvent} />);
+    await render(<TimeGrid {...gridProps()} renderEvent={ProbeEvent} />);
     expect(boxHeight()).toBe(32);
   });
 
-  it("minEventHeight lowers the floor so boxHeight follows the duration", () => {
+  it("minEventHeight lowers the floor so boxHeight follows the duration", async () => {
     const { ProbeEvent, boxHeight } = probe();
-    render(<TimeGrid {...gridProps()} renderEvent={ProbeEvent} minEventHeight={0} />);
+    await render(<TimeGrid {...gridProps()} renderEvent={ProbeEvent} minEventHeight={0} />);
     expect(boxHeight()).toBe(12);
   });
 
-  it("minEventHeight can raise the floor too", () => {
+  it("minEventHeight can raise the floor too", async () => {
     const { ProbeEvent, boxHeight } = probe();
-    render(<TimeGrid {...gridProps()} renderEvent={ProbeEvent} minEventHeight={40} />);
+    await render(<TimeGrid {...gridProps()} renderEvent={ProbeEvent} minEventHeight={40} />);
     expect(boxHeight()).toBe(40);
   });
 
-  it("insets the event box by eventGap (default 2) and lets 0 fill the slot", () => {
-    const boxPadding = (eventGap?: number) => {
-      const { UNSAFE_getAllByProps } = render(
+  it("insets the event box by eventGap (default 2) and lets 0 fill the slot", async () => {
+    const boxPadding = async (eventGap?: number) => {
+      const { container } = await render(
         <TimeGrid
           {...gridProps()}
           renderEvent={DefaultEvent}
@@ -700,17 +706,17 @@ describe("TimeGrid event box sizing", () => {
           eventGap={eventGap}
         />,
       );
-      const [box] = UNSAFE_getAllByProps({ className: "event-slot" });
+      const [box] = container.queryAll((node) => node.props.className === "event-slot");
       return (StyleSheet.flatten(box.props.style) as Record<string, unknown>).padding;
     };
-    expect(boxPadding()).toBe(2);
-    expect(boxPadding(0)).toBe(0);
-    expect(boxPadding(6)).toBe(6);
+    expect(await boxPadding()).toBe(2);
+    expect(await boxPadding(0)).toBe(0);
+    expect(await boxPadding(6)).toBe(6);
   });
 
-  it("Calendar forwards minEventHeight and eventGap to the grid", () => {
+  it("Calendar forwards minEventHeight and eventGap to the grid", async () => {
     const { ProbeEvent, boxHeight } = probe();
-    const { UNSAFE_getAllByProps } = render(
+    const { container } = await render(
       <Calendar
         mode="day"
         date={date}
@@ -724,7 +730,7 @@ describe("TimeGrid event box sizing", () => {
       />,
     );
     expect(boxHeight()).toBe(12);
-    const [box] = UNSAFE_getAllByProps({ className: "event-slot" });
+    const [box] = container.queryAll((node) => node.props.className === "event-slot");
     expect((StyleSheet.flatten(box.props.style) as Record<string, unknown>).padding).toBe(0);
   });
 });
@@ -743,31 +749,33 @@ describe("TimeGrid paged header", () => {
     onPressEvent: noop,
   });
 
-  it("renders the day header inside the page, so it pages with the columns", () => {
-    const { getByTestId } = render(<TimeGrid {...base()} />);
+  it("renders the day header inside the page, so it pages with the columns", async () => {
+    const { getByTestId } = await render(<TimeGrid {...base()} />);
     const paged = getByTestId("paged-header");
     // The weekday/date columns live inside the paged header, above the band.
     expect(within(paged).getByRole("header", { name: /Tuesday 6 January/ })).toBeTruthy();
   });
 
-  it("keeps a fixed header (no paged header) when renderHeader is supplied", () => {
-    const { queryByTestId, getByText } = render(
+  it("keeps a fixed header (no paged header) when renderHeader is supplied", async () => {
+    const { queryByTestId, getByText } = await render(
       <TimeGrid {...base()} renderHeader={() => <Text>custom header</Text>} />,
     );
     expect(queryByTestId("paged-header")).toBeNull();
     expect(getByText("custom header")).toBeTruthy();
   });
 
-  it("shows the week number in the hour-column corner, not a fixed row", () => {
-    const { getByTestId } = render(<TimeGrid {...base()} showWeekNumber weekNumberPrefix="W" />);
+  it("shows the week number in the hour-column corner, not a fixed row", async () => {
+    const { getByTestId } = await render(
+      <TimeGrid {...base()} showWeekNumber weekNumberPrefix="W" />,
+    );
     // ISO week of the visible Monday-start week containing 6 Jan 2026 is 2.
     expect(within(getByTestId("hour-gutter")).getByText("W2")).toBeTruthy();
   });
 
-  it("drops the paged header (and its offset) when a custom header is fixed", () => {
+  it("drops the paged header (and its offset) when a custom header is fixed", async () => {
     const flat = (node: { props: Record<string, unknown> }) =>
       StyleSheet.flatten(node.props.style as never) as Record<string, unknown>;
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <TimeGrid {...base()} minHour={7} maxHour={20} renderHeader={() => <Text>h</Text>} />,
     );
     // No 56px header band in the page height: empty lane + inset + 13 rows of 160.
@@ -790,7 +798,6 @@ describe("TimeGrid hour column", () => {
   });
   const flat = (node: { props: Record<string, unknown> }) =>
     (StyleSheet.flatten(node.props.style as never) ?? {}) as Record<string, unknown>;
-  const isHost = (node: { type: unknown }) => typeof node.type === "string";
   // The nearest ancestor positioned by the grid (its style carries a `top`).
   type Positioned = { props: Record<string, unknown>; parent: Positioned | null };
   const rowOf = (node: Positioned) => {
@@ -799,57 +806,59 @@ describe("TimeGrid hour column", () => {
     return current!;
   };
 
-  it("draws the hour labels once, in the column beside the pager", () => {
-    const { getByTestId, getAllByText } = render(<TimeGrid {...gridProps()} />);
+  it("draws the hour labels once, in the column beside the pager", async () => {
+    const { getByTestId, getAllByText } = await render(<TimeGrid {...gridProps()} />);
     const gutter = getByTestId("hour-gutter");
     expect(getAllByText("06:00")).toHaveLength(1);
     expect(within(gutter).getAllByText("06:00")).toHaveLength(1);
     expect(flat(gutter).width).toBe(56);
   });
 
-  it("renders hourComponent in the hour column only", () => {
-    const { getByTestId, getAllByText } = render(
+  it("renders hourComponent in the hour column only", async () => {
+    const { getByTestId, getAllByText } = await render(
       <TimeGrid {...gridProps()} hourComponent={(hour) => <Text>{`custom-${hour}`}</Text>} />,
     );
     expect(getAllByText("custom-6")).toHaveLength(1);
     expect(within(getByTestId("hour-gutter")).getAllByText("custom-6")).toHaveLength(1);
   });
 
-  it("renders no hour column, and no labels, when hours are hidden", () => {
-    const { queryByTestId, queryByText } = render(<TimeGrid {...gridProps()} hideHours />);
+  it("renders no hour column, and no labels, when hours are hidden", async () => {
+    const { queryByTestId, queryByText } = await render(<TimeGrid {...gridProps()} hideHours />);
     expect(queryByTestId("hour-gutter")).toBeNull();
     expect(queryByText("06:00")).toBeNull();
   });
 
-  it("lays the day columns out from the pager's left edge", () => {
-    const { UNSAFE_getAllByProps } = render(
+  it("lays the day columns out from the pager's left edge", async () => {
+    const { container } = await render(
       <TimeGrid {...gridProps()} classNames={{ event: "event-slot" }} />,
     );
-    const [box] = UNSAFE_getAllByProps({ className: "event-slot" });
+    const [box] = container.queryAll((node) => node.props.className === "event-slot");
     // Tuesday is the second column of a Monday-start week; the hour column sits
     // outside the pager, so the columns share the remaining width.
     expect(flat(box).left).toBeCloseTo((Dimensions.get("window").width - 56) / 7);
   });
 
-  it("keeps every hour line inside the page and none in the hour column", () => {
-    const { UNSAFE_getAllByProps, getByTestId } = render(
+  it("keeps every hour line inside the page and none in the hour column", async () => {
+    const { container, getByTestId } = await render(
       <TimeGrid {...gridProps()} classNames={{ gridLines: "grid-line" }} />,
     );
-    expect(UNSAFE_getAllByProps({ className: "grid-line" }).filter(isHost)).toHaveLength(24);
+    expect(container.queryAll((node) => node.props.className === "grid-line")).toHaveLength(24);
     expect(
-      within(getByTestId("hour-gutter")).UNSAFE_queryAllByProps({ className: "grid-line" }),
+      getByTestId("hour-gutter").queryAll((node) => node.props.className === "grid-line", {
+        includeSelf: true,
+      }),
     ).toHaveLength(0);
   });
 
-  it("starts the labels and the lines from the same origin in a windowed grid", () => {
-    const { getByTestId, getAllByText, queryByText, UNSAFE_getAllByProps } = render(
+  it("starts the labels and the lines from the same origin in a windowed grid", async () => {
+    const { getByTestId, getAllByText, queryByText, container } = await render(
       <TimeGrid {...gridProps()} minHour={7} maxHour={20} classNames={{ gridLines: "line" }} />,
     );
     // 13 labels, 07:00 first at the top of the column and 06:00 absent.
     expect(within(getByTestId("hour-gutter")).getAllByText(/^\d\d:00$/)).toHaveLength(13);
     expect(queryByText("06:00")).toBeNull();
     expect(flat(rowOf(getAllByText("07:00")[0])).top).toBe(0);
-    const [firstLine] = UNSAFE_getAllByProps({ className: "line" }).filter(isHost);
+    const [firstLine] = container.queryAll((node) => node.props.className === "line");
     expect(flat(firstLine).top).toBe(0);
     // The one hour window sizes the scroll content: the paged day header, the
     // empty all-day band, the label inset, then 13 rows of 48px. The page keeps a
@@ -858,26 +867,26 @@ describe("TimeGrid hour column", () => {
     expect(flat(getByTestId("time-grid-page")).height).toBe(56 + 12 + 13 * 160);
   });
 
-  it("starts the first column at the pager's left edge when hours are hidden", () => {
-    const { UNSAFE_getAllByProps } = render(
+  it("starts the first column at the pager's left edge when hours are hidden", async () => {
+    const { container } = await render(
       <TimeGrid {...gridProps()} hideHours classNames={{ event: "event-slot" }} />,
     );
-    const [box] = UNSAFE_getAllByProps({ className: "event-slot" });
+    const [box] = container.queryAll((node) => node.props.className === "event-slot");
     expect(flat(box).left).toBeCloseTo(Dimensions.get("window").width / 7);
   });
 
-  it("styles the hour column through the hourGutter slot", () => {
-    const { getByTestId } = render(
+  it("styles the hour column through the hourGutter slot", async () => {
+    const { getByTestId } = await render(
       <TimeGrid {...gridProps()} styles={{ hourGutter: { backgroundColor: "white" } }} />,
     );
     expect(flat(getByTestId("hour-gutter")).backgroundColor).toBe("white");
   });
 
-  it("scrolls the hour column and the pages in one seeded scroll view", () => {
-    const { UNSAFE_getAllByProps } = render(
+  it("scrolls the hour column and the pages in one seeded scroll view", async () => {
+    const { container } = await render(
       <TimeGrid {...gridProps()} hourHeight={48} scrollOffsetMinutes={8 * 60} />,
     );
-    const scrollers = UNSAFE_getAllByProps({ scrollEventThrottle: 16 }).filter(isHost);
+    const scrollers = container.queryAll((node) => node.props.scrollEventThrottle === 16);
     expect(scrollers).toHaveLength(1);
     expect(scrollers[0].props.contentOffset).toEqual({ x: 0, y: 384 });
     const scroller = within(scrollers[0]);
@@ -885,7 +894,7 @@ describe("TimeGrid hour column", () => {
     expect(scroller.getAllByLabelText(/Standup/)).toHaveLength(1);
   });
 
-  it("gives each page an all-day band that rides the scroll offset and follows its lane", () => {
+  it("gives each page an all-day band that rides the scroll offset and follows its lane", async () => {
     const trip: CalendarEvent<WithId> = {
       id: "trip",
       title: "Trip",
@@ -903,10 +912,10 @@ describe("TimeGrid hour column", () => {
         ampm={ampm}
       />
     );
-    const { UNSAFE_getAllByProps, getByTestId, getAllByLabelText, rerender } = render(grid(false));
+    const { container, getByTestId, getAllByLabelText, rerender } = await render(grid(false));
     // The lane lives inside the page, so it pages with the columns; the label
     // sits once in the hour column.
-    const [scroller] = UNSAFE_getAllByProps({ scrollEventThrottle: 16 }).filter(isHost);
+    const [scroller] = container.queryAll((node) => node.props.scrollEventThrottle === 16);
     expect(getAllByLabelText(/Trip/)).toHaveLength(1);
     expect(within(scroller).getAllByLabelText(/Trip/)).toHaveLength(1);
     // The "all-day" label is off by default.
@@ -917,22 +926,22 @@ describe("TimeGrid hour column", () => {
     expect(flat(band).height).toBe(1);
     expect(flat(band).transform).toEqual([{ translateY: 384 }]);
     // The page reports its lane's natural height; the band and the page follow.
-    const [lane] = UNSAFE_getAllByProps({ className: "lane" }).filter(isHost);
-    fireEvent(lane, "layout", { nativeEvent: { layout: { height: 46 } } });
-    rerender(grid(true));
+    const [lane] = container.queryAll((node) => node.props.className === "lane");
+    await fireEvent(lane, "layout", { nativeEvent: { layout: { height: 46 } } });
+    await rerender(grid(true));
     expect(flat(getByTestId("all-day-band")).height).toBe(46);
     expect(flat(getByTestId("time-grid-hours")).height).toBe(56 + 46 + 12 + 24 * 48);
     // The fixed page height grows with the tallest lane seen.
     expect(flat(getByTestId("time-grid-page")).height).toBe(56 + 46 + 12 + 24 * 160);
     // A week with no all-day events reports zero and the band collapses to its
     // 1px floor; the page keeps the tallest lane it has seen.
-    fireEvent(lane, "layout", { nativeEvent: { layout: { height: 0 } } });
-    rerender(grid(false));
+    await fireEvent(lane, "layout", { nativeEvent: { layout: { height: 0 } } });
+    await rerender(grid(false));
     expect(flat(getByTestId("all-day-band")).height).toBe(1);
     expect(flat(getByTestId("time-grid-page")).height).toBe(56 + 46 + 12 + 24 * 160);
   });
 
-  it("renders no all-day columns for a week whose all-day events fall elsewhere", () => {
+  it("renders no all-day columns for a week whose all-day events fall elsewhere", async () => {
     const away: CalendarEvent<WithId> = {
       id: "away",
       title: "Away",
@@ -940,7 +949,7 @@ describe("TimeGrid hour column", () => {
       end: new Date(2026, 1, 4),
       allDay: true,
     };
-    const { UNSAFE_queryAllByProps } = render(
+    const { container } = await render(
       <TimeGrid
         mode="week"
         date={new Date(2026, 0, 6, 12, 0, 0)}
@@ -956,13 +965,13 @@ describe("TimeGrid hour column", () => {
     );
     // The lane itself renders (it reports its height), but with no columns to
     // pad it, so the week measures as empty rather than as a row of padding.
-    expect(UNSAFE_queryAllByProps({ className: "lane" }).filter(isHost)).toHaveLength(1);
-    expect(UNSAFE_queryAllByProps({ className: "col" }).filter(isHost)).toHaveLength(0);
+    expect(container.queryAll((node) => node.props.className === "lane")).toHaveLength(1);
+    expect(container.queryAll((node) => node.props.className === "col")).toHaveLength(0);
   });
 });
 
 describe("TimeGrid all-day band during a swipe", () => {
-  it("interpolates the band's height between the outgoing and incoming pages", () => {
+  it("interpolates the band's height between the outgoing and incoming pages", async () => {
     const trip: CalendarEvent<WithId> = {
       id: "trip",
       title: "Trip",
@@ -985,14 +994,12 @@ describe("TimeGrid all-day band during a swipe", () => {
         ampm={ampm}
       />
     );
-    const { UNSAFE_getAllByProps, getByTestId, rerender } = render(grid(false));
+    const { container, getByTestId, rerender } = await render(grid(false));
     const flat = (node: { props: Record<string, unknown> }) =>
       StyleSheet.flatten(node.props.style as never) as Record<string, unknown>;
-    const [lane] = UNSAFE_getAllByProps({ className: "lane" }).filter(
-      (node) => typeof node.type === "string",
-    );
-    fireEvent(lane, "layout", { nativeEvent: { layout: { height: 64 } } });
-    rerender(grid(true));
+    const [lane] = container.queryAll((node) => node.props.className === "lane");
+    await fireEvent(lane, "layout", { nativeEvent: { layout: { height: 64 } } });
+    await rerender(grid(true));
     expect(flat(getByTestId("all-day-band")).height).toBe(64);
     // The list keeps its offset on the UI thread. Three quarters of the way in
     // from the previous page (unmeasured, so no height) the band is three
@@ -1003,7 +1010,7 @@ describe("TimeGrid all-day band during a swipe", () => {
     };
     const pageWidth = listProps.getFixedItemSize();
     listProps.sharedValues.scrollOffset.value = (179 + 0.75) * pageWidth;
-    rerender(grid(false));
+    await rerender(grid(false));
     expect(flat(getByTestId("all-day-band")).height).toBeCloseTo(64 * 0.75);
   });
 });
@@ -1015,10 +1022,10 @@ describe("TimeGrid fast-fling repaint", () => {
     });
   };
 
-  const settle = (x: number) => {
+  const settle = async (x: number) => {
     const onEnd = (lastListProps() as { onMomentumScrollEnd?: (e: unknown) => void })
       .onMomentumScrollEnd;
-    act(() => onEnd?.({ nativeEvent: { contentOffset: { x } } }));
+    await act(() => onEnd?.({ nativeEvent: { contentOffset: { x } } }));
   };
 
   beforeEach(() => {
@@ -1026,7 +1033,7 @@ describe("TimeGrid fast-fling repaint", () => {
   });
 
   it("re-anchors the list to the page the fling settled on", async () => {
-    render(
+    await render(
       <TimeGrid
         mode="week"
         date={new Date(2026, 0, 6, 12, 0, 0)}
@@ -1040,7 +1047,7 @@ describe("TimeGrid fast-fling repaint", () => {
       />,
     );
     const pageWidth = (lastListProps() as { getFixedItemSize: () => number }).getFixedItemSize();
-    settle(5 * pageWidth);
+    await settle(5 * pageWidth);
     await flushFrame();
     const calls = (globalThis as { __scrollToIndexCalls?: { index: number }[] })
       .__scrollToIndexCalls;
@@ -1048,7 +1055,7 @@ describe("TimeGrid fast-fling repaint", () => {
   });
 
   it("clamps an overscrolled settle to the page window", async () => {
-    render(
+    await render(
       <TimeGrid
         mode="week"
         date={new Date(2026, 0, 6, 12, 0, 0)}
@@ -1063,16 +1070,16 @@ describe("TimeGrid fast-fling repaint", () => {
     );
     const pageCount = (lastListProps() as { data: unknown[] }).data.length;
     // A rubber-band overscroll past the last page must not pass an out-of-range index.
-    settle(1e9);
+    await settle(1e9);
     await flushFrame();
     const calls = (globalThis as { __scrollToIndexCalls?: { index: number }[] })
       .__scrollToIndexCalls;
     expect(calls?.at(-1)).toEqual({ index: pageCount - 1, animated: false });
   });
 
-  it("commits the page a fling settles on, even one viewability never reported", () => {
+  it("commits the page a fling settles on, even one viewability never reported", async () => {
     const onChangeDate = jest.fn();
-    render(
+    await render(
       <TimeGrid
         mode="week"
         date={new Date(2026, 0, 6, 12, 0, 0)}
@@ -1089,7 +1096,7 @@ describe("TimeGrid fast-fling repaint", () => {
     const pageWidth = list.getFixedItemSize();
     // Rest 60% into the next page: under the 90% viewability threshold, so only
     // the settle can report it.
-    settle((list.initialScrollIndex + 0.6) * pageWidth);
+    await settle((list.initialScrollIndex + 0.6) * pageWidth);
     expect(onChangeDate).toHaveBeenCalledTimes(1);
     const [committed] = onChangeDate.mock.calls[0] as [Date];
     expect([committed.getFullYear(), committed.getMonth(), committed.getDate()]).toEqual([
@@ -1097,9 +1104,9 @@ describe("TimeGrid fast-fling repaint", () => {
     ]);
   });
 
-  it("does not re-commit a settle on the page already shown", () => {
+  it("does not re-commit a settle on the page already shown", async () => {
     const onChangeDate = jest.fn();
-    render(
+    await render(
       <TimeGrid
         mode="week"
         date={new Date(2026, 0, 6, 12, 0, 0)}
@@ -1113,7 +1120,7 @@ describe("TimeGrid fast-fling repaint", () => {
       />,
     );
     const list = lastListProps() as { getFixedItemSize: () => number; initialScrollIndex: number };
-    settle(list.initialScrollIndex * list.getFixedItemSize());
+    await settle(list.initialScrollIndex * list.getFixedItemSize());
     expect(onChangeDate).not.toHaveBeenCalled();
   });
 });
@@ -1129,7 +1136,7 @@ describe("TimeGrid cross-week drop", () => {
     jest.useRealTimers();
   });
 
-  it("maps the lifted ghost's pager-local position to a day column and time", () => {
+  it("maps the lifted ghost's pager-local position to a day column and time", async () => {
     const onDragEvent = jest.fn();
     const onChangeDate = jest.fn();
     const grid = (date: Date) => (
@@ -1147,15 +1154,15 @@ describe("TimeGrid cross-week drop", () => {
         onDragEvent={onDragEvent}
       />
     );
-    const { rerender } = render(grid(new Date(2026, 0, 6, 12, 0, 0)));
+    const { rerender } = await render(grid(new Date(2026, 0, 6, 12, 0, 0)));
     const move = moveGestureHarness();
     // Grab the box 10px in, then hold the finger inside the pager's right edge zone.
-    act(() => {
+    await act(() => {
       move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 });
       move.onUpdate?.({ translationX: 535, translationY: 0, absoluteX: 735, absoluteY: 750 });
     });
     // The edge dwell lifts the event into the floating ghost and pages the view.
-    act(() => {
+    await act(() => {
       jest.advanceTimersByTime(600);
     });
     expect(onChangeDate).toHaveBeenCalledWith(new Date(2026, 0, 12));
@@ -1164,8 +1171,8 @@ describe("TimeGrid cross-week drop", () => {
     expect((lastListProps() as { scrollEnabled?: boolean }).scrollEnabled).toBe(true);
     // A controlled app advances the page in response, so the drop's target week
     // becomes Jan 12-18 (not the un-advanced Jan 5-11).
-    rerender(grid(new Date(2026, 0, 12)));
-    act(() => {
+    await rerender(grid(new Date(2026, 0, 12)));
+    await act(() => {
       move.onFinalize?.({}, true);
     });
     // The ghost's left edge is 725px into the pager (past the last of seven
@@ -1201,9 +1208,9 @@ describe("TimeGrid short-event press", () => {
     chains().length = 0;
   });
 
-  it("presses the event from a tap on either resize handle", () => {
+  it("presses the event from a tap on either resize handle", async () => {
     const onPressEvent = jest.fn();
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <TimeGrid
         mode="week"
         date={new Date(2026, 0, 6, 12, 0, 0)}
@@ -1237,10 +1244,10 @@ describe("TimeGrid short-event press", () => {
     expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "brief" }));
   });
 
-  it("long-presses a handle on an event that a long press cannot move", () => {
+  it("long-presses a handle on an event that a long press cannot move", async () => {
     const onLongPressEvent = jest.fn();
     const pinned: CalendarEvent<WithId> = { ...brief, startEditable: false };
-    render(
+    await render(
       <TimeGrid
         mode="week"
         date={new Date(2026, 0, 6, 12, 0, 0)}
@@ -1293,8 +1300,8 @@ describe("TimeGrid background events", () => {
     />
   );
 
-  it("shades a background event without rendering it as an event", () => {
-    const { getByTestId, queryByText } = render(grid({}));
+  it("shades a background event without rendering it as an event", async () => {
+    const { getByTestId, queryByText } = await render(grid({}));
     // The default band is hidden from assistive tech, so ask for hidden elements.
     const band = getByTestId("background-event-shade", { includeHiddenElements: true });
     expect(flat(band).pointerEvents).toBe("none");
@@ -1302,10 +1309,10 @@ describe("TimeGrid background events", () => {
     expect(queryByText("Blocked")).toBeNull();
   });
 
-  it("renders a background event through the component and lets it press", () => {
+  it("renders a background event through the component and lets it press", async () => {
     const onPressEvent = jest.fn();
     const onLongPressEvent = jest.fn();
-    const { getByTestId, getByText } = render(
+    const { getByTestId, getByText } = await render(
       grid({ renderBackgroundEvent: BlockedBand, onPressEvent, onLongPressEvent }),
     );
     expect(getByText("Blocked")).toBeTruthy();
@@ -1313,13 +1320,13 @@ describe("TimeGrid background events", () => {
     expect(flat(band).pointerEvents).toBe("box-none");
     // The themed tint gives way to the component's own look.
     expect(flat(band).backgroundColor).toBeUndefined();
-    fireEvent.press(getByTestId("bg-press"));
+    await fireEvent.press(getByTestId("bg-press"));
     expect(onPressEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "blocked" }));
-    fireEvent(getByTestId("bg-press"), "longPress");
+    await fireEvent(getByTestId("bg-press"), "longPress");
     expect(onLongPressEvent).toHaveBeenCalledWith(expect.objectContaining({ id: "blocked" }));
   });
 
-  it("tells the component when a multi-day background continues past the column", () => {
+  it("tells the component when a multi-day background continues past the column", async () => {
     const span: CalendarEvent<WithId> = {
       id: "span",
       title: "Span",
@@ -1330,7 +1337,9 @@ describe("TimeGrid background events", () => {
     const Edges = ({ continuesBefore, continuesAfter }: RenderEventArgs<WithId>) => (
       <Text>{`${continuesBefore ? "<" : "-"}${continuesAfter ? ">" : "-"}`}</Text>
     );
-    const { getByText } = render(grid({ events: [span, event], renderBackgroundEvent: Edges }));
+    const { getByText } = await render(
+      grid({ events: [span, event], renderBackgroundEvent: Edges }),
+    );
     expect(getByText("->")).toBeTruthy(); // Jan 5 runs on into Jan 6
     expect(getByText("<>")).toBeTruthy(); // Jan 6 is covered end to end
     expect(getByText("<-")).toBeTruthy(); // Jan 7 carries the tail

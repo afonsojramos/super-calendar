@@ -45,7 +45,7 @@ Use pnpm or nub, not npm/npx; both install correctly from the shared `pnpm-lock.
 
 ## Tests
 
-Jest has three projects: `node` (core logic + native non-component tests), `dom` (jsdom, react-dom components), `native` (react-test-renderer + RN preset). Tests import `@super-calendar/core` by name, resolved to source, so no build is needed first. Add tests next to the code under `packages/*/src/**` (or `tests/**` for cross-cutting ones).
+Jest has three projects: `node` (core logic + native non-component tests), `dom` (jsdom, react-dom components), `native` (test-renderer + RN preset). Native tests use Testing Library 14: await rendering, events, and updates, and query host elements. Tests import `@super-calendar/core` by name, resolved to source, so no build is needed first. Add tests next to the code under `packages/*/src/**` (or `tests/**` for cross-cutting ones).
 
 ## Examples
 

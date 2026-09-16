@@ -8,44 +8,46 @@ const events: CalendarEvent[] = [
 ];
 
 describe("YearView", () => {
-  it("renders all twelve months of the anchor year", () => {
-    const { getByLabelText } = render(<YearView date={new Date(2026, 6, 20)} weekStartsOn={1} />);
+  it("renders all twelve months of the anchor year", async () => {
+    const { getByLabelText } = await render(
+      <YearView date={new Date(2026, 6, 20)} weekStartsOn={1} />,
+    );
     expect(getByLabelText("January 2026")).toBeTruthy();
     expect(getByLabelText("December 2026")).toBeTruthy();
   });
 
-  it("fires onPressDay with the tapped day", () => {
+  it("fires onPressDay with the tapped day", async () => {
     const onPressDay = jest.fn();
-    const { getByLabelText } = render(
+    const { getByLabelText } = await render(
       <YearView date={new Date(2026, 6, 20)} weekStartsOn={1} onPressDay={onPressDay} />,
     );
-    fireEvent.press(getByLabelText(/Wednesday, 15 July 2026/));
+    await fireEvent.press(getByLabelText(/Wednesday, 15 July 2026/));
     expect(onPressDay).toHaveBeenCalledTimes(1);
     expect(onPressDay.mock.calls[0][0].getDate()).toBe(15);
     expect(onPressDay.mock.calls[0][0].getMonth()).toBe(6);
   });
 
-  it("marks days holding events and announces them", () => {
-    const { getByLabelText } = render(
+  it("marks days holding events and announces them", async () => {
+    const { getByLabelText } = await render(
       <YearView date={new Date(2026, 6, 20)} weekStartsOn={1} events={events} />,
     );
     expect(getByLabelText(/15 July 2026.*has events/)).toBeTruthy();
   });
 
-  it("fires onPressMonth from a month title", () => {
+  it("fires onPressMonth from a month title", async () => {
     const onPressMonth = jest.fn();
-    const { getByLabelText } = render(
+    const { getByLabelText } = await render(
       <YearView date={new Date(2026, 6, 20)} weekStartsOn={1} onPressMonth={onPressMonth} />,
     );
-    fireEvent.press(getByLabelText("March 2026"));
+    await fireEvent.press(getByLabelText("March 2026"));
     expect(onPressMonth).toHaveBeenCalledTimes(1);
     expect(onPressMonth.mock.calls[0][0].getMonth()).toBe(2);
   });
 });
 
 describe("YearView selection", () => {
-  it("announces selected days and marks the range interior", () => {
-    const { getByLabelText } = render(
+  it("announces selected days and marks the range interior", async () => {
+    const { getByLabelText } = await render(
       <YearView
         date={new Date(2026, 6, 20)}
         weekStartsOn={1}
@@ -58,9 +60,9 @@ describe("YearView selection", () => {
     expect(getByLabelText(/Thursday, 16 July 2026$/)).toBeTruthy();
   });
 
-  it("renders days outside minDate/maxDate as unavailable and ignores their taps", () => {
+  it("renders days outside minDate/maxDate as unavailable and ignores their taps", async () => {
     const onPressDay = jest.fn();
-    const { getByLabelText } = render(
+    const { getByLabelText } = await render(
       <YearView
         date={new Date(2026, 6, 20)}
         weekStartsOn={1}
@@ -68,7 +70,7 @@ describe("YearView selection", () => {
         onPressDay={onPressDay}
       />,
     );
-    fireEvent.press(getByLabelText(/9 July 2026, unavailable/));
+    await fireEvent.press(getByLabelText(/9 July 2026, unavailable/));
     expect(onPressDay).not.toHaveBeenCalled();
   });
 });
@@ -88,10 +90,10 @@ describe("YearView drag to select", () => {
     return __gestures[__gestures.length - 12 + monthIndex].handlers;
   };
 
-  it("reports the sweep live and commits an all-day range on release", () => {
+  it("reports the sweep live and commits an all-day range on release", async () => {
     const onSelectDrag = jest.fn();
     const onCreateEvent = jest.fn();
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <YearView
         date={new Date(2026, 6, 20)}
         weekStartsOn={1}
@@ -100,22 +102,22 @@ describe("YearView drag to select", () => {
       />,
     );
     // The third row (index 2) runs Mon 13 July to Sun 19 July.
-    fireEvent(getByTestId("year-month-grid-6"), "layout", { nativeEvent: { layout: GRID } });
+    await fireEvent(getByTestId("year-month-grid-6"), "layout", { nativeEvent: { layout: GRID } });
 
-    act(() => monthPan(6).onStart({ x: 50, y: 50 })); // row 2, col 2: Wed 15 July
-    act(() => monthPan(6).onUpdate({ x: 90, y: 50 })); // row 2, col 4: Fri 17 July
+    await act(() => monthPan(6).onStart({ x: 50, y: 50 })); // row 2, col 2: Wed 15 July
+    await act(() => monthPan(6).onUpdate({ x: 90, y: 50 })); // row 2, col 4: Fri 17 July
     expect(onSelectDrag).toHaveBeenLastCalledWith(new Date(2026, 6, 15), new Date(2026, 6, 17));
 
-    act(() => monthPan(6).onFinalize());
+    await act(() => monthPan(6).onFinalize());
     expect(onCreateEvent).toHaveBeenCalledTimes(1);
     const [start, end] = onCreateEvent.mock.calls[0] as [Date, Date];
     expect(start).toEqual(new Date(2026, 6, 15));
     expect(end).toEqual(new Date(2026, 6, 18));
   });
 
-  it("lets the next tap through after a sweep, which leaves no press behind", () => {
+  it("lets the next tap through after a sweep, which leaves no press behind", async () => {
     const onPressDay = jest.fn();
-    const { getByTestId, getByLabelText } = render(
+    const { getByTestId, getByLabelText } = await render(
       <YearView
         date={new Date(2026, 6, 20)}
         weekStartsOn={1}
@@ -123,22 +125,22 @@ describe("YearView drag to select", () => {
         onPressDay={onPressDay}
       />,
     );
-    fireEvent(getByTestId("year-month-grid-6"), "layout", { nativeEvent: { layout: GRID } });
+    await fireEvent(getByTestId("year-month-grid-6"), "layout", { nativeEvent: { layout: GRID } });
 
-    act(() => monthPan(6).onStart({ x: 50, y: 50 }));
-    act(() => monthPan(6).onUpdate({ x: 90, y: 50 }));
-    act(() => monthPan(6).onFinalize());
+    await act(() => monthPan(6).onStart({ x: 50, y: 50 }));
+    await act(() => monthPan(6).onUpdate({ x: 90, y: 50 }));
+    await act(() => monthPan(6).onFinalize());
 
     // A pan never produces a press, so nothing consumed a "swallow the next tap"
     // flag; the tap after the sweep is a fresh interaction.
-    fireEvent.press(getByLabelText(/Monday, 20 July 2026/));
+    await fireEvent.press(getByLabelText(/Monday, 20 July 2026/));
     expect(onPressDay).toHaveBeenCalledTimes(1);
   });
 
-  it("ignores a hold that lands on a blank adjacent-month cell", () => {
+  it("ignores a hold that lands on a blank adjacent-month cell", async () => {
     const onSelectDrag = jest.fn();
     const onCreateEvent = jest.fn();
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <YearView
         date={new Date(2026, 6, 20)}
         weekStartsOn={1}
@@ -146,20 +148,20 @@ describe("YearView drag to select", () => {
         onCreateEvent={onCreateEvent}
       />,
     );
-    fireEvent(getByTestId("year-month-grid-6"), "layout", { nativeEvent: { layout: GRID } });
+    await fireEvent(getByTestId("year-month-grid-6"), "layout", { nativeEvent: { layout: GRID } });
 
     // Row 0, col 0 of July's mini month is Mon 29 June: drawn blank, so it can
     // neither anchor a sweep nor be swept onto.
-    act(() => monthPan(6).onStart({ x: 10, y: 10 }));
-    act(() => monthPan(6).onUpdate({ x: 50, y: 50 }));
-    act(() => monthPan(6).onFinalize());
+    await act(() => monthPan(6).onStart({ x: 10, y: 10 }));
+    await act(() => monthPan(6).onUpdate({ x: 50, y: 50 }));
+    await act(() => monthPan(6).onFinalize());
     expect(onSelectDrag).not.toHaveBeenCalled();
     expect(onCreateEvent).not.toHaveBeenCalled();
   });
 
-  it("keeps disabled days out of the sweep", () => {
+  it("keeps disabled days out of the sweep", async () => {
     const onCreateEvent = jest.fn();
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <YearView
         date={new Date(2026, 6, 20)}
         weekStartsOn={1}
@@ -167,15 +169,15 @@ describe("YearView drag to select", () => {
         onCreateEvent={onCreateEvent}
       />,
     );
-    fireEvent(getByTestId("year-month-grid-6"), "layout", { nativeEvent: { layout: GRID } });
+    await fireEvent(getByTestId("year-month-grid-6"), "layout", { nativeEvent: { layout: GRID } });
 
-    act(() => monthPan(6).onStart({ x: 50, y: 50 })); // Wed 15 July
-    act(() => monthPan(6).onUpdate({ x: 90, y: 50 })); // Fri 17 July, past maxDate
-    act(() => monthPan(6).onFinalize());
+    await act(() => monthPan(6).onStart({ x: 50, y: 50 })); // Wed 15 July
+    await act(() => monthPan(6).onUpdate({ x: 90, y: 50 })); // Fri 17 July, past maxDate
+    await act(() => monthPan(6).onFinalize());
     expect(onCreateEvent).not.toHaveBeenCalled();
   });
 
-  it("keeps one pan per mini month while a sweep is running", () => {
+  it("keeps one pan per mini month while a sweep is running", async () => {
     const { __gestures } = jest.requireMock("react-native-gesture-handler") as {
       __gestures: unknown[];
     };
@@ -194,25 +196,25 @@ describe("YearView drag to select", () => {
         />
       );
     }
-    const { getByTestId } = render(<Harness />);
-    fireEvent(getByTestId("year-month-grid-6"), "layout", { nativeEvent: { layout: GRID } });
+    const { getByTestId } = await render(<Harness />);
+    await fireEvent(getByTestId("year-month-grid-6"), "layout", { nativeEvent: { layout: GRID } });
 
-    act(() => monthPan(6).onStart({ x: 50, y: 50 }));
+    await act(() => monthPan(6).onStart({ x: 50, y: 50 }));
     const afterStart = __gestures.length;
-    act(() => monthPan(6).onUpdate({ x: 90, y: 50 }));
-    act(() => monthPan(6).onUpdate({ x: 110, y: 50 }));
+    await act(() => monthPan(6).onUpdate({ x: 90, y: 50 }));
+    await act(() => monthPan(6).onUpdate({ x: 110, y: 50 }));
     expect(__gestures.length).toBe(afterStart);
   });
 
-  it("commits nothing when the hold never leaves its day", () => {
+  it("commits nothing when the hold never leaves its day", async () => {
     const onCreateEvent = jest.fn();
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <YearView date={new Date(2026, 6, 20)} weekStartsOn={1} onCreateEvent={onCreateEvent} />,
     );
-    fireEvent(getByTestId("year-month-grid-6"), "layout", { nativeEvent: { layout: GRID } });
+    await fireEvent(getByTestId("year-month-grid-6"), "layout", { nativeEvent: { layout: GRID } });
 
-    act(() => monthPan(6).onStart({ x: 50, y: 50 }));
-    act(() => monthPan(6).onFinalize());
+    await act(() => monthPan(6).onStart({ x: 50, y: 50 }));
+    await act(() => monthPan(6).onFinalize());
     expect(onCreateEvent).not.toHaveBeenCalled();
   });
 });

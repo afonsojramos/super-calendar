@@ -26,10 +26,10 @@ describe("MonthList event updates", () => {
   // repaints when the list's `data` or `extraData` changes. Events supplied
   // after mount (the usual async fetch) change neither — the same bug the
   // MonthPager had (#28). Guard the wiring that makes external updates repaint.
-  it("feeds the current events to the list as extraData", () => {
+  it("feeds the current events to the list as extraData", async () => {
     const date = new Date(2026, 0, 6, 12, 0, 0);
     const initialEvents: CalendarEvent<WithId>[] = [];
-    const { rerender, getByLabelText, queryByLabelText } = render(
+    const { rerender, getByLabelText, queryByLabelText } = await render(
       <MonthList date={date} events={initialEvents} weekStartsOn={1} />,
     );
     expect((lastListProps()?.extraData as { events?: unknown })?.events).toBe(initialEvents);
@@ -44,7 +44,7 @@ describe("MonthList event updates", () => {
         title: "Standup",
       },
     ];
-    rerender(<MonthList date={date} events={fetched} weekStartsOn={1} />);
+    await rerender(<MonthList date={date} events={fetched} weekStartsOn={1} />);
 
     expect((lastListProps()?.extraData as { events?: unknown })?.events).toBe(fetched);
     expect(getByLabelText(/6 January 2026, 1 event$/)).toBeTruthy();

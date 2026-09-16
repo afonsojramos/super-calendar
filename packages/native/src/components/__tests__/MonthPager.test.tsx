@@ -27,10 +27,10 @@ describe("MonthPager event updates", () => {
   // after mount (the usual async fetch) change neither — so without feeding
   // `events` to the list as extraData, the month grid stays empty until the
   // pager remounts. Guard the wiring that makes external updates repaint.
-  it("feeds the current events to the list as extraData", () => {
+  it("feeds the current events to the list as extraData", async () => {
     const date = new Date(2026, 0, 6, 12, 0, 0);
     const initialEvents: CalendarEvent<WithId>[] = [];
-    const { rerender, getByLabelText, queryByLabelText } = render(
+    const { rerender, getByLabelText, queryByLabelText } = await render(
       <Calendar
         mode="month"
         date={date}
@@ -51,7 +51,7 @@ describe("MonthPager event updates", () => {
         title: "Standup",
       },
     ];
-    rerender(
+    await rerender(
       <Calendar
         mode="month"
         date={date}
@@ -69,15 +69,15 @@ describe("MonthPager event updates", () => {
 describe("MonthPager title", () => {
   const date = new Date(2026, 0, 6);
 
-  it("renders the built-in 'MMMM yyyy' title by default", () => {
-    const { getByText } = render(
+  it("renders the built-in 'MMMM yyyy' title by default", async () => {
+    const { getByText } = await render(
       <Calendar mode="month" date={date} events={[]} onChangeDate={noop} onPressEvent={noop} />,
     );
     expect(getByText("January 2026")).toBeTruthy();
   });
 
-  it("hides it with showTitle={false}, so an app header can own the label", () => {
-    const { queryByText } = render(
+  it("hides it with showTitle={false}, so an app header can own the label", async () => {
+    const { queryByText } = await render(
       <Calendar
         mode="month"
         date={date}
