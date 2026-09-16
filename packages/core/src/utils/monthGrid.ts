@@ -229,22 +229,20 @@ export function buildMonthGrid(month: Date, options: UseMonthGridOptions = {}): 
 
   const weeks: MonthGridWeek[] = rows.map((days) => ({
     id: days[0].toISOString(),
-    days: days.map(
-      (date): MonthGridDay => ({
+    days: days.map((date): MonthGridDay => ({
+      date,
+      id: format(date, "yyyy-MM-dd"),
+      label: format(date, "d"),
+      isCurrentMonth: isSameMonth(date, month),
+      isToday: getIsToday(date),
+      isWeekend: isWeekend(date),
+      // Shared with MonthView, so the headless grid matches the built-in view.
+      ...daySelectionState(
         date,
-        id: format(date, "yyyy-MM-dd"),
-        label: format(date, "d"),
-        isCurrentMonth: isSameMonth(date, month),
-        isToday: getIsToday(date),
-        isWeekend: isWeekend(date),
-        // Shared with MonthView, so the headless grid matches the built-in view.
-        ...daySelectionState(
-          date,
-          { selectedDates, selectedRange },
-          { minDate, maxDate, isDateDisabled },
-        ),
-      }),
-    ),
+        { selectedDates, selectedRange },
+        { minDate, maxDate, isDateDisabled },
+      ),
+    })),
   }));
 
   // Weekday labels depend only on the first row's dates (already ordered).
