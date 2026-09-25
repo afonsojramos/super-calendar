@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.11.1](https://github.com/afonsojramos/super-calendar/compare/v2.11.0...v2.11.1) (2026-09-16)
+
+
+### Bug Fixes
+
+* **native:** exclude accidental React Native releases while allowing 1.x ([2714460](https://github.com/afonsojramos/super-calendar/commit/2714460e24b327510befcb91cfdb17203f6c8a14))
+
 ## [2.11.0](https://github.com/afonsojramos/super-calendar/compare/v2.10.0...v2.11.0) (2026-09-15)
 
 
