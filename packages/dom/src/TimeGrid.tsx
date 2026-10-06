@@ -1214,7 +1214,9 @@ export function TimeGrid<T = unknown>({
           });
           const inner = (
             <>
-              <span style={VISUALLY_HIDDEN}>{dateLabel}</span>
+              <span style={VISUALLY_HIDDEN}>
+                {today ? `${dateLabel}, ${labels.today}` : dateLabel}
+              </span>
               <span
                 aria-hidden
                 {...slot("columnHeaderWeekday", { themed: { fontSize: 11, fontWeight: 600 } })}
@@ -1337,6 +1339,7 @@ export function TimeGrid<T = unknown>({
                               start: event.start,
                               end: event.end,
                               ampm,
+                              labels,
                             })
                       }
                       {...slot("allDayEvent", {
@@ -1593,6 +1596,7 @@ export function TimeGrid<T = unknown>({
                               start: pe.event.start,
                               end: pe.event.end,
                               ampm,
+                              labels,
                             })
                       }
                       onKeyDown={(e) => {

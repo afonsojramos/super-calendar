@@ -39,7 +39,11 @@ import {
   type WeekdayFormat,
   type WeekStartsOn,
 } from "@super-calendar/core";
-import { type CalendarLabels, resolveCalendarLabels } from "@super-calendar/core";
+import {
+  type CalendarLabels,
+  dayAccessibilityLabel,
+  resolveCalendarLabels,
+} from "@super-calendar/core";
 import { createSlots, dataState, type SlotDefault, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
@@ -847,11 +851,12 @@ export function MonthView<T = unknown>({
                   );
                 }
                 const band = rangeBandDefault(day, theme, fillCellOnSelection, eventsMode);
-                const label = format(
+                const dateLabel = format(
                   day.date,
                   "EEEE, d MMMM yyyy",
                   locale ? { locale } : undefined,
                 );
+                const label = dayAccessibilityLabel({ dateLabel, isToday: day.isToday, labels });
                 const dayTime = startOfDay(day.date).getTime();
                 const inCreate =
                   drag?.kind === "create" &&
@@ -907,7 +912,13 @@ export function MonthView<T = unknown>({
                       {...dayData}
                       tabIndex={keyboardDayNavigation ? (day.id === focusKey ? 0 : -1) : undefined}
                       aria-disabled={day.isDisabled || undefined}
-                      aria-label={label}
+                      aria-label={dayAccessibilityLabel({
+                        dateLabel,
+                        isToday: day.isToday,
+                        isSelected: day.isSelected,
+                        eventCount: dayEvents.length,
+                        labels,
+                      })}
                       {...dayCellProps}
                       // Dragging disables touch scroll on the cell so a swipe
                       // sketches a span (or carries an event) instead of scrolling
