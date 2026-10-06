@@ -603,8 +603,9 @@ import { fr } from "date-fns/locale";
 ```
 
 `locale` formats dates only. Screen-reader labels also add words such as
-"today", "selected" and "3 events", and the time grid shows "all-day" beside the
-lane. Pass `labels` to translate them. Keys you omit fall back to English
+"today", "selected", "3 events" and "09:00 to 10:00", draggable events offer
+actions such as "Move 15 minutes later", and the time grid shows "all-day" beside
+the lane. Pass `labels` to translate them. Keys you omit fall back to English
 (`defaultCalendarLabels`):
 
 ```tsx
@@ -618,14 +619,18 @@ const labels = {
   eventCount: (count: number) => `wydarzenia: ${count}`,
   moreEvents: (count: number) => `jeszcze ${count}`,
   allDay: "cały dzień",
+  allDayEvent: "cały dzień",
+  timeRange: (start: string, end: string) => `${start}–${end}`,
   close: "Zamknij",
 };
 
 <Calendar /* ... */ locale={pl} labels={labels} />;
 ```
 
-`MonthView`, `MonthPager`, `MonthList`, `TimeGrid` and `YearView` take the same
-`labels` prop. Define the object outside the render, or memoize it, so the
+`MonthView`, `MonthPager`, `MonthList`, `TimeGrid`, `YearView` and the native
+`ResourceTimeline` take the same `labels` prop. The
+[accessibility guide](https://super-calendar.afonsojramos.me/guides/accessibility#translating-the-labels)
+lists every key. Define the object outside the render, or memoize it, so the
 views do not re-render on every pass.
 
 Pass `isRTL` to reverse the day-column order in every view (month grid, week/day

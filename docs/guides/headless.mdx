@@ -130,6 +130,10 @@ TypeScript types for exact signatures.
 - **Event display** — `eventTimeLabel`, `eventAccessibilityLabel`,
   `titleNumberOfLines` / `titleEllipsizeMode`, `isTimeVisibleAtHeight`, `formatHour`
   (the shared time-grid hour-axis label both renderers default to).
+- **Labels** — `resolveCalendarLabels` fills a partial `labels` object with the
+  English defaults; `dayAccessibilityLabel` builds a day label from a formatted
+  date and its state words. Pass the resolved labels to `eventAccessibilityLabel`
+  to localize a custom renderer's event label the same way.
 - **Month overflow** — `monthEventCapacity` + `monthVisibleCount` decide how many
   chips fit before a "+N more" row.
 - **Business hours** — `closedHourBands(day, businessHours, minHour?, maxHour?)`
