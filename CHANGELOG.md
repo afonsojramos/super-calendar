@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.12.0](https://github.com/afonsojramos/super-calendar/compare/v2.11.1...v2.12.0) (2026-10-06)
+
+
+### Features
+
+* add labels prop to localize accessibility words and all-day text ([c968e34](https://github.com/afonsojramos/super-calendar/commit/c968e34e244f334b78addc389f88b8c5d0065d13))
+* **core:** add labels for event time ranges, all-day events and drag actions ([a524475](https://github.com/afonsojramos/super-calendar/commit/a5244759659a194919274c2116ca5b3491082f94))
+* **dom:** announce today, selection and event counts through labels ([47e10ad](https://github.com/afonsojramos/super-calendar/commit/47e10ad2f34439dab9617b51c8811ca15c73347e))
+* **native:** localize event labels and drag actions through labels ([866b460](https://github.com/afonsojramos/super-calendar/commit/866b460a9ec637c517a8f4f852f35180170fc714))
+
+
+### Bug Fixes
+
+* pass the view mode to the page move labels ([522b8bf](https://github.com/afonsojramos/super-calendar/commit/522b8bf21d9c5143f5490bd3234cc9f20a71f3ad))
+
 ## [2.11.1](https://github.com/afonsojramos/super-calendar/compare/v2.11.0...v2.11.1) (2026-09-16)
 
 
