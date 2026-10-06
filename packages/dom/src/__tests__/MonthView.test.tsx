@@ -133,6 +133,31 @@ describe("dom MonthView", () => {
       expect(getByText("Lunch")).toBeTruthy();
     });
 
+    it("announces each day's state and event count, translated with labels", () => {
+      const english = render(
+        <MonthView
+          date={new Date(2026, 6, 1)}
+          weekStartsOn={1}
+          events={events}
+          selectedDates={[new Date(2026, 6, 15)]}
+        />,
+      );
+      expect(english.getByLabelText("Wednesday, 15 July 2026, selected, 2 events")).toBeTruthy();
+      expect(english.getByLabelText("Thursday, 16 July 2026, 0 events")).toBeTruthy();
+      english.unmount();
+
+      const { getByLabelText } = render(
+        <MonthView
+          date={new Date(2026, 6, 1)}
+          weekStartsOn={1}
+          events={events}
+          selectedDates={[new Date(2026, 6, 15)]}
+          labels={{ selected: "selecionado", eventCount: (n) => `${n} eventos` }}
+        />,
+      );
+      expect(getByLabelText("Wednesday, 15 July 2026, selecionado, 2 eventos")).toBeTruthy();
+    });
+
     it("fires onPressEvent for a chip without also firing onPressDay", () => {
       const onPressEvent = jest.fn();
       const onPressDay = jest.fn();

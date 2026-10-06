@@ -1532,6 +1532,47 @@ describe("dom TimeGrid all-day label", () => {
   });
 });
 
+describe("dom TimeGrid labels", () => {
+  const meeting: CalendarEvent = {
+    title: "Reunião",
+    start: new Date(2026, 5, 26, 9),
+    end: new Date(2026, 5, 26, 10),
+  };
+  const trip: CalendarEvent = {
+    title: "Viagem",
+    start: new Date(2026, 5, 26),
+    end: new Date(2026, 5, 27),
+    allDay: true,
+  };
+  const labels = {
+    today: "hoje",
+    allDayEvent: "dia inteiro",
+    timeRange: (start: string, end: string) => `${start} até ${end}`,
+  };
+
+  it("translates the event labels and the today suffix of the column header", () => {
+    jest.useFakeTimers({ now: new Date(2026, 5, 26, 12) });
+    try {
+      const { getByLabelText, getByText } = render(
+        <TimeGrid date={day} mode="day" events={[meeting, trip]} hourHeight={48} labels={labels} />,
+      );
+      expect(getByLabelText("Reunião, 09:00 até 10:00")).toBeTruthy();
+      expect(getByLabelText("Viagem, dia inteiro")).toBeTruthy();
+      expect(getByText("Friday, 26 June 2026, hoje")).toBeTruthy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("speaks the English defaults", () => {
+    const { getByLabelText } = render(
+      <TimeGrid date={day} mode="day" events={[meeting, trip]} hourHeight={48} />,
+    );
+    expect(getByLabelText("Reunião, 09:00 to 10:00")).toBeTruthy();
+    expect(getByLabelText("Viagem, all day")).toBeTruthy();
+  });
+});
+
 describe("dom TimeGrid background band keys", () => {
   it("keeps a later band mounted when an earlier one is removed", () => {
     const mounts: string[] = [];
