@@ -23,22 +23,58 @@ event announcement with `eventAccessibilityLabel`:
 />
 ```
 
-The date part of each label follows `locale`. The words around it ("today",
-"selected", "unavailable", "3 events", "3 more events") and the "all-day"
-gutter text come from `labels`. Pass translations to localize them; keys you
-omit stay in English:
+### Translating the labels
+
+The date part of each label follows `locale`. The words around it come from
+`labels`, so pass translations to localize them. Keys you omit stay in English
+(`defaultCalendarLabels`). Define the object outside the component, or memoize
+it, so the views don't re-render on every pass:
 
 ```tsx
-<Calendar
-  locale={pl}
-  labels={{
-    today: "dzisiaj",
-    eventCount: (count) => `wydarzenia: ${count}`,
-    moreEvents: (count) => `jeszcze ${count}`,
-  }}
-  /* ... */
-/>
+import { pt } from "date-fns/locale";
+import type { CalendarLabels } from "@super-calendar/native";
+
+const labels: Partial<CalendarLabels> = {
+  today: "hoje",
+  selected: "selecionado",
+  unavailable: "indisponível",
+  hasEvents: "tem eventos",
+  eventCount: (count) => (count === 1 ? "1 evento" : `${count} eventos`),
+  moreEvents: (count) => `mais ${count} eventos`,
+  allDay: "todo o dia",
+  allDayEvent: "todo o dia",
+  timeRange: (start, end) => `${start} até ${end}`,
+  close: "Fechar",
+  moveLater: (minutes) => `Adiar ${minutes} minutos`,
+  moveEarlier: (minutes) => `Antecipar ${minutes} minutos`,
+  extend: (minutes) => `Prolongar ${minutes} minutos`,
+  shorten: (minutes) => `Encurtar ${minutes} minutos`,
+  moveToNextPage: (days) =>
+    days === 7 ? "Mover para a semana seguinte" : "Mover para o dia seguinte",
+  moveToPreviousPage: (days) =>
+    days === 7 ? "Mover para a semana anterior" : "Mover para o dia anterior",
+  moveToResource: (title) => `Mover para ${title}`,
+};
+
+<Calendar locale={pt} labels={labels} /* ... */ />;
 ```
+
+| Key                                                | Default                                         | Where it appears                                           |
+| -------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------- |
+| `today`, `selected`, `unavailable`                 | "today", "selected", "unavailable"              | Day cells and day-column headers.                          |
+| `hasEvents`                                        | "has events"                                    | Year-view days.                                            |
+| `eventCount(count)`                                | "3 events"                                      | Month-view day cells.                                      |
+| `moreEvents(count)`                                | "3 more events"                                 | The "+N more" control.                                     |
+| `close`                                            | "Close"                                         | The "+N more" popover backdrop (native).                   |
+| `allDay`                                           | "all-day"                                       | The time-grid gutter text, with `showAllDayLabel`.         |
+| `allDayEvent`                                      | "all day"                                       | An all-day event's label. `allDayLabel` wins when set.     |
+| `timeRange(start, end)`                            | "09:00 to 10:00"                                | A timed event's label.                                     |
+| `moveLater`, `moveEarlier`, `extend`, `shorten`    | "Move 15 minutes later", "Extend by 15 minutes" | Screen-reader drag actions (native).                       |
+| `moveToNextPage(days)`, `moveToPreviousPage(days)` | "Move to next week"                             | Time-grid drag actions (native). `days` is 7 in week mode. |
+| `moveToResource(title)`                            | "Move to Room A"                                | `ResourceTimeline` drag actions (native).                  |
+
+The `", "` separator and the word order are fixed. To word a whole event label
+differently, use `eventAccessibilityLabel`.
 
 ## Screen-reader actions (React Native)
 
@@ -48,7 +84,8 @@ VoiceOver and TalkBack users pick "Move 15 minutes later/earlier" or
 "Extend/Shorten by 15 minutes" from the actions rotor, and the change commits
 through the same `onDragEvent` path as a gesture. The step follows
 `dragStepMinutes`. Time-grid events and [ResourceTimeline](/guides/resource-timeline)
-bars both expose them whenever `onDragEvent` is set.
+bars both expose them whenever `onDragEvent` is set. Translate their names with
+[`labels`](#translating-the-labels).
 
 ## Keyboard (web)
 

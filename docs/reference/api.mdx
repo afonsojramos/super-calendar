@@ -43,21 +43,21 @@ pitfall this avoids.
 
 ## Events & rendering
 
-| Prop                       | Type                               | Notes                                    |
-| -------------------------- | ---------------------------------- | ---------------------------------------- |
-| `renderEvent`              | `RenderEvent<T>`                   | Render events your way, every mode.      |
-| `eventAccessibilityLabel`  | `(event, ctx) => string`           | Override an event's screen-reader label. |
-| `labels`                   | `Partial<CalendarLabels>`          | Translate screen-reader words, all-day.  |
-| `renderCustomDateForMonth` | `(date) => ReactNode`              | Month: replace the day-cell date badge.  |
-| `eventCellStyle`           | `style \| (event) => style`        | Tweak the built-in box.                  |
-| `calendarCellStyle`        | `(date) => style`                  | Per-date column/cell shading.            |
-| `businessHours`            | `(date) => { start, end } \| null` | Shade closed hours.                      |
-| `renderBusinessHours`      | `(band) => ReactNode`              | Render closed-hours bands yourself.      |
-| `renderBackgroundEvent`    | `RenderEvent`                      | Custom, pressable background bands.      |
-| `renderTimeGridHeader`     | `(days) => ReactNode`              | Replace the week/day day-header row.     |
-| `renderHeaderForMonthView` | `(weekDays) => ReactNode`          | Replace the month weekday header.        |
-| `headerComponent`          | `ReactNode`                        | Extra element between header and grid.   |
-| `keyExtractor`             | `(event, index) => string`         | Stable event keys.                       |
+| Prop                       | Type                               | Notes                                      |
+| -------------------------- | ---------------------------------- | ------------------------------------------ |
+| `renderEvent`              | `RenderEvent<T>`                   | Render events your way, every mode.        |
+| `eventAccessibilityLabel`  | `(event, ctx) => string`           | Override an event's screen-reader label.   |
+| `labels`                   | `Partial<CalendarLabels>`          | Translate screen-reader words and actions. |
+| `renderCustomDateForMonth` | `(date) => ReactNode`              | Month: replace the day-cell date badge.    |
+| `eventCellStyle`           | `style \| (event) => style`        | Tweak the built-in box.                    |
+| `calendarCellStyle`        | `(date) => style`                  | Per-date column/cell shading.              |
+| `businessHours`            | `(date) => { start, end } \| null` | Shade closed hours.                        |
+| `renderBusinessHours`      | `(band) => ReactNode`              | Render closed-hours bands yourself.        |
+| `renderBackgroundEvent`    | `RenderEvent`                      | Custom, pressable background bands.        |
+| `renderTimeGridHeader`     | `(days) => ReactNode`              | Replace the week/day day-header row.       |
+| `renderHeaderForMonthView` | `(weekDays) => ReactNode`          | Replace the month weekday header.          |
+| `headerComponent`          | `ReactNode`                        | Extra element between header and grid.     |
+| `keyExtractor`             | `(event, index) => string`         | Stable event keys.                         |
 
 ## Interactions
 
@@ -152,6 +152,10 @@ the [Date selection](/guides/selection) guide.
 `@super-calendar/core` also exports `clampMoveStartMinutes`. Use it when a custom
 time-grid drag must keep the moved start inside the visible hour window without
 shortening an event that continues past midnight.
+
+For a custom renderer that should read like the built-in ones, `resolveCalendarLabels`
+fills a partial `labels` object with the English defaults and
+`dayAccessibilityLabel` joins a formatted date with its state words.
 
 `resolveDraggedBounds` preserves elapsed duration when you pass the same minute
 delta for both edges, including across daylight saving changes. The end's local
