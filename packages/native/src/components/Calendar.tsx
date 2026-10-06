@@ -34,6 +34,7 @@ import {
   type WeekdayFormat,
   getViewDays,
 } from "@super-calendar/core";
+import type { CalendarLabels } from "@super-calendar/core";
 import { type SlotStyleProps } from "../utils/slots";
 import { YearView, type YearViewSlot } from "./YearView";
 import { Agenda, type AgendaSlot } from "./Agenda";
@@ -158,6 +159,8 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   sortedMonthView?: boolean;
   /** Month overflow label template; `{moreCount}` is replaced. Default "{moreCount} More". */
   moreLabel?: string;
+  /** Translations for the screen-reader words and gutter text; omitted keys use English. */
+  labels?: Partial<CalendarLabels>;
   /** Show dimmed adjacent-month days in the month grid. Default true. */
   showAdjacentMonths?: boolean;
   /** Ignore taps on month-cell events (day taps still fire). Default false. */
@@ -469,6 +472,7 @@ export function Calendar<T>({
   maxVisibleEventCount,
   sortedMonthView,
   moreLabel,
+  labels,
   showAdjacentMonths,
   disableMonthEventCellPress,
   weekStartsOn = 0,
@@ -641,6 +645,7 @@ export function Calendar<T>({
           hiddenDays={hiddenDays}
           weekdayFormat={weekdayFormat}
           locale={locale}
+          labels={labels}
           sortedMonthView={sortedMonthView}
           moreLabel={moreLabel}
           showAdjacentMonths={showAdjacentMonths}
@@ -687,6 +692,7 @@ export function Calendar<T>({
           weekStartsOn={weekStartsOn}
           hiddenDays={hiddenDays}
           locale={locale}
+          labels={labels}
           activeDate={activeDate}
           selectedDates={selectedDates}
           selectedRange={selectedRange}
@@ -761,6 +767,7 @@ export function Calendar<T>({
           eventGap={eventGap}
           showNowIndicator={showNowIndicator}
           locale={locale}
+          labels={labels}
           activeDate={activeDate}
           isRTL={isRTL}
           freeSwipe={freeSwipe}

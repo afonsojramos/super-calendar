@@ -436,6 +436,24 @@ describe("TimeGrid business hours", () => {
   });
 });
 
+describe("TimeGrid labels", () => {
+  it("translates the today suffix of the column header and the all-day text", async () => {
+    const { getByLabelText, getByTestId } = await render(
+      <Calendar
+        mode="day"
+        date={new Date()}
+        events={[]}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        showAllDayLabel
+        labels={{ today: "dzisiaj", allDay: "cały dzień" }}
+      />,
+    );
+    expect(getByLabelText(/, dzisiaj$/)).toBeTruthy();
+    expect(within(getByTestId("hour-gutter")).getByText("cały dzień")).toBeTruthy();
+  });
+});
+
 describe("TimeGrid cross-page accessibility actions", () => {
   const date = new Date(2026, 0, 6, 12, 0, 0); // Tue 6 Jan 2026
 

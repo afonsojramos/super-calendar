@@ -39,6 +39,7 @@ import {
   type WeekdayFormat,
   type WeekStartsOn,
 } from "@super-calendar/core";
+import { type CalendarLabels, resolveCalendarLabels } from "@super-calendar/core";
 import { createSlots, dataState, type SlotDefault, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
@@ -124,6 +125,8 @@ export interface MonthViewProps<T = unknown>
   maxVisibleEventCount?: number;
   /** Template for the overflow row; `{moreCount}` is replaced (default "{moreCount} More"). */
   moreLabel?: string;
+  /** Translations for the screen-reader words and gutter text; omitted keys use English. */
+  labels?: Partial<CalendarLabels>;
   /** Tap an event chip. */
   onPressEvent?: (event: CalendarEvent<T>) => void;
   /** Tap the "+N more" overflow row. */
@@ -481,6 +484,7 @@ export function MonthView<T = unknown>({
   eventAccessibilityLabel,
   maxVisibleEventCount = 3,
   moreLabel = "{moreCount} More",
+  labels: labelsProp,
   onPressEvent,
   onPressMore,
   selectedRange,
@@ -510,6 +514,7 @@ export function MonthView<T = unknown>({
   styles,
 }: MonthViewInternalProps<T>): ReactElement {
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
+  const labels = useMemo(() => resolveCalendarLabels(labelsProp), [labelsProp]);
   const slot = createSlots<MonthViewSlot>({ classNames, styles });
 
   // Calendar layout (date in the corner + event chips) is on whenever `events`
@@ -1065,7 +1070,7 @@ export function MonthView<T = unknown>({
                               }
                             }}
                             {...slot("more", moreButtonDefault(theme))}
-                            aria-label={`${hiddenEvents.length} more events, ${dayLabel}`}
+                            aria-label={`${labels.moreEvents(hiddenEvents.length)}, ${dayLabel}`}
                             aria-expanded={onPressMore ? undefined : moreOpenFor === day.id}
                           >
                             {moreLabel.replace("{moreCount}", String(hiddenEvents.length))}

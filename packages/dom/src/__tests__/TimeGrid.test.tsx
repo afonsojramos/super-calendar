@@ -1516,6 +1516,20 @@ describe("dom TimeGrid all-day label", () => {
     );
     expect(getByText("all-day")).toBeTruthy();
   });
+
+  it("translates the text with labels", () => {
+    const { getByText } = render(
+      <TimeGrid
+        date={day}
+        mode="day"
+        events={[trip]}
+        hourHeight={48}
+        showAllDayLabel
+        labels={{ allDay: "cały dzień" }}
+      />,
+    );
+    expect(getByText("cały dzień")).toBeTruthy();
+  });
 });
 
 describe("dom TimeGrid background band keys", () => {

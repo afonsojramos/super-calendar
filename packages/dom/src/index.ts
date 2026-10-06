@@ -63,6 +63,8 @@ export {
   type BusinessHours,
   type BusinessHoursBand,
   type CalendarEvent,
+  type CalendarLabels,
+  defaultCalendarLabels,
   type CalendarMode,
   type DateRange,
   type DateSelectionConstraints,

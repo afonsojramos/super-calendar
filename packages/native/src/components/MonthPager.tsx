@@ -34,6 +34,7 @@ import {
   getWeekDays,
   weekdayFormatToken,
 } from "@super-calendar/core";
+import type { CalendarLabels } from "@super-calendar/core";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { MonthView, type MonthViewSlot } from "./MonthView";
@@ -63,6 +64,8 @@ export type MonthPagerProps<T> = {
   locale?: Locale;
   sortedMonthView?: boolean;
   moreLabel?: string;
+  /** Translations for the screen-reader words and gutter text; omitted keys use English. */
+  labels?: Partial<CalendarLabels>;
   showAdjacentMonths?: boolean;
   highlightWeekends?: boolean;
   disableMonthEventCellPress?: boolean;
@@ -124,6 +127,7 @@ function MonthPagerInner<T>({
   locale,
   sortedMonthView,
   moreLabel,
+  labels,
   showAdjacentMonths,
   highlightWeekends,
   disableMonthEventCellPress,
@@ -318,6 +322,7 @@ function MonthPagerInner<T>({
           locale={locale}
           sortedMonthView={sortedMonthView}
           moreLabel={moreLabel}
+          labels={labels}
           showAdjacentMonths={showAdjacentMonths}
           highlightWeekends={highlightWeekends}
           disableMonthEventCellPress={disableMonthEventCellPress}
@@ -356,6 +361,7 @@ function MonthPagerInner<T>({
       locale,
       sortedMonthView,
       moreLabel,
+      labels,
       showAdjacentMonths,
       highlightWeekends,
       disableMonthEventCellPress,

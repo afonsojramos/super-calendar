@@ -602,6 +602,32 @@ import { fr } from "date-fns/locale";
 <Calendar /* ... */ locale={fr} weekStartsOn={1} />;
 ```
 
+`locale` formats dates only. Screen-reader labels also add words such as
+"today", "selected" and "3 events", and the time grid shows "all-day" beside the
+lane. Pass `labels` to translate them. Keys you omit fall back to English
+(`defaultCalendarLabels`):
+
+```tsx
+import { pl } from "date-fns/locale";
+
+const labels = {
+  today: "dzisiaj",
+  selected: "wybrany",
+  unavailable: "niedostępny",
+  hasEvents: "ma wydarzenia",
+  eventCount: (count: number) => `wydarzenia: ${count}`,
+  moreEvents: (count: number) => `jeszcze ${count}`,
+  allDay: "cały dzień",
+  close: "Zamknij",
+};
+
+<Calendar /* ... */ locale={pl} labels={labels} />;
+```
+
+`MonthView`, `MonthPager`, `MonthList`, `TimeGrid` and `YearView` take the same
+`labels` prop. Define the object outside the render, or memoize it, so the
+views do not re-render on every pass.
+
 Pass `isRTL` to reverse the day-column order in every view (month grid, week/day
 grid and the all-day lane). It's cosmetic — the hour gutter stays on the left and
 paging follows the system scroll direction — so enable React Native's

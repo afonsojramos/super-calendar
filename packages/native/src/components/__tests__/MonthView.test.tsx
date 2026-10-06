@@ -302,6 +302,51 @@ describe("MonthView built-in more popover", () => {
   });
 });
 
+describe("MonthView labels", () => {
+  const manyEvents: CalendarEvent[] = Array.from({ length: 6 }, (_, i) => ({
+    title: `Event ${i + 1}`,
+    start: new Date(2026, 5, 15, 9 + i),
+    end: new Date(2026, 5, 15, 10 + i),
+  }));
+  const labels = {
+    selected: "wybrany",
+    eventCount: (count: number) => `wydarzenia: ${count}`,
+    moreEvents: (count: number) => `jeszcze ${count}`,
+    close: "Zamknij",
+  };
+
+  it("announces day cells, the overflow and the popover backdrop in English by default", async () => {
+    const { getByLabelText, getByText } = await render(
+      <MonthView
+        {...baseProps}
+        events={manyEvents}
+        maxVisibleEventCount={2}
+        selectedDates={[new Date(2026, 5, 15)]}
+      />,
+    );
+    expect(getByLabelText("Monday, 15 June 2026, selected, 6 events")).toBeTruthy();
+    expect(getByLabelText("4 more events")).toBeTruthy();
+    await fireEvent.press(getByText(/More/));
+    expect(getByLabelText("Close")).toBeTruthy();
+  });
+
+  it("uses the translated labels", async () => {
+    const { getByLabelText, getByText } = await render(
+      <MonthView
+        {...baseProps}
+        events={manyEvents}
+        maxVisibleEventCount={2}
+        selectedDates={[new Date(2026, 5, 15)]}
+        labels={labels}
+      />,
+    );
+    expect(getByLabelText("Monday, 15 June 2026, wybrany, wydarzenia: 6")).toBeTruthy();
+    expect(getByLabelText("jeszcze 4")).toBeTruthy();
+    await fireEvent.press(getByText(/More/));
+    expect(getByLabelText("Zamknij")).toBeTruthy();
+  });
+});
+
 describe("MonthView multi-day events", () => {
   it("draws a multi-day event as one spanning bar, not a chip per day", async () => {
     const span: CalendarEvent[] = [

@@ -98,6 +98,7 @@ export {
   weekdayFormatToken,
 } from "@super-calendar/core";
 export { expandRecurringEvents } from "@super-calendar/core";
+export { type CalendarLabels, defaultCalendarLabels } from "@super-calendar/core";
 export {
   type ICalEvent,
   parseICalendar,

@@ -24,6 +24,7 @@ export * from "./utils/dates";
 export * from "./utils/drag";
 export * from "./utils/eventDisplay";
 export * from "./utils/ical";
+export * from "./utils/labels";
 export * from "./utils/useNow";
 export * from "./utils/useEventSource";
 export * from "./utils/layout";

@@ -33,6 +33,7 @@ import {
   type WeekdayFormat,
   type WeekStartsOn,
 } from "@super-calendar/core";
+import type { CalendarLabels } from "@super-calendar/core";
 import { Agenda, type AgendaSlot, type DomAgendaEvent } from "./Agenda";
 import { YearView, type YearViewSlot } from "./YearView";
 import { type DomMonthEvent, MonthView, type MonthViewSlot } from "./MonthView";
@@ -206,6 +207,8 @@ export interface CalendarProps<T = unknown>
   maxVisibleEventCount?: number;
   /** Overflow row template; `{moreCount}` is replaced. */
   moreLabel?: string;
+  /** Translations for the screen-reader words and gutter text; omitted keys use English. */
+  labels?: Partial<CalendarLabels>;
   /** Render neighbouring months' days in the leading/trailing cells (default true). */
   showAdjacentMonths?: boolean;
   /**
@@ -359,6 +362,7 @@ export function Calendar<T = unknown>({
   // month
   maxVisibleEventCount,
   moreLabel,
+  labels,
   showAdjacentMonths,
   showTitle,
   weekdayFormat,
@@ -419,6 +423,7 @@ export function Calendar<T = unknown>({
         weekStartsOn={weekStartsOn}
         hiddenDays={hiddenDays}
         locale={locale}
+        labels={labels}
         theme={theme}
         className={className}
         style={height != null ? { height, ...style } : style}
@@ -464,6 +469,7 @@ export function Calendar<T = unknown>({
         weekdayFormat={weekdayFormat}
         highlightWeekends={highlightWeekends}
         locale={locale}
+        labels={labels}
         theme={theme}
         className={className}
         style={style}
@@ -507,6 +513,7 @@ export function Calendar<T = unknown>({
         weekdayFormat={weekdayFormat}
         numberOfDays={numberOfDays}
         locale={locale}
+        labels={labels}
         theme={theme}
         height={height}
         className={className}
