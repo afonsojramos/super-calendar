@@ -32,6 +32,8 @@ import {
   isBackgroundEvent,
   eventAccessibilityLabel as defaultEventAccessibilityLabel,
   type EventAccessibilityLabeler,
+  type CalendarLabels,
+  resolveCalendarLabels,
   eventChipLayout,
   eventTimeLabel,
   formatHour,
@@ -214,6 +216,8 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   showAllDayEventCell?: boolean;
   /** Show the "all-day" text beside the lane (default false). */
   showAllDayLabel?: boolean;
+  /** Translations for the screen-reader words and gutter text; omitted keys use English. */
+  labels?: Partial<CalendarLabels>;
   /** Tint Saturday/Sunday columns with the weekend background (default true). Set
    * false to treat weekends like any other day. */
   highlightWeekends?: boolean;
@@ -444,6 +448,7 @@ export function TimeGrid<T = unknown>({
   timeZone,
   showAllDayEventCell = true,
   showAllDayLabel = false,
+  labels: labelsProp,
   locale,
   theme: themeOverrides,
   height = 600,
@@ -463,6 +468,7 @@ export function TimeGrid<T = unknown>({
   styles,
 }: TimeGridProps<T>): ReactElement {
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
+  const labels = useMemo(() => resolveCalendarLabels(labelsProp), [labelsProp]);
   const slot = createSlots<TimeGridSlot>({ classNames, styles });
   const scrollRef = useRef<HTMLDivElement>(null);
   const dfns = locale ? { locale } : undefined;
@@ -1282,7 +1288,7 @@ export function TimeGrid<T = unknown>({
               themed: { fontSize: 10, color: theme.textMuted, padding: "4px 6px 0 0" },
             })}
           >
-            {showAllDayLabel ? "all-day" : null}
+            {showAllDayLabel ? labels.allDay : null}
           </div>
           {allDayByDay.map((list, i) => {
             const dayStart = startOfDay(days[i]);

@@ -23,6 +23,23 @@ event announcement with `eventAccessibilityLabel`:
 />
 ```
 
+The date part of each label follows `locale`. The words around it ("today",
+"selected", "unavailable", "3 events", "3 more events") and the "all-day"
+gutter text come from `labels`. Pass translations to localize them; keys you
+omit stay in English:
+
+```tsx
+<Calendar
+  locale={pl}
+  labels={{
+    today: "dzisiaj",
+    eventCount: (count) => `wydarzenia: ${count}`,
+    moreEvents: (count) => `jeszcze ${count}`,
+  }}
+  /* ... */
+/>
+```
+
 ## Screen-reader actions (React Native)
 
 Dragging is a gesture, so draggable events expose the same operations as

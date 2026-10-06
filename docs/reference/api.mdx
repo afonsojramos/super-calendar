@@ -47,6 +47,7 @@ pitfall this avoids.
 | -------------------------- | ---------------------------------- | ---------------------------------------- |
 | `renderEvent`              | `RenderEvent<T>`                   | Render events your way, every mode.      |
 | `eventAccessibilityLabel`  | `(event, ctx) => string`           | Override an event's screen-reader label. |
+| `labels`                   | `Partial<CalendarLabels>`          | Translate screen-reader words, all-day.  |
 | `renderCustomDateForMonth` | `(date) => ReactNode`              | Month: replace the day-cell date badge.  |
 | `eventCellStyle`           | `style \| (event) => style`        | Tweak the built-in box.                  |
 | `calendarCellStyle`        | `(date) => style`                  | Per-date column/cell shading.            |
@@ -136,12 +137,13 @@ the [Date selection](/guides/selection) guide.
     `backgroundBandsForDay`, `buildMonthGrid`, `buildMonthWeeks`, `nextDateRange`,
     `isDateSelectable`, `isRangeEndpoint`, `isWithinDateRange`, `daySelectionState`, `getViewDays`,
     `getWeekDays`, `getIsToday`, `isWeekend`, `isSameCalendarDay`, `minutesIntoDay`,
-    `weekdayFormatToken`, `DEFAULT_HOUR_HEIGHT`
+    `weekdayFormatToken`, `defaultCalendarLabels`, `DEFAULT_HOUR_HEIGHT`
   </Card>
   <Card title="Types">
     `CalendarEvent`, `CalendarMode`, `RenderEventArgs`, `RecurrenceRule`, `BusinessHours`,
     `EventDragHandler`, `CalendarTheme`, `PositionedEvent`, `DateRange`, `MonthGrid`,
-    `MonthEventSegment`, `MonthWeekEvents`, `MonthListProps`, `CalendarSlot`, `SlotStyleProps`
+    `MonthEventSegment`, `MonthWeekEvents`, `MonthListProps`, `CalendarSlot`, `SlotStyleProps`,
+    `CalendarLabels`
   </Card>
 </CardGroup>
 

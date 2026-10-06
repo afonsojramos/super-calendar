@@ -27,6 +27,18 @@ describe("dom YearView", () => {
     expect(onPressDay.mock.calls[0][0].getMonth()).toBe(6);
   });
 
+  it("translates the state words with labels", () => {
+    const { getByLabelText } = render(
+      <YearView
+        date={new Date(2026, 6, 20)}
+        events={events}
+        selectedDates={[new Date(2026, 6, 15)]}
+        labels={{ selected: "wybrany", hasEvents: "ma wydarzenia" }}
+      />,
+    );
+    expect(getByLabelText("Wednesday, 15 July 2026, wybrany, ma wydarzenia")).toBeTruthy();
+  });
+
   it("marks selected days and the days inside a range", () => {
     const { getByLabelText } = render(
       <YearView

@@ -13,6 +13,7 @@ import {
   type WeekdayFormat,
   type WeekStartsOn,
 } from "@super-calendar/core";
+import type { CalendarLabels } from "@super-calendar/core";
 import { type DomMonthEvent, MonthView, type MonthViewSlot } from "./MonthView";
 import { createSlots, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
@@ -53,6 +54,8 @@ export interface MonthListProps<T = unknown>
   maxVisibleEventCount?: number;
   /** Template for the overflow row; `{moreCount}` is replaced. */
   moreLabel?: string;
+  /** Translations for the screen-reader words and gutter text; omitted keys use English. */
+  labels?: Partial<CalendarLabels>;
   /** Tap an event chip. */
   onPressEvent?: (event: CalendarEvent<T>) => void;
   /** Tap the "+N more" overflow row. */
@@ -100,6 +103,7 @@ export function MonthList<T = unknown>({
   eventAccessibilityLabel,
   maxVisibleEventCount,
   moreLabel,
+  labels,
   onPressEvent,
   onPressMore,
   selectedRange,
@@ -199,6 +203,7 @@ export function MonthList<T = unknown>({
             eventAccessibilityLabel={eventAccessibilityLabel}
             maxVisibleEventCount={maxVisibleEventCount}
             moreLabel={moreLabel}
+            labels={labels}
             onPressEvent={onPressEvent}
             onPressMore={onPressMore}
             selectedRange={selectedRange}

@@ -89,7 +89,8 @@ import {
   snapDeltaMinutes,
 } from "@super-calendar/core";
 import { formatHour, layoutDayEvents, type PositionedEvent } from "@super-calendar/core";
-import type { EventAccessibilityLabeler } from "@super-calendar/core";
+import type { CalendarLabels, EventAccessibilityLabeler } from "@super-calendar/core";
+import { resolveCalendarLabels } from "@super-calendar/core";
 import { type WeekdayFormat, weekdayFormatToken } from "@super-calendar/core";
 import {
   type ResolvedSlot,
@@ -1228,6 +1229,8 @@ type HourGutterProps = {
   /** Draw the "all-day" text in the lane cell. Default off, so an empty lane reads
    * as neutral space rather than a labelled-but-empty row. */
   showAllDayLabel: boolean;
+  /** The text drawn when `showAllDayLabel` is on. */
+  allDayLabel: string;
   /** Height of the day-header corner above the "all-day" cell (0 when the header
    * isn't paged, i.e. a custom `renderHeader` draws its own fixed header). */
   headerHeight: number;
@@ -1251,6 +1254,7 @@ const HourGutterInner = ({
   scrollY,
   showLane,
   showAllDayLabel,
+  allDayLabel,
   headerHeight,
   weekNumber,
   ampm,
@@ -1315,7 +1319,7 @@ const HourGutterInner = ({
               })}
               allowFontScaling={false}
             >
-              all-day
+              {allDayLabel}
             </Text>
           ) : null}
         </Animated.View>
@@ -1558,6 +1562,7 @@ type TimetablePageProps<T> = {
    * `renderHeader` owns a fixed header above the pager. */
   pagedHeader: boolean;
   weekdayFormat?: WeekdayFormat;
+  todayLabel: string;
   locale?: Locale;
   activeDate?: Date;
   onPressDateHeader?: (date: Date) => void;
@@ -1615,6 +1620,7 @@ function TimetablePageInner<T>({
   height,
   pagedHeader,
   weekdayFormat,
+  todayLabel,
   locale,
   activeDate,
   onPressDateHeader,
@@ -1923,6 +1929,7 @@ function TimetablePageInner<T>({
             mode={mode}
             dayWidth={dayWidth}
             weekdayFormat={weekdayFormat}
+            todayLabel={todayLabel}
             locale={locale}
             activeDate={activeDate}
             onPressDateHeader={onPressDateHeader}
@@ -2223,6 +2230,8 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   weekStartsOn: WeekStartsOn;
   /** Column-header weekday label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
   weekdayFormat?: WeekdayFormat;
+  /** Translations for the screen-reader words and gutter text; omitted keys use English. */
+  labels?: Partial<CalendarLabels>;
   renderEvent: RenderEvent<T>;
   /**
    * Override the screen-reader label for each event. Receives the event and a
@@ -2345,6 +2354,7 @@ function TimeGridInner<T>({
   hourHeight = DEFAULT_HOUR_HEIGHT,
   weekStartsOn,
   weekdayFormat = "short",
+  labels: labelsProp,
   renderEvent,
   eventAccessibilityLabel,
   keyExtractor,
@@ -2406,6 +2416,8 @@ function TimeGridInner<T>({
   const clampedMaxHour = Math.max(clampedMinHour + 1, Math.min(maxHour, HOURS_PER_DAY));
   // Collapse the hour gutter to zero when hours are hidden.
   const hourColumnWidth = hideHours ? 0 : hourColumnWidthProp;
+  const labels = useMemo(() => resolveCalendarLabels(labelsProp), [labelsProp]);
+  const todayLabel = labels.today;
   // The built-in day header pages with the columns (rendered inside each page). A
   // custom `renderHeader` keeps a single fixed header above the pager instead, so
   // the pages carry no header and nothing offsets by its height.
@@ -3034,6 +3046,7 @@ function TimeGridInner<T>({
         height={pagerHeight}
         pagedHeader={pagedHeader}
         weekdayFormat={weekdayFormat}
+        todayLabel={todayLabel}
         locale={locale}
         activeDate={activeDate}
         onPressDateHeader={onPressDateHeader}
@@ -3044,6 +3057,7 @@ function TimeGridInner<T>({
       pagerHeight,
       pagedHeader,
       weekdayFormat,
+      todayLabel,
       locale,
       activeDate,
       onPressDateHeader,
@@ -3148,6 +3162,7 @@ function TimeGridInner<T>({
                       scrollY={scrollY}
                       showLane={showAllDayEventCell}
                       showAllDayLabel={showAllDayLabel}
+                      allDayLabel={labels.allDay}
                       headerHeight={headerOffset}
                       weekNumber={weekNumber}
                       ampm={ampm}
@@ -3272,6 +3287,7 @@ type DayHeaderRowProps = {
   mode: CalendarMode;
   dayWidth: number;
   weekdayFormat?: WeekdayFormat;
+  todayLabel: string;
   locale?: Locale;
   activeDate?: Date;
   onPressDateHeader?: (date: Date) => void;
@@ -3284,6 +3300,7 @@ const DayHeaderRow = ({
   mode,
   dayWidth,
   weekdayFormat,
+  todayLabel,
   locale,
   activeDate,
   onPressDateHeader,
@@ -3298,6 +3315,7 @@ const DayHeaderRow = ({
           mode={mode}
           width={dayWidth}
           weekdayFormat={weekdayFormat}
+          todayLabel={todayLabel}
           locale={locale}
           activeDate={activeDate}
           onPressDateHeader={onPressDateHeader}
@@ -3312,6 +3330,7 @@ type DayHeaderProps = {
   mode: CalendarMode;
   width: number;
   weekdayFormat?: WeekdayFormat;
+  todayLabel: string;
   locale?: Locale;
   activeDate?: Date;
   onPressDateHeader?: (date: Date) => void;
@@ -3321,6 +3340,7 @@ const DayHeader = ({
   day,
   width,
   weekdayFormat = "short",
+  todayLabel,
   locale,
   activeDate,
   onPressDateHeader,
@@ -3334,7 +3354,7 @@ const DayHeader = ({
   // One accessible name for the whole header (the weekday + number below are
   // decorative). `accessible` groups the children so a screen reader announces
   // this once, not label-by-label.
-  const accessibilityLabel = `${format(day, "EEEE d MMMM", { locale })}${isToday ? ", today" : ""}`;
+  const accessibilityLabel = `${format(day, "EEEE d MMMM", { locale })}${isToday ? `, ${todayLabel}` : ""}`;
   const headerSlot = slot("columnHeader", {
     base: [styles.dayHeader, { width }],
     themed: theme.containers.columnHeader,

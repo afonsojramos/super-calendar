@@ -33,8 +33,11 @@ import type {
 import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { withEventAccessibilityLabel } from "../utils/withEventAccessibilityLabel";
 import {
+  type CalendarLabels,
   type DateRange,
   type EventAccessibilityLabeler,
+  dayAccessibilityLabel,
+  resolveCalendarLabels,
   type WeekdayFormat,
   daySelectionState,
   isDateSelectable,
@@ -167,6 +170,8 @@ export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
   sortedMonthView?: boolean;
   /** Template for the overflow label; `{moreCount}` is replaced. Default "{moreCount} More". */
   moreLabel?: string;
+  /** Translations for the screen-reader words and gutter text; omitted keys use English. */
+  labels?: Partial<CalendarLabels>;
   /** Show dimmed days from adjacent months in the grid. Default true. */
   showAdjacentMonths?: boolean;
   /** Tint weekend day cells with the theme's weekend background. Default true. */
@@ -272,6 +277,7 @@ function MonthViewInner<T>({
   locale,
   sortedMonthView = true,
   moreLabel = "{moreCount} More",
+  labels: labelsProp,
   showAdjacentMonths = true,
   highlightWeekends = true,
   disableMonthEventCellPress = false,
@@ -310,6 +316,7 @@ function MonthViewInner<T>({
 }: MonthViewProps<T>): ReactElement {
   const theme = useCalendarTheme();
   const slot = createSlots<MonthViewSlot>({ classNames, styles: styleOverrides });
+  const labels = useMemo(() => resolveCalendarLabels(labelsProp), [labelsProp]);
   // Selection comes from context (so cached pages still repaint), but explicit
   // props win for direct/standalone use of MonthView.
   const selection = useCalendarSelection();
@@ -694,7 +701,14 @@ function MonthViewInner<T>({
     // Summarise the cell for screen readers: full date, today marker, and how
     // many events it holds (the chips inside are grouped under this cell).
     const eventCount = dayEvents.length;
-    const accessibilityLabel = `${format(day, "EEEE, d LLLL yyyy", { locale })}${isToday ? ", today" : ""}${isSelected ? ", selected" : ""}${isDisabled ? ", unavailable" : ""}, ${eventCount} ${eventCount === 1 ? "event" : "events"}`;
+    const accessibilityLabel = dayAccessibilityLabel({
+      dateLabel: format(day, "EEEE, d LLLL yyyy", { locale }),
+      isToday,
+      isSelected,
+      isDisabled,
+      eventCount,
+      labels,
+    });
 
     const daySlot = slot("day", {
       // Events mode mirrors the dom renderer: left-aligned cell content with
@@ -856,7 +870,7 @@ function MonthViewInner<T>({
                 : () => setMoreOpenFor({ day, events: dayEvents })
             }
             accessibilityRole="button"
-            accessibilityLabel={`Show ${hiddenCount} more events`}
+            accessibilityLabel={labels.moreEvents(hiddenCount)}
             allowFontScaling={false}
           >
             {moreLabel.replace("{moreCount}", String(hiddenCount))}
@@ -911,7 +925,7 @@ function MonthViewInner<T>({
         <Modal transparent animationType="fade" visible onRequestClose={() => setMoreOpenFor(null)}>
           <Pressable
             style={styles.moreBackdrop}
-            accessibilityLabel="Close"
+            accessibilityLabel={labels.close}
             onPress={() => setMoreOpenFor(null)}
           >
             <Pressable

@@ -21,6 +21,11 @@ import {
   type WeekStartsOn,
   weekdayFormatToken,
 } from "@super-calendar/core";
+import {
+  type CalendarLabels,
+  dayAccessibilityLabel,
+  resolveCalendarLabels,
+} from "@super-calendar/core";
 import { createSlots, dataState, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
@@ -54,6 +59,8 @@ export interface YearViewProps<T = unknown>
   /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
   hiddenDays?: number[];
   locale?: Locale;
+  /** Translations for the screen-reader words; omitted keys use English. */
+  labels?: Partial<CalendarLabels>;
   /** Highlight this date instead of the real "today". */
   activeDate?: Date;
   /** A selected span: endpoints get a filled badge, the days between get the range band. */
@@ -104,6 +111,7 @@ export function YearView<T = unknown>({
   weekStartsOn = 0,
   hiddenDays,
   locale,
+  labels: labelsProp,
   activeDate,
   selectedRange,
   selectedDates,
@@ -122,6 +130,7 @@ export function YearView<T = unknown>({
   styles,
 }: YearViewProps<T>): ReactElement {
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
+  const labels = useMemo(() => resolveCalendarLabels(labelsProp), [labelsProp]);
   const slot = createSlots<YearViewSlot>({ classNames, styles });
 
   // Drag-to-select / drag-to-create: press a day and sweep across others (mini
@@ -302,11 +311,14 @@ export function YearView<T = unknown>({
                         creating != null &&
                         dayTime >= Math.min(creating.anchor, creating.hover) &&
                         dayTime <= Math.max(creating.anchor, creating.hover);
-                      const label = `${format(day, "EEEE, d LLLL yyyy", { locale })}${
-                        isToday ? ", today" : ""
-                      }${state.isSelected ? ", selected" : ""}${
-                        state.isDisabled ? ", unavailable" : ""
-                      }${hasEvents ? ", has events" : ""}`;
+                      const label = dayAccessibilityLabel({
+                        dateLabel: format(day, "EEEE, d LLLL yyyy", { locale }),
+                        isToday,
+                        isSelected: state.isSelected,
+                        isDisabled: state.isDisabled,
+                        hasEvents,
+                        labels,
+                      });
                       // Today wins over a selection, matching the month grid.
                       const badge = dayBadgeKind(state, isHighlighted);
                       const daySlot = slot("day", {

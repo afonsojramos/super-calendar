@@ -36,6 +36,7 @@ import {
   type WeekdayFormat,
   isDateSelectable,
 } from "@super-calendar/core";
+import type { CalendarLabels } from "@super-calendar/core";
 import { buildMonthWeeks, getWeekDays, weekdayFormatToken } from "@super-calendar/core";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { DefaultMonthEvent } from "./DefaultMonthEvent";
@@ -100,6 +101,8 @@ export type MonthListProps<T> = {
   locale?: Locale;
   sortedMonthView?: boolean;
   moreLabel?: string;
+  /** Translations for the screen-reader words and gutter text; omitted keys use English. */
+  labels?: Partial<CalendarLabels>;
   /** Show dimmed adjacent-month days. Default false (each month shows only its own days). */
   showAdjacentMonths?: boolean;
   /** Tint weekend day cells with the theme's weekend background. Default true. */
@@ -153,6 +156,7 @@ function MonthListInner<T>({
   locale,
   sortedMonthView,
   moreLabel,
+  labels,
   showAdjacentMonths = false,
   highlightWeekends = true,
   disableMonthEventCellPress,
@@ -466,6 +470,7 @@ function MonthListInner<T>({
             locale={locale}
             sortedMonthView={sortedMonthView}
             moreLabel={moreLabel}
+            labels={labels}
             showAdjacentMonths={showAdjacentMonths}
             highlightWeekends={highlightWeekends}
             disableMonthEventCellPress={disableMonthEventCellPress}
@@ -501,6 +506,7 @@ function MonthListInner<T>({
       weekStartsOn,
       sortedMonthView,
       moreLabel,
+      labels,
       showAdjacentMonths,
       disableMonthEventCellPress,
       isRTL,
