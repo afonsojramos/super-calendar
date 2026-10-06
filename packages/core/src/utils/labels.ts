@@ -1,3 +1,5 @@
+import type { CalendarMode } from "../types";
+
 /**
  * Words the built-in views add to their screen-reader labels and gutter text.
  * The date parts are formatted through `locale`; these words are not, so pass
@@ -37,19 +39,20 @@ export interface CalendarLabels {
   /** Screen-reader action that shortens an event by `minutes`. Default "Shorten by 15 minutes". */
   shorten: (minutes: number) => string;
   /**
-   * Screen-reader action that moves an event one page forward. `days` is 7 in
-   * week mode and the page's day count otherwise. Default "Move to next week" /
+   * Screen-reader action that moves an event one page forward, given the page's
+   * day count and the view mode. Default "Move to next week" in week mode, else
    * "Move to next day" / "Move to next 3 days".
    */
-  moveToNextPage: (days: number) => string;
+  moveToNextPage: (days: number, mode: CalendarMode) => string;
   /** The backward counterpart of `moveToNextPage`. Default "Move to previous week". */
-  moveToPreviousPage: (days: number) => string;
+  moveToPreviousPage: (days: number, mode: CalendarMode) => string;
   /** Resource timeline action that moves an event to another lane. Default "Move to Room A". */
   moveToResource: (title: string) => string;
 }
 
 const minutes = (n: number) => `${n} minute${n === 1 ? "" : "s"}`;
-const page = (days: number) => (days === 7 ? "week" : days === 1 ? "day" : `${days} days`);
+const page = (days: number, mode: CalendarMode) =>
+  mode === "week" ? "week" : days === 1 ? "day" : `${days} days`;
 
 /** The built-in English {@link CalendarLabels}. */
 export const defaultCalendarLabels: CalendarLabels = {
@@ -67,8 +70,8 @@ export const defaultCalendarLabels: CalendarLabels = {
   moveEarlier: (n) => `Move ${minutes(n)} earlier`,
   extend: (n) => `Extend by ${minutes(n)}`,
   shorten: (n) => `Shorten by ${minutes(n)}`,
-  moveToNextPage: (days) => `Move to next ${page(days)}`,
-  moveToPreviousPage: (days) => `Move to previous ${page(days)}`,
+  moveToNextPage: (days, mode) => `Move to next ${page(days, mode)}`,
+  moveToPreviousPage: (days, mode) => `Move to previous ${page(days, mode)}`,
   moveToResource: (title) => `Move to ${title}`,
 };
 
