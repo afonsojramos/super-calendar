@@ -452,6 +452,73 @@ describe("TimeGrid labels", () => {
     expect(getByLabelText(/, dzisiaj$/)).toBeTruthy();
     expect(within(getByTestId("hour-gutter")).getByText("cały dzień")).toBeTruthy();
   });
+
+  const weekProps = {
+    mode: "week" as const,
+    date: new Date(2026, 0, 6, 12, 0, 0),
+    events: [event],
+    onChangeDate: noop,
+    onPressEvent: noop,
+    onDragEvent: noop,
+  };
+  const actionLabels = (bar: { props: { accessibilityActions?: { label: string }[] } }) =>
+    (bar.props.accessibilityActions ?? []).map((a) => a.label);
+
+  it("labels the event and its screen-reader actions in English by default", async () => {
+    const { getByLabelText } = await render(<Calendar {...weekProps} />);
+    expect(actionLabels(getByLabelText("Standup, 09:00 to 10:00"))).toEqual([
+      "Move 15 minutes later",
+      "Move 15 minutes earlier",
+      "Extend by 15 minutes",
+      "Shorten by 15 minutes",
+      "Move to next week",
+      "Move to previous week",
+    ]);
+  });
+
+  it("translates the event's time range and its screen-reader actions", async () => {
+    const { getByLabelText } = await render(
+      <Calendar
+        {...weekProps}
+        labels={{
+          timeRange: (start, end) => `${start} até ${end}`,
+          moveLater: (n) => `Adiar ${n} minutos`,
+          moveEarlier: (n) => `Antecipar ${n} minutos`,
+          extend: (n) => `Prolongar ${n} minutos`,
+          shorten: (n) => `Encurtar ${n} minutos`,
+          moveToNextPage: () => "Mover para a semana seguinte",
+          moveToPreviousPage: () => "Mover para a semana anterior",
+        }}
+      />,
+    );
+    expect(actionLabels(getByLabelText("Standup, 09:00 até 10:00"))).toEqual([
+      "Adiar 15 minutos",
+      "Antecipar 15 minutos",
+      "Prolongar 15 minutos",
+      "Encurtar 15 minutos",
+      "Mover para a semana seguinte",
+      "Mover para a semana anterior",
+    ]);
+  });
+
+  it("speaks labels.allDayEvent for an all-day event, unless allDayLabel is set", async () => {
+    const trip = { ...event, allDay: true, title: "Viagem" };
+    const translated = await render(
+      <Calendar {...weekProps} events={[trip]} labels={{ allDayEvent: "dia inteiro" }} />,
+    );
+    expect(translated.getByLabelText("Viagem, dia inteiro")).toBeTruthy();
+    await translated.unmount();
+
+    const { getByLabelText } = await render(
+      <Calendar
+        {...weekProps}
+        events={[trip]}
+        allDayLabel="Todo o dia"
+        labels={{ allDayEvent: "dia inteiro" }}
+      />,
+    );
+    expect(getByLabelText("Viagem, Todo o dia")).toBeTruthy();
+  });
 });
 
 describe("TimeGrid cross-page accessibility actions", () => {
