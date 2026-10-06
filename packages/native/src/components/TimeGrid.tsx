@@ -101,6 +101,7 @@ import {
 import { useWebGridZoom } from "../utils/useWebGridZoom";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { withEventAccessibilityLabel } from "../utils/withEventAccessibilityLabel";
+import { CalendarLabelsContext, useCalendarLabels } from "../utils/labels";
 import { AllDayLane } from "./AllDayLane";
 import { type MultiDayMove, MultiDayMovePreview } from "./MultiDayMovePreview";
 
@@ -415,6 +416,7 @@ function AnimatedEventBoxInner<T>({
 }: AnimatedEventBoxProps<T>) {
   const RenderEventComponent = renderEvent;
   const theme = useCalendarTheme();
+  const labels = useCalendarLabels();
   const slot = useSlots<TimeGridSlot>();
   // Pager geometry, so a cross-week edge drag can find the edges and page the
   // view live under the finger (see EdgePaging). The two edge
@@ -1021,31 +1023,25 @@ function AnimatedEventBoxInner<T>({
   // Dragging is gesture-only, so expose the same move/resize commit path as
   // discrete screen-reader actions (VoiceOver/TalkBack invoke them from the
   // actions menu). Steps are one `snapMinutes` unit, matching a drag snap.
-  const unit = (n: number) => `${n} minute${n === 1 ? "" : "s"}`;
   // Label the whole-page move by what a page means in this mode.
-  const pageUnit =
-    mode === "week"
-      ? "week"
-      : daysPerPage === 1
-        ? "day"
-        : `${daysPerPage} day${daysPerPage === 1 ? "" : "s"}`;
+  const pageDays = mode === "week" ? 7 : daysPerPage;
   const dragActions = [
     ...(canMove
       ? [
-          { name: "move-later", label: `Move ${unit(snapMinutes)} later` },
-          { name: "move-earlier", label: `Move ${unit(snapMinutes)} earlier` },
+          { name: "move-later", label: labels.moveLater(snapMinutes) },
+          { name: "move-earlier", label: labels.moveEarlier(snapMinutes) },
         ]
       : []),
     ...(resizable
       ? [
-          { name: "extend", label: `Extend by ${unit(snapMinutes)}` },
-          { name: "shrink", label: `Shorten by ${unit(snapMinutes)}` },
+          { name: "extend", label: labels.extend(snapMinutes) },
+          { name: "shrink", label: labels.shorten(snapMinutes) },
         ]
       : []),
     ...(canMove
       ? [
-          { name: "move-next-page", label: `Move to next ${pageUnit}` },
-          { name: "move-previous-page", label: `Move to previous ${pageUnit}` },
+          { name: "move-next-page", label: labels.moveToNextPage(pageDays) },
+          { name: "move-previous-page", label: labels.moveToPreviousPage(pageDays) },
         ]
       : []),
   ];
@@ -3118,145 +3114,149 @@ function TimeGridInner<T>({
 
   return (
     <SlotStylesProvider classNames={classNames} styles={styleOverrides}>
-      <EdgePagingContext.Provider value={edgePaging}>
-        <View
-          ref={containerRef}
-          style={styles.container}
-          onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
-        >
-          {renderHeader ? renderHeader(headerDays) : null}
-
-          {headerComponent}
-
+      <CalendarLabelsContext.Provider value={labels}>
+        <EdgePagingContext.Provider value={edgePaging}>
           <View
-            ref={viewportRef}
-            style={styles.viewport}
-            onLayout={() => {
-              seedWebScroll();
-              // Window-space top of the scroll viewport, for the drag worklets'
-              // ghost placement (layout gives parent-relative coords, not window).
-              viewportRef.current?.measureInWindow((_x, y) => {
-                // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-                viewportTop.value = y;
-              });
-            }}
+            ref={containerRef}
+            style={styles.container}
+            onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
           >
-            <GestureDetector gesture={zoomGesture}>
-              <Animated.ScrollView
-                ref={scrollRef}
-                showsVerticalScrollIndicator={showVerticalScrollIndicator}
-                scrollEnabled={verticalScrollEnabled}
-                onScroll={scrollHandler}
-                scrollEventThrottle={16}
-                refreshControl={verticalScrollEnabled ? refreshControl : undefined}
-                contentOffset={{ x: 0, y: seedDefaultY }}
-              >
-                <Animated.View testID="time-grid-hours" style={[styles.gridRow, gridHeightStyle]}>
-                  {hourColumnWidth > 0 ? (
-                    <HourGutter
-                      width={hourColumnWidth}
-                      minHour={clampedMinHour}
-                      maxHour={clampedMaxHour}
-                      cellHeight={cellHeight}
-                      laneHeight={laneHeight}
-                      scrollY={scrollY}
-                      showLane={showAllDayEventCell}
-                      showAllDayLabel={showAllDayLabel}
-                      allDayLabel={labels.allDay}
-                      headerHeight={headerOffset}
-                      weekNumber={weekNumber}
-                      ampm={ampm}
-                      hourComponent={hourComponent}
-                    />
-                  ) : null}
-                  <View
-                    ref={pagerRef}
-                    testID="time-grid-pager"
-                    style={[styles.pager, { left: hourColumnWidth, height: pagerHeight }]}
-                    onLayout={(event) => {
-                      // Window-space frame of the pager for the drag worklets' edge
-                      // detection and ghost placement. Only a width change matters
-                      // (the grid's or the hour column's); the zoom changes the
-                      // height every frame, so those layouts are skipped.
-                      const laidOutWidth = event.nativeEvent.layout.width;
-                      if (laidOutWidth === pagerLayoutWidthRef.current) return;
-                      pagerLayoutWidthRef.current = laidOutWidth;
-                      setPagerLayoutWidth(laidOutWidth);
-                      pagerRef.current?.measureInWindow((x, _y, measuredWidth) => {
-                        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-                        pagerLeft.value = x;
-                        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-                        pagerWidth.value = measuredWidth;
-                      });
-                    }}
-                  >
-                    {pagerReady ? (
-                      <AnimatedLegendList
-                        // Mounts once the pager has measured, so the fixed item size is
-                        // right from the list's first layout; the key remounts it on a
-                        // later width change (a rotation, a re-measured container).
-                        key={`grid-${columnsWidth}`}
-                        ref={listRef}
-                        style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
-                        data={pageDates}
-                        extraData={listExtraData}
-                        horizontal
-                        recycleItems={false}
-                        keyExtractor={keyExtractorList}
-                        getFixedItemSize={getFixedItemSize}
-                        // Mount the next pages either side while idle, not mid-swipe.
-                        drawDistance={columnsWidth * 2}
-                        // The live horizontal offset, kept on the UI thread, drives the
-                        // all-day band's height.
-                        sharedValues={pagerSharedValues}
-                        // On web LegendList ignores these RN scroll props (it leaks them to the
-                        // DOM as unknown attributes), so omit them there and disable horizontal
-                        // scroll via `webNoScroll`; paging is driven by the arrow keys instead.
-                        // Native: paging makes each swipe hard-stop at the adjacent page, while
-                        // `freeSwipe` lets momentum carry across pages and snap to a boundary.
-                        {...(isWeb
-                          ? null
-                          : {
-                              scrollEnabled: swipeEnabled,
-                              pagingEnabled: !freeSwipe,
-                              snapToIndices: freeSwipe ? snapToIndices : undefined,
-                              // Paging: snap to the adjacent page quickly instead of the
-                              // slow platform glide, and stop at that page rather than
-                              // drifting, so rapid one-week swipes land crisply instead of
-                              // queuing a long chain of drawn-out snaps. `freeSwipe` keeps
-                              // its momentum, so it can still fling across several pages.
-                              decelerationRate: freeSwipe ? ("normal" as const) : ("fast" as const),
-                              disableIntervalMomentum: !freeSwipe,
-                              scrollEventThrottle: 16,
-                              onMomentumScrollEnd: handlePagerSettled,
-                            })}
-                        initialScrollIndex={activeIndex}
-                        showsHorizontalScrollIndicator={false}
-                        viewabilityConfig={PAGE_VIEWABILITY}
-                        onViewableItemsChanged={handleViewableItemsChanged}
-                        renderItem={renderItem}
+            {renderHeader ? renderHeader(headerDays) : null}
+
+            {headerComponent}
+
+            <View
+              ref={viewportRef}
+              style={styles.viewport}
+              onLayout={() => {
+                seedWebScroll();
+                // Window-space top of the scroll viewport, for the drag worklets'
+                // ghost placement (layout gives parent-relative coords, not window).
+                viewportRef.current?.measureInWindow((_x, y) => {
+                  // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+                  viewportTop.value = y;
+                });
+              }}
+            >
+              <GestureDetector gesture={zoomGesture}>
+                <Animated.ScrollView
+                  ref={scrollRef}
+                  showsVerticalScrollIndicator={showVerticalScrollIndicator}
+                  scrollEnabled={verticalScrollEnabled}
+                  onScroll={scrollHandler}
+                  scrollEventThrottle={16}
+                  refreshControl={verticalScrollEnabled ? refreshControl : undefined}
+                  contentOffset={{ x: 0, y: seedDefaultY }}
+                >
+                  <Animated.View testID="time-grid-hours" style={[styles.gridRow, gridHeightStyle]}>
+                    {hourColumnWidth > 0 ? (
+                      <HourGutter
+                        width={hourColumnWidth}
+                        minHour={clampedMinHour}
+                        maxHour={clampedMaxHour}
+                        cellHeight={cellHeight}
+                        laneHeight={laneHeight}
+                        scrollY={scrollY}
+                        showLane={showAllDayEventCell}
+                        showAllDayLabel={showAllDayLabel}
+                        allDayLabel={labels.allDay}
+                        headerHeight={headerOffset}
+                        weekNumber={weekNumber}
+                        ampm={ampm}
+                        hourComponent={hourComponent}
                       />
                     ) : null}
-                    {liftedEvent ? (
-                      <DragGhost
-                        x={ghostX}
-                        y={ghostY}
-                        w={ghostW}
-                        h={ghostH}
-                        visible={ghostVisible}
-                        event={liftedEvent}
-                        mode={mode}
-                        renderEvent={labeledRenderEvent}
-                        eventGap={eventGap}
-                      />
-                    ) : null}
-                  </View>
-                </Animated.View>
-              </Animated.ScrollView>
-            </GestureDetector>
+                    <View
+                      ref={pagerRef}
+                      testID="time-grid-pager"
+                      style={[styles.pager, { left: hourColumnWidth, height: pagerHeight }]}
+                      onLayout={(event) => {
+                        // Window-space frame of the pager for the drag worklets' edge
+                        // detection and ghost placement. Only a width change matters
+                        // (the grid's or the hour column's); the zoom changes the
+                        // height every frame, so those layouts are skipped.
+                        const laidOutWidth = event.nativeEvent.layout.width;
+                        if (laidOutWidth === pagerLayoutWidthRef.current) return;
+                        pagerLayoutWidthRef.current = laidOutWidth;
+                        setPagerLayoutWidth(laidOutWidth);
+                        pagerRef.current?.measureInWindow((x, _y, measuredWidth) => {
+                          // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+                          pagerLeft.value = x;
+                          // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+                          pagerWidth.value = measuredWidth;
+                        });
+                      }}
+                    >
+                      {pagerReady ? (
+                        <AnimatedLegendList
+                          // Mounts once the pager has measured, so the fixed item size is
+                          // right from the list's first layout; the key remounts it on a
+                          // later width change (a rotation, a re-measured container).
+                          key={`grid-${columnsWidth}`}
+                          ref={listRef}
+                          style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
+                          data={pageDates}
+                          extraData={listExtraData}
+                          horizontal
+                          recycleItems={false}
+                          keyExtractor={keyExtractorList}
+                          getFixedItemSize={getFixedItemSize}
+                          // Mount the next pages either side while idle, not mid-swipe.
+                          drawDistance={columnsWidth * 2}
+                          // The live horizontal offset, kept on the UI thread, drives the
+                          // all-day band's height.
+                          sharedValues={pagerSharedValues}
+                          // On web LegendList ignores these RN scroll props (it leaks them to the
+                          // DOM as unknown attributes), so omit them there and disable horizontal
+                          // scroll via `webNoScroll`; paging is driven by the arrow keys instead.
+                          // Native: paging makes each swipe hard-stop at the adjacent page, while
+                          // `freeSwipe` lets momentum carry across pages and snap to a boundary.
+                          {...(isWeb
+                            ? null
+                            : {
+                                scrollEnabled: swipeEnabled,
+                                pagingEnabled: !freeSwipe,
+                                snapToIndices: freeSwipe ? snapToIndices : undefined,
+                                // Paging: snap to the adjacent page quickly instead of the
+                                // slow platform glide, and stop at that page rather than
+                                // drifting, so rapid one-week swipes land crisply instead of
+                                // queuing a long chain of drawn-out snaps. `freeSwipe` keeps
+                                // its momentum, so it can still fling across several pages.
+                                decelerationRate: freeSwipe
+                                  ? ("normal" as const)
+                                  : ("fast" as const),
+                                disableIntervalMomentum: !freeSwipe,
+                                scrollEventThrottle: 16,
+                                onMomentumScrollEnd: handlePagerSettled,
+                              })}
+                          initialScrollIndex={activeIndex}
+                          showsHorizontalScrollIndicator={false}
+                          viewabilityConfig={PAGE_VIEWABILITY}
+                          onViewableItemsChanged={handleViewableItemsChanged}
+                          renderItem={renderItem}
+                        />
+                      ) : null}
+                      {liftedEvent ? (
+                        <DragGhost
+                          x={ghostX}
+                          y={ghostY}
+                          w={ghostW}
+                          h={ghostH}
+                          visible={ghostVisible}
+                          event={liftedEvent}
+                          mode={mode}
+                          renderEvent={labeledRenderEvent}
+                          eventGap={eventGap}
+                        />
+                      ) : null}
+                    </View>
+                  </Animated.View>
+                </Animated.ScrollView>
+              </GestureDetector>
+            </View>
           </View>
-        </View>
-      </EdgePagingContext.Provider>
+        </EdgePagingContext.Provider>
+      </CalendarLabelsContext.Provider>
     </SlotStylesProvider>
   );
 }

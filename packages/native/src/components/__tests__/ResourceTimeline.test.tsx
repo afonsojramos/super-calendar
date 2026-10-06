@@ -137,6 +137,31 @@ describe("ResourceTimeline", () => {
     expect(e2.getTime()).toBeGreaterThan(at(10).getTime());
   });
 
+  it("translates the screen-reader actions with labels", async () => {
+    const { getByLabelText } = await render(
+      <ResourceTimeline
+        date={at(0)}
+        resources={resources}
+        events={events}
+        onDragEvent={jest.fn()}
+        labels={{
+          moveLater: (n) => `Adiar ${n} minutos`,
+          moveToResource: (title) => `Mover para ${title}`,
+        }}
+      />,
+    );
+    const labels = (getByLabelText("Standup").props.accessibilityActions ?? []).map(
+      (a: { label: string }) => a.label,
+    );
+    expect(labels).toEqual([
+      "Adiar 15 minutos",
+      "Move 15 minutes earlier",
+      "Extend by 15 minutes",
+      "Shorten by 15 minutes",
+      "Mover para Room B",
+    ]);
+  });
+
   it("renders the hour axis with the configured window", async () => {
     const { getByText, queryByText } = await render(
       <ResourceTimeline

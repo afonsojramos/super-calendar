@@ -325,7 +325,7 @@ describe("MonthView labels", () => {
       />,
     );
     expect(getByLabelText("Monday, 15 June 2026, selected, 6 events")).toBeTruthy();
-    expect(getByLabelText("4 more events")).toBeTruthy();
+    expect(getByLabelText("4 more events, 15 June")).toBeTruthy();
     await fireEvent.press(getByText(/More/));
     expect(getByLabelText("Close")).toBeTruthy();
   });
@@ -341,7 +341,7 @@ describe("MonthView labels", () => {
       />,
     );
     expect(getByLabelText("Monday, 15 June 2026, wybrany, wydarzenia: 6")).toBeTruthy();
-    expect(getByLabelText("jeszcze 4")).toBeTruthy();
+    expect(getByLabelText("jeszcze 4, 15 June")).toBeTruthy();
     await fireEvent.press(getByText(/More/));
     expect(getByLabelText("Zamknij")).toBeTruthy();
   });

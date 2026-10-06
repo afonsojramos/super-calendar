@@ -32,6 +32,7 @@ import type {
 } from "../types";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { withEventAccessibilityLabel } from "../utils/withEventAccessibilityLabel";
+import { CalendarLabelsContext } from "../utils/labels";
 import {
   type CalendarLabels,
   type DateRange,
@@ -870,7 +871,7 @@ function MonthViewInner<T>({
                 : () => setMoreOpenFor({ day, events: dayEvents })
             }
             accessibilityRole="button"
-            accessibilityLabel={labels.moreEvents(hiddenCount)}
+            accessibilityLabel={`${labels.moreEvents(hiddenCount)}, ${format(day, "d MMMM", { locale })}`}
             allowFontScaling={false}
           >
             {moreLabel.replace("{moreCount}", String(hiddenCount))}
@@ -888,183 +889,191 @@ function MonthViewInner<T>({
   };
 
   return (
-    <View style={styles.root}>
-      {showTitle ? (
-        <Text
-          {...slot<TextStyle>("title", {
-            base: styles.title,
-            themed: [theme.text.monthTitle, { color: theme.colors.text }],
-          })}
-          allowFontScaling={false}
-        >
-          {format(date, "MMMM yyyy", locale ? { locale } : undefined)}
-        </Text>
-      ) : null}
-      {showWeekdays ? (
-        <View
-          {...slot("weekdays", {
-            base: styles.weekdayHeader,
-            themed: theme.containers.weekdayHeader,
-          })}
-        >
-          {weekdayLabels.map((day) => (
-            <Text
-              key={day.toISOString()}
-              {...slot<TextStyle>("weekday", {
-                base: styles.weekdayLabel,
-                themed: [theme.text.weekday, { color: theme.colors.textMuted }],
-              })}
-              allowFontScaling={false}
-            >
-              {format(day, weekdayFormatToken(weekdayFormat), { locale })}
-            </Text>
-          ))}
-        </View>
-      ) : null}
-      {moreOpenFor ? (
-        <Modal transparent animationType="fade" visible onRequestClose={() => setMoreOpenFor(null)}>
-          <Pressable
-            style={styles.moreBackdrop}
-            accessibilityLabel={labels.close}
-            onPress={() => setMoreOpenFor(null)}
+    <CalendarLabelsContext.Provider value={labels}>
+      <View style={styles.root}>
+        {showTitle ? (
+          <Text
+            {...slot<TextStyle>("title", {
+              base: styles.title,
+              themed: [theme.text.monthTitle, { color: theme.colors.text }],
+            })}
+            allowFontScaling={false}
           >
-            <Pressable
-              // Swallow taps on the card so only the backdrop dismisses.
-              onPress={() => {}}
-              {...slot("morePopover", {
-                base: styles.moreCard,
-                themed: {
-                  backgroundColor: theme.colors.surface,
-                  borderColor: theme.colors.gridLine,
-                },
-              })}
-            >
+            {format(date, "MMMM yyyy", locale ? { locale } : undefined)}
+          </Text>
+        ) : null}
+        {showWeekdays ? (
+          <View
+            {...slot("weekdays", {
+              base: styles.weekdayHeader,
+              themed: theme.containers.weekdayHeader,
+            })}
+          >
+            {weekdayLabels.map((day) => (
               <Text
-                accessibilityRole="header"
-                style={[styles.moreCardTitle, { color: theme.colors.text }]}
+                key={day.toISOString()}
+                {...slot<TextStyle>("weekday", {
+                  base: styles.weekdayLabel,
+                  themed: [theme.text.weekday, { color: theme.colors.textMuted }],
+                })}
                 allowFontScaling={false}
               >
-                {format(moreOpenFor.day, "EEEE, d LLLL yyyy", { locale })}
+                {format(day, weekdayFormatToken(weekdayFormat), { locale })}
               </Text>
-              <ScrollView>
-                {moreOpenFor.events.map((event, index) => (
-                  <View key={keyExtractor(event, index)} style={styles.moreCardRow}>
-                    <RenderEventComponent
-                      event={event}
-                      mode="month"
-                      isAllDay={isAllDayEvent(event)}
-                      onPress={() => {
-                        setMoreOpenFor(null);
-                        onPressEvent(event);
-                      }}
-                    />
-                  </View>
-                ))}
-              </ScrollView>
-            </Pressable>
-          </Pressable>
-        </Modal>
-      ) : null}
-      <MonthGridSurface gesture={dragGesture}>
-        <View
-          ref={gridRef}
-          testID="month-grid"
-          {...slot("grid", { base: styles.container })}
-          onLayout={handleLayout}
-          {...(isWeb && dragEnabled
-            ? {
-                onPointerDown: (event: RNPointerEvent) => {
-                  const point = gridPoint(event.nativeEvent.clientX, event.nativeEvent.clientY);
-                  if (point) beginDrag(point.x, point.y);
-                },
-                onPointerMove: (event: RNPointerEvent) => {
-                  if (!dragRef.current) return;
-                  const point = gridPoint(event.nativeEvent.clientX, event.nativeEvent.clientY);
-                  if (point) extendDrag(point.x, point.y);
-                },
-              }
-            : null)}
-        >
-          {weeks.map((week, weekIndex) => {
-            // Spanning bars for this row (laid out once in `weekLayouts`). A multi-day
-            // event is one bar across its columns, stacked into lanes; the bars render
-            // in an overlay so they can span cells, and the cells reserve the lane rows
-            // so "+more" sits below them. `visibleLanes` mirrors the per-day cap.
-            const rowLayout = weekLayouts[weekIndex] ?? EMPTY_LAYOUT;
-            const visibleLanes = monthVisibleCount(rowLayout.laneCount, capacity);
-            const cols = week.length;
-            // With adjacent months hidden, clamp bars to the current-month columns so
-            // none draw over the blank leading/trailing cells.
-            let firstVisCol = 0;
-            let lastVisCol = cols - 1;
-            if (showGrid && !showAdjacentMonths) {
-              const first = week.findIndex((d) => isSameMonth(d, date));
-              if (first !== -1) {
-                firstVisCol = first;
-                lastVisCol = cols - 1 - [...week].reverse().findIndex((d) => isSameMonth(d, date));
-              }
-            }
-            return (
-              <View
-                {...slot("week", { base: styles.weekRow, themed: theme.containers.weekRow })}
-                key={week[0].toISOString()}
+            ))}
+          </View>
+        ) : null}
+        {moreOpenFor ? (
+          <Modal
+            transparent
+            animationType="fade"
+            visible
+            onRequestClose={() => setMoreOpenFor(null)}
+          >
+            <Pressable
+              style={styles.moreBackdrop}
+              accessibilityLabel={labels.close}
+              onPress={() => setMoreOpenFor(null)}
+            >
+              <Pressable
+                // Swallow taps on the card so only the backdrop dismisses.
+                onPress={() => {}}
+                {...slot("morePopover", {
+                  base: styles.moreCard,
+                  themed: {
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.gridLine,
+                  },
+                })}
               >
-                {week.map((day, dayCol) => renderDay(day, dayCol, rowLayout, visibleLanes))}
-                {showGrid ? (
-                  <View style={[StyleSheet.absoluteFill, { pointerEvents: "box-none" }]}>
-                    {rowLayout.segments
-                      .filter((seg) => seg.lane < visibleLanes)
-                      .map((seg) => {
-                        const startCol = Math.max(seg.startCol, firstVisCol);
-                        const endCol = Math.min(seg.endCol, lastVisCol);
-                        if (startCol > endCol) return null;
-                        // Fade the bar being carried, so the tinted drop target reads
-                        // as where it is going and this as where it came from.
-                        const isDragged = drag?.kind === "move" && drag.event === seg.event;
-                        return (
-                          <View
-                            key={`bar-${seg.event.start.toISOString()}:${seg.event.title}:${seg.lane}`}
-                            style={{
-                              position: "absolute",
-                              left: pct((startCol / cols) * 100),
-                              width: pct(((endCol - startCol + 1) / cols) * 100),
-                              top: BADGE_AREA + seg.lane * chipMetrics.chipRowHeight,
-                              height: chipMetrics.chipHeight,
-                              paddingHorizontal: CHIP_INSET_H,
-                              // Let a sweep in progress reach the cells underneath.
-                              pointerEvents: drag ? "none" : "box-none",
-                              opacity: isDragged ? DRAGGED_BAR_OPACITY : 1,
-                            }}
-                          >
-                            <RenderEventComponent
-                              event={seg.event}
-                              mode="month"
-                              isAllDay={isAllDayEvent(seg.event)}
-                              onPress={
-                                disableMonthEventCellPress
-                                  ? () => {}
-                                  : () => {
-                                      if (consumeSuppressedPress()) return;
-                                      onPressEvent(seg.event);
-                                    }
-                              }
-                              onLongPress={
-                                disableMonthEventCellPress || !onLongPressEvent
-                                  ? undefined
-                                  : () => onLongPressEvent(seg.event)
-                              }
-                            />
-                          </View>
-                        );
-                      })}
-                  </View>
-                ) : null}
-              </View>
-            );
-          })}
-        </View>
-      </MonthGridSurface>
-    </View>
+                <Text
+                  accessibilityRole="header"
+                  style={[styles.moreCardTitle, { color: theme.colors.text }]}
+                  allowFontScaling={false}
+                >
+                  {format(moreOpenFor.day, "EEEE, d LLLL yyyy", { locale })}
+                </Text>
+                <ScrollView>
+                  {moreOpenFor.events.map((event, index) => (
+                    <View key={keyExtractor(event, index)} style={styles.moreCardRow}>
+                      <RenderEventComponent
+                        event={event}
+                        mode="month"
+                        isAllDay={isAllDayEvent(event)}
+                        onPress={() => {
+                          setMoreOpenFor(null);
+                          onPressEvent(event);
+                        }}
+                      />
+                    </View>
+                  ))}
+                </ScrollView>
+              </Pressable>
+            </Pressable>
+          </Modal>
+        ) : null}
+        <MonthGridSurface gesture={dragGesture}>
+          <View
+            ref={gridRef}
+            testID="month-grid"
+            {...slot("grid", { base: styles.container })}
+            onLayout={handleLayout}
+            {...(isWeb && dragEnabled
+              ? {
+                  onPointerDown: (event: RNPointerEvent) => {
+                    const point = gridPoint(event.nativeEvent.clientX, event.nativeEvent.clientY);
+                    if (point) beginDrag(point.x, point.y);
+                  },
+                  onPointerMove: (event: RNPointerEvent) => {
+                    if (!dragRef.current) return;
+                    const point = gridPoint(event.nativeEvent.clientX, event.nativeEvent.clientY);
+                    if (point) extendDrag(point.x, point.y);
+                  },
+                }
+              : null)}
+          >
+            {weeks.map((week, weekIndex) => {
+              // Spanning bars for this row (laid out once in `weekLayouts`). A multi-day
+              // event is one bar across its columns, stacked into lanes; the bars render
+              // in an overlay so they can span cells, and the cells reserve the lane rows
+              // so "+more" sits below them. `visibleLanes` mirrors the per-day cap.
+              const rowLayout = weekLayouts[weekIndex] ?? EMPTY_LAYOUT;
+              const visibleLanes = monthVisibleCount(rowLayout.laneCount, capacity);
+              const cols = week.length;
+              // With adjacent months hidden, clamp bars to the current-month columns so
+              // none draw over the blank leading/trailing cells.
+              let firstVisCol = 0;
+              let lastVisCol = cols - 1;
+              if (showGrid && !showAdjacentMonths) {
+                const first = week.findIndex((d) => isSameMonth(d, date));
+                if (first !== -1) {
+                  firstVisCol = first;
+                  lastVisCol =
+                    cols - 1 - [...week].reverse().findIndex((d) => isSameMonth(d, date));
+                }
+              }
+              return (
+                <View
+                  {...slot("week", { base: styles.weekRow, themed: theme.containers.weekRow })}
+                  key={week[0].toISOString()}
+                >
+                  {week.map((day, dayCol) => renderDay(day, dayCol, rowLayout, visibleLanes))}
+                  {showGrid ? (
+                    <View style={[StyleSheet.absoluteFill, { pointerEvents: "box-none" }]}>
+                      {rowLayout.segments
+                        .filter((seg) => seg.lane < visibleLanes)
+                        .map((seg) => {
+                          const startCol = Math.max(seg.startCol, firstVisCol);
+                          const endCol = Math.min(seg.endCol, lastVisCol);
+                          if (startCol > endCol) return null;
+                          // Fade the bar being carried, so the tinted drop target reads
+                          // as where it is going and this as where it came from.
+                          const isDragged = drag?.kind === "move" && drag.event === seg.event;
+                          return (
+                            <View
+                              key={`bar-${seg.event.start.toISOString()}:${seg.event.title}:${seg.lane}`}
+                              style={{
+                                position: "absolute",
+                                left: pct((startCol / cols) * 100),
+                                width: pct(((endCol - startCol + 1) / cols) * 100),
+                                top: BADGE_AREA + seg.lane * chipMetrics.chipRowHeight,
+                                height: chipMetrics.chipHeight,
+                                paddingHorizontal: CHIP_INSET_H,
+                                // Let a sweep in progress reach the cells underneath.
+                                pointerEvents: drag ? "none" : "box-none",
+                                opacity: isDragged ? DRAGGED_BAR_OPACITY : 1,
+                              }}
+                            >
+                              <RenderEventComponent
+                                event={seg.event}
+                                mode="month"
+                                isAllDay={isAllDayEvent(seg.event)}
+                                onPress={
+                                  disableMonthEventCellPress
+                                    ? () => {}
+                                    : () => {
+                                        if (consumeSuppressedPress()) return;
+                                        onPressEvent(seg.event);
+                                      }
+                                }
+                                onLongPress={
+                                  disableMonthEventCellPress || !onLongPressEvent
+                                    ? undefined
+                                    : () => onLongPressEvent(seg.event)
+                                }
+                              />
+                            </View>
+                          );
+                        })}
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        </MonthGridSurface>
+      </View>
+    </CalendarLabelsContext.Provider>
   );
 }
 

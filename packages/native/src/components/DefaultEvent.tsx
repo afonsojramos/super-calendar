@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { StyleSheet, Text, TouchableOpacity } from "react-native";
 import Animated, { useAnimatedStyle, useDerivedValue } from "react-native-reanimated";
 import { useCalendarTheme } from "../theme";
+import { useCalendarLabels } from "../utils/labels";
 import type { RenderEventArgs } from "../types";
 import {
   eventAccessibilityLabel,
@@ -46,6 +47,7 @@ export function DefaultEvent<T>({
   onLongPress,
 }: RenderEventArgs<T>): ReactElement {
   const theme = useCalendarTheme();
+  const labels = useCalendarLabels();
   const isAllDayEvent = isAllDay ?? false;
   const timeLabel = eventTimeLabel({
     mode,
@@ -75,6 +77,7 @@ export function DefaultEvent<T>({
       end: event.end,
       ampm,
       allDayLabel,
+      labels,
     });
 
   // Month cells and the all-day lane get a single clipped line; the timed grid

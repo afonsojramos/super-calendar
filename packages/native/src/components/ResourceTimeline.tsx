@@ -27,6 +27,8 @@ import {
   type PositionedEvent,
   resolveDraggedBounds,
   snapDeltaMinutes,
+  type CalendarLabels,
+  resolveCalendarLabels,
 } from "@super-calendar/core";
 import { useCalendarTheme } from "../theme";
 
@@ -167,6 +169,8 @@ export interface ResourceTimelineProps<T = unknown> {
   now?: Date;
   /** Shift the now indicator into this IANA zone (pair with `eventsInTimeZone`). */
   timeZone?: string;
+  /** Translations for the screen-reader drag actions; omitted keys use English. */
+  labels?: Partial<CalendarLabels>;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -250,6 +254,7 @@ type ResourceBarProps<T> = {
   /** Raise this bar's lane above its siblings while a drag is live. */
   onDragActiveChange: (laneId: string | null) => void;
   theme: ReturnType<typeof useCalendarTheme>;
+  labels: CalendarLabels;
 };
 
 // A bar with drag-to-move (long-press) and edge resize along the time axis
@@ -276,6 +281,7 @@ function ResourceBar<T>({
   dragActive,
   onDragActiveChange,
   theme,
+  labels,
 }: ResourceBarProps<T>): ReactElement {
   const moveX = useSharedValue(0);
   const moveCross = useSharedValue(0);
@@ -330,18 +336,19 @@ function ResourceBar<T>({
   // the same `commit` path. They all live on the bar's accessible Pressable (the
   // resize grip is a non-focusable visual/gesture affordance, so an `adjustable`
   // role there would never receive focus on a real device).
-  const unit = (n: number) => `${n} minute${n === 1 ? "" : "s"}`;
   const laneTitle = (lane?: Resource) => lane && (lane.title || lane.id);
   const nextLane = laneTitle(resources[laneIndex + 1]);
   const previousLane = laneTitle(resources[laneIndex - 1]);
   const barActions = draggable
     ? [
-        { name: "move-later", label: `Move ${unit(snapMinutes)} later` },
-        { name: "move-earlier", label: `Move ${unit(snapMinutes)} earlier` },
-        { name: "extend", label: `Extend by ${unit(snapMinutes)}` },
-        { name: "shrink", label: `Shorten by ${unit(snapMinutes)}` },
-        ...(nextLane ? [{ name: "move-next-lane", label: `Move to ${nextLane}` }] : []),
-        ...(previousLane ? [{ name: "move-previous-lane", label: `Move to ${previousLane}` }] : []),
+        { name: "move-later", label: labels.moveLater(snapMinutes) },
+        { name: "move-earlier", label: labels.moveEarlier(snapMinutes) },
+        { name: "extend", label: labels.extend(snapMinutes) },
+        { name: "shrink", label: labels.shorten(snapMinutes) },
+        ...(nextLane ? [{ name: "move-next-lane", label: labels.moveToResource(nextLane) }] : []),
+        ...(previousLane
+          ? [{ name: "move-previous-lane", label: labels.moveToResource(previousLane) }]
+          : []),
       ]
     : undefined;
   const onBarAction = draggable
@@ -720,8 +727,10 @@ export function ResourceTimeline<T = unknown>({
   showNowIndicator = true,
   now: nowProp,
   timeZone,
+  labels: labelsProp,
 }: ResourceTimelineProps<T>): ReactElement {
   const theme = useCalendarTheme();
+  const labels = useMemo(() => resolveCalendarLabels(labelsProp), [labelsProp]);
   // Window the lanes to the requested page when resourcesPerPage caps them.
   const resources = useMemo(() => {
     if (!resourcesPerPage || resourcesPerPage <= 0) return allResources;
@@ -960,6 +969,7 @@ export function ResourceTimeline<T = unknown>({
                           }
                           onDragEvent={onDragEvent}
                           theme={theme}
+                          labels={labels}
                         />
                       );
                     }
@@ -1139,6 +1149,7 @@ export function ResourceTimeline<T = unknown>({
                         }
                         onDragEvent={onDragEvent}
                         theme={theme}
+                        labels={labels}
                       />
                     );
                   }
