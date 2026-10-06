@@ -49,29 +49,37 @@ const labels: Partial<CalendarLabels> = {
   moveEarlier: (minutes) => `Antecipar ${minutes} minutos`,
   extend: (minutes) => `Prolongar ${minutes} minutos`,
   shorten: (minutes) => `Encurtar ${minutes} minutos`,
-  moveToNextPage: (days) =>
-    days === 7 ? "Mover para a semana seguinte" : "Mover para o dia seguinte",
-  moveToPreviousPage: (days) =>
-    days === 7 ? "Mover para a semana anterior" : "Mover para o dia anterior",
+  moveToNextPage: (days, mode) =>
+    mode === "week"
+      ? "Mover para a semana seguinte"
+      : days === 1
+        ? "Mover para o dia seguinte"
+        : `Mover para os ${days} dias seguintes`,
+  moveToPreviousPage: (days, mode) =>
+    mode === "week"
+      ? "Mover para a semana anterior"
+      : days === 1
+        ? "Mover para o dia anterior"
+        : `Mover para os ${days} dias anteriores`,
   moveToResource: (title) => `Mover para ${title}`,
 };
 
 <Calendar locale={pt} labels={labels} /* ... */ />;
 ```
 
-| Key                                                | Default                                         | Where it appears                                           |
-| -------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------- |
-| `today`, `selected`, `unavailable`                 | "today", "selected", "unavailable"              | Day cells and day-column headers.                          |
-| `hasEvents`                                        | "has events"                                    | Year-view days.                                            |
-| `eventCount(count)`                                | "3 events"                                      | Month-view day cells.                                      |
-| `moreEvents(count)`                                | "3 more events"                                 | The "+N more" control.                                     |
-| `close`                                            | "Close"                                         | The "+N more" popover backdrop (native).                   |
-| `allDay`                                           | "all-day"                                       | The time-grid gutter text, with `showAllDayLabel`.         |
-| `allDayEvent`                                      | "all day"                                       | An all-day event's label. `allDayLabel` wins when set.     |
-| `timeRange(start, end)`                            | "09:00 to 10:00"                                | A timed event's label.                                     |
-| `moveLater`, `moveEarlier`, `extend`, `shorten`    | "Move 15 minutes later", "Extend by 15 minutes" | Screen-reader drag actions (native).                       |
-| `moveToNextPage(days)`, `moveToPreviousPage(days)` | "Move to next week"                             | Time-grid drag actions (native). `days` is 7 in week mode. |
-| `moveToResource(title)`                            | "Move to Room A"                                | `ResourceTimeline` drag actions (native).                  |
+| Key                                                            | Default                                         | Where it appears                                       |
+| -------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------ |
+| `today`, `selected`, `unavailable`                             | "today", "selected", "unavailable"              | Day cells and day-column headers.                      |
+| `hasEvents`                                                    | "has events"                                    | Year-view days.                                        |
+| `eventCount(count)`                                            | "3 events"                                      | Month-view day cells.                                  |
+| `moreEvents(count)`                                            | "3 more events"                                 | The "+N more" control.                                 |
+| `close`                                                        | "Close"                                         | The "+N more" popover backdrop (native).               |
+| `allDay`                                                       | "all-day"                                       | The time-grid gutter text, with `showAllDayLabel`.     |
+| `allDayEvent`                                                  | "all day"                                       | An all-day event's label. `allDayLabel` wins when set. |
+| `timeRange(start, end)`                                        | "09:00 to 10:00"                                | A timed event's label.                                 |
+| `moveLater`, `moveEarlier`, `extend`, `shorten`                | "Move 15 minutes later", "Extend by 15 minutes" | Screen-reader drag actions (native).                   |
+| `moveToNextPage(days, mode)`, `moveToPreviousPage(days, mode)` | "Move to next week"                             | Time-grid drag actions (native).                       |
+| `moveToResource(title)`                                        | "Move to Room A"                                | `ResourceTimeline` drag actions (native).              |
 
 The `", "` separator and the word order are fixed. To word a whole event label
 differently, use `eventAccessibilityLabel`.
