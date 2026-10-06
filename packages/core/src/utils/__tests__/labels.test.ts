@@ -16,9 +16,10 @@ describe("resolveCalendarLabels", () => {
 
 describe("defaultCalendarLabels", () => {
   it("names the page a move action jumps by", () => {
-    expect(defaultCalendarLabels.moveToNextPage(7)).toBe("Move to next week");
-    expect(defaultCalendarLabels.moveToNextPage(1)).toBe("Move to next day");
-    expect(defaultCalendarLabels.moveToPreviousPage(3)).toBe("Move to previous 3 days");
+    expect(defaultCalendarLabels.moveToNextPage(7, "week")).toBe("Move to next week");
+    expect(defaultCalendarLabels.moveToNextPage(1, "day")).toBe("Move to next day");
+    expect(defaultCalendarLabels.moveToPreviousPage(3, "3days")).toBe("Move to previous 3 days");
+    expect(defaultCalendarLabels.moveToNextPage(7, "custom")).toBe("Move to next 7 days");
   });
 
   it("pluralizes the minute step", () => {

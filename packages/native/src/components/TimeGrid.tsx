@@ -1023,8 +1023,6 @@ function AnimatedEventBoxInner<T>({
   // Dragging is gesture-only, so expose the same move/resize commit path as
   // discrete screen-reader actions (VoiceOver/TalkBack invoke them from the
   // actions menu). Steps are one `snapMinutes` unit, matching a drag snap.
-  // Label the whole-page move by what a page means in this mode.
-  const pageDays = mode === "week" ? 7 : daysPerPage;
   const dragActions = [
     ...(canMove
       ? [
@@ -1040,8 +1038,8 @@ function AnimatedEventBoxInner<T>({
       : []),
     ...(canMove
       ? [
-          { name: "move-next-page", label: labels.moveToNextPage(pageDays) },
-          { name: "move-previous-page", label: labels.moveToPreviousPage(pageDays) },
+          { name: "move-next-page", label: labels.moveToNextPage(daysPerPage, mode) },
+          { name: "move-previous-page", label: labels.moveToPreviousPage(daysPerPage, mode) },
         ]
       : []),
   ];
