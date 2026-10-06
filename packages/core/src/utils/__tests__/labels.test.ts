@@ -1,3 +1,4 @@
+import { eventAccessibilityLabel } from "../eventDisplay";
 import { dayAccessibilityLabel, defaultCalendarLabels, resolveCalendarLabels } from "../labels";
 
 describe("resolveCalendarLabels", () => {
@@ -10,6 +11,49 @@ describe("resolveCalendarLabels", () => {
     expect(labels.today).toBe("dzisiaj");
     expect(labels.selected).toBe("selected");
     expect(labels.eventCount(2)).toBe("2 events");
+  });
+});
+
+describe("defaultCalendarLabels", () => {
+  it("names the page a move action jumps by", () => {
+    expect(defaultCalendarLabels.moveToNextPage(7)).toBe("Move to next week");
+    expect(defaultCalendarLabels.moveToNextPage(1)).toBe("Move to next day");
+    expect(defaultCalendarLabels.moveToPreviousPage(3)).toBe("Move to previous 3 days");
+  });
+
+  it("pluralizes the minute step", () => {
+    expect(defaultCalendarLabels.moveLater(1)).toBe("Move 1 minute later");
+    expect(defaultCalendarLabels.shorten(30)).toBe("Shorten by 30 minutes");
+  });
+});
+
+describe("eventAccessibilityLabel with labels", () => {
+  const start = new Date(2026, 0, 6, 9);
+  const end = new Date(2026, 0, 6, 10);
+  const labels = resolveCalendarLabels({
+    allDayEvent: "dia inteiro",
+    timeRange: (from, to) => `${from} até ${to}`,
+  });
+
+  it("uses the translated time range", () => {
+    expect(
+      eventAccessibilityLabel({
+        title: "Reunião",
+        isAllDay: false,
+        start,
+        end,
+        ampm: false,
+        labels,
+      }),
+    ).toBe("Reunião, 09:00 até 10:00");
+  });
+
+  it("uses allDayEvent, and an explicit allDayLabel wins over it", () => {
+    const args = { title: "Viagem", isAllDay: true, start, end, ampm: false, labels };
+    expect(eventAccessibilityLabel(args)).toBe("Viagem, dia inteiro");
+    expect(eventAccessibilityLabel({ ...args, allDayLabel: "Todo o dia" })).toBe(
+      "Viagem, Todo o dia",
+    );
   });
 });
 

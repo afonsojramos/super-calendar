@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import type { CalendarEvent, CalendarMode } from "../types";
+import { type CalendarLabels, defaultCalendarLabels } from "./labels";
 
 /**
  * Minimum event-box height (px) before the built-in renderer shows the time line
@@ -22,13 +23,16 @@ export function eventAccessibilityLabel(args: {
   start: Date;
   end: Date;
   ampm: boolean;
-  /** Spoken text for an all-day event. Default "all day". */
+  /** Spoken text for an all-day event. Default `labels.allDayEvent`. */
   allDayLabel?: string;
+  /** Words for the all-day text and the time range. Default English. */
+  labels?: CalendarLabels;
 }): string {
+  const labels = args.labels ?? defaultCalendarLabels;
   const timeFormat = args.ampm ? "h:mm a" : "HH:mm";
   const time = args.isAllDay
-    ? (args.allDayLabel ?? "all day")
-    : `${format(args.start, timeFormat)} to ${format(args.end, timeFormat)}`;
+    ? (args.allDayLabel ?? labels.allDayEvent)
+    : labels.timeRange(format(args.start, timeFormat), format(args.end, timeFormat));
   return [args.title, time].filter(Boolean).join(", ");
 }
 
