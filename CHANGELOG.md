@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.12.1](https://github.com/afonsojramos/super-calendar/compare/v2.12.0...v2.12.1) (2026-10-07)
+
+
+### Bug Fixes
+
+* **native:** snap the time-grid pager back onto a page after a cancelled drag ([#75](https://github.com/afonsojramos/super-calendar/issues/75)) ([60448ba](https://github.com/afonsojramos/super-calendar/commit/60448ba415e10149f3610c65c9c568ee4fb0c9e5))
+
 ## [2.12.0](https://github.com/afonsojramos/super-calendar/compare/v2.11.1...v2.12.0) (2026-10-06)
 
 
