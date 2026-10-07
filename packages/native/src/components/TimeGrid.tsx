@@ -34,6 +34,7 @@ import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  PixelRatio,
   Platform,
   Pressable,
   StyleSheet,
@@ -126,6 +127,13 @@ const MINUTES_PER_DAY = MINUTES_PER_HOUR * HOURS_PER_DAY;
 const PAGE_WINDOW = 180;
 // A page must be ~fully on screen before it becomes the committed date.
 const PAGE_VIEWABILITY = { itemVisiblePercentThreshold: 90 };
+
+// How long the Android pager must go without a scroll event before an off-page
+// rest is snapped back onto a page.
+const PAGER_IDLE_MS = 150;
+// The same wait after a drag that never reported its end, which may still be
+// held by a finger.
+const PAGER_HELD_DRAG_MS = 1000;
 
 // Matches the dom renderer's default so both grids start at the same density.
 /** Default height in pixels of one hour row on the time grid. */
@@ -2944,6 +2952,23 @@ function TimeGridInner<T>({
   );
   useWebPagerKeys(swipeEnabled, goToPage);
 
+  // Commit the page nearest `offsetX` and return its index. Viewability only
+  // reports a page that is nearly all on screen, so a pager that rests between
+  // pages would otherwise move the grid without moving the date behind the header.
+  const commitNearestPage = useCallback(
+    (offsetX: number) => {
+      const raw = Math.round(offsetX / columnsWidth);
+      const index = Math.min(Math.max(raw, 0), pageDates.length - 1);
+      if (index !== viewedIndexRef.current) {
+        viewedIndexRef.current = index;
+        const target = pageDates[index];
+        if (target) onChangeDate(target);
+      }
+      return index;
+    },
+    [columnsWidth, pageDates, onChangeDate],
+  );
+
   // A fast fling can outrun the list's on-demand mounting and leave the pager
   // blank until something nudges it. When momentum ends, re-anchor the list on
   // the page the offset landed on: `scrollToIndex` forces it to recompute its
@@ -2957,24 +2982,72 @@ function TimeGridInner<T>({
       // (goToPage, realign) sets `pendingScrollIndexRef` and repaints itself, so
       // skip those to avoid a redundant re-anchor during held edge paging.
       if (pendingScrollIndexRef.current != null) return;
-      const raw = Math.round(event.nativeEvent.contentOffset.x / columnsWidth);
-      const index = Math.min(Math.max(raw, 0), pageDates.length - 1);
-      // Commit the page the pager snaps to. Viewability only reports a page that
-      // is nearly all on screen, so a fling that rests between pages would
-      // otherwise move the grid without moving the date behind the header.
-      if (index !== viewedIndexRef.current) {
-        viewedIndexRef.current = index;
-        const target = pageDates[index];
-        if (target) onChangeDate(target);
-      }
+      const index = commitNearestPage(event.nativeEvent.contentOffset.x);
       // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
       pagerOffset.value = index * columnsWidth;
       requestAnimationFrame(() => {
         void listRef.current?.scrollToIndex({ index, animated: false });
       });
     },
-    [columnsWidth, pageDates, onChangeDate, pagerOffset],
+    [columnsWidth, commitNearestPage, pagerOffset],
   );
+
+  // Android: once the pager has gone a moment without a scroll event, snap an
+  // offset left between pages back onto the nearest page (or onto the target of
+  // an interrupted programmatic scroll). A drag that began and has not reported
+  // its end waits longer, in case a finger is still holding it.
+  const pagerDraggingRef = useRef(false);
+  const lastPagerScrollRef = useRef({ offsetX: 0, at: 0 });
+  const pagerIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (pagerIdleTimerRef.current) clearTimeout(pagerIdleTimerRef.current);
+    },
+    [],
+  );
+  const realignRestingPager = useCallback(
+    (offsetX: number) => {
+      pagerDraggingRef.current = false;
+      if (columnsWidth <= 0) return;
+      const pages = offsetX / columnsWidth;
+      const offPagePx = Math.abs(pages - Math.round(pages)) * columnsWidth * PixelRatio.get();
+      if (offPagePx < 0.5) return;
+      const index = pendingScrollIndexRef.current ?? commitNearestPage(offsetX);
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      pagerOffset.value = index * columnsWidth;
+      void listRef.current?.scrollToIndex({ index, animated: !reduceMotion });
+    },
+    [columnsWidth, commitNearestPage, pagerOffset, reduceMotion],
+  );
+  const realignRestingPagerRef = useRef(realignRestingPager);
+  realignRestingPagerRef.current = realignRestingPager;
+  // One timer per burst of scroll events: when it fires early it re-arms for
+  // the rest of the wait measured from the latest event.
+  const armPagerIdleTimer = useCallback((delay: number) => {
+    pagerIdleTimerRef.current = setTimeout(() => {
+      const wait = pagerDraggingRef.current ? PAGER_HELD_DRAG_MS : PAGER_IDLE_MS;
+      const remaining = lastPagerScrollRef.current.at + wait - Date.now();
+      if (remaining > 0) {
+        armPagerIdleTimer(remaining);
+        return;
+      }
+      pagerIdleTimerRef.current = null;
+      realignRestingPagerRef.current(lastPagerScrollRef.current.offsetX);
+    }, delay);
+  }, []);
+  const handlePagerScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      lastPagerScrollRef.current = { offsetX: event.nativeEvent.contentOffset.x, at: Date.now() };
+      if (!pagerIdleTimerRef.current) armPagerIdleTimer(PAGER_IDLE_MS);
+    },
+    [armPagerIdleTimer],
+  );
+  const handlePagerDragStart = useCallback(() => {
+    pagerDraggingRef.current = true;
+  }, []);
+  const handlePagerDragEnd = useCallback(() => {
+    pagerDraggingRef.current = false;
+  }, []);
 
   // Optionally snap the pager back to the active page after an empty-cell press
   // (so tapping a far-swiped page returns to the committed date).
@@ -3226,6 +3299,13 @@ function TimeGridInner<T>({
                                 disableIntervalMomentum: !freeSwipe,
                                 scrollEventThrottle: 16,
                                 onMomentumScrollEnd: handlePagerSettled,
+                                ...(Platform.OS === "android"
+                                  ? {
+                                      onScroll: handlePagerScroll,
+                                      onScrollBeginDrag: handlePagerDragStart,
+                                      onScrollEndDrag: handlePagerDragEnd,
+                                    }
+                                  : null),
                               })}
                           initialScrollIndex={activeIndex}
                           showsHorizontalScrollIndicator={false}

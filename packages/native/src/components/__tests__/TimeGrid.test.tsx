@@ -1,5 +1,5 @@
 import { act, fireEvent, within } from "@testing-library/react-native";
-import { Dimensions, Pressable, StyleSheet, Text } from "react-native";
+import { Dimensions, Platform, Pressable, StyleSheet, Text } from "react-native";
 import type { CalendarEvent, RenderEventArgs } from "../../types";
 import { render } from "./renderGrid";
 
@@ -1207,6 +1207,131 @@ describe("TimeGrid fast-fling repaint", () => {
     const list = lastListProps() as { getFixedItemSize: () => number; initialScrollIndex: number };
     await settle(list.initialScrollIndex * list.getFixedItemSize());
     expect(onChangeDate).not.toHaveBeenCalled();
+  });
+});
+
+describe("TimeGrid pager resting off a page", () => {
+  type PagerList = {
+    getFixedItemSize: () => number;
+    initialScrollIndex: number;
+    onScroll: (e: unknown) => void;
+    onScrollBeginDrag: () => void;
+    onScrollEndDrag: () => void;
+  };
+  const list = () => lastListProps() as unknown as PagerList;
+  const scrollTo = (x: number) =>
+    act(() => list().onScroll({ nativeEvent: { contentOffset: { x } } }));
+  const wait = (ms: number) =>
+    act(() => {
+      jest.advanceTimersByTime(ms);
+    });
+  const calls = () =>
+    (globalThis as { __scrollToIndexCalls?: { index: number; animated: boolean }[] })
+      .__scrollToIndexCalls ?? [];
+  const renderPager = (onChangeDate: (date: Date) => void = noop) =>
+    render(
+      <TimeGrid
+        mode="day"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={onChangeDate}
+        onPressEvent={noop}
+      />,
+    );
+
+  beforeEach(() => {
+    (globalThis as { __scrollToIndexCalls?: unknown[] }).__scrollToIndexCalls = [];
+    jest.replaceProperty(Platform, "OS", "android");
+    jest.useFakeTimers();
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  it("snaps a pager left a few pixels short of a page back onto it", async () => {
+    const onChangeDate = jest.fn();
+    await renderPager(onChangeDate);
+    const { getFixedItemSize, initialScrollIndex } = list();
+    await scrollTo(initialScrollIndex * getFixedItemSize() - 1);
+    await wait(250);
+    expect(calls().at(-1)).toEqual({ index: initialScrollIndex, animated: true });
+    expect(onChangeDate).not.toHaveBeenCalled();
+  });
+
+  it("commits and snaps to the nearest page when stopped mid-page", async () => {
+    const onChangeDate = jest.fn();
+    await renderPager(onChangeDate);
+    const { getFixedItemSize, initialScrollIndex } = list();
+    await scrollTo((initialScrollIndex + 0.6) * getFixedItemSize());
+    await wait(250);
+    expect(calls().at(-1)).toEqual({ index: initialScrollIndex + 1, animated: true });
+    const [committed] = onChangeDate.mock.calls[0] as [Date];
+    expect([committed.getFullYear(), committed.getMonth(), committed.getDate()]).toEqual([
+      2026, 0, 7,
+    ]);
+  });
+
+  it("leaves a pager resting on a page alone", async () => {
+    await renderPager();
+    const { getFixedItemSize, initialScrollIndex } = list();
+    await scrollTo((initialScrollIndex + 1) * getFixedItemSize());
+    await wait(250);
+    expect(calls()).toEqual([]);
+  });
+
+  it("does not snap while scroll events keep arriving", async () => {
+    await renderPager();
+    const { getFixedItemSize, initialScrollIndex } = list();
+    const start = initialScrollIndex * getFixedItemSize();
+    await scrollTo(start + 10);
+    await wait(100);
+    await scrollTo(start + 20);
+    await wait(100);
+    expect(calls()).toEqual([]);
+  });
+
+  it("waits longer before snapping a drag that never reported its end", async () => {
+    await renderPager();
+    const { getFixedItemSize, initialScrollIndex } = list();
+    await act(() => list().onScrollBeginDrag());
+    await scrollTo((initialScrollIndex + 0.3) * getFixedItemSize());
+    await wait(250);
+    expect(calls()).toEqual([]);
+    await wait(1000);
+    expect(calls().at(-1)).toEqual({ index: initialScrollIndex, animated: true });
+  });
+
+  it("uses the short wait again once the drag ends", async () => {
+    await renderPager();
+    const { getFixedItemSize, initialScrollIndex } = list();
+    await act(() => list().onScrollBeginDrag());
+    await act(() => list().onScrollEndDrag());
+    await scrollTo((initialScrollIndex + 0.3) * getFixedItemSize());
+    await wait(250);
+    expect(calls().at(-1)).toEqual({ index: initialScrollIndex, animated: true });
+  });
+
+  it("drops a stale drag once the pager rests on a page", async () => {
+    await renderPager();
+    const { getFixedItemSize, initialScrollIndex } = list();
+    await act(() => list().onScrollBeginDrag());
+    await scrollTo(initialScrollIndex * getFixedItemSize());
+    await wait(1000);
+    expect(calls()).toEqual([]);
+    await scrollTo((initialScrollIndex + 0.3) * getFixedItemSize());
+    await wait(200);
+    expect(calls().at(-1)).toEqual({ index: initialScrollIndex, animated: true });
+  });
+
+  it("does not attach the guard off Android", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    await renderPager();
+    expect(list().onScroll).toBeUndefined();
   });
 });
 
