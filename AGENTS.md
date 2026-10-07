@@ -55,11 +55,19 @@ Jest has three projects: `node` (core logic + native non-component tests), `dom`
 
 Use the stock Expo CLI, one command, from `examples/native`:
 
-- `pnpm exec expo run:android` (or `run:ios`) builds the debug dev client, installs it, launches it, and starts Metro. That single process is the dev server; leave it running. It prints the Metro URL and opens the app at it.
+- `pnpm exec expo run:android` (or `run:ios`) builds the debug dev client, installs it, launches it, and starts Metro. That single process is the dev server; leave it running. It prints the Metro URL and opens the app at it. With one device attached, leave `--device` off: it matches neither the adb serial nor the model name.
 - Fast Refresh is on: save a file under `packages/*/src` or `examples/native` and the change pushes to the running app on its own. No reload step. Verified by editing a visible string and watching it update live, then revert.
 - Reload or the dev menu when you need them: press `r` (reload) or `m` (dev menu) in the Metro terminal, or shake the device. On a physical device the dev menu often will not open from `adb shell input keyevent 82`; use `m` from the terminal instead.
 
 Do not fight the setup by hand: no second Metro on the same port, and don't `adb reverse` + `am force-stop` + re-open to "reload". Re-opening the dev client serves its cached JS instead of fetching your latest bundle, so edits look like no-ops. If it gets into that state, `adb uninstall <package>` and re-run `expo run:android` for a clean slate. Web parity check is the same idea: `pnpm exec expo start --web` from `examples/native`.
+
+### Reproducing native touch and layout bugs
+
+For a bug that only shows on a device (a gesture, a scroll, a pixel offset), ask the user to connect an Android device before tracing library source; a few device runs settle what static reading cannot.
+
+- Match the reporter's screen: `adb shell wm size 720x1600` and `adb shell wm density 300` (from their screenshot size and DPI). Fractional dp widths only appear at some densities. Restore with `wm size reset` and `wm density reset` when done.
+- Drive exact gestures with raw motion events: `adb shell "input motionevent DOWN x y; input motionevent MOVE x y; input motionevent CANCEL x y"`. `CANCEL` reproduces a drag a gesture handler steals; `input swipe` and separately timed `input tap` calls cannot land inside a ~100 ms snap animation.
+- Turn the symptom into a number: add a temporary `console.log` (e.g. a pager's resting `contentOffset.x` against its page width, in device pixels via `PixelRatio.get()`) and read it from the Metro output. Remove it before committing.
 
 ## Documentation
 
