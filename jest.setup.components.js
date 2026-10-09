@@ -66,9 +66,20 @@ jest.mock("react-native-reanimated", () => {
       if (next !== previous) reaction.react(next, previous);
     }
   };
+  // Records `scrollTo` calls on globalThis so a test can assert programmatic
+  // vertical scrolls.
+  const ScrollView = React.forwardRef((props, ref) => {
+    React.useImperativeHandle(ref, () => ({
+      scrollTo: (arg) => {
+        (globalThis.__scrollToCalls = globalThis.__scrollToCalls || []).push(arg);
+      },
+      getScrollableNode: () => null,
+    }));
+    return React.createElement(View, props);
+  });
   return {
     __esModule: true,
-    default: { View, ScrollView: View, createAnimatedComponent: (component) => component },
+    default: { View, ScrollView, createAnimatedComponent: (component) => component },
     useAnimatedStyle: (factory) => factory(),
     useDerivedValue: (factory) => {
       const factoryRef = React.useRef(factory);
@@ -83,7 +94,7 @@ jest.mock("react-native-reanimated", () => {
       return valueRef.current;
     },
     useSharedValue: (initial) => React.useRef({ value: initial }).current,
-    useAnimatedRef: () => ({ current: null }),
+    useAnimatedRef: () => React.useRef(null),
     useAnimatedReaction: (prepare, react) => {
       const reactionRef = React.useRef();
       if (!reactionRef.current) {

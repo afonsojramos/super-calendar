@@ -2495,6 +2495,9 @@ function TimeGridInner<T>({
       scrollY.value = event.contentOffset.y;
     },
   });
+  // The scroll view's `contentOffset` holds the mount offset; a later
+  // `scrollOffsetMinutes` is scrolled to by the effect further down.
+  const [mountOffsetY] = useState(seedDefaultY);
   // react-native-web ignores `contentOffset`; apply the initial offset once the
   // viewport and the content have laid out instead.
   const webSeededRef = useRef(!isWeb);
@@ -2903,6 +2906,19 @@ function TimeGridInner<T>({
     return () => cancelAnimationFrame(frame);
   }, [seedWebScroll]);
 
+  // Scroll to a changed `scrollOffsetMinutes` (or hour window) at the live zoom.
+  // The mount offset comes from `contentOffset` and the web seed above.
+  const appliedOffsetRef = useRef({ minutes: scrollOffsetMinutes, minHour: clampedMinHour });
+  useEffect(() => {
+    const applied = appliedOffsetRef.current;
+    if (applied.minutes === scrollOffsetMinutes && applied.minHour === clampedMinHour) return;
+    appliedOffsetRef.current = { minutes: scrollOffsetMinutes, minHour: clampedMinHour };
+    webSeededRef.current = true;
+    const y =
+      Math.max(0, scrollOffsetMinutes / MINUTES_PER_HOUR - clampedMinHour) * cellHeight.value;
+    scrollRef.current?.scrollTo({ y, animated: false });
+  }, [scrollOffsetMinutes, clampedMinHour, cellHeight, scrollRef]);
+
   // Web: LegendList's horizontal scroll container is `overflow-x: auto`, so a
   // trackpad swipe or horizontal wheel would scroll between pages. Paging should be
   // arrow-keys/toolbar only, so disable user horizontal scrolling on it (programmatic
@@ -3217,7 +3233,7 @@ function TimeGridInner<T>({
                   onScroll={scrollHandler}
                   scrollEventThrottle={16}
                   refreshControl={verticalScrollEnabled ? refreshControl : undefined}
-                  contentOffset={{ x: 0, y: seedDefaultY }}
+                  contentOffset={{ x: 0, y: mountOffsetY }}
                 >
                   <Animated.View testID="time-grid-hours" style={[styles.gridRow, gridHeightStyle]}>
                     {hourColumnWidth > 0 ? (

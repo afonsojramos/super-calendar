@@ -151,7 +151,7 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   weekdayFormat?: WeekdayFormat;
   /** Initial pixels per hour (default 48). */
   hourHeight?: number;
-  /** Initial scroll position, in minutes from midnight (default 8:00). */
+  /** Vertical scroll, in minutes from midnight (default 8:00). Applied on mount and whenever it changes. */
   scrollOffsetMinutes?: number;
   /** Pinch / Ctrl-⌘-scroll to zoom the grid (default true). */
   zoomable?: boolean;

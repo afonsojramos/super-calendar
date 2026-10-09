@@ -127,7 +127,7 @@ export interface CalendarProps<T = unknown>
    * Default 1; pass 0 to let events fill their column.
    */
   eventGap?: number;
-  /** Initial scroll position, in minutes from midnight. */
+  /** Vertical scroll, in minutes from midnight. Applied on mount and whenever it changes. */
   scrollOffsetMinutes?: number;
   /** Sub-divisions per hour for the grid lines. */
   timeslots?: number;
