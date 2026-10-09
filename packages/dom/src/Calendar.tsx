@@ -14,10 +14,15 @@ import {
 } from "date-fns";
 import {
   type CSSProperties,
+  type ForwardedRef,
+  forwardRef,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactElement,
   type ReactNode,
+  type RefAttributes,
+  useImperativeHandle,
   useMemo,
+  useRef,
 } from "react";
 import {
   type CalendarMode,
@@ -33,7 +38,7 @@ import {
   type WeekdayFormat,
   type WeekStartsOn,
 } from "@super-calendar/core";
-import type { CalendarLabels } from "@super-calendar/core";
+import type { CalendarHandle, CalendarLabels } from "@super-calendar/core";
 import { Agenda, type AgendaSlot, type DomAgendaEvent } from "./Agenda";
 import { YearView, type YearViewSlot } from "./YearView";
 import { type DomMonthEvent, MonthView, type MonthViewSlot } from "./MonthView";
@@ -311,79 +316,94 @@ function pageStep(
  * <Calendar mode="week" date={new Date()} events={events} />
  * ```
  */
-export function Calendar<T = unknown>({
-  mode = "week",
-  date,
-  events,
-  onChangeDate,
-  weekStartsOn = 0,
-  hiddenDays,
-  now,
-  numberOfDays,
-  locale,
-  timeZone,
-  theme,
-  height,
-  className,
-  style,
-  onPressEvent,
-  eventAccessibilityLabel,
-  // time grid
-  ampm,
-  hourHeight,
-  minEventHeight,
-  eventGap,
-  scrollOffsetMinutes,
-  timeslots,
-  minHour,
-  maxHour,
-  hideHours,
-  showWeekNumber,
-  weekNumberPrefix,
-  businessHours,
-  renderBusinessHours,
-  renderBackgroundEvent,
-  showNowIndicator,
-  showAllDayEventCell,
-  showAllDayLabel,
-  highlightWeekends,
-  eventStartEditable,
-  eventDurationEditable,
-  eventOverlap,
-  dragStepMinutes,
-  onPressCell,
-  onCreateEvent,
-  onDragStart,
-  onDragEvent,
-  onPressDateHeader,
-  renderTimeEvent,
-  hourComponent,
-  keyboardEventNavigation,
-  // month
-  maxVisibleEventCount,
-  moreLabel,
-  labels,
-  showAdjacentMonths,
-  showTitle,
-  weekdayFormat,
-  fillCellOnSelection,
-  selectedRange,
-  selectedDates,
-  minDate,
-  maxDate,
-  isDateDisabled,
-  keyboardDayNavigation,
-  onPressDay,
-  onSelectDrag,
-  onPressMonth,
-  onPressMore,
-  renderMonthEvent,
-  // schedule
-  renderScheduleEvent,
-  // styling
-  classNames,
-  styles,
-}: CalendarProps<T>): ReactElement {
+export const Calendar = forwardRef(CalendarInner) as <T = unknown>(
+  props: CalendarProps<T> & RefAttributes<CalendarHandle>,
+) => ReactElement;
+
+function CalendarInner<T = unknown>(
+  {
+    mode = "week",
+    date,
+    events,
+    onChangeDate,
+    weekStartsOn = 0,
+    hiddenDays,
+    now,
+    numberOfDays,
+    locale,
+    timeZone,
+    theme,
+    height,
+    className,
+    style,
+    onPressEvent,
+    eventAccessibilityLabel,
+    // time grid
+    ampm,
+    hourHeight,
+    minEventHeight,
+    eventGap,
+    scrollOffsetMinutes,
+    timeslots,
+    minHour,
+    maxHour,
+    hideHours,
+    showWeekNumber,
+    weekNumberPrefix,
+    businessHours,
+    renderBusinessHours,
+    renderBackgroundEvent,
+    showNowIndicator,
+    showAllDayEventCell,
+    showAllDayLabel,
+    highlightWeekends,
+    eventStartEditable,
+    eventDurationEditable,
+    eventOverlap,
+    dragStepMinutes,
+    onPressCell,
+    onCreateEvent,
+    onDragStart,
+    onDragEvent,
+    onPressDateHeader,
+    renderTimeEvent,
+    hourComponent,
+    keyboardEventNavigation,
+    // month
+    maxVisibleEventCount,
+    moreLabel,
+    labels,
+    showAdjacentMonths,
+    showTitle,
+    weekdayFormat,
+    fillCellOnSelection,
+    selectedRange,
+    selectedDates,
+    minDate,
+    maxDate,
+    isDateDisabled,
+    keyboardDayNavigation,
+    onPressDay,
+    onSelectDrag,
+    onPressMonth,
+    onPressMore,
+    renderMonthEvent,
+    // schedule
+    renderScheduleEvent,
+    // styling
+    classNames,
+    styles,
+  }: CalendarProps<T>,
+  ref: ForwardedRef<CalendarHandle>,
+): ReactElement {
+  const timeGridRef = useRef<CalendarHandle>(null);
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToTime: (minutes, options) => timeGridRef.current?.scrollToTime(minutes, options),
+    }),
+    [],
+  );
   // Materialise recurring events over the range this mode renders, then apply the
   // display zone. Non-recurring and already-expanded events pass through
   // untouched, so identity is preserved for the common (no-recurrence) case.
@@ -503,6 +523,7 @@ export function Calendar<T = unknown>({
   } else {
     view = (
       <TimeGrid<T>
+        ref={timeGridRef}
         date={date}
         mode={mode}
         events={displayEvents}

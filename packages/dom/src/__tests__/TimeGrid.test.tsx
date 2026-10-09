@@ -1,6 +1,6 @@
 import { act, fireEvent, render } from "@testing-library/react";
-import { useState } from "react";
-import type { CalendarEvent } from "@super-calendar/core";
+import { createRef, useState } from "react";
+import type { CalendarEvent, CalendarHandle } from "@super-calendar/core";
 import { type DomRenderEventArgs, TimeGrid } from "../TimeGrid";
 
 const day = new Date(2026, 5, 26);
@@ -1611,5 +1611,23 @@ describe("dom TimeGrid background band keys", () => {
       />,
     );
     expect(mounts).toEqual(["First", "Second"]);
+  });
+});
+
+describe("dom TimeGrid scrollToTime", () => {
+  it("scrolls to a time through its ref every call, from the hour window's start", () => {
+    const ref = createRef<CalendarHandle>();
+    const { container } = render(
+      <TimeGrid ref={ref} date={day} mode="day" events={events} hourHeight={48} minHour={6} />,
+    );
+    const scroller = [...container.querySelectorAll<HTMLElement>("div")].find(
+      (el) => el.style.overflowY === "auto",
+    )!;
+    act(() => ref.current!.scrollToTime(14 * 60, { animated: false }));
+    expect(scroller.scrollTop).toBe((14 - 6) * 48);
+    // The same time again still scrolls, after the user has moved away.
+    scroller.scrollTop = 0;
+    act(() => ref.current!.scrollToTime(14 * 60));
+    expect(scroller.scrollTop).toBe((14 - 6) * 48);
   });
 });

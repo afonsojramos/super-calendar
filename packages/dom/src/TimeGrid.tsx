@@ -10,11 +10,15 @@ import {
 import {
   type ComponentType,
   type CSSProperties,
+  type ForwardedRef,
+  forwardRef,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
   type ReactNode,
+  type RefAttributes,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -23,6 +27,7 @@ import {
   type BusinessHours,
   type BusinessHoursBand,
   type CalendarEvent,
+  type CalendarHandle,
   type CalendarMode,
   cellRangeFromDrag,
   clampMoveStartMinutes,
@@ -412,61 +417,68 @@ function DefaultDomEvent<T>({
  * <TimeGrid mode="week" date={new Date()} events={events} />
  * ```
  */
-export function TimeGrid<T = unknown>({
-  date,
-  events = [],
-  mode = "day",
-  numberOfDays = 1,
-  weekStartsOn = 0,
-  weekdayFormat = "short",
-  hourHeight: initialHourHeight = 48,
-  scrollOffsetMinutes = 8 * 60,
-  zoomable = true,
-  minHourHeight = 24,
-  maxHourHeight = 160,
-  minEventHeight = DEFAULT_MIN_EVENT_HEIGHT,
-  eventGap = DEFAULT_EVENT_GAP,
-  dragStepMinutes = 15,
-  ampm = false,
-  timeslots = 1,
-  minHour = 0,
-  maxHour = 24,
-  hideHours = false,
-  showWeekNumber = false,
-  weekNumberPrefix = "W",
-  hiddenDays,
-  keyboardEventNavigation = false,
-  businessHours,
-  renderBusinessHours,
-  renderBackgroundEvent,
-  showNowIndicator = true,
-  highlightWeekends = true,
-  eventStartEditable = true,
-  eventDurationEditable = true,
-  eventOverlap = true,
-  now: nowProp,
-  timeZone,
-  showAllDayEventCell = true,
-  showAllDayLabel = false,
-  labels: labelsProp,
-  locale,
-  theme: themeOverrides,
-  height = 600,
-  renderEvent,
-  eventAccessibilityLabel,
-  hourComponent,
-  onPressEvent,
-  onPressDateHeader,
-  onPressCell,
-  onCreateEvent,
-  onDragStart,
-  onDragEvent,
-  onChangeDate,
-  className,
-  style,
-  classNames,
-  styles,
-}: TimeGridProps<T>): ReactElement {
+export const TimeGrid = forwardRef(TimeGridInner) as <T = unknown>(
+  props: TimeGridProps<T> & RefAttributes<CalendarHandle>,
+) => ReactElement;
+
+function TimeGridInner<T = unknown>(
+  {
+    date,
+    events = [],
+    mode = "day",
+    numberOfDays = 1,
+    weekStartsOn = 0,
+    weekdayFormat = "short",
+    hourHeight: initialHourHeight = 48,
+    scrollOffsetMinutes = 8 * 60,
+    zoomable = true,
+    minHourHeight = 24,
+    maxHourHeight = 160,
+    minEventHeight = DEFAULT_MIN_EVENT_HEIGHT,
+    eventGap = DEFAULT_EVENT_GAP,
+    dragStepMinutes = 15,
+    ampm = false,
+    timeslots = 1,
+    minHour = 0,
+    maxHour = 24,
+    hideHours = false,
+    showWeekNumber = false,
+    weekNumberPrefix = "W",
+    hiddenDays,
+    keyboardEventNavigation = false,
+    businessHours,
+    renderBusinessHours,
+    renderBackgroundEvent,
+    showNowIndicator = true,
+    highlightWeekends = true,
+    eventStartEditable = true,
+    eventDurationEditable = true,
+    eventOverlap = true,
+    now: nowProp,
+    timeZone,
+    showAllDayEventCell = true,
+    showAllDayLabel = false,
+    labels: labelsProp,
+    locale,
+    theme: themeOverrides,
+    height = 600,
+    renderEvent,
+    eventAccessibilityLabel,
+    hourComponent,
+    onPressEvent,
+    onPressDateHeader,
+    onPressCell,
+    onCreateEvent,
+    onDragStart,
+    onDragEvent,
+    onChangeDate,
+    className,
+    style,
+    classNames,
+    styles,
+  }: TimeGridProps<T>,
+  ref: ForwardedRef<CalendarHandle>,
+): ReactElement {
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
   const labels = useMemo(() => resolveCalendarLabels(labelsProp), [labelsProp]);
   const slot = createSlots<TimeGridSlot>({ classNames, styles });
@@ -601,6 +613,21 @@ export function TimeGrid<T = unknown>({
         (scrollOffsetMinutes / 60 - windowStart) * hourHeightRef.current,
       );
   }, [scrollOffsetMinutes, windowStart]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToTime: (minutes, { animated = true } = {}) => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const top = Math.max(0, (minutes / 60 - windowStart) * hourHeightRef.current);
+        const smooth = animated && !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+        if (smooth && typeof el.scrollTo === "function") el.scrollTo({ top, behavior: "smooth" });
+        else el.scrollTop = top;
+      },
+    }),
+    [windowStart],
+  );
 
   // Zoom: Ctrl/⌘ + wheel (native listener so we can preventDefault), plus
   // two-pointer pinch. Both scale hourHeight about the current view.

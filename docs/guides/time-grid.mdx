@@ -31,6 +31,36 @@ at the current zoom. Keep it stable rather than deriving it from the clock on
 every render: re-rendering with the same value leaves the user's scroll position
 alone, while a new value scrolls.
 
+## Scroll to a time
+
+To scroll on demand, such as from a "now" button, attach a ref to `Calendar` (or
+`TimeGrid`) and call `scrollToTime` with minutes from midnight. Unlike
+`scrollOffsetMinutes`, it scrolls every time you call it, even to the same time.
+The scroll animates unless you pass `{ animated: false }` or the OS asks to
+reduce motion, and it does nothing while a month, year, or schedule view is
+showing.
+
+```tsx
+import { useRef, useState } from "react";
+import { Button } from "react-native";
+import { Calendar, type CalendarEvent, type CalendarHandle } from "@super-calendar/native";
+
+function WeekWithNowButton({ events }: { events: CalendarEvent[] }) {
+  const [date, setDate] = useState(new Date());
+  const calendar = useRef<CalendarHandle>(null);
+  const scrollToNow = () => {
+    const now = new Date();
+    calendar.current?.scrollToTime(now.getHours() * 60 + now.getMinutes());
+  };
+  return (
+    <>
+      <Button title="Now" onPress={scrollToNow} />
+      <Calendar ref={calendar} mode="week" date={date} events={events} onChangeDate={setDate} />
+    </>
+  );
+}
+```
+
 ## The hour axis
 
 - `minHour` / `maxHour` — clamp the visible window (e.g. 7–20) instead of the

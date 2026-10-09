@@ -18,12 +18,16 @@ import {
 import {
   createContext,
   type Dispatch,
+  type ForwardedRef,
+  forwardRef,
   memo,
   type ReactElement,
+  type RefAttributes,
   type SetStateAction,
   useCallback,
   useContext,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -90,7 +94,11 @@ import {
   snapDeltaMinutes,
 } from "@super-calendar/core";
 import { formatHour, layoutDayEvents, type PositionedEvent } from "@super-calendar/core";
-import type { CalendarLabels, EventAccessibilityLabeler } from "@super-calendar/core";
+import type {
+  CalendarHandle,
+  CalendarLabels,
+  EventAccessibilityLabeler,
+} from "@super-calendar/core";
 import { resolveCalendarLabels } from "@super-calendar/core";
 import { type WeekdayFormat, weekdayFormatToken } from "@super-calendar/core";
 import {
@@ -2346,73 +2354,76 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   renderHeader?: (days: Date[]) => React.ReactNode;
 };
 
-function TimeGridInner<T>({
-  mode,
-  numberOfDays = 1,
-  weekEndsOn,
-  date,
-  events,
-  cellHeight,
-  hourHeight = DEFAULT_HOUR_HEIGHT,
-  weekStartsOn,
-  weekdayFormat = "short",
-  labels: labelsProp,
-  renderEvent,
-  eventAccessibilityLabel,
-  keyExtractor,
-  scrollOffsetMinutes = 0,
-  hourColumnWidth: hourColumnWidthProp = DEFAULT_HOUR_COLUMN_WIDTH,
-  hideHours = false,
-  timeslots = 1,
-  showAllDayEventCell = true,
-  showAllDayLabel = false,
-  refreshControl,
-  highlightWeekends = true,
-  calendarCellStyle,
-  businessHours,
-  renderBusinessHours,
-  renderBackgroundEvent,
-  showWeekNumber = false,
-  headerComponent,
-  minHour = 0,
-  maxHour = HOURS_PER_DAY,
-  ampm = false,
-  isRTL = false,
-  minHourHeight = DEFAULT_MIN_HOUR_HEIGHT,
-  maxHourHeight = DEFAULT_MAX_HOUR_HEIGHT,
-  minEventHeight = DEFAULT_MIN_EVENT_HEIGHT,
-  eventGap = DEFAULT_EVENT_GAP,
-  showNowIndicator = true,
-  locale,
-  freeSwipe = false,
-  swipeEnabled = true,
-  showVerticalScrollIndicator = true,
-  verticalScrollEnabled = true,
-  weekNumberPrefix = "W",
-  hiddenDays,
-  now,
-  timeZone,
-  hourComponent,
-  activeDate,
-  resetPageOnPressCell = false,
-  dragStepMinutes = DEFAULT_DRAG_STEP_MINUTES,
-  showDragHandle = true,
-  eventStartEditable = true,
-  eventDurationEditable = true,
-  eventOverlap = true,
-  onPressEvent,
-  onLongPressEvent,
-  onDragEvent: onDragEventProp,
-  onDragStart,
-  onPressCell,
-  onLongPressCell,
-  onCreateEvent,
-  onPressDateHeader,
-  onChangeDate,
-  renderHeader,
-  classNames,
-  styles: styleOverrides,
-}: TimeGridProps<T>): ReactElement {
+function TimeGridInner<T>(
+  {
+    mode,
+    numberOfDays = 1,
+    weekEndsOn,
+    date,
+    events,
+    cellHeight,
+    hourHeight = DEFAULT_HOUR_HEIGHT,
+    weekStartsOn,
+    weekdayFormat = "short",
+    labels: labelsProp,
+    renderEvent,
+    eventAccessibilityLabel,
+    keyExtractor,
+    scrollOffsetMinutes = 0,
+    hourColumnWidth: hourColumnWidthProp = DEFAULT_HOUR_COLUMN_WIDTH,
+    hideHours = false,
+    timeslots = 1,
+    showAllDayEventCell = true,
+    showAllDayLabel = false,
+    refreshControl,
+    highlightWeekends = true,
+    calendarCellStyle,
+    businessHours,
+    renderBusinessHours,
+    renderBackgroundEvent,
+    showWeekNumber = false,
+    headerComponent,
+    minHour = 0,
+    maxHour = HOURS_PER_DAY,
+    ampm = false,
+    isRTL = false,
+    minHourHeight = DEFAULT_MIN_HOUR_HEIGHT,
+    maxHourHeight = DEFAULT_MAX_HOUR_HEIGHT,
+    minEventHeight = DEFAULT_MIN_EVENT_HEIGHT,
+    eventGap = DEFAULT_EVENT_GAP,
+    showNowIndicator = true,
+    locale,
+    freeSwipe = false,
+    swipeEnabled = true,
+    showVerticalScrollIndicator = true,
+    verticalScrollEnabled = true,
+    weekNumberPrefix = "W",
+    hiddenDays,
+    now,
+    timeZone,
+    hourComponent,
+    activeDate,
+    resetPageOnPressCell = false,
+    dragStepMinutes = DEFAULT_DRAG_STEP_MINUTES,
+    showDragHandle = true,
+    eventStartEditable = true,
+    eventDurationEditable = true,
+    eventOverlap = true,
+    onPressEvent,
+    onLongPressEvent,
+    onDragEvent: onDragEventProp,
+    onDragStart,
+    onPressCell,
+    onLongPressCell,
+    onCreateEvent,
+    onPressDateHeader,
+    onChangeDate,
+    renderHeader,
+    classNames,
+    styles: styleOverrides,
+  }: TimeGridProps<T>,
+  ref: ForwardedRef<CalendarHandle>,
+): ReactElement {
   // Guard against an inverted/out-of-range window so the grid never collapses.
   const clampedMinHour = Math.max(0, Math.min(minHour, HOURS_PER_DAY - 1));
   const clampedMaxHour = Math.max(clampedMinHour + 1, Math.min(maxHour, HOURS_PER_DAY));
@@ -2906,18 +2917,25 @@ function TimeGridInner<T>({
     return () => cancelAnimationFrame(frame);
   }, [seedWebScroll]);
 
-  // Scroll to a changed `scrollOffsetMinutes` (or hour window) at the live zoom.
-  // The mount offset comes from `contentOffset` and the web seed above.
+  // Scroll so `minutes` sits at the top of the hours, at the live zoom.
+  const scrollToMinutes = useCallback(
+    (minutes: number, animated: boolean) => {
+      webSeededRef.current = true;
+      const y = Math.max(0, minutes / MINUTES_PER_HOUR - clampedMinHour) * cellHeight.value;
+      scrollRef.current?.scrollTo({ y, animated });
+    },
+    [clampedMinHour, cellHeight, scrollRef],
+  );
+
+  // Scroll to a changed `scrollOffsetMinutes` (or hour window). The mount offset
+  // comes from `contentOffset` and the web seed above.
   const appliedOffsetRef = useRef({ minutes: scrollOffsetMinutes, minHour: clampedMinHour });
   useEffect(() => {
     const applied = appliedOffsetRef.current;
     if (applied.minutes === scrollOffsetMinutes && applied.minHour === clampedMinHour) return;
     appliedOffsetRef.current = { minutes: scrollOffsetMinutes, minHour: clampedMinHour };
-    webSeededRef.current = true;
-    const y =
-      Math.max(0, scrollOffsetMinutes / MINUTES_PER_HOUR - clampedMinHour) * cellHeight.value;
-    scrollRef.current?.scrollTo({ y, animated: false });
-  }, [scrollOffsetMinutes, clampedMinHour, cellHeight, scrollRef]);
+    scrollToMinutes(scrollOffsetMinutes, false);
+  }, [scrollOffsetMinutes, clampedMinHour, scrollToMinutes]);
 
   // Web: LegendList's horizontal scroll container is `overflow-x: auto`, so a
   // trackpad swipe or horizontal wheel would scroll between pages. Paging should be
@@ -2948,6 +2966,15 @@ function TimeGridInner<T>({
   // (paging from an edge drag, the snap-back after a cell press) become instant
   // jumps when it's on.
   const reduceMotion = useReducedMotion();
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToTime: (minutes, { animated = true } = {}) =>
+        scrollToMinutes(minutes, animated && !reduceMotion),
+    }),
+    [scrollToMinutes, reduceMotion],
+  );
 
   // Page by `delta` (edge drags, web arrow keys): move the list at once and
   // report the date, rather than waiting for the reported date to come back
@@ -3374,7 +3401,9 @@ function TimeGridInner<T>({
  * />
  * ```
  */
-export const TimeGrid = memo(TimeGridInner) as typeof TimeGridInner;
+export const TimeGrid = memo(forwardRef(TimeGridInner)) as <T>(
+  props: TimeGridProps<T> & RefAttributes<CalendarHandle>,
+) => ReactElement;
 
 type DayHeaderRowProps = {
   days: Date[];

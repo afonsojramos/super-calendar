@@ -1,4 +1,6 @@
 import { act, fireEvent, within } from "@testing-library/react-native";
+import { createRef } from "react";
+import type { CalendarHandle } from "@super-calendar/core";
 import { Dimensions, Platform, Pressable, StyleSheet, Text } from "react-native";
 import type { CalendarEvent, RenderEventArgs } from "../../types";
 import { render } from "./renderGrid";
@@ -1005,6 +1007,32 @@ describe("TimeGrid hour column", () => {
     await rerender(grid(13 * 60));
     expect(scrollToCalls()).toEqual([{ y: 13 * 96, animated: false }]);
     expect(scroller().props.contentOffset).toEqual({ x: 0, y: 384 });
+  });
+
+  it("scrolls to a time through its ref on every call, at the live zoom", async () => {
+    const scrollToCalls = () =>
+      (globalThis as { __scrollToCalls?: { y: number }[] }).__scrollToCalls ?? [];
+    (globalThis as { __scrollToCalls?: unknown[] }).__scrollToCalls = [];
+    const cellHeight = { value: 48 };
+    const ref = createRef<CalendarHandle>();
+    await render(
+      <TimeGrid
+        {...gridProps()}
+        ref={ref}
+        hourHeight={48}
+        cellHeight={cellHeight as never}
+        minHour={6}
+        scrollOffsetMinutes={14 * 60}
+      />,
+    );
+    // The same time as `scrollOffsetMinutes`, twice: each call scrolls.
+    await act(() => ref.current!.scrollToTime(14 * 60));
+    cellHeight.value = 96;
+    await act(() => ref.current!.scrollToTime(14 * 60, { animated: false }));
+    expect(scrollToCalls()).toEqual([
+      { y: (14 - 6) * 48, animated: true },
+      { y: (14 - 6) * 96, animated: false },
+    ]);
   });
 
   it("gives each page an all-day band that rides the scroll offset and follows its lane", async () => {
