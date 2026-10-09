@@ -158,3 +158,21 @@ export interface BusinessHoursBand {
   start: number;
   end: number;
 }
+
+/** Options for {@link CalendarHandle.scrollToTime}. */
+export interface ScrollToTimeOptions {
+  /** Animate the scroll. Default true; off when the OS asks to reduce motion. */
+  animated?: boolean;
+}
+
+/**
+ * Imperative methods exposed through a `ref` on `Calendar` and `TimeGrid`.
+ */
+export interface CalendarHandle {
+  /**
+   * Scroll the time grid so `minutes` (from midnight) sits at the top of the
+   * hours, at the current zoom. Works with any value, including the one already
+   * passed as `scrollOffsetMinutes`. A no-op when no time grid is showing.
+   */
+  scrollToTime(minutes: number, options?: ScrollToTimeOptions): void;
+}

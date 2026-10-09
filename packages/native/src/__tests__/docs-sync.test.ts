@@ -54,6 +54,9 @@ for (const [name, decls] of indexExports) {
 }
 const calendarProps = componentProps.get("Calendar") ?? new Set<string>();
 
+// Attributes React handles itself rather than passing as props.
+const REACT_ATTRIBUTES = new Set(["key", "ref"]);
+
 const read = (file: string) => fs.readFileSync(file, "utf8");
 
 // First-column backtick token of every markdown table row. Header and separator
@@ -143,7 +146,7 @@ describe("docs stay in sync with the type surface", () => {
           for (const attr of node.getAttributes()) {
             if (!Node.isJsxAttribute(attr)) continue; // skip {...spread}
             const attrName = attr.getNameNode().getText();
-            if (!props.has(attrName)) {
+            if (!props.has(attrName) && !REACT_ATTRIBUTES.has(attrName)) {
               propViolations.push(`${rel}: <${node.getTagNameNode().getText()} ${attrName}>`);
             }
           }

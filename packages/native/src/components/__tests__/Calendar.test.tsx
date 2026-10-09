@@ -1,4 +1,7 @@
 import { LegendList } from "@legendapp/list/react-native";
+import { act } from "@testing-library/react-native";
+import { createRef } from "react";
+import type { CalendarHandle } from "@super-calendar/core";
 import { RefreshControl } from "react-native";
 import { render } from "./renderGrid";
 import type { CalendarEvent } from "../../types";
@@ -215,5 +218,30 @@ describe("Calendar refreshControl", () => {
     );
     const scrollers = container.queryAll((node) => node.type === "RCTScrollView");
     expect(scrollers.some((node) => node.props.refreshControl === control)).toBe(true);
+  });
+});
+
+describe("Calendar ref", () => {
+  it("forwards scrollToTime to the time grid, and is a no-op off the grid", async () => {
+    (globalThis as { __scrollToCalls?: unknown[] }).__scrollToCalls = [];
+    const ref = createRef<CalendarHandle>();
+    const calendar = (mode: "week" | "month") => (
+      <Calendar
+        ref={ref}
+        mode={mode}
+        date={new Date(2026, 6, 15)}
+        events={[]}
+        hourHeight={48}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />
+    );
+    const { rerender } = await render(calendar("week"));
+    await act(() => ref.current!.scrollToTime(9 * 60, { animated: false }));
+    expect((globalThis as { __scrollToCalls?: unknown[] }).__scrollToCalls).toEqual([
+      { y: 9 * 48, animated: false },
+    ]);
+    await rerender(calendar("month"));
+    expect(() => ref.current!.scrollToTime(9 * 60)).not.toThrow();
   });
 });
