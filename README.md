@@ -1,6 +1,6 @@
 <h1 align="center">super-calendar</h1>
 
-<p align="center">A generic, themeable <strong>month / week / day</strong> calendar for React Native.</p>
+<p align="center">A generic, themeable <strong>month / week / day</strong> calendar for React Native and React.</p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@super-calendar/native"><img alt="npm version" src="https://img.shields.io/npm/v/@super-calendar/native?style=flat-square&amp;color=1F6FEB" /></a>
@@ -22,13 +22,25 @@
 </p>
 
 - 📆 Month grid plus day / 3-day / week / custom-N time-grids
-- 🤏 Zoomable week/day grid: pinch on iOS & Android, Ctrl/Cmd + scroll on web (UI thread, no re-renders)
+- 🤏 Zoomable week/day grid: pinch on iOS & Android (UI thread, no re-renders), Ctrl/Cmd + scroll or pinch on web
 - ♾️ Virtualized, snap-paging months/weeks/days via [`@legendapp/list`](https://legendapp.com/open-source/list/)
 - 🧩 Bring-your-own event type (`CalendarEvent<T>`) and a `renderEvent` escape hatch
 - 🗓️ Date selection (single / multiple / range via `useDateRange`), disabled days, and a scrolling `MonthList`
 - 🪝 Headless `useMonthGrid` hook to build a fully custom calendar
 - 🎨 Fully themeable, with sensible defaults (no styling library required)
-- 🌐 Runs on iOS, Android and web (web via [react-native-web](https://necolas.github.io/react-native-web/); see [Web](#web))
+- 🌐 Runs on iOS, Android and the web: a pure react-dom renderer for React apps, or the React Native package on [react-native-web](https://necolas.github.io/react-native-web/) (see [Web](#web))
+
+## Packages
+
+Pick the renderer for your app. Both share the same `Calendar` API, built on one render-agnostic core.
+
+| Package                                                                          | Use it for                                                                                                     |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| [`@super-calendar/native`](https://www.npmjs.com/package/@super-calendar/native) | React Native apps on iOS and Android, plus the web through react-native-web                                    |
+| [`@super-calendar/dom`](https://www.npmjs.com/package/@super-calendar/dom)       | React web apps (react-dom), with no React Native runtime; see [React DOM](#react-dom-web-without-react-native) |
+| [`@super-calendar/core`](https://www.npmjs.com/package/@super-calendar/core)     | The headless logic, types, and hooks both renderers use, for building your own renderer                        |
+
+The [quickstart](https://super-calendar.afonsojramos.me/quickstart) has a tab for each platform.
 
 ## Relationship to react-native-big-calendar
 

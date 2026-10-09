@@ -1,80 +1,147 @@
 ---
 title: Quickstart
-description: Install the calendar and render your first view.
+description: Install the calendar and render your first view, in React Native or in React on the web.
 ---
 
-## Prerequisites
+super-calendar works with both React Native and React. Each platform has its own
+package, and both expose the same `Calendar` API on a shared core:
 
-A React Native app on the new architecture, within the `>=0.74 <2` peer range,
-with these peer dependencies
-installed: `react-native-reanimated` (v4), `react-native-gesture-handler`,
-`react-native-worklets`, and `@legendapp/list` (v3). The Expo SDK includes
-compatible versions.
+| Your app                                                      | Package                  |
+| ------------------------------------------------------------- | ------------------------ |
+| React Native (iOS and Android, plus web via react-native-web) | `@super-calendar/native` |
+| React on the web (react-dom)                                  | `@super-calendar/dom`    |
 
-## Install
+Pick the tab for your app.
 
-<Steps>
-  <Step title="Add the package and peers">
-    <CodeGroup>
-    ```bash npm
-    npx expo install @super-calendar/native react-native-reanimated react-native-gesture-handler react-native-worklets @legendapp/list date-fns
-    ```
+<Tabs>
+  <Tab title="React Native">
+    You need a React Native app on the new architecture, within the `>=0.74 <2`
+    peer range. The Expo SDK includes compatible versions of the peers below.
 
-    ```bash pnpm
-    pnpm add @super-calendar/native react-native-reanimated react-native-gesture-handler react-native-worklets @legendapp/list date-fns
-    ```
-    </CodeGroup>
+    <Steps>
+      <Step title="Add the package and peers">
+        <CodeGroup>
+        ```bash npm
+        npx expo install @super-calendar/native react-native-reanimated react-native-gesture-handler react-native-worklets @legendapp/list date-fns
+        ```
 
-  </Step>
+        ```bash pnpm
+        pnpm add @super-calendar/native react-native-reanimated react-native-gesture-handler react-native-worklets @legendapp/list date-fns
+        ```
+        </CodeGroup>
 
-  <Step title="Wrap your app in GestureHandlerRootView">
-    Gesture Handler needs a root view at the top of your tree.
+      </Step>
 
-    ```tsx
-    import { GestureHandlerRootView } from "react-native-gesture-handler";
+      <Step title="Wrap your app in GestureHandlerRootView">
+        Gesture Handler needs a root view at the top of your tree.
 
-    export default function App() {
-      return <GestureHandlerRootView style={{ flex: 1 }}>{/* ... */}</GestureHandlerRootView>;
-    }
-    ```
+        ```tsx
+        import { GestureHandlerRootView } from "react-native-gesture-handler";
 
-  </Step>
+        export default function App() {
+          return <GestureHandlerRootView style={{ flex: 1 }}>{/* ... */}</GestureHandlerRootView>;
+        }
+        ```
 
-  <Step title="Render a calendar">
-    `<Calendar>` is controlled: you own `date` and `events`, and update them from
-    its callbacks.
+      </Step>
 
-    ```tsx
-    import { useState } from "react";
-    import { Calendar, type CalendarEvent, type CalendarMode } from "@super-calendar/native";
+      <Step title="Render a calendar">
+        `<Calendar>` is controlled: you own `date` and `events`, and update them from
+        its callbacks.
 
-    const events: CalendarEvent[] = [
-      { title: "Standup", start: new Date(2026, 5, 23, 9, 0), end: new Date(2026, 5, 23, 9, 30) },
-    ];
+        ```tsx
+        import { useState } from "react";
+        import { Calendar, type CalendarEvent, type CalendarMode } from "@super-calendar/native";
 
-    export function MyCalendar() {
-      const [date, setDate] = useState(() => new Date());
-      const [mode, setMode] = useState<CalendarMode>("week");
-      return (
-        <Calendar
-          mode={mode}
-          date={date}
-          events={events}
-          weekStartsOn={1}
-          onChangeDate={setDate}
-          onPressEvent={(event) => console.log(event.title)}
-        />
-      );
-    }
-    ```
+        const events: CalendarEvent[] = [
+          { title: "Standup", start: new Date(2026, 5, 23, 9, 0), end: new Date(2026, 5, 23, 9, 30) },
+        ];
 
-  </Step>
-</Steps>
+        export function MyCalendar() {
+          const [date, setDate] = useState(() => new Date());
+          const [mode, setMode] = useState<CalendarMode>("week");
+          return (
+            <Calendar
+              mode={mode}
+              date={date}
+              events={events}
+              weekStartsOn={1}
+              onChangeDate={setDate}
+              onPressEvent={(event) => console.log(event.title)}
+            />
+          );
+        }
+        ```
 
-<Tip>
-  Targeting the web too? See the [Web guide](/guides/web) for the extra peers and how the touch
-  gestures map to mouse and keyboard.
-</Tip>
+      </Step>
+    </Steps>
+
+    <Tip>
+      Shipping the same app to the browser? See the [Web guide](/guides/web) for the extra
+      peers and how the touch gestures map to mouse and keyboard.
+    </Tip>
+
+  </Tab>
+  <Tab title="React (DOM)">
+    You need a React 18 or later app rendering with react-dom. No React Native
+    packages are involved: the calendar renders plain DOM elements.
+
+    <Steps>
+      <Step title="Add the package and peers">
+        <CodeGroup>
+        ```bash npm
+        npm install @super-calendar/dom @legendapp/list date-fns
+        ```
+
+        ```bash pnpm
+        pnpm add @super-calendar/dom @legendapp/list date-fns
+        ```
+        </CodeGroup>
+
+        `react` and `react-dom` are peers too, so the calendar uses the copies your
+        app already has.
+      </Step>
+
+      <Step title="Render a calendar">
+        `<Calendar>` is controlled: you own `date` and `events`, and update them from
+        its callbacks. The time grid scrolls inside the box set by `height`.
+
+        ```tsx
+        import { useState } from "react";
+        import { Calendar, type CalendarEvent, type CalendarMode } from "@super-calendar/dom";
+
+        const events: CalendarEvent[] = [
+          { title: "Standup", start: new Date(2026, 5, 23, 9, 0), end: new Date(2026, 5, 23, 9, 30) },
+        ];
+
+        export function MyCalendar() {
+          const [date, setDate] = useState(() => new Date());
+          const [mode, setMode] = useState<CalendarMode>("week");
+          return (
+            <Calendar
+              mode={mode}
+              date={date}
+              events={events}
+              weekStartsOn={1}
+              height={600}
+              onChangeDate={setDate}
+              onPressEvent={(event) => console.log(event.title)}
+            />
+          );
+        }
+        ```
+
+      </Step>
+    </Steps>
+
+    <Tip>
+      The [react-dom renderer](/guides/dom) guide covers the individual views, theming, and
+      keyboard navigation. Most other guides use the React Native package; the
+      [renderer comparison](/reference/renderers) lists what differs.
+    </Tip>
+
+  </Tab>
+</Tabs>
 
 ## Next steps
 
