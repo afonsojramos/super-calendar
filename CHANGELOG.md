@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.13.0](https://github.com/afonsojramos/super-calendar/compare/v2.12.1...v2.13.0) (2026-10-09)
+
+
+### Features
+
+* add a scrollToTime ref handle to Calendar and TimeGrid ([a0e790e](https://github.com/afonsojramos/super-calendar/commit/a0e790ed79113b9f6bc216fb56f7de523db6d15c))
+
+
+### Bug Fixes
+
+* **native:** apply scrollOffsetMinutes changes explicitly at the live zoom ([b828d8b](https://github.com/afonsojramos/super-calendar/commit/b828d8b6fedee759b728a00171f70da6e62b2f43))
+
 ## [2.12.1](https://github.com/afonsojramos/super-calendar/compare/v2.12.0...v2.12.1) (2026-10-07)
 
 
