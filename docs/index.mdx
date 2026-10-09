@@ -4,7 +4,7 @@ sidebarTitle: Overview
 description: A gesture-driven, virtualized calendar for React Native and the web.
 ---
 
-A calendar for React Native and the web, built on a render-agnostic core. It
+A calendar for React Native and React on the web, built on a render-agnostic core. It
 renders month, week, day, 3-day, and schedule views, virtualizes and snap-pages
 every view, and leans into touch: pinch-to-zoom, drag to move and resize, and
 drag to create.
@@ -54,7 +54,9 @@ if you want a standalone, headless picker rather than a full calendar.
 - **Virtualized & paged** — every view snap-pages and only mounts a few dates at
   a time, so far-future and far-past dates stay cheap.
 - **Gesture-driven** — pinch-to-zoom the time grid, long-press to drag events,
-  drag a grip to resize, and drag empty space to create.
+  drag a grip to resize, and drag empty space to create. On the web the same
+  interactions run on the pointer: Ctrl/⌘ + scroll (or a trackpad pinch) zooms,
+  and you drag events directly with the mouse.
 - **Drag across days**, with optional validation to reject a drop.
 - **Date selection** (single, multiple, or range with the `useDateRange` hook),
   disabled days, and a scrolling `MonthList`.
