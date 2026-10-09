@@ -26,6 +26,11 @@ choose.
 />
 ```
 
+`scrollOffsetMinutes` is applied on mount and again whenever its value changes,
+at the current zoom. Keep it stable rather than deriving it from the clock on
+every render: re-rendering with the same value leaves the user's scroll position
+alone, while a new value scrolls.
+
 ## The hour axis
 
 - `minHour` / `maxHour` — clamp the visible window (e.g. 7–20) instead of the

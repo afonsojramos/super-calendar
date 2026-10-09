@@ -979,6 +979,34 @@ describe("TimeGrid hour column", () => {
     expect(scroller.getAllByLabelText(/Standup/)).toHaveLength(1);
   });
 
+  it("scrolls to a changed scrollOffsetMinutes at the live zoom, keeping contentOffset at mount", async () => {
+    const scrollToCalls = () =>
+      (globalThis as { __scrollToCalls?: { y: number }[] }).__scrollToCalls ?? [];
+    (globalThis as { __scrollToCalls?: unknown[] }).__scrollToCalls = [];
+    const cellHeight = { value: 48 };
+    const grid = (minutes: number) => (
+      <TimeGrid
+        {...gridProps()}
+        hourHeight={48}
+        cellHeight={cellHeight as never}
+        scrollOffsetMinutes={minutes}
+      />
+    );
+    const { container, rerender } = await render(grid(8 * 60));
+    const scroller = () => container.queryAll((node) => node.props.scrollEventThrottle === 16)[0];
+    // Mounting seeds through contentOffset, without a programmatic scroll.
+    expect(scrollToCalls()).toEqual([]);
+    // A re-render with the same offset leaves the user's scroll alone.
+    await rerender(grid(8 * 60));
+    expect(scrollToCalls()).toEqual([]);
+    // A zoomed grid scrolls a changed offset with the live row height, while the
+    // native contentOffset stays at the mount value so it can't re-apply.
+    cellHeight.value = 96;
+    await rerender(grid(13 * 60));
+    expect(scrollToCalls()).toEqual([{ y: 13 * 96, animated: false }]);
+    expect(scroller().props.contentOffset).toEqual({ x: 0, y: 384 });
+  });
+
   it("gives each page an all-day band that rides the scroll offset and follows its lane", async () => {
     const trip: CalendarEvent<WithId> = {
       id: "trip",

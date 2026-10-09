@@ -311,7 +311,7 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   ellipsizeTitle?: boolean;
   /** Label the built-in renderer shows for an all-day event in the schedule (and its screen-reader text). Default "All day". */
   allDayLabel?: string;
-  /** Initial vertical scroll, in minutes from midnight (week/day). */
+  /** Vertical scroll, in minutes from midnight (week/day). Applied on mount and whenever it changes. */
   scrollOffsetMinutes?: number;
   /** Show the current-time line on the week/day grid. Default true. */
   showNowIndicator?: boolean;
