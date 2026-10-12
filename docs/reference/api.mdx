@@ -81,6 +81,10 @@ On the time grid, dragging any segment of a multi-day event moves its whole rang
 All visible segments preview the move together on both renderers. Moving preserves
 duration; resizing changes only the selected edge. See [dragging](/guides/dragging).
 
+DOM `onPressCell` also handles touch taps on empty time-grid slots. The callback
+runs from the column's click, after pointer-up. Swipes and cancelled contacts
+do not call it. Mouse and pen retain their existing behavior.
+
 ## Selection
 
 | Prop                  | Type                   | Notes                                            |

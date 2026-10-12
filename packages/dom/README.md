@@ -76,6 +76,10 @@ Out of the box the calendar is fully styled from the theme, no stylesheet requir
 
 A slot's structural layout is always kept; only its themed look steps aside for your class, so the class wins over the inline default. See the [styling guide](https://super-calendar.afonsojramos.me/guides/styling).
 
+On the time grid, an empty-slot touch tap calls `onPressCell` from the column's
+click. Swipes and cancelled contacts do not press the slot. Mouse and pen retain
+drag-to-create behavior. See the [DOM guide](https://super-calendar.afonsojramos.me/guides/dom).
+
 ## Documentation
 
 See the [full documentation](https://super-calendar.afonsojramos.me), the [quickstart](https://super-calendar.afonsojramos.me/quickstart), and the [API reference](https://super-calendar.afonsojramos.me/reference/api).
