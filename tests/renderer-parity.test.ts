@@ -36,6 +36,9 @@ const DOM_PLATFORM_PROPS: Record<string, Set<string>> = {
     "height",
     "theme",
     "zoomable",
+    // DOM Pointer Events need configurable hold arbitration against browser scrolling.
+    "touchDragDelay",
+    "touchDragThreshold",
     "keyboardEventNavigation",
   ]),
   // showTitle/showWeekdays toggle dom-only chrome; theme/className/style as above.
