@@ -72,8 +72,6 @@ const DATE_BADGE_HEIGHT = 24;
 const BAND_CENTER_Y = DAY_CELL_PADDING_TOP + DATE_BADGE_HEIGHT / 2;
 const CELL_ROW_GAP = 2;
 const CHIP_PADDING_V = 2;
-// Where the first event row sits below the date badge (padding + badge + gap).
-const BADGE_AREA = DAY_CELL_PADDING_TOP + DATE_BADGE_HEIGHT + CELL_ROW_GAP;
 // Stable empty layout for the events-free picker (avoids a fresh object per render).
 const EMPTY_LAYOUT = { segments: [], laneCount: 0 } as const;
 // Horizontal inset of a chip within its cell (mirrors `styles.monthEvent`).
@@ -161,6 +159,10 @@ export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
    * explicit value when using a custom `renderEvent`.
    */
   maxVisibleEventCount?: number;
+  /** Chip and overflow height in pixels; defaults to the theme title height plus padding. */
+  chipHeight?: number;
+  /** Vertical gap between chip rows in pixels (default 2). */
+  chipGap?: number;
   weekStartsOn: WeekStartsOn;
   /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
   hiddenDays?: number[];
@@ -272,6 +274,8 @@ function MonthViewInner<T>({
   date,
   events,
   maxVisibleEventCount,
+  chipHeight,
+  chipGap = CELL_ROW_GAP,
   weekStartsOn,
   hiddenDays,
   weekdayFormat = "short",
@@ -316,6 +320,7 @@ function MonthViewInner<T>({
   styles: styleOverrides,
 }: MonthViewProps<T>): ReactElement {
   const theme = useCalendarTheme();
+  const badgeArea = DAY_CELL_PADDING_TOP + DATE_BADGE_HEIGHT + chipGap;
   const slot = createSlots<MonthViewSlot>({ classNames, styles: styleOverrides });
   const labels = useMemo(() => resolveCalendarLabels(labelsProp), [labelsProp]);
   // Selection comes from context (so cached pages still repaint), but explicit
@@ -366,9 +371,9 @@ function MonthViewInner<T>({
   const chipMetrics = useMemo(() => {
     const fontSize = numericStyle(theme.text.eventTitle.fontSize, 12);
     const lineHeight = numericStyle(theme.text.eventTitle.lineHeight, Math.ceil(fontSize * 1.3));
-    const chipHeight = lineHeight + CHIP_PADDING_V * 2;
-    return { chipHeight, chipRowHeight: chipHeight + CELL_ROW_GAP };
-  }, [theme]);
+    const height = chipHeight ?? lineHeight + CHIP_PADDING_V * 2;
+    return { chipHeight: height, chipRowHeight: height + chipGap };
+  }, [theme, chipHeight, chipGap]);
 
   // How many chips fit per cell: a fixed cap when `maxVisibleEventCount` is set,
   // else derived from the measured cell height and the (default) chip metrics.
@@ -381,10 +386,10 @@ function MonthViewInner<T>({
     }
     const rowHeight = gridHeight / weeks.length;
     const moreFontSize = numericStyle(theme.text.more.fontSize, 11);
-    const moreRowHeight = Math.ceil(moreFontSize * 1.3) + CELL_ROW_GAP;
+    const moreRowHeight = (chipHeight ?? Math.ceil(moreFontSize * 1.3)) + chipGap;
     const available = rowHeight - DAY_CELL_PADDING_TOP - DATE_BADGE_HEIGHT;
     return monthEventCapacity(available, chipMetrics.chipRowHeight, moreRowHeight);
-  }, [maxVisibleEventCount, gridHeight, weeks.length, theme, chipMetrics]);
+  }, [maxVisibleEventCount, gridHeight, weeks.length, theme, chipMetrics, chipHeight, chipGap]);
 
   // Group events by calendar day once per `events` change (shared with the dom
   // renderer via core's `groupEventsByDay`), rather than scanning the whole list
@@ -466,7 +471,7 @@ function MonthViewInner<T>({
       if (!isDateSelectable(day, { minDate, maxDate, isDateDisabled })) return null;
       // Which lane row the point lands on, mirroring the bar overlay's geometry.
       const rowLayout = weekLayouts[row] ?? EMPTY_LAYOUT;
-      const lane = Math.floor((y - row * rowHeight - BADGE_AREA) / chipMetrics.chipRowHeight);
+      const lane = Math.floor((y - row * rowHeight - badgeArea) / chipMetrics.chipRowHeight);
       const visibleLanes = monthVisibleCount(rowLayout.laneCount, capacity);
       const segment =
         lane >= 0 && lane < visibleLanes
@@ -480,6 +485,7 @@ function MonthViewInner<T>({
       weekLayouts,
       capacity,
       chipMetrics,
+      badgeArea,
       showAdjacentMonths,
       date,
       minDate,
@@ -623,7 +629,7 @@ function MonthViewInner<T>({
         <View
           key={day.toISOString()}
           {...slot("day", {
-            base: styles.dayCell,
+            base: [styles.dayCell, { gap: chipGap }],
             themed: [
               showGrid && {
                 borderTopWidth: StyleSheet.hairlineWidth,
@@ -715,7 +721,7 @@ function MonthViewInner<T>({
       // Events mode mirrors the dom renderer: left-aligned cell content with
       // the date badge in the top-right. The picker (no grid) stays centered
       // so the selection range band lines up with the centered badge.
-      base: [styles.dayCell, showGrid && styles.dayCellEvents],
+      base: [styles.dayCell, { gap: chipGap }, showGrid && styles.dayCellEvents],
       themed: [
         showGrid && {
           borderTopWidth: StyleSheet.hairlineWidth,
@@ -862,7 +868,7 @@ function MonthViewInner<T>({
         {hiddenCount > 0 ? (
           <Text
             {...slot<TextStyle>("more", {
-              base: styles.moreLabel,
+              base: [styles.moreLabel, chipHeight != null && { height: chipHeight }],
               themed: [theme.text.more, { color: theme.colors.textMuted }],
             })}
             onPress={
@@ -1036,7 +1042,7 @@ function MonthViewInner<T>({
                                 position: "absolute",
                                 left: pct((startCol / cols) * 100),
                                 width: pct(((endCol - startCol + 1) / cols) * 100),
-                                top: BADGE_AREA + seg.lane * chipMetrics.chipRowHeight,
+                                top: badgeArea + seg.lane * chipMetrics.chipRowHeight,
                                 height: chipMetrics.chipHeight,
                                 paddingHorizontal: CHIP_INSET_H,
                                 // Let a sweep in progress reach the cells underneath.

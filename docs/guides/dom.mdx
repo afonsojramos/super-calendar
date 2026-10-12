@@ -57,6 +57,35 @@ Creating on empty space is pointer-only (drag to sweep out a range); see
 
 ## The Calendar wrapper
 
+On the time grid, a touch or pen drag waits for a held press. A swipe scrolls
+instead, and a touch tap on empty space calls `onPressCell`. Adjust the hold with
+`touchDragDelay` (default 300 ms) and `touchDragThreshold` (default 8 px).
+See [Dragging](/guides/dragging).
+
+For touch target sizes, use the existing `hourHeight`, `minEventHeight`,
+`eventDurationEditable`, and all-day slot styles. `chipHeight` and `chipGap` now
+control month lanes. The library keeps its current defaults and does not select
+a size preset based on the pointer. For example:
+
+```tsx
+<TimeGrid
+  date={date}
+  events={events}
+  hourHeight={72}
+  minEventHeight={44}
+  eventDurationEditable={false}
+  styles={{ allDayEvent: { height: 44 }, allDayColumn: { gap: 4 } }}
+  onPressEvent={onPressEvent}
+  onPressCell={onPressCell}
+  onDragEvent={onDragEvent}
+/>
+<MonthView date={date} events={events} chipHeight={44} chipGap={4} maxVisibleEventCount={2} />
+```
+
+If you use `(pointer: coarse)` to select sizes, update the options when the media
+query changes. Drag activation follows each event's pointer type, so mouse use
+on a hybrid device still starts immediately.
+
 The quickest start mirrors the native component: pick a `mode` and pass events.
 
 ```tsx

@@ -27,6 +27,19 @@ range). New `start`/`end` are snapped to `dragStepMinutes` (default 15).
 />
 ```
 
+### DOM touch gestures
+
+On the DOM time grid, touch and pen wait for a 300 ms hold within 8 px before
+dragging. A tap calls `onPressEvent` from the event's click. A vertical swipe
+that starts on an event scrolls the grid. Once the hold activates a drag,
+scrolling stops until release or cancellation. Mouse dragging starts immediately.
+
+Set `touchDragDelay` (milliseconds) and `touchDragThreshold` (pixels) on DOM
+`Calendar` or `TimeGrid` to adjust the hold. Touch and pen do not trigger edge
+paging, so resting a finger near an edge cannot repeatedly change the date.
+Empty-slot touch taps call `onPressCell`; dragging to create remains mouse and
+pen only. These changes apply to the DOM time grid, not the month drag gestures.
+
 ### Move an event past midnight
 
 A move keeps its duration, so dragging an event **down past the end of the day**

@@ -29,6 +29,15 @@ bar that runs past a week's edge is squared off and continues on the next row.
 
 ## Event chips and overflow
 
+Set `chipHeight` and `chipGap` on `Calendar`, `MonthView`, or `MonthList` to size
+the event lanes and their gaps. Native `MonthPager` forwards them too. Dimensions
+also control spanning bars and the overflow row. Custom renderers must fit inside
+the configured height.
+
+The DOM defaults remain 18 px for height and 2 px for gaps. Native keeps its
+theme-derived height and 2 px gaps when you omit the options. With larger chips,
+choose a smaller `maxVisibleEventCount` if your calendar has limited height.
+
 Each week row stacks its events into lanes (a multi-day bar keeps its lane across
 the days it spans) and shows as many lanes as the cell height allows, collapsing
 the rest of a day's events into a `+N more` label.

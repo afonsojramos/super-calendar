@@ -77,6 +77,11 @@ pitfall this avoids.
 | `onPressDay`            | `(date) => void`                         | Tap a month day cell.                                                             |
 | `onPressMore`           | `(events, date) => void`                 | Tap the `+N more` overflow.                                                       |
 
+DOM `Calendar` and `TimeGrid` also accept two numeric options for touch and pen:
+`touchDragDelay` is the hold duration in milliseconds (default 300), and
+`touchDragThreshold` is the movement tolerance in pixels (default 8). They do not
+apply to the native renderer. See [DOM touch gestures](/guides/dragging#dom-touch-gestures).
+
 On the time grid, dragging any segment of a multi-day event moves its whole range.
 All visible segments preview the move together on both renderers. Moving preserves
 duration; resizing changes only the selected edge. See [dragging](/guides/dragging).
@@ -113,6 +118,8 @@ the [Date selection](/guides/selection) guide.
 | `allDayLabel`          | `string`                                   | Schedule all-day text ("All day").                                              |
 | `highlightWeekends`    | `boolean`                                  | Tint weekend cells/columns (month + time grid, default on).                     |
 | `maxVisibleEventCount` | `number`                                   | Month: fixed cap on event lanes per week row.                                   |
+| `chipHeight`           | `number`                                   | Month chip and overflow height, in px. DOM default 18; native uses the theme.   |
+| `chipGap`              | `number`                                   | Gap between month chip rows, in px (default 2).                                 |
 | `showTitle`            | `boolean`                                  | Month: the built-in "MMMM yyyy" label above the grid (default on).              |
 | `theme`                | `PartialCalendarTheme`                     | Color/text/metric overrides.                                                    |
 | `classNames`           | `Partial<Record<CalendarSlot, string>>`    | Per-slot Tailwind classes (uniwind/NativeWind); see [Styling](/guides/styling). |

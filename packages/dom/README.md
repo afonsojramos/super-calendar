@@ -61,6 +61,18 @@ only the start or end. See the [dragging guide](https://super-calendar.afonsojra
 
 ## Styling
 
+Touch and pen on `TimeGrid` wait for a 300 ms hold within 8 px before dragging.
+A tap presses the event from its click; a vertical swipe scrolls the grid.
+Touch and pen do not trigger edge paging. Empty-slot touch taps call `onPressCell`.
+Set `touchDragDelay` and `touchDragThreshold` on `TimeGrid` or `Calendar` to adjust
+the hold. Mouse drag and resize retain their existing behavior.
+
+Set `chipHeight` and `chipGap` on `MonthView`, `MonthList`, or `Calendar` to size
+month chips and overflow rows (defaults 18 px and 2 px). Use existing `hourHeight`,
+`minEventHeight`, `eventDurationEditable`, and all-day slot styles for touch sizes.
+The library does not apply a pointer-based size preset. See the
+[DOM guide](https://super-calendar.afonsojramos.me/guides/dom).
+
 Out of the box the calendar is fully styled from the theme, no stylesheet required. To restyle a specific part with **Tailwind** or your own CSS, every element is a named slot: pass `classNames` (or `styles`) per slot, and use `data-*` state variants like `data-[today]:`.
 
 ```tsx

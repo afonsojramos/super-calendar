@@ -72,6 +72,12 @@ only the start or end. See the [dragging guide](https://super-calendar.afonsojra
 
 ## Styling with Tailwind
 
+`chipHeight` and `chipGap` control month event lanes and overflow rows on
+`Calendar`, `MonthView`, `MonthList`, and `MonthPager`. Omit them to retain the
+theme-derived chip height and 2 px gaps. Custom event renderers must fit inside
+the configured height. See the
+[month guide](https://super-calendar.afonsojramos.me/guides/month-view).
+
 Every styleable part is a named slot that accepts a class (resolved by a Tailwind runtime such as [uniwind](https://docs.uniwind.dev) or NativeWind) and/or a style override. A classed slot drops its built-in themed styles, so your classes own the look:
 
 ```tsx
