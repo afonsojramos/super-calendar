@@ -517,6 +517,7 @@ function TimeGridInner<T = unknown>(
   const dragOrigin = useRef<{
     pointerX: number;
     pointerY: number;
+    pointerType: string;
     startHours: number;
     durationHours: number;
     dayIndex: number;
@@ -784,7 +785,7 @@ function TimeGridInner<T = unknown>(
       }
       // Edge auto-advance: dwell near a horizontal edge to page the view. Read the
       // columns rect live so a mid-drag scroll/layout shift can't stale it.
-      if (edgeAdvanceEnabled) {
+      if (edgeAdvanceEnabled && o.pointerType === "mouse") {
         const rect = columnsRef.current?.getBoundingClientRect();
         if (rect && rect.right > rect.left) {
           const left = rect.left + gutterWidth;
@@ -902,6 +903,7 @@ function TimeGridInner<T = unknown>(
     dragOrigin.current = {
       pointerX: e.clientX,
       pointerY: e.clientY,
+      pointerType: e.pointerType,
       startHours,
       durationHours,
       dayIndex,
