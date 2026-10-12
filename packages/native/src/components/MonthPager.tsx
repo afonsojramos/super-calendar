@@ -57,6 +57,10 @@ export type MonthPagerProps<T> = {
   date: Date;
   events: CalendarEvent<T>[];
   maxVisibleEventCount?: number;
+  /** Month chip height in pixels; omit to keep the theme default. */
+  chipHeight?: number;
+  /** Gap between month chip rows in pixels (default 2). */
+  chipGap?: number;
   weekStartsOn: WeekStartsOn;
   /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
   hiddenDays?: number[];
@@ -121,6 +125,8 @@ function MonthPagerInner<T>({
   date,
   events,
   maxVisibleEventCount,
+  chipHeight,
+  chipGap,
   weekStartsOn,
   hiddenDays,
   weekdayFormat = "short",
@@ -317,6 +323,8 @@ function MonthPagerInner<T>({
           showTitle={false}
           showWeekdays={false}
           maxVisibleEventCount={maxVisibleEventCount}
+          chipHeight={chipHeight}
+          chipGap={chipGap}
           weekStartsOn={weekStartsOn}
           hiddenDays={hiddenDays}
           locale={locale}
@@ -356,6 +364,8 @@ function MonthPagerInner<T>({
       pageHeight,
       events,
       maxVisibleEventCount,
+      chipHeight,
+      chipGap,
       weekStartsOn,
       hiddenDays,
       locale,

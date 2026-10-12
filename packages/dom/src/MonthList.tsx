@@ -52,6 +52,10 @@ export interface MonthListProps<T = unknown>
   eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
   /** Max chips shown per day before a "+N more" row (default 3). */
   maxVisibleEventCount?: number;
+  /** Month chip height in pixels; omit to keep the renderer default. */
+  chipHeight?: number;
+  /** Gap between month chip rows in pixels (default 2). */
+  chipGap?: number;
   /** Template for the overflow row; `{moreCount}` is replaced. */
   moreLabel?: string;
   /** Translations for the screen-reader words and gutter text; omitted keys use English. */
@@ -102,6 +106,8 @@ export function MonthList<T = unknown>({
   renderEvent,
   eventAccessibilityLabel,
   maxVisibleEventCount,
+  chipHeight,
+  chipGap,
   moreLabel,
   labels,
   onPressEvent,
@@ -202,6 +208,8 @@ export function MonthList<T = unknown>({
             renderEvent={renderEvent}
             eventAccessibilityLabel={eventAccessibilityLabel}
             maxVisibleEventCount={maxVisibleEventCount}
+            chipHeight={chipHeight}
+            chipGap={chipGap}
             moreLabel={moreLabel}
             labels={labels}
             onPressEvent={onPressEvent}

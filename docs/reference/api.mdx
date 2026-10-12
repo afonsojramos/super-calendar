@@ -118,6 +118,10 @@ the [Date selection](/guides/selection) guide.
 | `classNames`           | `Partial<Record<CalendarSlot, string>>`    | Per-slot Tailwind classes (uniwind/NativeWind); see [Styling](/guides/styling). |
 | `styles`               | `Partial<Record<CalendarSlot, StyleProp>>` | Per-slot style overrides, merged last.                                          |
 
+Month `Calendar`, `MonthView`, and `MonthList` accept `chipHeight` and `chipGap`.
+Both are numbers in pixels. DOM height defaults to 18; native height follows the
+theme. The gap defaults to 2 on both renderers. Native `MonthPager` forwards them too.
+
 ## Exports
 
 <CardGroup cols={2}>

@@ -169,6 +169,10 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
    * fixed cap. Pass an explicit value when using a custom `renderEvent`.
    */
   maxVisibleEventCount?: number;
+  /** Month chip height in pixels; omit to keep the renderer default. */
+  chipHeight?: number;
+  /** Gap between month chip rows in pixels (default 2). */
+  chipGap?: number;
   /** Sort each month day's events by start. Default true. */
   sortedMonthView?: boolean;
   /** Month overflow label template; `{moreCount}` is replaced. Default "{moreCount} More". */
@@ -489,6 +493,8 @@ function CalendarInner<T>(
     isDateDisabled,
     onPressDateHeader,
     maxVisibleEventCount,
+    chipHeight,
+    chipGap,
     sortedMonthView,
     moreLabel,
     labels,
@@ -673,6 +679,8 @@ function CalendarInner<T>(
             date={date}
             events={displayEvents}
             maxVisibleEventCount={maxVisibleEventCount}
+            chipHeight={chipHeight}
+            chipGap={chipGap}
             weekStartsOn={weekStartsOn}
             hiddenDays={hiddenDays}
             weekdayFormat={weekdayFormat}

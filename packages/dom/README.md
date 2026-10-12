@@ -59,6 +59,13 @@ On the time grid, dragging any segment of a multi-day event previews the whole
 range moving together and preserves its duration. Drag a resize grip to change
 only the start or end. See the [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
 
+## Month chip dimensions
+
+`chipHeight` and `chipGap` configure month lanes and overflow rows on `Calendar`,
+`MonthView`, and `MonthList`. Native `MonthPager` forwards them too. DOM defaults
+remain 18 px height and 2 px gaps; native height keeps its theme default.
+See the [month guide](https://super-calendar.afonsojramos.me/guides/month-view).
+
 ## Styling
 
 Out of the box the calendar is fully styled from the theme, no stylesheet required. To restyle a specific part with **Tailwind** or your own CSS, every element is a named slot: pass `classNames` (or `styles`) per slot, and use `data-*` state variants like `data-[today]:`.
