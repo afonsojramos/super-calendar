@@ -11,9 +11,12 @@ jest.mock("@legendapp/list/react-native", () => ({
   __esModule: true,
   LegendList: (props: any) => {
     (globalThis as any).__listProps = props;
-    const index = props.initialScrollIndex ?? 0;
-    const item = props.data?.[index];
-    return item === undefined ? null : props.renderItem({ item, index });
+    const { useMemo } = jest.requireActual<typeof import("react")>("react");
+    return useMemo(() => {
+      const index = props.initialScrollIndex ?? 0;
+      const item = props.data?.[index];
+      return item === undefined ? null : props.renderItem({ item, index });
+    }, [props.data, props.extraData]);
   },
 }));
 
@@ -48,5 +51,25 @@ describe("MonthList event updates", () => {
 
     expect((lastListProps()?.extraData as { events?: unknown })?.events).toBe(fetched);
     expect(getByLabelText(/6 January 2026, 1 event$/)).toBeTruthy();
+  });
+
+  it("updates mounted rows when only chip dimensions change", async () => {
+    const date = new Date(2026, 0, 6);
+    const events: CalendarEvent[] = [
+      { title: "One", start: date, end: new Date(2026, 0, 7), allDay: true },
+      { title: "Two", start: date, end: new Date(2026, 0, 7), allDay: true },
+    ];
+    const props = { date, events, weekStartsOn: 1 as const, maxVisibleEventCount: 1 };
+    const { getByLabelText, rerender } = await render(
+      <MonthList {...props} chipHeight={20} chipGap={2} />,
+    );
+    expect(getByLabelText(/6 January 2026, 2 events$/)).toHaveStyle({ gap: 2 });
+    expect(getByLabelText(/1 more events, 6 January/)).toHaveStyle({ height: 20 });
+
+    await rerender(<MonthList {...props} chipHeight={44} chipGap={2} />);
+    expect(getByLabelText(/1 more events, 6 January/)).toHaveStyle({ height: 44 });
+
+    await rerender(<MonthList {...props} chipHeight={44} chipGap={6} />);
+    expect(getByLabelText(/6 January 2026, 2 events$/)).toHaveStyle({ gap: 6 });
   });
 });

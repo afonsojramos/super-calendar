@@ -210,6 +210,10 @@ export interface CalendarProps<T = unknown>
   // --- Month mode ---
   /** Max chips per day before a "+N more" row. */
   maxVisibleEventCount?: number;
+  /** Month chip height in pixels; omit to keep the renderer default. */
+  chipHeight?: number;
+  /** Gap between month chip rows in pixels (default 2). */
+  chipGap?: number;
   /** Overflow row template; `{moreCount}` is replaced. */
   moreLabel?: string;
   /** Translations for the screen-reader words and gutter text; omitted keys use English. */
@@ -371,6 +375,8 @@ function CalendarInner<T = unknown>(
     keyboardEventNavigation,
     // month
     maxVisibleEventCount,
+    chipHeight,
+    chipGap,
     moreLabel,
     labels,
     showAdjacentMonths,
@@ -496,6 +502,8 @@ function CalendarInner<T = unknown>(
         classNames={classNames}
         styles={styles}
         maxVisibleEventCount={maxVisibleEventCount}
+        chipHeight={chipHeight}
+        chipGap={chipGap}
         moreLabel={moreLabel}
         showAdjacentMonths={showAdjacentMonths}
         showTitle={showTitle}

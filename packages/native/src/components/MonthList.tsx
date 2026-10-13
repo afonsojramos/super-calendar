@@ -98,6 +98,10 @@ export type MonthListProps<T> = {
    */
   monthHeaderHeight?: number;
   maxVisibleEventCount?: number;
+  /** Month chip height in pixels; omit to keep the renderer default. */
+  chipHeight?: number;
+  /** Gap between month chip rows in pixels (default 2). */
+  chipGap?: number;
   locale?: Locale;
   sortedMonthView?: boolean;
   moreLabel?: string;
@@ -153,6 +157,8 @@ function MonthListInner<T>({
   weekRowHeight: weekRowHeightProp,
   monthHeaderHeight = DEFAULT_MONTH_HEADER_HEIGHT,
   maxVisibleEventCount,
+  chipHeight,
+  chipGap,
   locale,
   sortedMonthView,
   moreLabel,
@@ -209,8 +215,8 @@ function MonthListInner<T>({
   // `firstViewableIndex` (the web `inert` cutoff must stay current). Selection
   // needs no entry: it reaches MonthView through context.
   const listExtraData = useMemo(
-    () => ({ events, activeDate, firstViewableIndex }),
-    [events, activeDate, firstViewableIndex],
+    () => ({ events, activeDate, firstViewableIndex, chipHeight, chipGap }),
+    [events, activeDate, firstViewableIndex, chipHeight, chipGap],
   );
 
   // A fixed window of months anchored once, aligned to the month start.
@@ -466,6 +472,8 @@ function MonthListInner<T>({
             showTitle={false}
             showWeekdays={false}
             maxVisibleEventCount={maxVisibleEventCount}
+            chipHeight={chipHeight}
+            chipGap={chipGap}
             weekStartsOn={weekStartsOn}
             locale={locale}
             sortedMonthView={sortedMonthView}
@@ -503,6 +511,8 @@ function MonthListInner<T>({
       locale,
       events,
       maxVisibleEventCount,
+      chipHeight,
+      chipGap,
       weekStartsOn,
       sortedMonthView,
       moreLabel,

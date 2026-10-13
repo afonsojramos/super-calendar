@@ -127,6 +127,10 @@ export interface MonthViewProps<T = unknown>
    * per day, so a long bar can push a lightly-booked day's own events into "+N more".
    */
   maxVisibleEventCount?: number;
+  /** Height of an event chip and of the "+N more" row, in px (default 18). */
+  chipHeight?: number;
+  /** Vertical gap between event chips, in px (default 2). */
+  chipGap?: number;
   /** Template for the overflow row; `{moreCount}` is replaced (default "{moreCount} More"). */
   moreLabel?: string;
   /** Translations for the screen-reader words and gutter text; omitted keys use English. */
@@ -328,6 +332,7 @@ function eventCellDefault(
   // True while a drag is over this day: a create sweep covering it, or a move
   // about to land on it. Tinted over the weekend shading so the drag reads live.
   isDragTarget: boolean,
+  chipGap: number,
 ): SlotDefault {
   return {
     base: {
@@ -338,7 +343,7 @@ function eventCellDefault(
       cursor: day.isDisabled ? "default" : "pointer",
       display: "flex",
       flexDirection: "column",
-      gap: CHIP_GAP,
+      gap: chipGap,
       padding: CELL_PAD,
       boxSizing: "border-box",
       textAlign: "left",
@@ -397,12 +402,12 @@ const chipButtonDefault: SlotDefault = {
   },
 };
 
-function chipDefault(theme: DomCalendarTheme): SlotDefault {
+function chipDefault(theme: DomCalendarTheme, chipHeight: number): SlotDefault {
   return {
     base: {
       display: "block",
-      height: CHIP_HEIGHT,
-      lineHeight: `${CHIP_HEIGHT}px`,
+      height: chipHeight,
+      lineHeight: `${chipHeight}px`,
       whiteSpace: "nowrap",
       overflow: "hidden",
       textOverflow: "ellipsis",
@@ -418,7 +423,7 @@ function chipDefault(theme: DomCalendarTheme): SlotDefault {
   };
 }
 
-function moreButtonDefault(theme: DomCalendarTheme): SlotDefault {
+function moreButtonDefault(theme: DomCalendarTheme, chipHeight: number): SlotDefault {
   return {
     base: {
       position: "relative",
@@ -427,8 +432,8 @@ function moreButtonDefault(theme: DomCalendarTheme): SlotDefault {
       background: "transparent",
       cursor: "pointer",
       textAlign: "left",
-      height: CHIP_HEIGHT,
-      lineHeight: `${CHIP_HEIGHT}px`,
+      height: chipHeight,
+      lineHeight: `${chipHeight}px`,
       fontFamily: "inherit",
     },
     themed: {
@@ -487,6 +492,8 @@ export function MonthView<T = unknown>({
   renderEvent,
   eventAccessibilityLabel,
   maxVisibleEventCount = 3,
+  chipHeight = CHIP_HEIGHT,
+  chipGap = CHIP_GAP,
   moreLabel = "{moreCount} More",
   labels: labelsProp,
   onPressEvent,
@@ -579,7 +586,7 @@ export function MonthView<T = unknown>({
   }, [moreOpenFor]);
   // Reserve `maxVisibleEventCount` rows below the date so every cell is uniform;
   // when a day overflows, the last row becomes the "+N more" affordance.
-  const eventRowHeight = CELL_PAD * 2 + DATE_ROW + maxVisibleEventCount * (CHIP_HEIGHT + CHIP_GAP);
+  const eventRowHeight = CELL_PAD * 2 + DATE_ROW + maxVisibleEventCount * (chipHeight + chipGap);
   const { weeks, weekdays } = useMemo(
     () =>
       buildMonthGrid(date, {
@@ -833,7 +840,7 @@ export function MonthView<T = unknown>({
             })
             .filter((b) => b.startCol <= b.endCol);
           const barChipButton = slot("chipButton", chipButtonDefault);
-          const barChip = slot("chip", chipDefault(theme));
+          const barChip = slot("chip", chipDefault(theme, chipHeight));
           return (
             <div
               key={week.id}
@@ -897,6 +904,7 @@ export function MonthView<T = unknown>({
                       cellHeight,
                       highlightWeekends,
                       inCreate || isDropTarget,
+                      chipGap,
                     ),
                   );
                   return (
@@ -1019,9 +1027,9 @@ export function MonthView<T = unknown>({
                                 top:
                                   CELL_PAD +
                                   DATE_ROW +
-                                  CHIP_GAP +
-                                  b.seg.lane * (CHIP_HEIGHT + CHIP_GAP),
-                                height: CHIP_HEIGHT,
+                                  chipGap +
+                                  b.seg.lane * (chipHeight + chipGap),
+                                height: chipHeight,
                                 pointerEvents: isDragging ? "none" : "auto",
                                 // Fade the bar being carried, so the tinted drop
                                 // target reads as where it is going.
@@ -1057,13 +1065,13 @@ export function MonthView<T = unknown>({
                         })}
                       <div
                         {...slot("events", {
-                          base: { display: "flex", flexDirection: "column", gap: CHIP_GAP },
+                          base: { display: "flex", flexDirection: "column", gap: chipGap },
                         })}
                       >
                         {/* Reserve one row per visible lane so the absolute bars have
                           space and "+more" sits below them. */}
                         {Array.from({ length: visibleLanes }, (_, i) => (
-                          <div key={`lane-${i}`} aria-hidden style={{ height: CHIP_HEIGHT }} />
+                          <div key={`lane-${i}`} aria-hidden style={{ height: chipHeight }} />
                         ))}
                         {hiddenEvents.length > 0 ? (
                           <button
@@ -1080,7 +1088,7 @@ export function MonthView<T = unknown>({
                                 setMoreOpenFor((open) => (open === day.id ? null : day.id));
                               }
                             }}
-                            {...slot("more", moreButtonDefault(theme))}
+                            {...slot("more", moreButtonDefault(theme, chipHeight))}
                             aria-label={`${labels.moreEvents(hiddenEvents.length)}, ${dayLabel}`}
                             aria-expanded={onPressMore ? undefined : moreOpenFor === day.id}
                           >
@@ -1160,7 +1168,9 @@ export function MonthView<T = unknown>({
                                 {Chip ? (
                                   <Chip event={event} onPress={() => onPressEvent?.(event)} />
                                 ) : (
-                                  <span {...slot("chip", chipDefault(theme))}>{event.title}</span>
+                                  <span {...slot("chip", chipDefault(theme, chipHeight))}>
+                                    {event.title}
+                                  </span>
                                 )}
                               </button>
                             ))}
