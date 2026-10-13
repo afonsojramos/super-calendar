@@ -297,8 +297,15 @@ function MonthPagerInner<T>({
   // grids as renderItem props, not through the selection context below: toggling
   // a "pick dates" mode on must reach the pages already rendered.
   const listExtraData = useMemo(
-    () => ({ events, activeDate, fillCellOnSelection, dragSelect: onSelectDrag != null }),
-    [events, activeDate, fillCellOnSelection, onSelectDrag],
+    () => ({
+      events,
+      activeDate,
+      fillCellOnSelection,
+      dragSelect: onSelectDrag != null,
+      chipHeight,
+      chipGap,
+    }),
+    [events, activeDate, fillCellOnSelection, onSelectDrag, chipHeight, chipGap],
   );
 
   // Selection reaches the grids through context, not `renderItem`, so a change

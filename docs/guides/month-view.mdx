@@ -32,6 +32,7 @@ bar that runs past a week's edge is squared off and continues on the next row.
 Set `chipHeight` and `chipGap` on `Calendar`, `MonthView`, or `MonthList` to size
 month lanes, spanning bars, and overflow rows. Native `MonthPager` forwards them too.
 Custom event renderers must fit inside the configured height.
+You can change either dimension after mounting, including in cached list and pager months.
 
 DOM defaults remain 18 px for height and 2 px for gaps. Native keeps its
 theme-derived height and 2 px gaps when you omit the options. Choose a smaller

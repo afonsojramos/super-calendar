@@ -154,11 +154,10 @@ export function MonthList<T = unknown>({
     return map;
   }, [events]);
 
-  // Stable reference so LegendList only re-renders rows when selection or events
-  // actually change, not on every parent render.
+  // Cached rows refresh when selection, events, or chip dimensions change.
   const extraData = useMemo(
-    () => [selectedRange, selectedDates, events] as const,
-    [selectedRange, selectedDates, events],
+    () => [selectedRange, selectedDates, events, chipHeight, chipGap] as const,
+    [selectedRange, selectedDates, events, chipHeight, chipGap],
   );
 
   return (

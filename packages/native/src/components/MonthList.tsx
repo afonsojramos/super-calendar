@@ -215,8 +215,8 @@ function MonthListInner<T>({
   // `firstViewableIndex` (the web `inert` cutoff must stay current). Selection
   // needs no entry: it reaches MonthView through context.
   const listExtraData = useMemo(
-    () => ({ events, activeDate, firstViewableIndex }),
-    [events, activeDate, firstViewableIndex],
+    () => ({ events, activeDate, firstViewableIndex, chipHeight, chipGap }),
+    [events, activeDate, firstViewableIndex, chipHeight, chipGap],
   );
 
   // A fixed window of months anchored once, aligned to the month start.

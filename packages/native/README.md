@@ -94,6 +94,7 @@ See the [styling guide](https://super-calendar.afonsojramos.me/guides/styling) f
 `chipHeight` and `chipGap` configure month lanes and overflow rows on `Calendar`,
 `MonthView`, and `MonthList`. Native `MonthPager` forwards them too. DOM defaults
 remain 18 px height and 2 px gaps; native height keeps its theme default.
+Changing either dimension updates already mounted list and pager months.
 See the [month guide](https://super-calendar.afonsojramos.me/guides/month-view).
 
 ## Documentation
