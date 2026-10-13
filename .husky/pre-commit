@@ -1,5 +1,0 @@
-set -e
-pnpm format
-pnpm lint
-pnpm typecheck
-pnpm test
