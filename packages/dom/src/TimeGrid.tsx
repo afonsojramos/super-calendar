@@ -60,6 +60,7 @@ import {
 } from "@super-calendar/core";
 import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
+import { type EventGrab, waitForHold } from "./touch";
 
 /**
  * Styleable parts of {@link TimeGrid}. Pass a class or inline style per slot via
@@ -179,6 +180,10 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   eventGap?: number;
   /** Snap dragged events to this many minutes (default 15). */
   dragStepMinutes?: number;
+  /** Hold duration before a DOM touch or pen drag, in ms (default 300). */
+  touchDragDelay?: number;
+  /** Movement tolerance for a DOM touch or pen hold, in px (default 8). */
+  touchDragThreshold?: number;
   /** Render event time ranges in 12-hour AM/PM (default false, 24h). */
   ampm?: boolean;
   /** Sub-divisions per hour for the grid lines, e.g. 2 for half-hour (default 1). */
@@ -439,6 +444,8 @@ function TimeGridInner<T = unknown>(
     minEventHeight = DEFAULT_MIN_EVENT_HEIGHT,
     eventGap = DEFAULT_EVENT_GAP,
     dragStepMinutes = 15,
+    touchDragDelay = 300,
+    touchDragThreshold = 8,
     ampm = false,
     timeslots = 1,
     minHour = 0,
@@ -574,6 +581,13 @@ function TimeGridInner<T = unknown>(
     h: number;
   } | null>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
+  // A held touch or pen drag stops touchmove from scrolling the grid.
+  const touchDragRef = useRef(false);
+  const activeGrabRef = useRef<EventGrab | null>(null);
+  // Cancels a touch or pen press that has not become a drag yet.
+  const cancelHoldRef = useRef<(() => void) | null>(null);
+  // A touch or pen tap ended on an event; its click presses the event.
+  const tappedRef = useRef<HTMLElement | null>(null);
   const docHandlersRef = useRef<{
     move: (e: PointerEvent) => void;
     up: (e: PointerEvent) => void;
@@ -647,6 +661,30 @@ function TimeGridInner<T = unknown>(
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, [zoomable, minHourHeight, maxHourHeight]);
+
+  // Browser touch-action is fixed for the gesture; cancel touchmove only during a held drag.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) {
+      return;
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      if (touchDragRef.current && e.cancelable) {
+        e.preventDefault();
+      }
+    };
+    const onContextMenu = (e: Event) => {
+      if (touchDragRef.current || cancelHoldRef.current) {
+        e.preventDefault();
+      }
+    };
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("contextmenu", onContextMenu);
+    return () => {
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("contextmenu", onContextMenu);
+    };
+  }, []);
 
   const pinch = useRef<Map<number, number>>(new Map());
   const pinchBase = useRef<{ dist: number; height: number } | null>(null);
@@ -722,6 +760,8 @@ function TimeGridInner<T = unknown>(
     edgeSide.current = 0;
     pagedRef.current = false;
     setPaged(false);
+    touchDragRef.current = false;
+    activeGrabRef.current = null;
     draggedRef.current = null;
     dragOrigin.current = null;
     applyDrag(null);
@@ -730,6 +770,16 @@ function TimeGridInner<T = unknown>(
   const moveDrag = (e: PointerEvent) => {
     const d = dragRef.current;
     if (!d || !dragOrigin.current) return;
+    if (
+      touchDragRef.current &&
+      !d.moved &&
+      Math.hypot(
+        e.clientX - dragOrigin.current.pointerX,
+        e.clientY - dragOrigin.current.pointerY,
+      ) <= touchDragThreshold
+    ) {
+      return;
+    }
     ptr.current = { x: e.clientX, y: e.clientY };
     // Read the live row height (ref, not the state closure) so a mid-drag zoom
     // keeps the math aligned with what's on screen.
@@ -823,14 +873,20 @@ function TimeGridInner<T = unknown>(
     const d = dragRef.current;
     if (!d) return;
     try {
-      (e.target as HTMLElement)?.releasePointerCapture?.(e.pointerId);
+      activeGrabRef.current?.box.releasePointerCapture?.(e.pointerId);
     } catch {
       // Best-effort release; ignore if the capture was never granted.
     }
     const held = draggedRef.current;
     if (!d.moved) {
+      const wasTouch = touchDragRef.current;
+      const tapBox = activeGrabRef.current?.box ?? null;
       finishDrag();
-      held?.onPress();
+      if (wasTouch) {
+        tappedRef.current = tapBox;
+      } else {
+        held?.onPress();
+      }
       return;
     }
     const origin = dragOrigin.current;
@@ -881,25 +937,25 @@ function TimeGridInner<T = unknown>(
   // `continues*` flags are the same type, so passing them positionally invites a
   // silent transposition.
   const beginDrag = (
-    e: ReactPointerEvent,
+    e: EventGrab,
     pe: PositionedEvent<T>,
     key: string,
     kind: "move" | "resize" | "resize-start",
     dayIndex: number,
     onPress?: () => void,
   ) => {
-    if (!onDragEvent) return;
     const { event, startHours, durationHours, continuesBefore, continuesAfter } = pe;
-    e.stopPropagation();
     try {
-      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      e.box.setPointerCapture?.(e.pointerId);
     } catch {
       // Pointer capture is best-effort; some environments reject it.
     }
+    touchDragRef.current = e.pointerType !== "mouse";
+    activeGrabRef.current = e;
     // The event box sits inside its day column, so the parent's width is one day;
     // columns are equal-width, so measuring one is enough. Resizes never move
     // across days, so 0 is fine there.
-    const boxEl = e.currentTarget as HTMLElement;
+    const boxEl = e.box;
     const column = kind === "move" ? boxEl.parentElement : null;
     const dayWidth = column ? column.getBoundingClientRect().width : 0;
     const boxRect = kind === "move" ? boxEl.getBoundingClientRect() : null;
@@ -945,21 +1001,89 @@ function TimeGridInner<T = unknown>(
     // columns unmounting on a page change (the dragged box's own node disappears).
     // Detach any prior set first so a second beginDrag can't leak listeners.
     detachDocListeners();
-    const handlers = { move: moveDrag, up: endDrag, cancel: cancelDrag };
+    const handlers = {
+      move: (event: PointerEvent) => {
+        if (event.pointerId === e.pointerId) {
+          moveDrag(event);
+        }
+      },
+      up: (event: PointerEvent) => {
+        if (event.pointerId === e.pointerId) {
+          endDrag(event);
+        }
+      },
+      cancel: (event: PointerEvent) => {
+        if (event.pointerId === e.pointerId) {
+          cancelDrag();
+        }
+      },
+    };
     docHandlersRef.current = handlers;
     document.addEventListener("pointermove", handlers.move);
     document.addEventListener("pointerup", handlers.up);
     document.addEventListener("pointercancel", handlers.cancel);
   };
 
+  const pressEvent = (
+    e: ReactPointerEvent<HTMLElement>,
+    pe: PositionedEvent<T>,
+    key: string,
+    kind: "move" | "resize" | "resize-start",
+    dayIndex: number,
+    onPress?: () => void,
+  ) => {
+    if (!onDragEvent || e.button > 0) {
+      return;
+    }
+    e.stopPropagation();
+    const hadPendingHold = cancelHoldRef.current !== null;
+    cancelHoldRef.current?.();
+    tappedRef.current = null;
+    if (hadPendingHold || activeGrabRef.current || (e.pointerType !== "mouse" && !e.isPrimary)) {
+      return;
+    }
+    const grab: EventGrab = {
+      box: e.currentTarget,
+      pointerId: e.pointerId,
+      pointerType: e.pointerType,
+      clientX: e.clientX,
+      clientY: e.clientY,
+    };
+    if (e.pointerType === "mouse") {
+      beginDrag(grab, pe, key, kind, dayIndex, onPress);
+      return;
+    }
+    cancelHoldRef.current = waitForHold(
+      grab,
+      touchDragDelay,
+      touchDragThreshold,
+      () => {
+        cancelHoldRef.current = null;
+        beginDrag(grab, pe, key, kind, dayIndex, onPress);
+      },
+      () => {
+        cancelHoldRef.current = null;
+        tappedRef.current = grab.box;
+      },
+      () => {
+        cancelHoldRef.current = null;
+      },
+    );
+  };
+
   // Remove any lingering document listeners / dwell timer if we unmount mid-drag.
   useEffect(
     () => () => {
+      cancelHoldRef.current?.();
       detachDocListeners();
       clearEdgeTimer();
     },
     [],
   );
+
+  useEffect(() => {
+    cancelHoldRef.current?.();
+  }, [date, events, onDragEvent]);
 
   const pxFromTop = (el: HTMLElement, clientY: number) => clientY - el.getBoundingClientRect().top;
   const beginCreate = (e: ReactPointerEvent, dayIndex: number) => {
@@ -1671,10 +1795,22 @@ function TimeGridInner<T = unknown>(
                       // remounting on a page change.
                       onPointerDown={
                         canMove
-                          ? (e) => beginDrag(e, pe, key, "move", dayIndex, onPress)
+                          ? (e) => pressEvent(e, pe, key, "move", dayIndex, onPress)
                           : undefined
                       }
-                      onClick={canMove ? undefined : onPress}
+                      onClick={
+                        canMove
+                          ? (e) => {
+                              if (
+                                e.detail === 0 ||
+                                (tappedRef.current && e.currentTarget.contains(tappedRef.current))
+                              ) {
+                                tappedRef.current = null;
+                                onPress();
+                              }
+                            }
+                          : onPress
+                      }
                       {...dataState({ "data-dragging": !!active && !hiddenForMove })}
                       {...slot("event", {
                         base: {
@@ -1688,7 +1824,9 @@ function TimeGridInner<T = unknown>(
                           left: `calc(${pe.column * widthPct}% + ${eventGap}px)`,
                           width: `calc(${widthPct}% - ${eventGap * 2}px)`,
                           cursor: canMove ? "grab" : "pointer",
-                          touchAction: canMove ? "none" : "auto",
+                          touchAction: canMove ? "pan-y" : "auto",
+                          userSelect: canMove ? "none" : undefined,
+                          WebkitTouchCallout: canMove ? "none" : undefined,
                           zIndex: active ? 3 : 1,
                           opacity: active ? 0.85 : 1,
                           visibility: hiddenForMove ? "hidden" : undefined,
@@ -1711,8 +1849,7 @@ function TimeGridInner<T = unknown>(
                       {canResize && !pe.continuesBefore ? (
                         <div
                           onPointerDown={(e) => {
-                            e.stopPropagation();
-                            beginDrag(
+                            pressEvent(
                               e,
                               pe,
                               key,
@@ -1728,7 +1865,7 @@ function TimeGridInner<T = unknown>(
                             top: 0,
                             height: 8,
                             cursor: "ns-resize",
-                            touchAction: "none",
+                            touchAction: "pan-y",
                           }}
                         />
                       ) : null}
@@ -1740,8 +1877,7 @@ function TimeGridInner<T = unknown>(
                       {canResize && !pe.continuesAfter ? (
                         <div
                           onPointerDown={(e) => {
-                            e.stopPropagation();
-                            beginDrag(
+                            pressEvent(
                               e,
                               pe,
                               key,
@@ -1757,7 +1893,7 @@ function TimeGridInner<T = unknown>(
                             bottom: 0,
                             height: 8,
                             cursor: "ns-resize",
-                            touchAction: "none",
+                            touchAction: "pan-y",
                           }}
                         />
                       ) : null}

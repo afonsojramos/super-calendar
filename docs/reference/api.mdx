@@ -61,6 +61,12 @@ pitfall this avoids.
 
 ## Interactions
 
+DOM `Calendar` and `TimeGrid` accept `touchDragDelay` and `touchDragThreshold`.
+The delay is in milliseconds (default 300), and the threshold is in pixels
+(default 8). They control held event dragging and do not apply to native.
+Additional contacts cancel pending holds and cannot take over an active drag.
+See [DOM held presses](/guides/dragging#dom-held-presses).
+
 | Prop                    | Type                                     | Notes                                                                             |
 | ----------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- |
 | `onDragEvent`           | `(event, start, end) => void \| boolean` | Enable move/resize; return `false` to reject. Month: drop on another day.         |

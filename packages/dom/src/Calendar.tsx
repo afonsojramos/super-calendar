@@ -176,6 +176,10 @@ export interface CalendarProps<T = unknown>
   eventOverlap?: boolean;
   /** Snap dragged/created events to this many minutes. */
   dragStepMinutes?: number;
+  /** DOM touch/pen hold duration in ms (default 300). */
+  touchDragDelay?: number;
+  /** DOM touch/pen movement tolerance in px (default 8). */
+  touchDragThreshold?: number;
   /**
    * Tap empty space: the date+time pressed on the week/day grid, or the tapped
    * day at midnight in `month` mode (where it fires alongside `onPressDay`).
@@ -365,6 +369,8 @@ function CalendarInner<T = unknown>(
     eventDurationEditable,
     eventOverlap,
     dragStepMinutes,
+    touchDragDelay,
+    touchDragThreshold,
     onPressCell,
     onCreateEvent,
     onDragStart,
@@ -571,6 +577,8 @@ function CalendarInner<T = unknown>(
         eventDurationEditable={eventDurationEditable}
         eventOverlap={eventOverlap}
         dragStepMinutes={dragStepMinutes}
+        touchDragDelay={touchDragDelay}
+        touchDragThreshold={touchDragThreshold}
         onPressEvent={onPressEvent}
         onPressCell={onPressCell}
         onCreateEvent={onCreateEvent}

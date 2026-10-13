@@ -5,10 +5,12 @@ if (typeof window.PointerEvent === "undefined") {
   window.PointerEvent = class PointerEvent extends MouseEvent {
     pointerId;
     pointerType;
+    isPrimary;
     constructor(type, params = {}) {
       super(type, params);
       this.pointerId = params.pointerId ?? 0;
       this.pointerType = params.pointerType ?? "mouse";
+      this.isPrimary = params.isPrimary ?? true;
     }
   };
 }

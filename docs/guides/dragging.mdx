@@ -27,6 +27,20 @@ range). New `start`/`end` are snapped to `dragStepMinutes` (default 15).
 />
 ```
 
+### DOM held presses
+
+On the DOM time grid, touch and pen wait for a 300 ms hold within 8 px before
+dragging. A tap calls `onPressEvent` from the event's own click. A vertical swipe
+that starts on an event or resize grip scrolls the grid. During a held drag,
+scrolling stops until release or cancellation. Mouse dragging starts immediately.
+
+Set `touchDragDelay` (milliseconds) and `touchDragThreshold` (pixels) on DOM
+`Calendar` or `TimeGrid` to adjust the hold. Movement, pointer cancellation,
+another finger, navigation, or unmount cancels a pending hold.
+An additional contact on an event or resize grip cannot start a replacement hold
+or take over an active drag.
+These options apply to event gestures, not empty-slot or month interactions.
+
 ### Move an event past midnight
 
 A move keeps its duration, so dragging an event **down past the end of the day**
