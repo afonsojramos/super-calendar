@@ -56,6 +56,7 @@ For a custom picker, pair the headless hooks (`useDateRange`, `useMonthGrid`) wi
 
 Touch and pen on `TimeGrid` wait for a 300 ms hold within 8 px before dragging.
 A tap presses the event from its click; a vertical swipe scrolls the grid.
+Additional contacts cancel pending holds and cannot take over an active drag.
 Set `touchDragDelay` and `touchDragThreshold` on `TimeGrid` or `Calendar` to adjust
 the hold. Mouse drag and resize retain their existing behavior. See the
 [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).

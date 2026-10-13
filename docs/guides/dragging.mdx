@@ -37,6 +37,8 @@ scrolling stops until release or cancellation. Mouse dragging starts immediately
 Set `touchDragDelay` (milliseconds) and `touchDragThreshold` (pixels) on DOM
 `Calendar` or `TimeGrid` to adjust the hold. Movement, pointer cancellation,
 another finger, navigation, or unmount cancels a pending hold.
+An additional contact on an event or resize grip cannot start a replacement hold
+or take over an active drag.
 These options apply to event gestures, not empty-slot or month interactions.
 
 ### Move an event past midnight

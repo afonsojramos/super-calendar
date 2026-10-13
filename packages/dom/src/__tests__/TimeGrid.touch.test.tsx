@@ -18,14 +18,14 @@ function element(node: Element | null): HTMLElement {
   return node;
 }
 
-function setup() {
+function setup(events: CalendarEvent[] = [event]) {
   const onPressEvent = jest.fn();
   const onDragStart = jest.fn();
   const onDragEvent = jest.fn();
   const result = render(
     <TimeGrid
       date={day}
-      events={[event]}
+      events={events}
       hourHeight={48}
       onPressEvent={onPressEvent}
       onDragStart={onDragStart}
@@ -167,6 +167,78 @@ describe("DOM time grid touch gestures", () => {
     fireEvent.pointerMove(box, { ...point, clientY: 348 });
     fireEvent.pointerUp(box, { ...point, clientY: 348 });
     expect(onDragEvent).toHaveBeenCalledTimes(1);
+  });
+
+  describe.each([false, true])("with an active drag: %s", (active) => {
+    it.each(["same event", "another event", "start grip", "end grip"])(
+      "rejects a second contact on the %s",
+      (target) => {
+        const other: CalendarEvent = {
+          title: "Other",
+          start: new Date(2026, 5, 26, 17),
+          end: new Date(2026, 5, 26, 18),
+        };
+        const { box, getByText, onDragStart, onDragEvent } = setup([event, other]);
+        const grips = box.querySelectorAll('[style*="ns-resize"]');
+        const secondBox =
+          target === "another event"
+            ? element(getByText("Other").closest('[role="button"]'))
+            : target === "start grip"
+              ? element(grips[0])
+              : target === "end grip"
+                ? element(grips[1])
+                : box;
+        fireEvent.pointerDown(box, point);
+        if (active) {
+          act(() => jest.advanceTimersByTime(300));
+        }
+        const second = { ...point, pointerId: 2, isPrimary: false };
+        fireEvent.pointerDown(secondBox, second);
+        act(() => jest.advanceTimersByTime(400));
+        expect(onDragStart).toHaveBeenCalledTimes(active ? 1 : 0);
+        fireEvent.pointerMove(secondBox, { ...second, clientY: 348 });
+        fireEvent.pointerUp(secondBox, { ...second, clientY: 348 });
+        expect(onDragEvent).not.toHaveBeenCalled();
+
+        fireEvent.pointerMove(box, { ...point, clientY: 348 });
+        fireEvent.pointerUp(box, { ...point, clientY: 348 });
+        expect(onDragEvent).toHaveBeenCalledTimes(active ? 1 : 0);
+        if (active) {
+          expect(onDragEvent).toHaveBeenCalledWith(
+            event,
+            new Date(2026, 5, 26, 15),
+            new Date(2026, 5, 26, 17),
+          );
+        }
+      },
+    );
+  });
+
+  it("rejects a secondary touch when the primary contact began outside the grid", () => {
+    const { box, onDragStart } = setup();
+    fireEvent.pointerDown(document.body, point);
+    const second = { ...point, pointerId: 2, isPrimary: false };
+    fireEvent.pointerDown(box, second);
+    act(() => jest.advanceTimersByTime(400));
+    expect(onDragStart).not.toHaveBeenCalled();
+    fireEvent.pointerUp(box, second);
+    fireEvent.pointerUp(document.body, point);
+
+    fireEvent.pointerDown(box, { ...point, pointerId: 3, isPrimary: true });
+    act(() => jest.advanceTimersByTime(300));
+    expect(onDragStart).toHaveBeenCalledTimes(1);
+    fireEvent.pointerCancel(box, { ...point, pointerId: 3 });
+  });
+
+  it("cancels a pending hold when another primary pointer type presses an event", () => {
+    const { box, onDragStart } = setup();
+    fireEvent.pointerDown(box, point);
+    const pen = { ...point, pointerId: 2, pointerType: "pen", isPrimary: true };
+    fireEvent.pointerDown(box, pen);
+    act(() => jest.advanceTimersByTime(400));
+    expect(onDragStart).not.toHaveBeenCalled();
+    fireEvent.pointerUp(box, pen);
+    fireEvent.pointerUp(box, point);
   });
 
   it("forwards configurable hold timing and tolerance from Calendar", () => {

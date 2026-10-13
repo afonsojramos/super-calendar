@@ -1031,8 +1031,12 @@ function TimeGridInner<T = unknown>(
       return;
     }
     e.stopPropagation();
+    const hadPendingHold = cancelHoldRef.current !== null;
     cancelHoldRef.current?.();
     tappedRef.current = null;
+    if (hadPendingHold || activeGrabRef.current || (e.pointerType !== "mouse" && !e.isPrimary)) {
+      return;
+    }
     const grab: EventGrab = {
       box: e.currentTarget,
       pointerId: e.pointerId,
