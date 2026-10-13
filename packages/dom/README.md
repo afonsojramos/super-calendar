@@ -64,6 +64,11 @@ the hold. Mouse drag and resize retain their existing behavior. See the
 ## Moving events
 
 Pass `onDragEvent` and update your event state with the returned `start` and `end`.
+
+Time-grid edge paging requires a mouse drag. Touch and pen remain within the
+visible period, so resting near an edge cannot repeatedly change the date.
+See the [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
+
 On the time grid, dragging any segment of a multi-day event previews the whole
 range moving together and preserves its duration. Drag a resize grip to change
 only the start or end. See the [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
