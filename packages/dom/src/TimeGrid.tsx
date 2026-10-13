@@ -13,6 +13,7 @@ import {
   type ForwardedRef,
   forwardRef,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
   type ReactNode,
@@ -101,6 +102,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 const EDGE_ZONE = 32;
 const EDGE_DWELL_MS = 600;
 const EDGE_REPEAT_MS = 600;
+const CELL_TOUCH_SLOP_PX = 8;
 
 // Off-screen but readable by assistive tech: gives an element an accessible name
 // without changing the visible layout.
@@ -541,6 +543,9 @@ function TimeGridInner<T = unknown>(
     heightPx: number;
   } | null>(null);
   const createOrigin = useRef<{ el: HTMLElement; dayIndex: number; startPx: number } | null>(null);
+  // Touch never sweeps, so a tap presses the cell from its click, which the
+  // browser skips when the finger scrolled the grid instead.
+  const cellTouchRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const cellEnabled = !!onPressCell || !!onCreateEvent;
 
   const days = useMemo(
@@ -960,6 +965,10 @@ function TimeGridInner<T = unknown>(
   const beginCreate = (e: ReactPointerEvent, dayIndex: number) => {
     // Mouse / pen only: on touch the column must stay free to scroll the grid.
     // Only from the column background, primary button, never on an event.
+    cellTouchRef.current =
+      e.pointerType === "touch" && e.target === e.currentTarget
+        ? { pointerId: e.pointerId, x: e.clientX, y: e.clientY }
+        : null;
     if (!cellEnabled || e.pointerType === "touch") return;
     if (e.target !== e.currentTarget || e.button > 0) return;
     const el = e.currentTarget as HTMLElement;
@@ -973,6 +982,14 @@ function TimeGridInner<T = unknown>(
     setCreateBox({ dayIndex, topPx: startPx, heightPx: 0 });
   };
   const moveCreate = (e: ReactPointerEvent) => {
+    const touch = cellTouchRef.current;
+    if (
+      touch &&
+      e.pointerId === touch.pointerId &&
+      Math.hypot(e.clientX - touch.x, e.clientY - touch.y) > CELL_TOUCH_SLOP_PX
+    ) {
+      cellTouchRef.current = null;
+    }
     const o = createOrigin.current;
     if (!o) return;
     const cur = pxFromTop(o.el, e.clientY);
@@ -1004,9 +1021,23 @@ function TimeGridInner<T = unknown>(
     createOrigin.current = null;
     setCreateBox(null);
   };
+  const tapCell = (e: ReactMouseEvent<HTMLDivElement>, dayIndex: number) => {
+    const touch = cellTouchRef.current;
+    cellTouchRef.current = null;
+    const day = days[dayIndex];
+    if (!touch || !onPressCell || !day || e.target !== e.currentTarget) {
+      return;
+    }
+    const px = pxFromTop(e.currentTarget, e.clientY);
+    const at = cellRangeFromDrag(day, px, px, hourHeightRef.current, windowStart, snapMinutes);
+    if (at) {
+      onPressCell(at.start);
+    }
+  };
   // A gesture the browser/OS cancels (scroll takeover, etc.) must not commit a
   // create — just drop the in-progress state.
   const cancelCreate = () => {
+    cellTouchRef.current = null;
     createOrigin.current = null;
     setCreateBox(null);
   };
@@ -1470,6 +1501,7 @@ function TimeGridInner<T = unknown>(
                 onPointerMove={cellEnabled ? moveCreate : undefined}
                 onPointerUp={cellEnabled ? endCreate : undefined}
                 onPointerCancel={cellEnabled ? cancelCreate : undefined}
+                onClick={cellEnabled ? (e) => tapCell(e, dayIndex) : undefined}
                 {...dataState({ "data-today": getIsToday(day), "data-weekend": isWeekend(day) })}
                 {...slot("dayColumn", {
                   base: { flex: 1, position: "relative" },

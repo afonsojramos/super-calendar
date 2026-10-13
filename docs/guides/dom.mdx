@@ -55,6 +55,10 @@ can return `false` to reject a drop).
 Creating on empty space is pointer-only (drag to sweep out a range); see
 [Keyboard navigation](#keyboard-navigation) for how focus moves.
 
+On empty time-grid space, a touch tap calls `onPressCell` from the column's click.
+A swipe or cancelled contact does not create an event. Mouse and pen retain
+drag-to-create behavior. This also applies through DOM `Calendar`.
+
 ## The Calendar wrapper
 
 The quickest start mirrors the native component: pick a `mode` and pass events.
