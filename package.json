@@ -22,7 +22,7 @@
     "lint:fix": "oxlint --fix --type-aware packages",
     "format": "oxfmt --check .",
     "format:fix": "oxfmt .",
-    "prepare": "husky"
+    "hooks:install": "hk install --mise"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
@@ -40,7 +40,6 @@
     "@types/react-dom": "^19.3.0",
     "babel-jest": "^29.7.0",
     "date-fns": "4.4.0",
-    "husky": "^9.1.7",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "oxfmt": "0.68.0",
