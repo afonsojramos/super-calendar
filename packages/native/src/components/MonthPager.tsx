@@ -57,6 +57,10 @@ export type MonthPagerProps<T> = {
   date: Date;
   events: CalendarEvent<T>[];
   maxVisibleEventCount?: number;
+  /** Month chip height in pixels; omit to keep the theme default. */
+  chipHeight?: number;
+  /** Gap between month chip rows in pixels (default 2). */
+  chipGap?: number;
   weekStartsOn: WeekStartsOn;
   /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
   hiddenDays?: number[];
@@ -121,6 +125,8 @@ function MonthPagerInner<T>({
   date,
   events,
   maxVisibleEventCount,
+  chipHeight,
+  chipGap,
   weekStartsOn,
   hiddenDays,
   weekdayFormat = "short",
@@ -291,8 +297,15 @@ function MonthPagerInner<T>({
   // grids as renderItem props, not through the selection context below: toggling
   // a "pick dates" mode on must reach the pages already rendered.
   const listExtraData = useMemo(
-    () => ({ events, activeDate, fillCellOnSelection, dragSelect: onSelectDrag != null }),
-    [events, activeDate, fillCellOnSelection, onSelectDrag],
+    () => ({
+      events,
+      activeDate,
+      fillCellOnSelection,
+      dragSelect: onSelectDrag != null,
+      chipHeight,
+      chipGap,
+    }),
+    [events, activeDate, fillCellOnSelection, onSelectDrag, chipHeight, chipGap],
   );
 
   // Selection reaches the grids through context, not `renderItem`, so a change
@@ -317,6 +330,8 @@ function MonthPagerInner<T>({
           showTitle={false}
           showWeekdays={false}
           maxVisibleEventCount={maxVisibleEventCount}
+          chipHeight={chipHeight}
+          chipGap={chipGap}
           weekStartsOn={weekStartsOn}
           hiddenDays={hiddenDays}
           locale={locale}
@@ -356,6 +371,8 @@ function MonthPagerInner<T>({
       pageHeight,
       events,
       maxVisibleEventCount,
+      chipHeight,
+      chipGap,
       weekStartsOn,
       hiddenDays,
       locale,

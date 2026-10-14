@@ -35,6 +35,9 @@ pitfall this avoids.
 
 ## Navigation
 
+DOM `onChangeDate` edge paging requires a mouse drag. Touch and pen retain
+in-view dragging without edge paging. Other navigation remains available.
+
 | Prop                | Type                            | Notes                                    |
 | ------------------- | ------------------------------- | ---------------------------------------- |
 | `onChangeDate`      | `(date) => void`                | Fires when paging changes the date.      |
@@ -61,6 +64,12 @@ pitfall this avoids.
 
 ## Interactions
 
+DOM `Calendar` and `TimeGrid` accept `touchDragDelay` and `touchDragThreshold`.
+The delay is in milliseconds (default 300), and the threshold is in pixels
+(default 8). They control held event dragging and do not apply to native.
+Additional contacts cancel pending holds and cannot take over an active drag.
+See [DOM held presses](/guides/dragging#dom-held-presses).
+
 | Prop                    | Type                                     | Notes                                                                             |
 | ----------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- |
 | `onDragEvent`           | `(event, start, end) => void \| boolean` | Enable move/resize; return `false` to reject. Month: drop on another day.         |
@@ -80,6 +89,10 @@ pitfall this avoids.
 On the time grid, dragging any segment of a multi-day event moves its whole range.
 All visible segments preview the move together on both renderers. Moving preserves
 duration; resizing changes only the selected edge. See [dragging](/guides/dragging).
+
+DOM `onPressCell` also handles touch taps on empty time-grid slots. The callback
+runs from the column's click, after pointer-up. Swipes and cancelled contacts
+do not call it. Mouse and pen retain their existing behavior.
 
 ## Selection
 
@@ -117,6 +130,11 @@ the [Date selection](/guides/selection) guide.
 | `theme`                | `PartialCalendarTheme`                     | Color/text/metric overrides.                                                    |
 | `classNames`           | `Partial<Record<CalendarSlot, string>>`    | Per-slot Tailwind classes (uniwind/NativeWind); see [Styling](/guides/styling). |
 | `styles`               | `Partial<Record<CalendarSlot, StyleProp>>` | Per-slot style overrides, merged last.                                          |
+
+Month `Calendar`, `MonthView`, and `MonthList` accept `chipHeight` and `chipGap`.
+Both are numbers in pixels. DOM height defaults to 18; native height follows the
+theme. The gap defaults to 2 on both renderers. Native `MonthPager` forwards them too.
+Changing either dimension updates already mounted list and pager months.
 
 ## Exports
 

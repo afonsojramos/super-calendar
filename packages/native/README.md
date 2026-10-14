@@ -91,6 +91,12 @@ Every styleable part is a named slot that accepts a class (resolved by a Tailwin
 
 See the [styling guide](https://super-calendar.afonsojramos.me/guides/styling) for the slot list and the uniwind setup.
 
+`chipHeight` and `chipGap` configure month lanes and overflow rows on `Calendar`,
+`MonthView`, and `MonthList`. Native `MonthPager` forwards them too. DOM defaults
+remain 18 px height and 2 px gaps; native height keeps its theme default.
+Changing either dimension updates already mounted list and pager months.
+See the [month guide](https://super-calendar.afonsojramos.me/guides/month-view).
+
 ## Documentation
 
 See the [full documentation](https://super-calendar.afonsojramos.me) and the [quickstart](https://super-calendar.afonsojramos.me/quickstart), including theming, recurring events, time zones, and the headless picker.

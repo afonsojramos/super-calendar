@@ -52,12 +52,34 @@ export function MyCalendar() {
 
 For a custom picker, pair the headless hooks (`useDateRange`, `useMonthGrid`) with `MonthList` and `TimeGrid`, all re-exported from this package.
 
+## Touch event gestures
+
+Touch and pen on `TimeGrid` wait for a 300 ms hold within 8 px before dragging.
+A tap presses the event from its click; a vertical swipe scrolls the grid.
+Additional contacts cancel pending holds and cannot take over an active drag.
+Set `touchDragDelay` and `touchDragThreshold` on `TimeGrid` or `Calendar` to adjust
+the hold. Mouse drag and resize retain their existing behavior. See the
+[dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
+
 ## Moving events
 
 Pass `onDragEvent` and update your event state with the returned `start` and `end`.
+
+Time-grid edge paging requires a mouse drag. Touch and pen remain within the
+visible period, so resting near an edge cannot repeatedly change the date.
+See the [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
+
 On the time grid, dragging any segment of a multi-day event previews the whole
 range moving together and preserves its duration. Drag a resize grip to change
 only the start or end. See the [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
+
+## Month chip dimensions
+
+`chipHeight` and `chipGap` configure month lanes and overflow rows on `Calendar`,
+`MonthView`, and `MonthList`. Native `MonthPager` forwards them too. DOM defaults
+remain 18 px height and 2 px gaps; native height keeps its theme default.
+Changing either dimension updates already mounted list and pager months.
+See the [month guide](https://super-calendar.afonsojramos.me/guides/month-view).
 
 ## Styling
 
@@ -75,6 +97,10 @@ Out of the box the calendar is fully styled from the theme, no stylesheet requir
 ```
 
 A slot's structural layout is always kept; only its themed look steps aside for your class, so the class wins over the inline default. See the [styling guide](https://super-calendar.afonsojramos.me/guides/styling).
+
+On the time grid, an empty-slot touch tap calls `onPressCell` from the column's
+click. Swipes and cancelled contacts do not press the slot. Mouse and pen retain
+drag-to-create behavior. See the [DOM guide](https://super-calendar.afonsojramos.me/guides/dom).
 
 ## Documentation
 

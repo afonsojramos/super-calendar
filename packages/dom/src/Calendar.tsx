@@ -176,6 +176,10 @@ export interface CalendarProps<T = unknown>
   eventOverlap?: boolean;
   /** Snap dragged/created events to this many minutes. */
   dragStepMinutes?: number;
+  /** DOM touch/pen hold duration in ms (default 300). */
+  touchDragDelay?: number;
+  /** DOM touch/pen movement tolerance in px (default 8). */
+  touchDragThreshold?: number;
   /**
    * Tap empty space: the date+time pressed on the week/day grid, or the tapped
    * day at midnight in `month` mode (where it fires alongside `onPressDay`).
@@ -210,6 +214,10 @@ export interface CalendarProps<T = unknown>
   // --- Month mode ---
   /** Max chips per day before a "+N more" row. */
   maxVisibleEventCount?: number;
+  /** Month chip height in pixels; omit to keep the renderer default. */
+  chipHeight?: number;
+  /** Gap between month chip rows in pixels (default 2). */
+  chipGap?: number;
   /** Overflow row template; `{moreCount}` is replaced. */
   moreLabel?: string;
   /** Translations for the screen-reader words and gutter text; omitted keys use English. */
@@ -361,6 +369,8 @@ function CalendarInner<T = unknown>(
     eventDurationEditable,
     eventOverlap,
     dragStepMinutes,
+    touchDragDelay,
+    touchDragThreshold,
     onPressCell,
     onCreateEvent,
     onDragStart,
@@ -371,6 +381,8 @@ function CalendarInner<T = unknown>(
     keyboardEventNavigation,
     // month
     maxVisibleEventCount,
+    chipHeight,
+    chipGap,
     moreLabel,
     labels,
     showAdjacentMonths,
@@ -496,6 +508,8 @@ function CalendarInner<T = unknown>(
         classNames={classNames}
         styles={styles}
         maxVisibleEventCount={maxVisibleEventCount}
+        chipHeight={chipHeight}
+        chipGap={chipGap}
         moreLabel={moreLabel}
         showAdjacentMonths={showAdjacentMonths}
         showTitle={showTitle}
@@ -563,6 +577,8 @@ function CalendarInner<T = unknown>(
         eventDurationEditable={eventDurationEditable}
         eventOverlap={eventOverlap}
         dragStepMinutes={dragStepMinutes}
+        touchDragDelay={touchDragDelay}
+        touchDragThreshold={touchDragThreshold}
         onPressEvent={onPressEvent}
         onPressCell={onPressCell}
         onCreateEvent={onCreateEvent}

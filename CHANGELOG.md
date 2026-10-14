@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.14.0](https://github.com/afonsojramos/super-calendar/compare/v2.13.0...v2.14.0) (2026-10-13)
+
+
+### Features
+
+* make month chip dimensions configurable ([#82](https://github.com/afonsojramos/super-calendar/issues/82)) ([6cd5ebf](https://github.com/afonsojramos/super-calendar/commit/6cd5ebf4f9cc067001f40bce028b83875996c277))
+
+
+### Bug Fixes
+
+* **dom:** handle touch taps on empty time-grid slots ([#83](https://github.com/afonsojramos/super-calendar/issues/83)) ([afab6ab](https://github.com/afonsojramos/super-calendar/commit/afab6abf092c1d2738762dbc10b9d8aa3ddf5981))
+* **dom:** restrict drag edge paging to mouse pointers ([#85](https://github.com/afonsojramos/super-calendar/issues/85)) ([e5317ca](https://github.com/afonsojramos/super-calendar/commit/e5317cab2a5bc142a869ac840821d67c04914d99))
+* **dom:** wait for a held press before touch event dragging ([#84](https://github.com/afonsojramos/super-calendar/issues/84)) ([bb7e7fd](https://github.com/afonsojramos/super-calendar/commit/bb7e7fde6794a9baa02ca87b919cc1c056099111))
+
 ## [2.13.0](https://github.com/afonsojramos/super-calendar/compare/v2.12.1...v2.13.0) (2026-10-09)
 
 
