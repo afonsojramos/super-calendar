@@ -5,7 +5,16 @@ import {
   type OnViewableItemsChangedInfo,
 } from "@legendapp/list/react-native";
 import { addMonths, differenceInCalendarMonths, format, type Locale, startOfMonth } from "date-fns";
-import { memo, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ComponentRef,
+  memo,
+  type ReactElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Platform,
   StyleSheet,
@@ -178,7 +187,7 @@ function MonthPagerInner<T>({
   );
   const { width, height } = useWindowDimensions();
   const listRef = useRef<LegendListRef>(null);
-  const containerRef = useRef<View>(null);
+  const containerRef = useRef<ComponentRef<typeof View>>(null);
 
   // Web: LegendList's horizontal scroll container is `overflow-x: auto`, so a
   // trackpad swipe or horizontal wheel would page between months. Paging should be

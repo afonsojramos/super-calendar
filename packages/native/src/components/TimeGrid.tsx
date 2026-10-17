@@ -16,6 +16,7 @@ import {
   startOfWeek,
 } from "date-fns";
 import {
+  type ComponentRef,
   createContext,
   type Dispatch,
   type ForwardedRef,
@@ -2458,13 +2459,13 @@ function TimeGridInner<T>(
   const listRef = useRef<LegendListRef>(null);
   // The pager's own view; measured in the window so an event drag can locate the
   // horizontal edges (its screen-space left and width) for cross-week paging.
-  const pagerRef = useRef<View>(null);
+  const pagerRef = useRef<ComponentRef<typeof View>>(null);
   // The grid's outer view; on web its ref resolves to the DOM node we attach the
   // Ctrl/Cmd + scroll zoom listener to.
-  const containerRef = useRef<View>(null);
+  const containerRef = useRef<ComponentRef<typeof View>>(null);
   // The scroll viewport; measured in the window so a lifted drag can map the
   // finger into the scrolling content.
-  const viewportRef = useRef<View>(null);
+  const viewportRef = useRef<ComponentRef<typeof View>>(null);
   // Width the pager last laid out at, so the zoom (which changes its height every
   // frame) doesn't re-measure it.
   const pagerLayoutWidthRef = useRef(-1);
@@ -2519,8 +2520,19 @@ function TimeGridInner<T>(
     node.scrollTo({ y: seedDefaultY, animated: false });
     // Latch only once the view can hold the offset: until both the viewport and
     // the content have a size, the scroll clamps to 0 and would drop the seed.
-    const dom = node.getScrollableNode() as { scrollHeight: number; clientHeight: number } | null;
-    if (dom && dom.scrollHeight > dom.clientHeight) webSeededRef.current = true;
+    // Native types expose a node handle; react-native-web returns a DOM element.
+    const dom: unknown = node.getScrollableNode();
+    if (
+      dom != null &&
+      typeof dom === "object" &&
+      "scrollHeight" in dom &&
+      typeof dom.scrollHeight === "number" &&
+      "clientHeight" in dom &&
+      typeof dom.clientHeight === "number" &&
+      dom.scrollHeight > dom.clientHeight
+    ) {
+      webSeededRef.current = true;
+    }
   }, [scrollRef, seedDefaultY]);
   // Height of the all-day band, shared by the hour column and every page. Each
   // page reports its lane's natural height under its index, and the band follows

@@ -11,7 +11,7 @@ import {
   View,
   type ScrollViewProps,
 } from "react-native";
-import { Gesture, GestureDetector, type PanGesture } from "react-native-gesture-handler";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, WeekStartsOn } from "../types";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
@@ -522,7 +522,7 @@ function MiniMonthGrid({
     if (day.getMonth() !== current.getMonth()) return null;
     return selectable(day) ? day : null;
   }, []);
-  const gesture = useMemo<PanGesture | undefined>(() => {
+  const gesture = useMemo(() => {
     if (!sweepEnabled) return undefined;
     return Gesture.Pan()
       .activateAfterLongPress(DRAG_HOLD_MS)
