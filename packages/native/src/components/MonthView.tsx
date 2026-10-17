@@ -1,5 +1,14 @@
 import { format, type Locale, isSameMonth, startOfDay } from "date-fns";
-import { memo, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ComponentRef,
+  memo,
+  type ReactElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   type DimensionValue,
   type LayoutChangeEvent,
@@ -420,7 +429,7 @@ function MonthViewInner<T>({
 
   // ---- drag to create a day span / reschedule an event ----------------------
   const dragEnabled = onCreateEvent != null || onSelectDrag != null || onDragEvent != null;
-  const gridRef = useRef<View>(null);
+  const gridRef = useRef<ComponentRef<typeof View>>(null);
   // The live drag drives the preview; the ref is what the gesture and the web
   // pointer listeners read, so neither has to be rebuilt as the hover day moves
   // (rebuilding the gesture mid-drag would cancel it).
