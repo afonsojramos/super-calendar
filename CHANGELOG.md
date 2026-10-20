@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.14.1](https://github.com/afonsojramos/super-calendar/compare/v2.14.0...v2.14.1) (2026-10-20)
+
+
+### Bug Fixes
+
+* **core:** place time-grid events by clock time on DST change days ([#90](https://github.com/afonsojramos/super-calendar/issues/90)) ([973d6f5](https://github.com/afonsojramos/super-calendar/commit/973d6f5d97759bdbed8d87b641d6488e55719597))
+* **native:** type-check with React Native 0.88 and Gesture Handler 3 ([#89](https://github.com/afonsojramos/super-calendar/issues/89)) ([8b1d971](https://github.com/afonsojramos/super-calendar/commit/8b1d9718233808d61242e95e71f055c55d040fb2))
+
 ## [2.14.0](https://github.com/afonsojramos/super-calendar/compare/v2.13.0...v2.14.0) (2026-10-13)
 
 
