@@ -12,7 +12,16 @@ import {
   type Locale,
   startOfMonth,
 } from "date-fns";
-import { memo, type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ComponentRef,
+  memo,
+  type ReactElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -613,7 +622,7 @@ function MonthBlock({
   inert: boolean;
   children: React.ReactNode;
 }) {
-  const ref = useRef<View>(null);
+  const ref = useRef<ComponentRef<typeof View>>(null);
   useEffect(() => {
     if (!isWeb) return;
     const node = ref.current as unknown as { inert?: boolean } | null;
