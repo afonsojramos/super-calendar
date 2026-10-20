@@ -91,6 +91,7 @@ import {
   overlapsOtherEvents,
   pageStepDays,
   resolveDraggedBounds,
+  movedClockSpan,
   snapDeltaMinutes,
 } from "@super-calendar/core";
 import { formatHour, layoutDayEvents, type PositionedEvent } from "@super-calendar/core";
@@ -129,6 +130,8 @@ type WebKeyTarget = {
 const MINUTES_PER_HOUR = 60;
 const HOURS_PER_DAY = 24;
 const MINUTES_PER_DAY = MINUTES_PER_HOUR * HOURS_PER_DAY;
+// `moveExtra` for a box that isn't moving; shared so the hot path allocates nothing.
+const NO_MOVE_EXTRA = { top: 0, hours: 0 };
 // Steps rendered either side of the current page. LegendList virtualises, so
 // only a few mount at once; a wide window means the user effectively never runs
 // out of pages to swipe. Items are keyed by date and never recycled.
@@ -514,6 +517,40 @@ function AnimatedEventBoxInner<T>({
     [startHours, ownsStart],
   );
 
+  // Where a move in progress lands beyond its plain row offset, in hours: a start
+  // in the hour a spring-forward change skips moves on past it (`top`), and the
+  // kept elapsed duration covers a different number of rows once a DST change
+  // falls inside it or stops falling inside it (`hours`). Timestamps, not the
+  // event's `Date`s, so the worklet can capture them; a multi-day segment
+  // previews through `MultiDayMovePreview` instead.
+  const eventStartMs = positioned.event.start.getTime();
+  const eventEndMs = positioned.event.end.getTime();
+  const moveExtra = useDerivedValue(() => {
+    if (multiDay || lifted.value || cellHeight.value <= 0) return NO_MOVE_EXTRA;
+    if (moveOffset.value === 0 && moveOffsetX.value === 0) return NO_MOVE_EXTRA;
+    const columnDelta = dayWidth > 0 ? Math.round(moveOffsetX.value / dayWidth) : 0;
+    const target = Math.min(Math.max(dayIndex + columnDelta, 0), dayCount - 1);
+    const minutes =
+      Math.round((moveOffset.value / cellHeight.value) * MINUTES_PER_HOUR) +
+      (dayOrdinals[target] - dayOrdinals[dayIndex]) * MINUTES_PER_DAY;
+    const from = new Date(eventStartMs);
+    const to = new Date(eventEndMs);
+    const moved = movedClockSpan(from, to, minutes);
+    return {
+      top: moved.startHours - minutes / MINUTES_PER_HOUR,
+      hours: moved.hours - durationHours,
+    };
+  }, [
+    multiDay,
+    dayWidth,
+    dayIndex,
+    dayCount,
+    dayOrdinals,
+    eventStartMs,
+    eventEndMs,
+    durationHours,
+  ]);
+
   // Live pixel height of the box, driven on the UI thread by the shared
   // cellHeight (plus any in-progress resize). Handed to renderEvent so custom
   // renderers can reveal detail progressively as the grid zooms, without
@@ -521,7 +558,9 @@ function AnimatedEventBoxInner<T>({
   const boxHeight = useDerivedValue(
     () =>
       Math.max(
-        durationHours * cellHeight.value + resizeDelta.value - resizeStartDelta.value,
+        (durationHours + moveExtra.value.hours) * cellHeight.value +
+          resizeDelta.value -
+          resizeStartDelta.value,
         minEventHeight,
       ),
     [durationHours, minEventHeight],
@@ -533,7 +572,9 @@ function AnimatedEventBoxInner<T>({
   // math and the floating cross-page ghost.
   const visibleBoxHeight = useDerivedValue(() => {
     const top =
-      (startHours - minHour) * cellHeight.value + moveOffset.value + resizeStartDelta.value;
+      (startHours + moveExtra.value.top - minHour) * cellHeight.value +
+      moveOffset.value +
+      resizeStartDelta.value;
     const dayEnd = (HOURS_PER_DAY - minHour) * cellHeight.value;
     return Math.max(Math.min(boxHeight.value, dayEnd - top), minEventHeight);
   }, [startHours, minHour, minEventHeight]);
@@ -541,7 +582,9 @@ function AnimatedEventBoxInner<T>({
   const boxStyle = useAnimatedStyle(() => {
     // A top-edge resize pushes the box down and shortens it (start moves later).
     const top =
-      (startHours - minHour) * cellHeight.value + moveOffset.value + resizeStartDelta.value;
+      (startHours + moveExtra.value.top - minHour) * cellHeight.value +
+      moveOffset.value +
+      resizeStartDelta.value;
     // Cut the box off at midnight; whatever runs past it shows in the next column
     // instead (see MoveSpillPreview), the way a committed event spanning midnight
     // already renders. Purely geometric, so a resting box (already clipped to the
@@ -565,8 +608,9 @@ function AnimatedEventBoxInner<T>({
   // moved, which is every box but one.
   const spillHeight = useDerivedValue(() => {
     if (multiDay || !moving.value || lifted.value || cellHeight.value <= 0) return 0;
-    const liveStartHours = startHours + moveOffset.value / cellHeight.value;
-    const overflowHours = liveStartHours + durationHours - HOURS_PER_DAY;
+    const extra = moveExtra.value;
+    const liveStartHours = startHours + extra.top + moveOffset.value / cellHeight.value;
+    const overflowHours = liveStartHours + durationHours + extra.hours - HOURS_PER_DAY;
     if (overflowHours <= 0) return 0;
     const columnDelta = dayWidth > 0 ? Math.round(moveOffsetX.value / dayWidth) : 0;
     const target = Math.min(Math.max(dayIndex + columnDelta, 0), dayCount - 1);

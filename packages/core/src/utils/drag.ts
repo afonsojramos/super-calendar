@@ -1,6 +1,8 @@
 import { addDays, differenceInCalendarDays, startOfDay } from "date-fns";
 import type { CalendarEvent, CalendarMode, WeekStartsOn } from "../types";
 import { getViewDays } from "./dates";
+import { clockHoursBetween, drawnEnd } from "./layout";
+import { MIN_DURATION_HOURS } from "./minDuration";
 
 /**
  * True when two time ranges overlap. Edges touching (one ends exactly when the
@@ -77,12 +79,63 @@ export function clampMoveStartMinutes(
   return Math.min(Math.max(startMinutes, lower), upper);
 }
 
-/** A copy of `date` shifted by `minutes` (may be negative). */
+/**
+ * A copy of `date` shifted by `minutes` (may be negative) on the clock, so a
+ * shift across a DST change keeps the clock time. When the resulting clock time
+ * occurs twice (the hour a fall-back change repeats), the occurrence nearer to
+ * `minutes` of elapsed time wins.
+ */
 export function shiftMinutes(date: Date, minutes: number): Date {
   "worklet";
   const next = new Date(date);
   next.setMinutes(next.getMinutes() + minutes);
-  return next;
+  return nearestOccurrence(next, date.getTime() + minutes * 60_000);
+}
+
+// The instant reading the same clock time as `date` that is nearest `target`
+// (ms). In the hour a fall-back change repeats a clock time names two instants,
+// one offset change apart; elsewhere this is `date`.
+function nearestOccurrence(date: Date, target: number): Date {
+  "worklet";
+  const offset = date.getTimezoneOffset();
+  const later = new Date(date.getTime() + 3 * 3_600_000).getTimezoneOffset() - offset;
+  const earlier = offset - new Date(date.getTime() - 3 * 3_600_000).getTimezoneOffset();
+  let best = date;
+  for (const change of [later, -earlier]) {
+    if (change === 0) continue;
+    const other = new Date(date.getTime() + change * 60_000);
+    if (other.getHours() !== date.getHours() || other.getMinutes() !== date.getMinutes()) continue;
+    if (Math.abs(other.getTime() - target) < Math.abs(best.getTime() - target)) best = other;
+  }
+  return best;
+}
+
+// `date`'s clock reading as milliseconds, equal for two instants that read the same.
+const localTime = (date: Date): number => date.getTime() - date.getTimezoneOffset() * 60_000;
+
+/**
+ * Where moving `[start, end]` by `minutes` on the clock lands, in clock hours:
+ * how far the start moves, and how many rows the moved span covers. The span
+ * keeps its elapsed duration, as {@link resolveDraggedBounds} commits a move, so
+ * gaining or losing a DST change changes its row count, and a start that lands
+ * in the hour a spring-forward change skips moves on past it. The row count is
+ * at least the layout's minimum box, as the committed event will be drawn.
+ * Worklet-safe, for live drag previews.
+ */
+export function movedClockSpan(
+  start: Date,
+  end: Date,
+  minutes: number,
+): { startHours: number; hours: number } {
+  "worklet";
+  const nextStart = shiftMinutes(start, minutes);
+  const nextEnd = new Date(nextStart.getTime() + end.getTime() - start.getTime());
+  return {
+    startHours:
+      (nextStart.getTime() - start.getTime()) / 3_600_000 +
+      (start.getTimezoneOffset() - nextStart.getTimezoneOffset()) / 60,
+    hours: Math.max(clockHoursBetween(nextStart, nextEnd), MIN_DURATION_HOURS),
+  };
 }
 
 /**
@@ -104,10 +157,20 @@ export function resolveDraggedBounds(
 ): { start: Date; end: Date } | null {
   const nextStart = shiftMinutes(start, deltaStartMinutes);
   const oldDuration = end.getTime() - start.getTime();
-  const nextEnd =
-    deltaStartMinutes === deltaEndMinutes
-      ? new Date(nextStart.getTime() + oldDuration)
-      : shiftMinutes(end, deltaEndMinutes);
+  let nextEnd = end;
+  if (deltaStartMinutes === deltaEndMinutes) {
+    nextEnd = new Date(nextStart.getTime() + oldDuration);
+  } else if (deltaEndMinutes !== 0) {
+    // A resize moves the end to the clock time its drawn edge is dragged to. That
+    // edge differs from `end` for a span whose clock runs backwards, and a clock
+    // time in the hour a fall-back change repeats resolves to the occurrence
+    // nearest `end` shifted by the same amount.
+    const target = shiftMinutes(drawnEnd(start, end), deltaEndMinutes);
+    nextEnd = nearestOccurrence(target, end.getTime() + deltaEndMinutes * 60_000);
+    // An end dragged above the start can still land after it in the repeated
+    // hour, where its edge would be drawn somewhere else; refuse it.
+    if (localTime(drawnEnd(nextStart, nextEnd)) !== localTime(target)) return null;
+  }
   const newDuration = nextEnd.getTime() - nextStart.getTime();
   // Reject only a shrink past one step — never a move, which preserves duration.
   if (newDuration < snapMinutes * 60_000 && newDuration < oldDuration) return null;

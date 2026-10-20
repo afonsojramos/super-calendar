@@ -7,7 +7,7 @@ import Animated, {
   useAnimatedStyle,
   useDerivedValue,
 } from "react-native-reanimated";
-import { shiftMinutes } from "@super-calendar/core";
+import { clockHoursBetween, shiftMinutes, wallClockHours } from "@super-calendar/core";
 import type { CalendarEvent, CalendarMode, RenderEvent } from "../types";
 import { useCalendarTheme } from "../theme";
 import { useSlots } from "../utils/slots";
@@ -91,11 +91,11 @@ function PreviewDay<T>({
     ).getTime();
     const end = start + duration;
     const visible = !lifted.value && start < dayEnd && end > dayStart;
+    const segStart = new Date(Math.max(start, dayStart));
+    const segEnd = new Date(Math.min(end, dayEnd));
     return {
-      top: (Math.max(start, dayStart) - dayStart) / 3_600_000,
-      hours: visible
-        ? Math.max((Math.min(end, dayEnd) - Math.max(start, dayStart)) / 3_600_000, 0.25)
-        : 0,
+      top: wallClockHours(segStart, new Date(dayStart), new Date(dayEnd)),
+      hours: visible ? Math.max(clockHoursBetween(segStart, segEnd), 0.25) : 0,
       continuesBefore: start < dayStart,
       continuesAfter: end > dayEnd,
     };

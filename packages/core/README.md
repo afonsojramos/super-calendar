@@ -53,6 +53,12 @@ import { clampMoveStartMinutes } from "@super-calendar/core";
 const startMinutes = clampMoveStartMinutes(rawStartMinutes, minHour, maxHour, snapMinutes);
 ```
 
+To position your own marks on a time grid, `wallClockHours(date, dayStart, nextDayStart)`
+returns the fractional clock hour, clamped to the day. It matches `layoutDayEvents`,
+which places events by clock time so they line up with the hour labels on a
+daylight saving change day. `clockHoursBetween(from, to)` returns how many rows a
+span covers.
+
 Use `resolveDraggedBounds` to commit a move or resize. Equal start and end deltas
 move the event while preserving elapsed duration, including across daylight
 saving changes. For a resize, pass zero for the edge you want to keep fixed.
