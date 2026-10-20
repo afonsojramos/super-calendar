@@ -1,6 +1,5 @@
 import {
   addDays,
-  addMinutes,
   differenceInCalendarDays,
   format,
   getISOWeek,
@@ -32,6 +31,9 @@ import {
   type CalendarMode,
   cellRangeFromDrag,
   clampMoveStartMinutes,
+  resolveDraggedBounds,
+  movedClockSpan,
+  shiftMinutes,
   pageStepDays,
   backgroundBandsForDay,
   closedHourBands,
@@ -299,6 +301,10 @@ type DragState = {
   // top edge (changes the start, end fixed).
   kind: "move" | "resize" | "resize-start";
   startHours: number;
+  // The row a move asked for. `startHours` is where it lands, an hour later when
+  // that row is in the hour a spring-forward change skips; the commit re-resolves
+  // the request against the day it drops on.
+  requestedStartHours: number;
   durationHours: number;
   /** Whole day columns the box has been dragged across, clamped to the view. */
   dayDelta: number;
@@ -320,7 +326,24 @@ type DragState = {
 // both. The time reserves two lines (it can wrap on a narrow column).
 const DOM_TITLE_LINE_HEIGHT = 16;
 const DOM_TIME_LINE_HEIGHT = 30;
+
 const DOM_BOX_PADDING_V = 2;
+
+// Where a dragged segment's start lands: shifted on the clock by as many minutes
+// as its row moved, plus whole days to `base`, from the instant it started at.
+// Shifting the real instant rather than rebuilding it from rows keeps a start in
+// the hour a fall-back change repeats on its own occurrence.
+function movedSegmentStart(
+  origin: { startHours: number; segmentStart: Date; base: Date },
+  base: Date,
+  startHours: number,
+): Date {
+  const dayMinutes = differenceInCalendarDays(base, origin.base) * HOURS_PER_DAY * 60;
+  return shiftMinutes(
+    origin.segmentStart,
+    dayMinutes + Math.round((startHours - origin.startHours) * 60),
+  );
+}
 
 function DefaultDomEvent<T>({
   event,
@@ -537,6 +560,8 @@ function TimeGridInner<T = unknown>(
     // (which would truncate everything outside the dragged day).
     segmentStart: Date;
     segmentEnd: Date;
+    // Midnight of the day the segment was grabbed on.
+    base: Date;
   } | null>(null);
   const applyDrag = (next: DragState | null) => {
     dragRef.current = next;
@@ -793,7 +818,7 @@ function TimeGridInner<T = unknown>(
       // layout clipped the event, not where the event starts, so holding it there
       // would make the tail of a midnight-spanning event impossible to drag earlier.
       const raw = snap(dragOrigin.current.startHours + dHours);
-      const startHours = d.continuesBefore
+      const requestedHours = d.continuesBefore
         ? raw
         : clampMoveStartMinutes(raw * 60, windowStart, windowEnd, snapMinutes) / 60;
       // Map the horizontal drag to whole day columns, clamped so the in-view box
@@ -803,12 +828,27 @@ function TimeGridInner<T = unknown>(
       const rawDayDelta = o.dayWidth > 0 ? Math.round((e.clientX - o.pointerX) / o.dayWidth) : 0;
       const targetDay = clamp(o.dayIndex + rawDayDelta, 0, daysRef.current.length - 1);
       const dayDelta = targetDay - o.dayIndex;
+      // Draw the box where the drop commits it: a start in the hour a
+      // spring-forward change skips moves on past it, and the kept elapsed
+      // duration covers a different number of rows once a DST change falls
+      // inside it or stops falling inside it.
+      const dayMinutes =
+        differenceInCalendarDays(startOfDay(daysRef.current[targetDay] ?? o.base), o.base) *
+        HOURS_PER_DAY *
+        60;
+      const moved = movedClockSpan(
+        o.segmentStart,
+        o.segmentEnd,
+        dayMinutes + Math.round((requestedHours - o.startHours) * 60),
+      );
+      const startHours = o.startHours + moved.startHours - dayMinutes / 60;
+      const durationHours = moved.hours;
       // Preview the part that runs past *midnight* at the top of the next column.
       // Measured against the end of the day, not `windowEnd`: a narrowed window
       // (say 8–18) leaves plenty of events hanging below the last visible hour
       // without them reaching the next day at all.
       const spillHours = Math.min(
-        Math.max(startHours + d.durationHours - HOURS_PER_DAY, 0),
+        Math.max(startHours + durationHours - HOURS_PER_DAY, 0),
         windowHours,
       );
       const nextDay = daysRef.current[targetDay + 1];
@@ -826,6 +866,8 @@ function TimeGridInner<T = unknown>(
       applyDrag({
         ...d,
         startHours,
+        requestedStartHours: requestedHours,
+        durationHours,
         dayDelta,
         dayOffsetPx: dayDelta * o.dayWidth,
         spillHours,
@@ -909,20 +951,26 @@ function TimeGridInner<T = unknown>(
     } else {
       base = startOfDay(daysRef.current[originIndex] ?? daysRef.current[0]);
     }
-    if (base && held && origin) {
+    if (held && origin && d.kind === "resize") {
+      // Resolve the end like the native renderer, from the edge the layout drew,
+      // so it lands at the row the edge was dragged to on either side of a DST
+      // change.
+      const endDelta = Math.round(
+        (d.startHours + d.durationHours - origin.startHours - origin.durationHours) * 60,
+      );
+      const next = resolveDraggedBounds(held.event.start, held.event.end, 0, endDelta, snapMinutes);
+      if (next) onDragEventRef.current?.(held.event, next.start, next.end);
+    } else if (base && held && origin) {
       // Shift the real event by how far its segment moved, so a move that now
       // spans midnight (and every later drag of the resulting multi-day event)
       // keeps the parts outside the dragged day instead of clipping to it.
-      const segmentStart = addMinutes(base, Math.round(d.startHours * 60));
-      const segmentEnd = addMinutes(base, Math.round((d.startHours + d.durationHours) * 60));
-      const startShift =
-        d.kind === "resize" ? 0 : segmentStart.getTime() - origin.segmentStart.getTime();
-      const endShift =
-        d.kind === "move"
-          ? startShift
-          : d.kind === "resize-start"
-            ? 0
-            : segmentEnd.getTime() - origin.segmentEnd.getTime();
+      const segmentStart = movedSegmentStart(
+        origin,
+        base,
+        d.kind === "move" ? d.requestedStartHours : d.startHours,
+      );
+      const startShift = segmentStart.getTime() - origin.segmentStart.getTime();
+      const endShift = d.kind === "move" ? startShift : 0;
       const start = new Date(held.event.start.getTime() + startShift);
       const end = new Date(held.event.end.getTime() + endShift);
       if (end > start) onDragEventRef.current?.(held.event, start, end);
@@ -961,6 +1009,8 @@ function TimeGridInner<T = unknown>(
     const dayWidth = column ? column.getBoundingClientRect().width : 0;
     const boxRect = kind === "move" ? boxEl.getBoundingClientRect() : null;
     const originBase = startOfDay(days[dayIndex] ?? days[0]);
+    const originNextDay = addDays(originBase, 1);
+    const segmentStart = event.start > originBase ? event.start : originBase;
     dragOrigin.current = {
       pointerX: e.clientX,
       pointerY: e.clientY,
@@ -969,8 +1019,11 @@ function TimeGridInner<T = unknown>(
       durationHours,
       dayIndex,
       dayWidth,
-      segmentStart: addMinutes(originBase, Math.round(startHours * 60)),
-      segmentEnd: addMinutes(originBase, Math.round((startHours + durationHours) * 60)),
+      // The segment's real edges rather than ones rebuilt from its rows: in the
+      // hour a fall-back change repeats, one row maps to two instants.
+      segmentStart,
+      segmentEnd: event.end < originNextDay ? event.end : originNextDay,
+      base: originBase,
     };
     draggedRef.current = {
       event,
@@ -989,6 +1042,7 @@ function TimeGridInner<T = unknown>(
       key,
       kind,
       startHours,
+      requestedStartHours: startHours,
       durationHours,
       continuesBefore,
       continuesAfter,
@@ -1198,7 +1252,11 @@ function TimeGridInner<T = unknown>(
     movingEvent
       ? (() => {
           const target = days[moveOrigin.dayIndex + drag.dayDelta];
-          const segmentStart = addMinutes(startOfDay(target), Math.round(drag.startHours * 60));
+          const segmentStart = movedSegmentStart(
+            moveOrigin,
+            startOfDay(target),
+            drag.requestedStartHours,
+          );
           const shift = segmentStart.getTime() - moveOrigin.segmentStart.getTime();
           return {
             ...movingEvent,

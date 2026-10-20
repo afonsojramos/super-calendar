@@ -1,18 +1,18 @@
-import { addDays, differenceInMinutes, max as maxDate, min as minDate, startOfDay } from "date-fns";
+import { addDays, max as maxDate, min as minDate, startOfDay } from "date-fns";
 import type { BusinessHours, CalendarEvent } from "../types";
-
-const MINUTES_PER_HOUR = 60;
-// Minimum duration (in hours) a positioned event is given, so a zero/negative
-// span still occupies a sliver rather than collapsing to nothing.
-const MIN_DURATION_HOURS = 0.25;
+import { MIN_DURATION_HOURS } from "./minDuration";
 
 /** An event placed on a single day's time grid by {@link layoutDayEvents}, with its vertical span and overlap column. */
 export type PositionedEvent<T> = {
   /** The source event for this segment. */
   event: CalendarEvent<T>;
-  /** Hours from midnight to the event's segment start on this day (fractional). */
+  /**
+   * Clock time of the segment start on this day, in fractional hours: the
+   * time-grid row it starts in. On a DST change day this differs from the time
+   * elapsed since midnight (see {@link wallClockHours}).
+   */
   startHours: number;
-  /** Segment duration in hours on this day (clamped to a small minimum). */
+  /** Clock hours the segment spans on this day (clamped to a small minimum). */
   durationHours: number;
   /** Zero-based column index within its overlap cluster. */
   column: number;
@@ -29,6 +29,66 @@ type Segment<T> = {
   end: number;
   continuesBefore: boolean;
   continuesAfter: boolean;
+};
+
+/**
+ * The fractional hour `date` shows on the clock, which is the time-grid row it
+ * belongs in, clamped to `[dayStart, nextDayStart]` so the midnight that ends
+ * the day reads 24. On a DST change day this differs from the time elapsed
+ * since midnight: after clocks go back, 10:00 is 11 hours in but reads 10.
+ * Worklet-safe, so a UI-thread preview places events the same way.
+ */
+export function wallClockHours(date: Date, dayStart: Date, nextDayStart: Date): number {
+  "worklet";
+  if (date.getTime() >= nextDayStart.getTime()) return 24;
+  if (date.getTime() <= dayStart.getTime()) return 0;
+  return (
+    date.getHours() +
+    date.getMinutes() / 60 +
+    date.getSeconds() / 3600 +
+    date.getMilliseconds() / 3_600_000
+  );
+}
+
+/**
+ * The hours between `from` and `to` as the clock reads them: the elapsed hours
+ * plus any DST offset change between the two, so 01:30 to 03:30 is 2 even on a
+ * spring-forward day when only 1 hour passes. In the hour a fall-back change
+ * repeats the clock can read earlier at `to` than at `from` (01:30 EDT to 01:00
+ * EST); such a span keeps its elapsed length so it still has a size to draw.
+ * Worklet-safe, so a UI-thread drag preview sizes boxes the same way.
+ */
+export function clockHoursBetween(from: Date, to: Date): number {
+  "worklet";
+  const elapsed = (to.getTime() - from.getTime()) / 3_600_000;
+  const clock = elapsed + (from.getTimezoneOffset() - to.getTimezoneOffset()) / 60;
+  return clock > 0 || elapsed <= 0 ? clock : elapsed;
+}
+
+/**
+ * The instant a time grid draws the bottom edge of `[start, end]` at. That is
+ * `end`, except in the hour a fall-back change repeats: a span whose clock runs
+ * backwards (01:30 EDT to 01:00 EST) is drawn its elapsed length from `start`
+ * (see {@link clockHoursBetween}), so its edge reads 02:00. Resizing from that
+ * instant keeps the edge under the pointer. Worklet-safe.
+ */
+export function drawnEnd(start: Date, end: Date): Date {
+  "worklet";
+  const offsetChange = end.getTimezoneOffset() - start.getTimezoneOffset();
+  const elapsed = end.getTime() - start.getTime();
+  if (elapsed <= 0 || elapsed - offsetChange * 60_000 > 0) return end;
+  return new Date(end.getTime() + offsetChange * 60_000);
+}
+
+// The clock-hour rows `[from, to]` covers on a day.
+const clockSpan = (
+  from: Date,
+  to: Date,
+  dayStart: Date,
+  nextDayStart: Date,
+): { start: number; end: number } => {
+  const start = wallClockHours(from, dayStart, nextDayStart);
+  return { start, end: Math.min(24, start + clockHoursBetween(from, to)) };
 };
 
 /**
@@ -52,8 +112,7 @@ export function layoutDayEvents<T>(events: CalendarEvent<T>[], day: Date): Posit
       const segEnd = minDate([event.end, nextDayStart]);
       return {
         event,
-        start: differenceInMinutes(segStart, dayStart) / MINUTES_PER_HOUR,
-        end: differenceInMinutes(segEnd, dayStart) / MINUTES_PER_HOUR,
+        ...clockSpan(segStart, segEnd, dayStart, nextDayStart),
         continuesBefore: event.start < dayStart,
         continuesAfter: event.end > nextDayStart,
       };
@@ -235,8 +294,7 @@ export function backgroundBandsForDay<T>(
     if (event.start >= nextDayStart || event.end <= dayStart) continue;
     const from = event.start > dayStart ? event.start : dayStart;
     const to = event.end < nextDayStart ? event.end : nextDayStart;
-    const startHours = (from.getTime() - dayStart.getTime()) / 3_600_000;
-    const endHours = (to.getTime() - dayStart.getTime()) / 3_600_000;
+    const { start: startHours, end: endHours } = clockSpan(from, to, dayStart, nextDayStart);
     if (endHours > startHours) out.push({ event, startHours, endHours });
   }
   return out;

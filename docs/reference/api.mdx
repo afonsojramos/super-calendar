@@ -175,6 +175,23 @@ For a custom renderer that should read like the built-in ones, `resolveCalendarL
 fills a partial `labels` object with the English defaults and
 `dayAccessibilityLabel` joins a formatted date with its state words.
 
+`wallClockHours(date, dayStart, nextDayStart)` converts a time to its time-grid
+row in fractional clock hours, clamped to the day. `layoutDayEvents` and
+`backgroundBandsForDay` use it, so on a daylight saving change day events line up
+with their hour labels rather than shifting by the hour the clock skipped or
+repeated. `clockHoursBetween(from, to)` returns how many rows a span covers: the
+elapsed hours plus any daylight saving offset change between the two. Inside the
+hour a fall-back change repeats, where that would come out zero or negative, it
+returns the elapsed hours instead.
+
 `resolveDraggedBounds` preserves elapsed duration when you pass the same minute
 delta for both edges, including across daylight saving changes. The end's local
-clock time can change to keep that duration.
+clock time can change to keep that duration. Each edge moves on the clock with
+`shiftMinutes`; when the resulting clock time occurs twice, in the hour a
+fall-back change repeats, the occurrence nearer the elapsed shift wins. For a live
+preview of the same move, `movedClockSpan(start, end, minutes)` returns how far
+the start moves in clock hours and how many rows the moved span covers, at least
+the layout's minimum box. A resize moves the end to the clock time its drawn
+edge is dragged to. That edge is what `drawnEnd(start, end)` returns: the end
+itself, except for a span whose clock runs backwards in the repeated hour, which
+is drawn its elapsed length from its start.

@@ -1,4 +1,3 @@
-import { addMinutes, startOfDay } from "date-fns";
 import type {
   ComponentType,
   CSSProperties,
@@ -19,6 +18,9 @@ import {
   eventTimeLabel,
   formatHour,
   layoutDayEvents,
+  movedClockSpan,
+  type PositionedEvent,
+  resolveDraggedBounds,
 } from "@super-calendar/core";
 import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
@@ -340,6 +342,9 @@ export function ResourceTimeline<T = unknown>({
     cross: number;
     startHours: number;
     durationHours: number;
+    // The event's own bounds, for previewing a move across a DST change; null
+    // for a bar clipped to the day.
+    span: { start: Date; end: Date } | null;
   } | null>(null);
   const applyDrag = (next: DragState | null) => {
     dragRef.current = next;
@@ -351,9 +356,9 @@ export function ResourceTimeline<T = unknown>({
     key: string,
     resourceId: string,
     kind: "move" | "resize",
-    startHours: number,
-    durationHours: number,
+    pe: PositionedEvent<T>,
   ) => {
+    const { startHours, durationHours } = pe;
     if (!onDragEvent) return;
     e.stopPropagation();
     try {
@@ -366,6 +371,10 @@ export function ResourceTimeline<T = unknown>({
       cross: vertical ? e.clientX : e.clientY,
       startHours,
       durationHours,
+      span:
+        pe.continuesBefore || pe.continuesAfter
+          ? null
+          : { start: pe.event.start, end: pe.event.end },
     };
     applyDrag({ key, resourceId, kind, startHours, durationHours, crossPx: 0, moved: false });
   };
@@ -375,13 +384,24 @@ export function ResourceTimeline<T = unknown>({
     const dHours = ((vertical ? e.clientY : e.clientX) - origin.current.x) / hourSize;
     const snap = (v: number) => Math.round(v / snapHours) * snapHours;
     if (d.kind === "move") {
-      const startHours = clamp(
-        snap(origin.current.startHours + dHours),
+      const o = origin.current;
+      const requestedHours = clamp(
+        snap(o.startHours + dHours),
         startHour,
-        endHour - d.durationHours,
+        endHour - o.durationHours,
       );
-      const crossPx = (vertical ? e.clientX : e.clientY) - origin.current.cross;
-      applyDrag({ ...d, startHours, crossPx, moved: true });
+      // Draw the bar where the drop commits it: a start in the hour a
+      // spring-forward change skips moves on past it, and the kept elapsed
+      // duration covers a different number of hours once a DST change falls
+      // inside it or stops falling inside it.
+      const span = o.span;
+      const moved = span
+        ? movedClockSpan(span.start, span.end, Math.round((requestedHours - o.startHours) * 60))
+        : null;
+      const startHours = moved ? o.startHours + moved.startHours : requestedHours;
+      const durationHours = moved ? moved.hours : o.durationHours;
+      const crossPx = (vertical ? e.clientX : e.clientY) - o.cross;
+      applyDrag({ ...d, startHours, durationHours, crossPx, moved: true });
     } else {
       const durationHours = clamp(
         snap(origin.current.durationHours + dHours),
@@ -433,10 +453,22 @@ export function ResourceTimeline<T = unknown>({
       return;
     }
     const target = d.kind === "move" ? laneAt(e, resource) : resource;
-    const base = startOfDay(date);
-    const start = addMinutes(base, Math.round(d.startHours * 60));
-    const end = addMinutes(base, Math.round((d.startHours + d.durationHours) * 60));
-    onDragEvent?.(event, start, end, target);
+    // Shift the event by how far its bar moved, like the native renderer, so a
+    // move keeps its elapsed duration across a DST change.
+    const o = origin.current;
+    const startDelta = o ? Math.round((d.startHours - o.startHours) * 60) : 0;
+    // A move shifts both edges alike; its preview duration only redraws the
+    // kept elapsed duration.
+    const endDelta =
+      d.kind === "move" ? startDelta : o ? Math.round((d.durationHours - o.durationHours) * 60) : 0;
+    const next = resolveDraggedBounds(
+      event.start,
+      event.end,
+      startDelta,
+      endDelta,
+      dragStepMinutes,
+    );
+    if (next) onDragEvent?.(event, next.start, next.end, target);
     applyDrag(null);
     origin.current = null;
   };
@@ -732,17 +764,7 @@ export function ResourceTimeline<T = unknown>({
                         aria-label={pe.event.title}
                         {...dataState({ "data-dragging": !!active })}
                         onPointerDown={
-                          draggable
-                            ? (e) =>
-                                beginDrag(
-                                  e,
-                                  key,
-                                  resource.id,
-                                  "move",
-                                  pe.startHours,
-                                  pe.durationHours,
-                                )
-                            : undefined
+                          draggable ? (e) => beginDrag(e, key, resource.id, "move", pe) : undefined
                         }
                         onPointerMove={draggable ? moveDrag : undefined}
                         onPointerUp={
@@ -783,14 +805,7 @@ export function ResourceTimeline<T = unknown>({
                             aria-hidden
                             onPointerDown={(e) => {
                               e.stopPropagation();
-                              beginDrag(
-                                e,
-                                key,
-                                resource.id,
-                                "resize",
-                                pe.startHours,
-                                pe.durationHours,
-                              );
+                              beginDrag(e, key, resource.id, "resize", pe);
                             }}
                             style={{
                               position: "absolute",
@@ -983,17 +998,7 @@ export function ResourceTimeline<T = unknown>({
                       aria-label={pe.event.title}
                       {...dataState({ "data-dragging": !!active })}
                       onPointerDown={
-                        draggable
-                          ? (e) =>
-                              beginDrag(
-                                e,
-                                key,
-                                resource.id,
-                                "move",
-                                pe.startHours,
-                                pe.durationHours,
-                              )
-                          : undefined
+                        draggable ? (e) => beginDrag(e, key, resource.id, "move", pe) : undefined
                       }
                       onPointerMove={draggable ? moveDrag : undefined}
                       onPointerUp={
@@ -1032,14 +1037,7 @@ export function ResourceTimeline<T = unknown>({
                           aria-hidden
                           onPointerDown={(e) => {
                             e.stopPropagation();
-                            beginDrag(
-                              e,
-                              key,
-                              resource.id,
-                              "resize",
-                              pe.startHours,
-                              pe.durationHours,
-                            );
+                            beginDrag(e, key, resource.id, "resize", pe);
                           }}
                           style={{
                             position: "absolute",

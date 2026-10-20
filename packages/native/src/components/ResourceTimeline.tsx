@@ -11,7 +11,12 @@ import {
   View,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useDerivedValue,
+  useSharedValue,
+} from "react-native-reanimated";
 import {
   backgroundBandsForDay,
   type CalendarEvent,
@@ -24,6 +29,7 @@ import {
   eventTimeLabel,
   formatHour,
   layoutDayEvents,
+  movedClockSpan,
   type PositionedEvent,
   resolveDraggedBounds,
   snapDeltaMinutes,
@@ -38,6 +44,8 @@ const MOVE_ACTIVATE_MS = 250;
 // a plain mouse drag creates (mirrors the time grid).
 const DRAG_ACTIVATE_PX = 8;
 const MINUTES_PER_HOUR = 60;
+// `moveExtra` for a bar that isn't moving; shared so the hot path allocates nothing.
+const NO_MOVE_EXTRA = { top: 0, hours: 0 };
 const isWeb = Platform.OS === "web";
 
 /** A schedulable lane (room, person, machine) events are grouped under. */
@@ -376,19 +384,41 @@ function ResourceBar<T>({
       }
     : undefined;
 
-  const barStyle = useAnimatedStyle(
-    () =>
-      vertical
-        ? {
-            transform: [{ translateY: moveX.value }, { translateX: moveCross.value }],
-            height: Math.max(height + resizeW.value, 2),
-          }
-        : {
-            transform: [{ translateX: moveX.value }, { translateY: moveCross.value }],
-            width: Math.max((width as number) + resizeW.value, 2),
-          },
-    [vertical, width, height],
-  );
+  // Where a move in progress lands beyond its plain offset, in hours: a start in
+  // the hour a spring-forward change skips moves on past it (`top`), and the kept
+  // elapsed duration covers a different number of hours on the axis once a DST
+  // change falls inside it or stops falling inside it (`hours`). Timestamps, not
+  // `Date`s, so the worklet can capture them; a bar clipped to the day keeps its
+  // plain offset.
+  const eventStartMs = pe.event.start.getTime();
+  const eventEndMs = pe.event.end.getTime();
+  const clipped = pe.continuesBefore || pe.continuesAfter;
+  const barHours = pe.durationHours;
+  const moveExtra = useDerivedValue(() => {
+    if (clipped || moveX.value === 0 || hourSize <= 0) return NO_MOVE_EXTRA;
+    const minutes = Math.round((moveX.value / hourSize) * MINUTES_PER_HOUR);
+    const from = new Date(eventStartMs);
+    const to = new Date(eventEndMs);
+    const moved = movedClockSpan(from, to, minutes);
+    return {
+      top: moved.startHours - minutes / MINUTES_PER_HOUR,
+      hours: moved.hours - barHours,
+    };
+  }, [clipped, hourSize, eventStartMs, eventEndMs, barHours]);
+
+  const barStyle = useAnimatedStyle(() => {
+    const shift = moveX.value + moveExtra.value.top * hourSize;
+    const grow = resizeW.value + moveExtra.value.hours * hourSize;
+    return vertical
+      ? {
+          transform: [{ translateY: shift }, { translateX: moveCross.value }],
+          height: Math.max(height + grow, 2),
+        }
+      : {
+          transform: [{ translateX: shift }, { translateY: moveCross.value }],
+          width: Math.max((width as number) + grow, 2),
+        };
+  }, [vertical, width, height, hourSize]);
 
   const laneId = resources[laneIndex]?.id ?? "";
   const moveGesture = useMemo(

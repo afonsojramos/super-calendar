@@ -108,11 +108,18 @@ import { layoutDayEvents } from "@super-calendar/core";
 
 for (const pe of layoutDayEvents(events, day)) {
   // pe.event                              the original event
-  // pe.startHours, pe.durationHours       vertical position (hours from midnight)
+  // pe.startHours, pe.durationHours       vertical position (clock hours)
   // pe.column / pe.columns                left = (column / columns) * 100%, width = 100% / columns
   // pe.continuesBefore / pe.continuesAfter   multi-day clipping flags
 }
 ```
+
+`startHours` is the clock time, not the time elapsed since midnight, so on a
+daylight saving change day an event still lines up with its hour label. To place
+your own marks the same way, use `wallClockHours(date, dayStart, nextDayStart)`,
+which reads the clock and clamps to the day (the closing midnight reads 24).
+`clockHoursBetween(from, to)` gives the rows a span covers: 01:30 to 03:30 is 2
+even on a spring-forward day, when only 1 hour passes.
 
 To bucket events by calendar day (for a month or agenda), use
 `groupEventsByDay(events)` — a `Map` keyed by `startOfDay(date).toISOString()`
@@ -126,7 +133,8 @@ TypeScript types for exact signatures.
 
 - **Drag math** — `cellRangeFromDrag` (a sweep to start/end), `resolveDraggedBounds`
   (a move/resize to snapped bounds), `clampMoveStartMinutes` (holds a moved start
-  inside the visible hour window), `snapDeltaMinutes`, `shiftMinutes`.
+  inside the visible hour window), `snapDeltaMinutes`, `shiftMinutes`,
+  `movedClockSpan` (where a move previews on a daylight saving change day).
 - **Event display** — `eventTimeLabel`, `eventAccessibilityLabel`,
   `titleNumberOfLines` / `titleEllipsizeMode`, `isTimeVisibleAtHeight`, `formatHour`
   (the shared time-grid hour-axis label both renderers default to).
