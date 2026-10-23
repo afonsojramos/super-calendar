@@ -79,22 +79,11 @@ export function clampMoveStartMinutes(
   return Math.min(Math.max(startMinutes, lower), upper);
 }
 
-/**
- * A copy of `date` shifted by `minutes` (may be negative) on the clock, so a
- * shift across a DST change keeps the clock time. When the resulting clock time
- * occurs twice (the hour a fall-back change repeats), the occurrence nearer to
- * `minutes` of elapsed time wins.
- */
-export function shiftMinutes(date: Date, minutes: number): Date {
-  "worklet";
-  const next = new Date(date);
-  next.setMinutes(next.getMinutes() + minutes);
-  return nearestOccurrence(next, date.getTime() + minutes * 60_000);
-}
-
 // The instant reading the same clock time as `date` that is nearest `target`
 // (ms). In the hour a fall-back change repeats a clock time names two instants,
-// one offset change apart; elsewhere this is `date`.
+// one offset change apart; elsewhere this is `date`. Declared before the
+// worklets that call it: the worklets plugin captures a worklet's dependencies
+// when the module is evaluated, so a later declaration is still undefined.
 function nearestOccurrence(date: Date, target: number): Date {
   "worklet";
   const offset = date.getTimezoneOffset();
@@ -108,6 +97,19 @@ function nearestOccurrence(date: Date, target: number): Date {
     if (Math.abs(other.getTime() - target) < Math.abs(best.getTime() - target)) best = other;
   }
   return best;
+}
+
+/**
+ * A copy of `date` shifted by `minutes` (may be negative) on the clock, so a
+ * shift across a DST change keeps the clock time. When the resulting clock time
+ * occurs twice (the hour a fall-back change repeats), the occurrence nearer to
+ * `minutes` of elapsed time wins.
+ */
+export function shiftMinutes(date: Date, minutes: number): Date {
+  "worklet";
+  const next = new Date(date);
+  next.setMinutes(next.getMinutes() + minutes);
+  return nearestOccurrence(next, date.getTime() + minutes * 60_000);
 }
 
 // `date`'s clock reading as milliseconds, equal for two instants that read the same.
