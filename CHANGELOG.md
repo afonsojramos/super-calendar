@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.14.2](https://github.com/afonsojramos/super-calendar/compare/v2.14.1...v2.14.2) (2026-10-23)
+
+
+### Bug Fixes
+
+* **core:** declare nearestOccurrence before the worklets that capture it ([#93](https://github.com/afonsojramos/super-calendar/issues/93)) ([a2e278a](https://github.com/afonsojramos/super-calendar/commit/a2e278a7c431fbb4c279e49a3d99b571990c2e2f))
+
 ## [2.14.1](https://github.com/afonsojramos/super-calendar/compare/v2.14.0...v2.14.1) (2026-10-20)
 
 
