@@ -1402,6 +1402,82 @@ describe("TimeGrid cross-week drop", () => {
     jest.useRealTimers();
   });
 
+  it.each([
+    { label: "full-width box mostly over Wednesday", overlaps: 1, left: 1.9, day: 14 },
+    { label: "half-width box mostly over Wednesday", overlaps: 2, left: 1.9, day: 14 },
+    { label: "narrow box mostly over Wednesday", overlaps: 4, left: 1.95, day: 14 },
+    { label: "narrow box still mostly over Tuesday", overlaps: 4, left: 1.8, day: 13 },
+    { label: "full-width box still mostly over Tuesday", overlaps: 1, left: 1.4, day: 13 },
+    { label: "box beyond the first column", overlaps: 1, left: -1, day: 12 },
+    { label: "box beyond the last column", overlaps: 1, left: 7, day: 18 },
+    { label: "right-to-left columns", overlaps: 2, left: 1.9, day: 16, isRTL: true },
+    { label: "hidden Wednesday", overlaps: 2, left: 1.9, day: 15, hideWednesday: true },
+    { label: "rejected placement", overlaps: 2, left: 1.9, day: 14, reject: true },
+  ])(
+    "selects the destination by the ghost's centre: $label",
+    async ({ overlaps, left, day, isRTL, hideWednesday, reject }) => {
+      const onDragEvent = jest.fn(() => !reject);
+      const onChangeDate = jest.fn();
+      const events = Array.from({ length: overlaps }, (_, index) => ({
+        ...event,
+        id: String(index),
+      }));
+      const grid = (date: Date) => (
+        <TimeGrid<WithId>
+          mode="week"
+          date={date}
+          events={events}
+          cellHeight={{ value: 48 } as never}
+          hourHeight={48}
+          weekStartsOn={1}
+          hideHours
+          isRTL={isRTL}
+          hiddenDays={hideWednesday ? [3] : undefined}
+          renderEvent={DefaultEvent}
+          keyExtractor={(item) => item.id}
+          onChangeDate={onChangeDate}
+          onPressEvent={noop}
+          onDragEvent={onDragEvent}
+        />
+      );
+      const { rerender } = await render(grid(event.start));
+      const width = Dimensions.get("window").width;
+      const columnWidth = width / (hideWednesday ? 6 : 7);
+      const grabX = columnWidth / overlaps / 2;
+      const move = moveGestureHarness();
+      await act(() => {
+        move.onStart?.({ x: grabX, y: 10, absoluteX: 200, absoluteY: 300 });
+        move.onUpdate?.({
+          translationX: width,
+          translationY: 0,
+          absoluteX: width + 100,
+          absoluteY: 750,
+        });
+        jest.advanceTimersByTime(600);
+      });
+      expect(onChangeDate).toHaveBeenCalledTimes(1);
+      expect(onDragEvent).not.toHaveBeenCalled();
+      await rerender(grid(new Date(2026, 0, 12)));
+      await act(() => {
+        move.onUpdate?.({
+          translationX: 0,
+          translationY: 0,
+          absoluteX: left * columnWidth + grabX,
+          absoluteY: 750,
+        });
+        move.onFinalize?.({}, true);
+      });
+      expect(onDragEvent).toHaveBeenCalledTimes(1);
+      expect(onDragEvent).toHaveBeenCalledWith(
+        events[0],
+        new Date(2026, 0, day, 14),
+        new Date(2026, 0, day, 15),
+      );
+      if (reject) expect(onChangeDate).toHaveBeenLastCalledWith(event.start);
+      else expect(onChangeDate).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it("maps the lifted ghost's pager-local position to a day column and time", async () => {
     const onDragEvent = jest.fn();
     const onChangeDate = jest.fn();

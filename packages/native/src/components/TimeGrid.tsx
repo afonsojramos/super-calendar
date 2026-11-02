@@ -2678,12 +2678,15 @@ function TimeGridInner<T>(
       clearLift();
       if (!ev || !onDrag || days.length === 0) return;
       // Map the ghost's drawn position on the page it landed on back to a cell:
-      // its left edge picks the day column, its top edge picks the time. Both are
+      // its centre picks the day column, its top edge picks the time. Both are
       // pager-local, and the pager is the scrolling content itself, so the top
       // edge only needs the page's all-day band and label inset taken off before
       // the live row height (pinch) converts it to hours.
       const dayWidth = cw / days.length;
-      const col = Math.min(Math.max(Math.floor(ghostLocalX / dayWidth), 0), days.length - 1);
+      const col = Math.min(
+        Math.max(Math.floor((ghostLocalX + ghostW.value / 2) / dayWidth), 0),
+        days.length - 1,
+      );
       const hoursFromMin =
         (ghostLocalY - headerH - laneHeight.value - HOUR_LABEL_TOP_INSET) / cellHeight.value;
       const rawMinutes = (min + hoursFromMin) * MINUTES_PER_HOUR;
@@ -2699,7 +2702,7 @@ function TimeGridInner<T>(
       // reads as a visible snap-back instead of the event seeming to vanish.
       if (onDrag(ev, start, end) === false) onDate(ev.start);
     },
-    [clearLift, cellHeight, laneHeight],
+    [clearLift, cellHeight, laneHeight, ghostW],
   );
   const edgePaging = useMemo<EdgePaging>(
     () => ({
