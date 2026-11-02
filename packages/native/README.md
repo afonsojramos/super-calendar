@@ -73,6 +73,10 @@ only the start or end. See the [dragging guide](https://super-calendar.afonsojra
 After edge paging, the floating event's horizontal centre selects the destination
 day, and its top edge selects the time.
 
+Set an event's `dragHandleColor` to colour its resize grips in `TimeGrid` and
+`ResourceTimeline` (both orientations). It defaults to `theme.colors.eventText`.
+`showDragHandle={false}` still hides the time-grid grips.
+
 ## Styling with Tailwind
 
 Every styleable part is a named slot that accepts a class (resolved by a Tailwind runtime such as [uniwind](https://docs.uniwind.dev) or NativeWind) and/or a style override. A classed slot drops its built-in themed styles, so your classes own the look:

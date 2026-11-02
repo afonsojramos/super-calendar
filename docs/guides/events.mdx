@@ -35,6 +35,8 @@ const events: CalendarEvent<Meta>[] = [
 - `disabled` opts an event out of drag interactions.
 - `draggable`, `startEditable`, and `durationEditable` control per-event drag and
   resize (see the [drag guide](/guides/dragging)).
+- `dragHandleColor` overrides the resize grip colour for an event in the native
+  time grid and resource timeline. It defaults to `theme.colors.eventText`.
 - Multi-day events draw as one continuous bar across the days they span in the
   month view, and as a per-day clipped segment on the week/day time grid.
 

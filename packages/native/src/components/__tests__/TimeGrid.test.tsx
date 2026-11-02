@@ -23,6 +23,7 @@ jest.mock("@legendapp/list/react-native", () => ({
 import { Calendar } from "../Calendar";
 import { DefaultEvent } from "../DefaultEvent";
 import { TimeGrid } from "../TimeGrid";
+import { CalendarThemeProvider, mergeTheme } from "../../theme";
 
 type WithId = { id: string };
 const event: CalendarEvent<WithId> = {
@@ -1525,6 +1526,57 @@ describe("TimeGrid cross-week drop", () => {
     const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent<WithId>, Date, Date];
     expect(start).toEqual(new Date(2026, 0, 18, 14, 0));
     expect(end).toEqual(new Date(2026, 0, 18, 15, 0));
+  });
+});
+
+describe("TimeGrid drag handle colour", () => {
+  it("uses each event's colour for both grips and restores the theme when removed", async () => {
+    const coloured = { ...event, dragHandleColor: "#ff00ff" };
+    const other = {
+      ...event,
+      id: "2",
+      start: new Date(2026, 0, 6, 11),
+      end: new Date(2026, 0, 6, 12),
+    };
+    const grid = (events: CalendarEvent<WithId>[], showDragHandle = true) => (
+      <CalendarThemeProvider value={mergeTheme({ colors: { eventText: "#123456" } })}>
+        <TimeGrid
+          mode="week"
+          date={event.start}
+          events={events}
+          cellHeight={{ value: 48 } as never}
+          weekStartsOn={1}
+          renderEvent={DefaultEvent}
+          keyExtractor={(item) => item.id}
+          onChangeDate={noop}
+          onPressEvent={noop}
+          onDragEvent={noop}
+          showDragHandle={showDragHandle}
+        />
+      </CalendarThemeProvider>
+    );
+    const { getAllByTestId, rerender } = await render(grid([coloured, other]));
+    const colours = (testID: string) =>
+      getAllByTestId(testID).map((handle) => {
+        const grip = handle.children[0];
+        if (!grip || typeof grip === "string") throw new Error("resize grip missing");
+        return StyleSheet.flatten(grip.props.style).backgroundColor;
+      });
+    for (const id of ["resize-handle-top", "resize-handle"]) {
+      expect(colours(id)).toEqual(["#ff00ff", "#123456"]);
+    }
+    await rerender(grid([{ ...coloured, dragHandleColor: "#00ff00" }, other]));
+    for (const id of ["resize-handle-top", "resize-handle"]) {
+      expect(colours(id)).toEqual(["#00ff00", "#123456"]);
+    }
+    await rerender(grid([event, other]));
+    for (const id of ["resize-handle-top", "resize-handle"]) {
+      expect(colours(id)).toEqual(["#123456", "#123456"]);
+    }
+    await rerender(grid([coloured, other], false));
+    for (const id of ["resize-handle-top", "resize-handle"]) {
+      expect(getAllByTestId(id).map((handle) => handle.children.length)).toEqual([0, 0]);
+    }
   });
 });
 

@@ -1151,7 +1151,12 @@ function AnimatedEventBoxInner<T>({
         <GestureDetector gesture={resizeStartGesture}>
           <Animated.View testID="resize-handle-top" style={styles.resizeHandleTop}>
             {showDragHandle ? (
-              <View style={[styles.resizeGrip, { backgroundColor: theme.colors.eventText }]} />
+              <View
+                style={[
+                  styles.resizeGrip,
+                  { backgroundColor: positioned.event.dragHandleColor ?? theme.colors.eventText },
+                ]}
+              />
             ) : null}
           </Animated.View>
         </GestureDetector>
@@ -1162,7 +1167,12 @@ function AnimatedEventBoxInner<T>({
             {/* The grip is the only visible drag affordance; hiding it keeps the
                 resize gesture working but removes the indicator. */}
             {showDragHandle ? (
-              <View style={[styles.resizeGrip, { backgroundColor: theme.colors.eventText }]} />
+              <View
+                style={[
+                  styles.resizeGrip,
+                  { backgroundColor: positioned.event.dragHandleColor ?? theme.colors.eventText },
+                ]}
+              />
             ) : null}
           </Animated.View>
         </GestureDetector>

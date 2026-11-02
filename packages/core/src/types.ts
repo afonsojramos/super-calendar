@@ -47,6 +47,8 @@ export interface ICalendarEvent {
    * move. A `draggable: false` event ignores this (it can neither move nor resize).
    */
   durationEditable?: boolean;
+  /** Colour of this event's resize grips in the native time grid and resource timeline. Defaults to the theme's eventText colour. */
+  dragHandleColor?: string;
   /**
    * How the event renders. `"auto"` (default) is a normal event box/chip;
    * `"background"` paints the event's time range as a non-interactive shaded

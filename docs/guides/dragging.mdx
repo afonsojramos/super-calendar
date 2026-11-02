@@ -74,6 +74,29 @@ drag-to-resize fully working, so events stay editable without the visual marker.
 />
 ```
 
+### Colour an event's grips
+
+Set `dragHandleColor` on an event to override its resize grip colour in
+`@super-calendar/native`. This applies to both time-grid grips and to the
+resource timeline's grip in either orientation. Omit it to use
+`theme.colors.eventText`. Choose a colour that contrasts with the event's background.
+
+```tsx
+import type { CalendarEvent } from "@super-calendar/native";
+
+const events: CalendarEvent[] = [
+  {
+    title: "Blocked time",
+    start: new Date(2026, 5, 23, 9),
+    end: new Date(2026, 5, 23, 10),
+    dragHandleColor: "#ffffff",
+  },
+];
+```
+
+`showDragHandle={false}` still hides the time-grid grips. The DOM renderer's
+resize targets have no visible grips, so this field does not change their appearance.
+
 ### Lock specific events
 
 `onDragEvent` makes **every** event draggable, which is the right default: most
