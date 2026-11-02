@@ -70,6 +70,14 @@ On the time grid, dragging any segment of a multi-day event previews the whole
 range moving together and preserves its duration. Drag a resize grip to change
 only the start or end. See the [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
 
+After edge paging, the floating event's horizontal centre selects the destination
+day, and its top edge selects the time.
+
+Set an event's `dragHandleColor` to colour its resize grips in `TimeGrid` and
+`ResourceTimeline` (both orientations). It defaults to `theme.colors.eventText`.
+`showDragHandle={false}` still hides the time-grid grips.
+You can toggle it after mounting without replacing the `events` array.
+
 ## Styling with Tailwind
 
 Every styleable part is a named slot that accepts a class (resolved by a Tailwind runtime such as [uniwind](https://docs.uniwind.dev) or NativeWind) and/or a style override. A classed slot drops its built-in themed styles, so your classes own the look:

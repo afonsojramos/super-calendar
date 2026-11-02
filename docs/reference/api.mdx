@@ -90,6 +90,16 @@ On the time grid, dragging any segment of a multi-day event moves its whole rang
 All visible segments preview the move together on both renderers. Moving preserves
 duration; resizing changes only the selected edge. See [dragging](/guides/dragging).
 
+After native edge paging, a floating event's horizontal centre selects the
+destination day, and its top edge selects the time.
+
+`CalendarEvent.dragHandleColor?: string` overrides an event's native resize grip
+colour in `TimeGrid` and both orientations of `ResourceTimeline`. It defaults to
+`theme.colors.eventText`; `showDragHandle={false}` still hides time-grid grips.
+Changing `showDragHandle` updates mounted native time-grid grips even when
+`events` is unchanged.
+The DOM renderer has no visible resize grips.
+
 DOM `onPressCell` also handles touch taps on empty time-grid slots. The callback
 runs from the column's click, after pointer-up. Swipes and cancelled contacts
 do not call it. Mouse and pen retain their existing behavior.

@@ -2,6 +2,7 @@ import { fireEvent, render } from "@testing-library/react-native";
 import { StyleSheet, Text } from "react-native";
 import type { CalendarEvent } from "../../types";
 import { ResourceTimeline } from "../ResourceTimeline";
+import { CalendarThemeProvider, mergeTheme } from "../../theme";
 
 const at = (h: number, m = 0): Date => new Date(2026, 0, 1, h, m, 0, 0);
 
@@ -101,6 +102,35 @@ describe("ResourceTimeline", () => {
     await fireEvent.press(getByLabelText("Standup"));
     expect(onPressEvent).toHaveBeenCalledTimes(1);
   });
+
+  it.each(["horizontal", "vertical"] as const)(
+    "colours each %s resize grip independently",
+    async (orientation) => {
+      const grid = (events: ResourceEvent[]) => (
+        <CalendarThemeProvider value={mergeTheme({ colors: { eventText: "#123456" } })}>
+          <ResourceTimeline
+            date={at(0)}
+            orientation={orientation}
+            resources={resources}
+            events={events}
+            onDragEvent={jest.fn()}
+          />
+        </CalendarThemeProvider>
+      );
+      const { getAllByTestId, rerender } = await render(
+        grid([{ ...events[0], dragHandleColor: "#ff00ff" }, events[1]]),
+      );
+      const colours = () =>
+        getAllByTestId("resource-resize-grip", { includeHiddenElements: true }).map(
+          (grip) => StyleSheet.flatten(grip.props.style).backgroundColor,
+        );
+      expect(colours()).toEqual(["#ff00ff", "#123456"]);
+      await rerender(grid([{ ...events[0], dragHandleColor: "#00ff00" }, events[1]]));
+      expect(colours()).toEqual(["#00ff00", "#123456"]);
+      await rerender(grid(events));
+      expect(colours()).toEqual(["#123456", "#123456"]);
+    },
+  );
 
   it("exposes screen-reader move and resize actions on the draggable bar", async () => {
     const onDragEvent = jest.fn();

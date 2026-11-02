@@ -535,7 +535,7 @@ function ResourceBar<T>({
           testID="resource-resize-grip"
           style={[
             vertical ? styles.resizeGripBottom : styles.resizeGrip,
-            { backgroundColor: theme.colors.eventText },
+            { backgroundColor: pe.event.dragHandleColor ?? theme.colors.eventText },
           ]}
           accessibilityElementsHidden
           importantForAccessibility="no"

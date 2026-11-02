@@ -63,6 +63,8 @@ Use a resize grip to change just the start or end.
 By default a small grip shows at each draggable event's bottom edge. Set
 `showDragHandle={false}` to hide that indicator while keeping drag-to-move and
 drag-to-resize fully working, so events stay editable without the visual marker.
+You can toggle `showDragHandle` after mounting; native time-grid grips update
+without replacing the `events` array.
 
 ```tsx
 <Calendar
@@ -73,6 +75,29 @@ drag-to-resize fully working, so events stay editable without the visual marker.
   }
 />
 ```
+
+### Colour an event's grips
+
+Set `dragHandleColor` on an event to override its resize grip colour in
+`@super-calendar/native`. This applies to both time-grid grips and to the
+resource timeline's grip in either orientation. Omit it to use
+`theme.colors.eventText`. Choose a colour that contrasts with the event's background.
+
+```tsx
+import type { CalendarEvent } from "@super-calendar/native";
+
+const events: CalendarEvent[] = [
+  {
+    title: "Blocked time",
+    start: new Date(2026, 5, 23, 9),
+    end: new Date(2026, 5, 23, 10),
+    dragHandleColor: "#ffffff",
+  },
+];
+```
+
+`showDragHandle={false}` still hides the time-grid grips. The DOM renderer's
+resize targets have no visible grips, so this field does not change their appearance.
 
 ### Lock specific events
 
@@ -168,6 +193,11 @@ deliberate dwell at the very edge, so a normal in-view drag never trips it.
 
 On native the pager's own swipe is frozen for the moment it pages, so the view
 advances under your held finger instead of waiting for you to lift.
+
+On native, the floating copy's horizontal centre selects the destination day.
+Its top edge selects the time. This also applies to narrower boxes for overlapping
+events, so a copy mostly over a day lands in that column even if its left edge
+crosses the previous column.
 
 In-view move, cross-day within the visible columns, and resize all work by gesture
 as usual on both.

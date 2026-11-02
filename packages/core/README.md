@@ -63,6 +63,10 @@ Use `resolveDraggedBounds` to commit a move or resize. Equal start and end delta
 move the event while preserving elapsed duration, including across daylight
 saving changes. For a resize, pass zero for the edge you want to keep fixed.
 
+`CalendarEvent<T>` includes an optional `dragHandleColor: string` for the native
+renderer's time-grid and resource-timeline resize grips. When omitted, those
+grips use `theme.colors.eventText`. Core preserves the field without interpreting it.
+
 ## Documentation
 
 See the [full documentation](https://super-calendar.afonsojramos.me) and the [API reference](https://super-calendar.afonsojramos.me/reference/api).
