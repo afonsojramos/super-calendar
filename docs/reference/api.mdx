@@ -96,6 +96,8 @@ destination day, and its top edge selects the time.
 `CalendarEvent.dragHandleColor?: string` overrides an event's native resize grip
 colour in `TimeGrid` and both orientations of `ResourceTimeline`. It defaults to
 `theme.colors.eventText`; `showDragHandle={false}` still hides time-grid grips.
+Changing `showDragHandle` updates mounted native time-grid grips even when
+`events` is unchanged.
 The DOM renderer has no visible resize grips.
 
 DOM `onPressCell` also handles touch taps on empty time-grid slots. The callback

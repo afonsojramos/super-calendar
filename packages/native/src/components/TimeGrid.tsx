@@ -3290,9 +3290,10 @@ function TimeGridInner<T>(
   // `isActive` updates as you swipe). Without `activeIndex`, a page that pages in
   // never learns it became active, so its zoom source and now line would lag.
   // `columnsWidth` resizes the mounted pages when the grid is re-measured.
+  // `showDragHandle` refreshes grips without requiring an event-data change.
   const listExtraData = useMemo(
-    () => ({ events, activeIndex, columnsWidth }),
-    [events, activeIndex, columnsWidth],
+    () => ({ events, activeIndex, columnsWidth, showDragHandle }),
+    [events, activeIndex, columnsWidth, showDragHandle],
   );
 
   return (

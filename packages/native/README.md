@@ -76,6 +76,7 @@ day, and its top edge selects the time.
 Set an event's `dragHandleColor` to colour its resize grips in `TimeGrid` and
 `ResourceTimeline` (both orientations). It defaults to `theme.colors.eventText`.
 `showDragHandle={false}` still hides the time-grid grips.
+You can toggle it after mounting without replacing the `events` array.
 
 ## Styling with Tailwind
 

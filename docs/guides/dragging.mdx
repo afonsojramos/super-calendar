@@ -63,6 +63,8 @@ Use a resize grip to change just the start or end.
 By default a small grip shows at each draggable event's bottom edge. Set
 `showDragHandle={false}` to hide that indicator while keeping drag-to-move and
 drag-to-resize fully working, so events stay editable without the visual marker.
+You can toggle `showDragHandle` after mounting; native time-grid grips update
+without replacing the `events` array.
 
 ```tsx
 <Calendar
