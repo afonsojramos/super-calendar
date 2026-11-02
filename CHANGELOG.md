@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.15.0](https://github.com/afonsojramos/super-calendar/compare/v2.14.2...v2.15.0) (2026-11-02)
+
+
+### Features
+
+* **native:** add grip colours and correct drag behaviour ([#97](https://github.com/afonsojramos/super-calendar/issues/97)) ([ce35e88](https://github.com/afonsojramos/super-calendar/commit/ce35e88a227fd37eb6b8383b9752839659f4c1f8))
+
 ## [2.14.2](https://github.com/afonsojramos/super-calendar/compare/v2.14.1...v2.14.2) (2026-10-23)
 
 
