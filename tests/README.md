@@ -35,6 +35,10 @@ The root `vitest.config.mts` owns discovery, environment setup, and framework
 aliases. Shared contracts are typechecked against both adapters. Tests import
 library source, so they do not require a build.
 
+The native project pins `test-renderer` to 1.2.0 for React 19.2. Version 1.3.1
+pulls in `react-reconciler@0.34.0`, which requires React 19.3. Update the renderer
+with the Expo and React toolchain, and check peer dependencies before running tests.
+
 The separate `vitest.browser.config.mts` runs browser contracts with real layout
 and input. See the [browser test guide](web/README.md#browser-contracts) for setup.
 Solid hydration and package verification commands live in `scripts/` and are documented
