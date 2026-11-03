@@ -12,16 +12,13 @@ super-calendar provides three renderers over one shared core (`@super-calendar/c
 - **`@super-calendar/solid`** provides experimental Solid 2 web components and
   imports the React-free `@super-calendar/core/vanilla` entry.
 
-The renderers share calendar views and core types. The tables below compare the
-native and React DOM renderers. Solid follows the DOM column for views and
-features, with the differences listed next. The tables show where the platforms
-differ. Most differences are platform concerns (touch vs pointer, RN styling vs
-CSS), not missing functionality.
+The renderers share calendar views and core types. The tables compare their
+components, interactions, and styling. Solid support is experimental.
 
 ## Solid 2 differences
 
 Solid uses `JSX.Element` from `@solidjs/web` for render callbacks, `createDateRange`,
-`createMonthGrid`, and `createNow` for reactive state, and `SolidCalendarTheme`
+`createMonthGrid`, `createNow`, and `createEventSource` for reactive state, and `SolidCalendarTheme`
 with `defaultSolidTheme` and `darkSolidTheme` for styling. Component prop names
 match React DOM, including `className`, `classNames`, and `styles`.
 
@@ -32,53 +29,53 @@ Solid 2 release-candidate peers and uses the `experimental` npm tag. See the
 
 ## Views and components
 
-| Component / view                     | native | dom | Notes                                                               |
-| ------------------------------------ | :----: | :-: | ------------------------------------------------------------------- |
-| Month, week, day, 3-day, custom      |   ✅   | ✅  | Same modes on both.                                                 |
-| Schedule / agenda                    |   ✅   | ✅  | `mode="schedule"`.                                                  |
-| `TimeGrid`, `MonthView`, `MonthList` |   ✅   | ✅  | Shared components, matching prop names.                             |
-| `Agenda`, `ResourceTimeline`         |   ✅   | ✅  |                                                                     |
-| `MonthPager` (paged month swipe)     |   ✅   | ❌  | dom `Calendar` is a single window; use `MonthList` to scroll.       |
-| `DatePicker` / `DateRangePicker`     |   ❌   | ✅  | native exposes the headless picker parts via the `/picker` subpath. |
+| Component / view                      | React Native | React DOM | Solid 2 | Notes                                                       |
+| ------------------------------------- | :----------: | :-------: | :-----: | ----------------------------------------------------------- |
+| Month, week, day, 3-day, custom, year |      ✅      |    ✅     |   ✅    | The same `Calendar` modes.                                  |
+| Schedule / agenda                     |      ✅      |    ✅     |   ✅    | `mode="schedule"`.                                          |
+| `TimeGrid`, `MonthView`, `MonthList`  |      ✅      |    ✅     |   ✅    | Shared components, matching prop names.                     |
+| `Agenda`, `ResourceTimeline`          |      ✅      |    ✅     |   ✅    |                                                             |
+| `MonthPager` (paged month swipe)      |      ✅      |    ❌     |   ❌    | Web `Calendar` shows one window; use `MonthList` to scroll. |
+| `DatePicker` / `DateRangePicker`      |      ❌      |    ✅     |   ✅    | Native exposes headless picker parts through `/picker`.     |
 
 ## Interaction
 
-| Capability                     | native | dom | Notes                                                                                          |
-| ------------------------------ | :----: | :-: | ---------------------------------------------------------------------------------------------- |
-| Drag to move / resize / create |   ✅   | ✅  | native: long-press + gesture; dom: pointer.                                                    |
-| Month drag (create / move day) |   ✅   | ✅  | Sweep an all-day span, or drop an event on another day. Resize is time-grid only.              |
-| Year drag (select / create)    |   ✅   | ✅  | Sweep a date range across mini months; native keeps a sweep inside the month it started in.    |
-| Pinch / scroll to zoom         |   ✅   | ✅  | native: pinch; dom: pinch + Ctrl/⌘-scroll (`zoomable`).                                        |
-| Controlled navigation          |   ✅   | ✅  | both fire `onChangeDate` — native on swipe/paging, dom on PageDown/PageUp of the focused grid. |
-| RTL layout                     |   ✅   | ❌  | native `isRTL` (cosmetic).                                                                     |
-| Respects OS reduce-motion      |   ✅   | ✅  | native makes its one animated page-snap instant; dom uses almost no animation.                 |
+| Capability                     | React Native | React DOM | Solid 2 | Notes                                                                             |
+| ------------------------------ | :----------: | :-------: | :-----: | --------------------------------------------------------------------------------- |
+| Drag to move / resize / create |      ✅      |    ✅     |   ✅    | Native uses long-press gestures. Web uses mouse, touch, or pen pointers.          |
+| Month drag (create / move day) |      ✅      |    ✅     |   ✅    | Sweep an all-day span, or drop an event on another day. Resize is time-grid only. |
+| Year drag (select / create)    |      ✅      |    ✅     |   ✅    | Native keeps a sweep inside the month it started in.                              |
+| Pinch / scroll to zoom         |      ✅      |    ✅     |   ✅    | Native uses pinch. Web also supports Ctrl/⌘-scroll with `zoomable`.               |
+| Controlled navigation          |      ✅      |    ✅     |   ✅    | `onChangeDate`: native swipe/paging, web PageDown/PageUp on the focused grid.     |
+| RTL layout                     |      ✅      |    ❌     |   ❌    | Native `isRTL` is cosmetic.                                                       |
+| Respects OS reduce-motion      |      ✅      |    ✅     |   ✅    | Native disables page-snap animation. Web renderers use almost no animation.       |
 
 ## Time grid
 
-| Feature                             | native | dom | Notes                             |
-| ----------------------------------- | :----: | :-: | --------------------------------- |
-| `minHour` / `maxHour` / `hideHours` |   ✅   | ✅  |                                   |
-| Week numbers (`showWeekNumber`)     |   ✅   | ✅  | ISO week of the visible Thursday. |
-| Now indicator (ticking)             |   ✅   | ✅  |                                   |
-| Business hours shading, `timeslots` |   ✅   | ✅  |                                   |
+| Feature                             | React Native | React DOM | Solid 2 | Notes                             |
+| ----------------------------------- | :----------: | :-------: | :-----: | --------------------------------- |
+| `minHour` / `maxHour` / `hideHours` |      ✅      |    ✅     |   ✅    |                                   |
+| Week numbers (`showWeekNumber`)     |      ✅      |    ✅     |   ✅    | ISO week of the visible Thursday. |
+| Now indicator (ticking)             |      ✅      |    ✅     |   ✅    |                                   |
+| Business hours shading, `timeslots` |      ✅      |    ✅     |   ✅    |                                   |
 
 ## Data
 
-| Feature                                 | native | dom | Notes                                                    |
-| --------------------------------------- | :----: | :-: | -------------------------------------------------------- |
-| Recurrence auto-expansion in `Calendar` |   ✅   | ✅  | Plus `expandRecurringEvents` for manual control.         |
-| `timeZone` prop                         |   ✅   | ✅  | Display-only, via `eventsInTimeZone`.                    |
-| iCalendar import / export               |   ✅   | ✅  | `parseICalendar` / `toICalendar`, re-exported from both. |
+| Feature                                 | React Native | React DOM | Solid 2 | Notes                                                         |
+| --------------------------------------- | :----------: | :-------: | :-----: | ------------------------------------------------------------- |
+| Recurrence auto-expansion in `Calendar` |      ✅      |    ✅     |   ✅    | Also `expandRecurringEvents` for manual control.              |
+| `timeZone` prop                         |      ✅      |    ✅     |   ✅    | Display-only, via `eventsInTimeZone`.                         |
+| iCalendar import / export               |      ✅      |    ✅     |   ✅    | `parseICalendar` / `toICalendar`, exported by every renderer. |
 
 ## Styling and accessibility
 
-| Feature                        | native | dom | Notes                                                                                                                                                                        |
-| ------------------------------ | :----: | :-: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Theming                        |   ✅   | ✅  | native: `CalendarTheme` + context + `mergeTheme`; dom: flat `DomCalendarTheme` + `data-slot`/`data-state`.                                                                   |
-| Per-slot `classNames`/`styles` |   ✅   | ✅  | Same contract on both: a classed slot drops its themed styles. Native needs a Tailwind runtime (uniwind/NativeWind); dom works with any CSS. See [Styling](/guides/styling). |
-| Screen-reader labels and roles |   ✅   | ✅  | Events, month cells, and day headers are labelled on both.                                                                                                                   |
-| Screen-reader event actions    |   ✅   | ❌  | native exposes move / resize as `accessibilityActions` so VoiceOver/TalkBack can reschedule without a gesture; dom uses keyboard nav instead.                                |
-| Keyboard navigation            |   ❌   | ✅  | dom `keyboardDayNavigation` (month) and `keyboardEventNavigation` (time grid). A web concern; native is touch-driven (arrow-key paging on react-native-web).                 |
+| Feature                        | React Native | React DOM | Solid 2 | Notes                                                                                                                      |
+| ------------------------------ | :----------: | :-------: | :-----: | -------------------------------------------------------------------------------------------------------------------------- |
+| Theming                        |      ✅      |    ✅     |   ✅    | `CalendarTheme`, `DomCalendarTheme`, or `SolidCalendarTheme`, respectively.                                                |
+| Per-slot `classNames`/`styles` |      ✅      |    ✅     |   ✅    | A classed slot drops its themed styles. Native needs a Tailwind runtime; web supports CSS. See [Styling](/guides/styling). |
+| Screen-reader labels and roles |      ✅      |    ✅     |   ✅    | Events, month cells, and day headers are labelled.                                                                         |
+| Screen-reader event actions    |      ✅      |    ❌     |   ❌    | Native exposes move / resize as `accessibilityActions` for VoiceOver/TalkBack.                                             |
+| Keyboard navigation            |      ❌      |    ✅     |   ✅    | Web supports `keyboardDayNavigation` and `keyboardEventNavigation`. Native supports arrow-key paging on react-native-web.  |
 
 <Note>
   The shared components (`MonthView`, `MonthList`, `TimeGrid`) keep the same prop names across

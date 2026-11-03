@@ -4,24 +4,29 @@ sidebarTitle: Overview
 description: A gesture-driven, virtualized calendar for React Native and the web.
 ---
 
-A calendar for React Native and React on the web, built on a render-agnostic core. It
-renders month, week, day, 3-day, and schedule views, virtualizes and snap-pages
-every view, and leans into touch: pinch-to-zoom, drag to move and resize, and
-drag to create.
+A calendar for React Native, React DOM, and Solid 2, built on a shared core. It
+renders month, week, day, custom, schedule, and year views. Move, resize, and
+create events with gestures, or use date pickers and resource timelines.
 
-It ships as three packages:
+It has four packages:
 
-- **`@super-calendar/native`** — the React Native renderer (Reanimated 4, Gesture
+- **`@super-calendar/native`**: the React Native renderer (Reanimated 4, Gesture
   Handler, Legend List). This is what most of these docs cover.
-- **`@super-calendar/dom`** — a pure react-dom renderer with no React Native
+- **`@super-calendar/dom`**: a pure react-dom renderer with no React Native
   runtime, for web-only or web-first apps. See the
   [react-dom renderer](/guides/dom) guide.
-- **`@super-calendar/core`** — the platform-free logic, types, and hooks both
-  renderers share. See [Headless usage](/guides/headless).
+- **`@super-calendar/solid`**: the experimental Solid 2 renderer, with signals,
+  server rendering, and hydration. It requires no React runtime. See the
+  [Solid 2 guide](/guides/solid).
+- **`@super-calendar/core`**: shared logic and types through the React-free
+  `/vanilla` entry, plus React hooks through the root entry. See
+  [headless usage](/guides/headless).
+
+See the [renderer comparison](/reference/renderers) for platform differences.
 
 It's an homage to
 [react-native-big-calendar](https://github.com/acroca/react-native-big-calendar),
-not a fork — the API differs and the internals are new. The date-picker surface
+not a fork. The API differs and the internals are new. The date-picker surface
 (`MonthList`, `useDateRange`) is in turn inspired by
 [flash-calendar](https://github.com/MarceloPrado/flash-calendar); reach for that
 if you want a standalone, headless picker rather than a full calendar.
@@ -35,7 +40,7 @@ if you want a standalone, headless picker rather than a full calendar.
     Install it and render your first calendar in a couple of minutes.
   </Card>
   <Card title="Live demo" icon="play" href="/demo">
-    Try the web build — drag, resize, zoom, and create events in the browser.
+    Drag, resize, zoom, and create events in the React web demo.
   </Card>
   <Card title="Dragging & creating" icon="hand-pointer" href="/guides/dragging">
     Move, resize, reschedule across days, and sweep out new events.
@@ -46,26 +51,29 @@ if you want a standalone, headless picker rather than a full calendar.
   <Card title="react-dom renderer" icon="globe" href="/guides/dom">
     Run in the browser with no React Native runtime.
   </Card>
+  <Card title="Solid 2 renderer" icon="code" href="/guides/solid">
+    Use signals, custom events, date pickers, and server rendering.
+  </Card>
 </CardGroup>
 
 ## Highlights
 
-- **Five views** — month, week, day, 3-day (or any N), and a schedule list.
-- **Virtualized & paged** — every view snap-pages and only mounts a few dates at
-  a time, so far-future and far-past dates stay cheap.
-- **Gesture-driven** — pinch-to-zoom the time grid, long-press to drag events,
+- **Calendar views**: month, week, day, 3-day, custom, schedule, and year.
+- **Virtualized lists**: month and agenda lists mount visible rows. Native also
+  snap-pages its calendar views.
+- **Gesture-driven**: pinch-to-zoom the time grid, long-press to drag events,
   drag a grip to resize, and drag empty space to create. On the web the same
   interactions run on the pointer: Ctrl/⌘ + scroll (or a trackpad pinch) zooms,
   and you drag events directly with the mouse.
 - **Drag across days**, with optional validation to reject a drop.
-- **Date selection** (single, multiple, or range with the `useDateRange` hook),
+- **Date selection** (single, multiple, or range with `useDateRange` in React or
+  `createDateRange` in Solid),
   disabled days, and a scrolling `MonthList`.
 - **Recurring events**, **time-zone display**, and a **dark theme** preset.
-- **Bring-your-own event type** (`CalendarEvent<T>`) and a `renderEvent` escape
-  hatch that works across every mode and event shape.
-- **Runs on the web** two ways: a pure react-dom renderer
-  (`@super-calendar/dom`), or the React Native package on react-native-web with
-  the touch gestures remapped to mouse and keyboard.
+- **Bring-your-own event type** (`CalendarEvent<T>`) and custom event renderers
+  for each view.
+- **Web renderers** for React DOM and Solid 2. The React Native package also
+  runs on react-native-web.
 
 ## At a glance
 

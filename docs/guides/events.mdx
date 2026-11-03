@@ -42,7 +42,11 @@ const events: CalendarEvent<Meta>[] = [
 
 ## Render your own event
 
-Pass `renderEvent` — a component (so it can use hooks) that receives
+For Solid, use the [custom event example](/guides/solid#render-custom-events).
+For React DOM, see the [web renderer guide](/guides/dom). Both web `Calendar`
+components use separate renderers for timed, month, and schedule events.
+
+On React Native, pass `renderEvent`, a component that receives
 `RenderEventArgs`. It's used in every mode and for every event shape (timed,
 all-day, multi-day), so you only write it once.
 
