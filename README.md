@@ -231,20 +231,22 @@ edge to edge instead.
 
 ### Headless core (any renderer)
 
-Want the date math and selection model without any of the built-in UI? The
-`@super-calendar/core` package exports just the pure pieces,
-`buildMonthGrid` / `useMonthGrid`, `useDateRange` and the selection helpers,
-`layoutDayEvents`, and the date utilities, with zero React Native, Reanimated, or
-Legend List imports. It's what the DOM components are built on, and it works in
-any React renderer (react-dom, Solid via its React compat, your own).
+Use `@super-calendar/core/vanilla` for date math, selection helpers, event layout,
+recurrence, and time-zone conversion without a rendering framework. This entry
+does not import React, React Native, Reanimated, or Legend List.
 
 ```sh
-npm install @super-calendar/core react date-fns
+npm install @super-calendar/core date-fns
 ```
 
 ```tsx
-import { buildMonthGrid, nextDateRange } from "@super-calendar/core";
+import { buildMonthGrid, nextDateRange } from "@super-calendar/core/vanilla";
 ```
+
+The root `@super-calendar/core` entry also exports React hooks such as
+`useMonthGrid` and `useDateRange`. Install React when you use that entry.
+Solid apps can use `createMonthGrid` and `createDateRange` from
+`@super-calendar/solid` for reactive state.
 
 ## Usage
 

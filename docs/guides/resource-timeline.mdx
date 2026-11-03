@@ -5,10 +5,12 @@ description: A one-day timeline with a lane per resource (room, person, machine)
 
 <Note>
   Available on **React DOM, Solid, and React Native**, including drag-to-move and edge-resize via
-  `onDragEvent`. The web renderer (`@super-calendar/dom`) adds per-slot class styling; the React
-  Native renderer (`@super-calendar/native`) styles via `theme.containers`. Import from the package
-  you're using.
+  `onDragEvent`. The web renderers add per-slot class styling; the React Native renderer
+  (`@super-calendar/native`) styles via `theme.containers`. Import from the package you're using.
 </Note>
+
+The examples below use React. See the [Solid resource example](/guides/solid#schedule-resources)
+for controlled events with signals.
 
 `ResourceTimeline` lays a single day out horizontally: each **resource** is a row,
 the x-axis is the day's hours, and every event sits in its resource's row at its

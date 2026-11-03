@@ -258,6 +258,13 @@ Component props and slot types are exported with their component names, such as
 `EventSourceState<T>` are also exported.
 Render callbacks return `JSX.Element` from `@solidjs/web`.
 
+`Calendar` takes `renderTimeEvent`, `renderMonthEvent`, and
+`renderScheduleEvent`. Direct views take `renderEvent`. Read renderer props
+inside JSX to preserve reactivity. The Solid guide includes complete examples
+for [custom events](/guides/solid#render-custom-events),
+[date pickers](/guides/solid#add-date-pickers), and
+[resource timelines](/guides/solid#schedule-resources).
+
 `Calendar` and `TimeGrid` accept a callback `ref` receiving `CalendarHandle`.
 `scrollToTime(minutes, options?)` scrolls the mounted time grid. It has no effect
 after disposal or while `Calendar` displays another type of view.

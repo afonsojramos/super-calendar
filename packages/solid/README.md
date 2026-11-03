@@ -175,6 +175,20 @@ Use matching initial dates, events, locale, and time zone on both sides. Pass a
 fixed `now` when the clock must match during hydration. The server does not start
 timers or access the DOM.
 
+## Integration examples and troubleshooting
+
+The [Solid guide](https://super-calendar.afonsojramos.me/guides/solid) includes
+complete examples for controlled date pickers, resource bookings, and custom
+events. `Calendar` uses `renderTimeEvent`, `renderMonthEvent`, and
+`renderScheduleEvent`; direct views use `renderEvent`.
+
+If updates stop, read accessors in JSX and update event arrays with signal
+setters. Keep custom renderer props reactive by reading `props.event` in JSX.
+For compilation errors, check the exact peer versions and compiler setup above.
+For hydration mismatches, use `hydrate` with matching initial data and include
+`generateHydrationScript()` before the client entry. See
+[troubleshooting](https://super-calendar.afonsojramos.me/guides/solid#troubleshoot-an-integration).
+
 ## Run the example
 
 From the repository root:

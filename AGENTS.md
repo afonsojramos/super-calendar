@@ -2,13 +2,15 @@
 
 ## What this is
 
-A render-agnostic calendar, gesture-driven and virtualized, published as three packages from a pnpm monorepo:
+A render-agnostic calendar, gesture-driven and virtualized, with four packages in a pnpm monorepo:
 
-- `@super-calendar/core` — `packages/core`. Pure logic, no rendering. Peer deps: `date-fns`, `react`. Entry: `packages/core/src/index.ts`.
+- `@super-calendar/core`: `packages/core`. Pure logic through `./vanilla`; React hooks through the root entry. Peer deps: `date-fns` and optional `react`, required by the root entry.
 - `@super-calendar/dom` — `packages/dom`. react-dom renderer. Adds `@legendapp/list`, `react-dom`.
 - `@super-calendar/native` — `packages/native`. React Native renderer. Adds `@legendapp/list`, `react-native`, `react-native-gesture-handler`, `react-native-reanimated`, `react-native-worklets`. Has a `./picker` subpath export. Entry: `packages/native/src/index.tsx`.
 
-Both renderers depend on core via `workspace:*`. The npm slug and repo are `super-calendar`; the directory on disk still says `bigger`.
+- `@super-calendar/solid`: `packages/solid`. Experimental Solid 2 renderer. Exact `solid-js` and `@solidjs/web` RC peers, with no React dependency. Entry: `packages/solid/src/index.ts`.
+
+All renderers depend on core via `workspace:*`.
 
 ## Principles
 
@@ -24,6 +26,7 @@ Both renderers depend on core via `workspace:*`. The npm slug and repo are `supe
 - **Native animation runs in Reanimated v4 worklets on the UI thread** (`Calendar.tsx`, `TimeGrid.tsx`, `picker.tsx`, and others). Code in those paths follows worklet rules (`'worklet'` directives, `runOnJS` to cross back to JS); don't treat it like ordinary JS.
 - **`date-fns` is a peer with range `>=3`,** so the library must stay compatible across v3 and v4. Don't use an API that exists in only one major.
 - **Packaging is CI-gated by `attw` + `publint` per package.** The dual ESM/CJS `exports` maps are load-bearing; don't hand-edit them carelessly or CI fails.
+- **Solid is ESM-only.** Its `solid` condition exposes source for the Solid compiler; `browser` resolves to the built client and the default condition to the built server. Validate both source and built entries after compiler or packaging changes.
 
 ## Commands (run from the repo root)
 
@@ -37,11 +40,11 @@ Both renderers depend on core via `workspace:*`. The npm slug and repo are `supe
 - `pnpm bench` — core benchmarks (runs under bun)
 - `pnpm parity:visual` screenshots both web renderers side by side for manual visual parity (see Scripts)
 
-Use pnpm or nub, not npm/npx; both install correctly from the shared `pnpm-lock.yaml` now that the workspace uses the default isolated layout (CI stays on pnpm). Two rules keep that true: never reintroduce `nodeLinker: hoisted` (nub mislinks under it, and hoisted splits react whenever the lockfile carries mixed react versions; run `pnpm dedupe` after partial bumps), and never re-add `disableHierarchicalLookup` to the example's metro config (Metro needs hierarchical symlink resolution for isolated layouts). CI runs lint, format, typecheck (root + both examples), test, build, then attw + publint per package and a docs broken-link check.
+Use pnpm or nub, not npm/npx; both install correctly from the shared `pnpm-lock.yaml` now that the workspace uses the default isolated layout (CI stays on pnpm). Two rules keep that true: never reintroduce `nodeLinker: hoisted` (nub mislinks under it, and hoisted splits react whenever the lockfile carries mixed react versions; run `pnpm dedupe` after partial bumps), and never re-add `disableHierarchicalLookup` to the example's metro config (Metro needs hierarchical symlink resolution for isolated layouts). CI runs lint, format, typecheck (root and all three apps), Vitest parity, build, browser and package checks, then attw + publint per package and a docs broken-link check.
 
 ## Scripts
 
-`scripts/` holds dev tooling that runs directly with `node` (zero deps, no build step).
+`scripts/` holds dev tooling that runs directly with `node`, using workspace dependencies where needed, with no build step.
 
 - `scripts/visual-parity.mjs` (`pnpm parity:visual`) drives system Chrome over CDP to screenshot the dom (`examples/web`) and native-on-react-native-web (`examples/native`) renderers across every view at one fixed viewport, then writes `visual-parity/index.html` with the pairs side by side for eyeballing. It's a manual aid for keeping the two **web** outputs aligned when changing shared layout/styling; the automated guard is still `tests/architecture/renderer-parity.test.ts` (prop-name parity only). Start both dev servers first (`cd examples/web && pnpm dev`, `cd examples/native && pnpm start`). Output is gitignored. Override targets with `DOM_URL`, `NATIVE_URL`, `CHROME`, `VIEWS`, `WIDTH`, `HEIGHT`.
 
@@ -55,7 +58,7 @@ For real layout, scrolling, pointer capture, and touch input, add shared cases t
 
 ## Examples
 
-`examples/native` and `examples/web` are runnable demos. The web build powers the live demo on the home/demo page of the docs site, deployed to GitHub Pages by `.github/workflows/demo.yml`.
+`examples/native`, `examples/web`, and `examples/solid` are runnable demos. The React web build powers the live demo on the home/demo page of the docs site, deployed to GitHub Pages by `.github/workflows/demo.yml`. The Solid example has client rendering at `/` and hydration at `/ssr`.
 
 ### Running the native example on a device or emulator
 

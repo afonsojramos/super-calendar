@@ -106,6 +106,120 @@ Pass an accessor to `createDateRange` when constraints change. Read the returned
 create them inside a Solid component or root so their work is disposed with it.
 The React hooks remain available from the existing React packages.
 
+## Add date pickers
+
+Keep picker values in signals. `DateRangePicker` reports a start-only range with
+`end: null` until you choose the second day. Clearing a range reports `null`.
+
+```tsx
+import { createSignal } from "solid-js";
+import { DatePicker, DateRangePicker, type DateRange } from "@super-calendar/solid";
+
+export function BookingDates() {
+  const [date, setDate] = createSignal<Date | null>(null);
+  const [range, setRange] = createSignal<DateRange | null>(null);
+
+  return (
+    <>
+      <DatePicker value={date()} onChange={setDate} placeholder="Choose a day" />
+      <DateRangePicker value={range()} onChange={setRange} placeholder="Choose a stay" />
+    </>
+  );
+}
+```
+
+Both pickers accept `minDate`, `maxDate`, `isDateDisabled`, and `theme`. Changing
+`disabled` to `true` closes an open popover. Re-enabling it leaves it closed.
+See [date and range pickers](/guides/date-picker) for the shared behavior.
+
+## Schedule resources
+
+Use a custom field to assign each event to a resource. Apply the proposed dates
+in `onDragEvent` to commit a move or resize. Return `false` to reject it.
+
+```tsx
+import { createSignal } from "solid-js";
+import { ResourceTimeline, type CalendarEvent } from "@super-calendar/solid";
+
+type Booking = { room: string };
+
+export function Rooms() {
+  const date = new Date(2026, 10, 2);
+  const [events, setEvents] = createSignal<CalendarEvent<Booking>[]>([
+    {
+      title: "Planning",
+      start: new Date(2026, 10, 2, 9),
+      end: new Date(2026, 10, 2, 10),
+      room: "studio",
+    },
+  ]);
+
+  return (
+    <ResourceTimeline
+      date={date}
+      resources={[
+        { id: "studio", title: "Studio" },
+        { id: "meeting", title: "Meeting room" },
+      ]}
+      events={events()}
+      resourceId={(event) => event.room}
+      startHour={8}
+      endHour={18}
+      onDragEvent={(event, start, end, resource) => {
+        setEvents((current) =>
+          current.map((item) =>
+            item === event ? { ...item, start, end, room: resource.id } : item,
+          ),
+        );
+      }}
+      onCreateEvent={(start, end, resource) => {
+        setEvents((current) => [
+          ...current,
+          { title: "New booking", start, end, room: resource.id },
+        ]);
+      }}
+    />
+  );
+}
+```
+
+Set `orientation="vertical"` to place resources in columns. See
+[resource timelines](/guides/resource-timeline) for paging, business hours, and
+custom headers. Direct views expect already expanded events; use
+`expandRecurringEvents` when your bookings recur.
+
+## Render custom events
+
+`Calendar` uses `renderTimeEvent`, `renderMonthEvent`, and `renderScheduleEvent`
+for the corresponding views. Direct views such as `TimeGrid` use `renderEvent`.
+Define the renderer once and read its props inside JSX to keep updates reactive.
+
+```tsx
+import { Calendar, type CalendarEvent, type SolidRenderEventArgs } from "@super-calendar/solid";
+
+type Meeting = { room: string };
+
+function MeetingCard(props: SolidRenderEventArgs<Meeting>) {
+  return (
+    <div style={{ height: "100%", overflow: "hidden", padding: "4px", "box-sizing": "border-box" }}>
+      <strong>{props.event.title}</strong>
+      <div>{props.event.room}</div>
+    </div>
+  );
+}
+
+export function Meetings(props: { date: Date; events: CalendarEvent<Meeting>[] }) {
+  return (
+    <Calendar date={props.date} events={props.events} mode="week" renderTimeEvent={MeetingCard} />
+  );
+}
+```
+
+The calendar positions the event and handles its gestures. Keep custom content
+within its box; `boxHeight` reports the available timed-event height. A custom
+renderer replaces the default event content and its themed appearance. Use the
+shared [styling options](/guides/styling) when you only need different colors or spacing.
+
 ## Load an event feed
 
 Create the source inside a component. Pass accessors for the URL or async loader
@@ -165,3 +279,32 @@ anchor dates in the same local zone on both sides, as described in
 
 The repository's `examples/solid` app includes `/` and `/ssr` routes. Start it
 with `pnpm --filter @super-calendar/example-solid dev` after `pnpm build`.
+
+## Troubleshoot an integration
+
+### JSX compilation or missing exports
+
+Check that `solid-js` and `@solidjs/web` both resolve to `2.0.0-rc.20`.
+Use `@solidjs/vite-plugin@3.0.0-next.55`, `jsx: "preserve"`, and
+`jsxImportSource: "@solidjs/web"`. Remove React JSX transforms from the Solid app.
+Import calendar components from `@super-calendar/solid`; use
+`@super-calendar/core/vanilla` for shared logic without React.
+
+### Changes do not appear
+
+Read accessors in JSX, such as `events={events()}`. Reading `events()` once in
+the component body captures a snapshot. Keep reactive props as `props.event`
+inside custom renderers instead of destructuring them. Update event arrays with
+a signal setter, and replace the edited event object. For helpers such as
+`createDateRange` and `createEventSource`, pass accessors for changing options.
+
+### Hydration reports mismatches
+
+Enable `solid({ ssr: true })`. Insert `generateHydrationScript()` from
+`@solidjs/web` in the server document before the client entry, and use `hydrate`
+for the container that already holds server-rendered HTML. Use `render` for an
+empty client-only container. The repository example shows both paths.
+
+Compare the initial date, events, locale, time zone, and `now` on both sides.
+JSON serializes dates as strings, so restore each date field before passing
+events to the calendar. Keep browser-only values out of the initial server render.
