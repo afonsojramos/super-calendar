@@ -1,6 +1,6 @@
 <h1 align="center">super-calendar</h1>
 
-<p align="center">A generic, themeable <strong>month / week / day</strong> calendar for React Native and React.</p>
+<p align="center">A generic, themeable <strong>month / week / day</strong> calendar for React Native, React, and Solid 2.</p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@super-calendar/native"><img alt="npm version" src="https://img.shields.io/npm/v/@super-calendar/native?style=flat-square&amp;color=1F6FEB" /></a>
@@ -23,24 +23,25 @@
 
 - 📆 Month grid plus day / 3-day / week / custom-N time-grids
 - 🤏 Zoomable week/day grid: pinch on iOS & Android (UI thread, no re-renders), Ctrl/Cmd + scroll or pinch on web
-- ♾️ Virtualized, snap-paging months/weeks/days via [`@legendapp/list`](https://legendapp.com/open-source/list/)
+- ♾️ Virtualized views. React renderers use [`@legendapp/list`](https://legendapp.com/open-source/list/); Solid measures and windows its month and agenda rows.
 - 🧩 Bring-your-own event type (`CalendarEvent<T>`) and a `renderEvent` escape hatch
-- 🗓️ Date selection (single / multiple / range via `useDateRange`), disabled days, and a scrolling `MonthList`
-- 🪝 Headless `useMonthGrid` hook to build a fully custom calendar
+- 🗓️ Date selection (single / multiple / range via `useDateRange` or Solid's `createDateRange`), disabled days, and a scrolling `MonthList`
+- 🪝 Headless month grids through `useMonthGrid`, Solid's `createMonthGrid`, or the pure `buildMonthGrid`
 - 🎨 Fully themeable, with sensible defaults (no styling library required)
 - 🌐 Runs on iOS, Android and the web: a pure react-dom renderer for React apps, or the React Native package on [react-native-web](https://necolas.github.io/react-native-web/) (see [Web](#web))
 
 ## Packages
 
-Pick the renderer for your app. Both share the same `Calendar` API, built on one render-agnostic core.
+Pick the renderer for your app. The renderers share calendar types and logic. Solid 2 support is experimental.
 
 | Package                                                                          | Use it for                                                                                                     |
 | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | [`@super-calendar/native`](https://www.npmjs.com/package/@super-calendar/native) | React Native apps on iOS and Android, plus the web through react-native-web                                    |
 | [`@super-calendar/dom`](https://www.npmjs.com/package/@super-calendar/dom)       | React web apps (react-dom), with no React Native runtime; see [React DOM](#react-dom-web-without-react-native) |
-| [`@super-calendar/core`](https://www.npmjs.com/package/@super-calendar/core)     | The headless logic, types, and hooks both renderers use, for building your own renderer                        |
+| `@super-calendar/solid`                                                          | Solid 2 web apps, with no React runtime; see [Solid 2](#solid-2-experimental)                                  |
+| [`@super-calendar/core`](https://www.npmjs.com/package/@super-calendar/core)     | Pure logic through `@super-calendar/core/vanilla`, plus React hooks through the root entry                     |
 
-The [quickstart](https://super-calendar.afonsojramos.me/quickstart) has a tab for each platform.
+See the [quickstart](https://super-calendar.afonsojramos.me/quickstart) for React, or the [Solid 2 guide](https://super-calendar.afonsojramos.me/guides/solid).
 
 ## Relationship to react-native-big-calendar
 
@@ -182,6 +183,25 @@ import { MonthList, useDateRange } from "@super-calendar/native/picker";
 peers, so this subpath won't pull them in. (Metro doesn't tree-shake the
 `@super-calendar/native` barrel, so the subpath is what guarantees the timetable
 code is left out.)
+
+### Solid 2 (experimental)
+
+`@super-calendar/solid` provides the calendar views, virtualized month list and
+agenda, resource timeline, and date pickers as Solid components. It uses Solid
+signals and the React-free `@super-calendar/core/vanilla` entry.
+
+```sh
+pnpm add @super-calendar/solid@experimental solid-js@2.0.0-rc.20 @solidjs/web@2.0.0-rc.20 date-fns
+```
+
+Keep both Solid peers on these exact release-candidate versions. Solid 1 is not
+supported. Use `createDateRange`, `createMonthGrid`, and `createNow` for reactive
+state, and `darkSolidTheme` or partial theme tokens for styling. See the
+[Solid package README](packages/solid/README.md) for compiler setup, examples, and
+server rendering.
+
+The React packages retain their existing imports and APIs. For pure calendar
+logic without any UI framework, import `@super-calendar/core/vanilla`.
 
 ### React DOM (web without React Native)
 

@@ -58,8 +58,8 @@ export interface ICalendarEvent {
   display?: "auto" | "background";
   /**
    * Repeat rule. Pass the event to `expandRecurringEvents(events, start, end)` to
-   * materialise its occurrences within a range; the calendar itself doesn't
-   * expand recurrences.
+   * materialise its occurrences within a range. Calendar expands rules for its
+   * visible range; standalone views expect already expanded events.
    */
   recurrence?: RecurrenceRule;
 }

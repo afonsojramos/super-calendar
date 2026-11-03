@@ -1,0 +1,22 @@
+{
+  "name": "@super-calendar/example-solid",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && vite build --ssr src/server.tsx --outDir dist/server",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@solidjs/web": "2.0.0-rc.20",
+    "@super-calendar/solid": "workspace:*",
+    "date-fns": "4.4.0",
+    "solid-js": "2.0.0-rc.20"
+  },
+  "devDependencies": {
+    "@solidjs/vite-plugin": "3.0.0-next.55",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0"
+  }
+}

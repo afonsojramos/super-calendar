@@ -1,0 +1,233 @@
+import { type JSX } from "@solidjs/web";
+import type { CalendarLabels } from "@super-calendar/core/vanilla";
+import {
+  buildMonthGrid,
+  type CalendarEvent,
+  compareDayEvents,
+  type DateRange,
+  type DateSelectionConstraints,
+  type EventAccessibilityLabeler,
+  groupEventsByDay,
+  isBackgroundEvent,
+  type WeekdayFormat,
+  type WeekStartsOn,
+} from "@super-calendar/core/vanilla";
+import { addMonths, type Locale, startOfMonth } from "date-fns";
+import { createMemo, For } from "solid-js";
+import { MonthView, type MonthViewSlot, type SolidMonthEvent } from "./MonthView";
+import { withDefaults } from "./props";
+import { createSlots, type SlotStyleProps } from "./slots";
+import { css, type CSSProperties } from "./styles";
+import { mergeSolidTheme, type SolidCalendarTheme } from "./theme";
+import { VirtualList } from "./VirtualList";
+
+/**
+ * Styleable parts of {@link MonthList}. The shared weekday header uses `weekdays`
+ * / `weekday`; every other slot is forwarded to each month's {@link MonthView}
+ * (e.g. `title`, `day`, `chip`). See {@link MonthViewSlot}.
+ */
+export type MonthListSlot = MonthViewSlot;
+
+/** Props for {@link MonthList}. */
+export interface MonthListProps<T = unknown>
+  extends DateSelectionConstraints, SlotStyleProps<MonthListSlot> {
+  /** Anchor month; the list spans `pastMonths` before to `futureMonths` after. */
+  date: Date;
+  /** Months to render before the anchor (default 1). */
+  pastMonths?: number;
+  /** Months to render after the anchor (default 12). */
+  futureMonths?: number;
+  /** First day of the week. Sunday = 0 (default) ... Saturday = 6. */
+  weekStartsOn?: WeekStartsOn;
+  /** Weekday header label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
+  weekdayFormat?: WeekdayFormat;
+  /** Tint weekend day cells with the theme's weekend background (default true). */
+  highlightWeekends?: boolean;
+  /** Events to render as chips in each day cell (calendar layout when provided). */
+  events?: CalendarEvent<T>[];
+  /** Custom chip renderer; falls back to the built-in titled chip. */
+  renderEvent?: SolidMonthEvent<T>;
+  /**
+   * Override the screen-reader label for each event chip. Receives the event and a
+   * `{ mode: "month", isAllDay, ampm: false }` context; return the full text to
+   * announce. Defaults to the event title and day (e.g. "Standup, 15 July").
+   */
+  eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
+  /** Max chips shown per day before a "+N more" row (default 3). */
+  maxVisibleEventCount?: number;
+  /** Month chip height in pixels; omit to keep the renderer default. */
+  chipHeight?: number;
+  /** Gap between month chip rows in pixels (default 2). */
+  chipGap?: number;
+  /** Template for the overflow row; `{moreCount}` is replaced. */
+  moreLabel?: string;
+  /** Translations for the screen-reader words and gutter text; omitted keys use English. */
+  labels?: Partial<CalendarLabels>;
+  /** Tap an event chip. */
+  onPressEvent?: (event: CalendarEvent<T>) => void;
+  /** Tap the "+N more" overflow row. */
+  onPressMore?: (events: CalendarEvent<T>[], date: Date) => void;
+  /** Selected span; days between the endpoints get the range band. */
+  selectedRange?: DateRange;
+  /** Discrete selected days (single / multiple). */
+  selectedDates?: Date[];
+  /** Fill the whole cell on selection instead of the default rounded pill band. */
+  fillCellOnSelection?: boolean;
+  /** date-fns locale for the month titles and weekday labels. */
+  locale?: Locale;
+  /** Theme overrides; falls back to the default light theme. */
+  theme?: Partial<SolidCalendarTheme>;
+  /** Height of the scroll viewport, in px (default 480). */
+  height?: number | string;
+  /**
+   * When events are shown, make each month's day cells keyboard-navigable (roving
+   * tab stop, arrow keys, Enter to open the day). Default false. The picker
+   * layout (no `events`) is always navigable regardless.
+   */
+  keyboardDayNavigation?: boolean;
+  /** Fired when a selectable day is clicked. */
+  onPressDay?: (date: Date) => void;
+  /** Class applied to the root element. */
+  className?: string;
+  /** Inline styles applied to the root element. */
+  style?: CSSProperties;
+}
+
+/**
+ * A vertically scrolling, virtualized list of months: the date picker. Built on
+ * measured row virtualization and the library's headless grid logic. Selection is
+ * controlled, pass `selectedRange` (or `selectedDates`) and handle `onPressDay`.
+ */
+export function MonthList<T = unknown>(incoming: MonthListProps<T>): JSX.Element {
+  const props = withDefaults(
+    {
+      pastMonths: 1,
+      futureMonths: 12,
+      weekdayFormat: "short",
+      highlightWeekends: true,
+      weekStartsOn: 0,
+      fillCellOnSelection: false,
+      height: 480,
+    } satisfies Partial<MonthListProps<T>>,
+    incoming,
+  );
+  const theme = createMemo(() => mergeSolidTheme(props.theme));
+  const slot = createSlots<MonthListSlot>(props);
+  const months = createMemo(() => {
+    const first = startOfMonth(addMonths(props.date, -props.pastMonths));
+    const count = props.pastMonths + props.futureMonths + 1;
+    return Array.from(
+      {
+        length: count,
+      },
+      (_, i) => addMonths(first, i),
+    );
+  });
+
+  // The weekday header only depends on the week start and locale, not the
+  // rendered month window.
+  const weekdays = createMemo(
+    () =>
+      buildMonthGrid(props.date, {
+        weekStartsOn: props.weekStartsOn,
+        weekdayFormat: props.weekdayFormat,
+        locale: props.locale,
+      }).weekdays,
+  );
+
+  // Build the day→events index once for the whole list rather than per month.
+  const eventsByDay = createMemo(() => {
+    if (!props.events) return undefined;
+    // Background events shade the time grid; the month grids ignore them.
+    const map = groupEventsByDay(props.events.filter((event) => !isBackgroundEvent(event)));
+    // Each day reads all-day events first, then timed events by start.
+    for (const list of map.values()) list.sort(compareDayEvents);
+    return map;
+  });
+  return (
+    <div
+      class={props.className}
+      style={css({
+        fontFamily: theme().fontFamily,
+        color: theme().text,
+        ...props.style,
+      })}
+    >
+      <div
+        {...slot("weekdays", {
+          base: {
+            display: "grid",
+            gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+          },
+          themed: {
+            borderBottom: `1px solid ${theme().gridLine}`,
+            padding: "8px 0",
+          },
+        })}
+      >
+        {
+          <For each={weekdays()} keyed={false}>
+            {(wd) => (
+              <span
+                {...slot("weekday", {
+                  themed: {
+                    textAlign: "center",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: theme().textMuted,
+                  },
+                })}
+              >
+                {wd().label}
+              </span>
+            )}
+          </For>
+        }
+      </div>
+      <VirtualList
+        data={months()}
+        keyExtractor={(m: Date) => m.toISOString()}
+        estimatedItemSize={theme().cellHeight * 7 + 40}
+        // Open on the anchor month (today by default), not the first past month.
+        // `months` starts `pastMonths` before the anchor, so it sits at that index.
+        initialScrollIndex={props.pastMonths}
+        style={css({
+          height: props.height,
+          overflowY: "auto",
+        })}
+        renderItem={(row: { item: Date }) => (
+          <MonthView<T>
+            date={row.item}
+            weekStartsOn={props.weekStartsOn}
+            highlightWeekends={props.highlightWeekends}
+            events={props.events}
+            eventsByDay={eventsByDay()}
+            renderEvent={props.renderEvent}
+            eventAccessibilityLabel={props.eventAccessibilityLabel}
+            maxVisibleEventCount={props.maxVisibleEventCount}
+            chipHeight={props.chipHeight}
+            chipGap={props.chipGap}
+            moreLabel={props.moreLabel}
+            labels={props.labels}
+            onPressEvent={props.onPressEvent}
+            onPressMore={props.onPressMore}
+            selectedRange={props.selectedRange}
+            selectedDates={props.selectedDates}
+            fillCellOnSelection={props.fillCellOnSelection}
+            showAdjacentMonths={false}
+            showWeekdays={false}
+            locale={props.locale}
+            theme={props.theme}
+            minDate={props.minDate}
+            maxDate={props.maxDate}
+            isDateDisabled={props.isDateDisabled}
+            keyboardDayNavigation={props.keyboardDayNavigation}
+            onPressDay={props.onPressDay}
+            classNames={props.classNames}
+            styles={props.styles}
+          />
+        )}
+      />
+    </div>
+  );
+}

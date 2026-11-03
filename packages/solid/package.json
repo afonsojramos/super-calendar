@@ -1,0 +1,63 @@
+{
+  "name": "@super-calendar/solid",
+  "version": "0.1.0-experimental.0",
+  "description": "Solid 2 calendar and date picker with virtualized views, keyboard navigation, and pointer gestures.",
+  "keywords": [
+    "calendar",
+    "date-picker",
+    "solid",
+    "solidjs"
+  ],
+  "homepage": "https://super-calendar.afonsojramos.me",
+  "bugs": {
+    "url": "https://github.com/afonsojramos/super-calendar/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/afonsojramos/super-calendar.git",
+    "directory": "packages/solid"
+  },
+  "source": "./src/index.ts",
+  "files": [
+    "dist",
+    "src",
+    "!**/__tests__"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/server/index.js",
+  "module": "./dist/client/index.js",
+  "types": "./dist/client/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/client/index.d.ts",
+      "solid": "./src/index.ts",
+      "browser": "./dist/client/index.js",
+      "default": "./dist/server/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "experimental"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@super-calendar/core": "workspace:^",
+    "csstype": "^3.1.0"
+  },
+  "devDependencies": {
+    "@solidjs/babel-plugin": "2.0.0-rc.20",
+    "@solidjs/web": "2.0.0-rc.20",
+    "solid-js": "2.0.0-rc.20"
+  },
+  "peerDependencies": {
+    "@solidjs/web": "2.0.0-rc.20",
+    "date-fns": ">=3",
+    "solid-js": "2.0.0-rc.20"
+  }
+}

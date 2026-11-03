@@ -1,0 +1,109 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #1a1b1e;
+  background: #f4f5f7;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+main {
+  max-width: 1120px;
+  margin: 32px auto;
+  padding: 24px;
+  border: 1px solid #dedfe3;
+  border-radius: 16px;
+  background: white;
+}
+main[data-theme="dark"] {
+  color: #e6e8ec;
+  background: #1a1b1e;
+}
+header,
+nav,
+.navigation,
+.pickers {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header,
+nav {
+  justify-content: space-between;
+}
+header {
+  margin-bottom: 24px;
+}
+h1 {
+  font-size: clamp(26px, 4vw, 36px);
+  letter-spacing: -0.035em;
+  margin: 6px 0;
+}
+header p {
+  margin: 0;
+  color: #757a83;
+}
+.eyebrow {
+  font-size: 13px;
+  font-weight: 650;
+}
+button,
+select {
+  font: inherit;
+  border: 1px solid #dedfe3;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+button:focus-visible,
+select:focus-visible {
+  outline: 2px solid #3366ff;
+  outline-offset: 2px;
+}
+.calendar {
+  border: 1px solid #dedfe3;
+  border-radius: 12px;
+  margin: 20px 0;
+  overflow: hidden;
+}
+.pickers {
+  flex-wrap: wrap;
+}
+.pickers > label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+.orientation {
+  display: block;
+  padding: 12px;
+}
+[role="status"] {
+  font-size: 13px;
+  margin-bottom: 0;
+  color: #757a83;
+  min-height: 20px;
+}
+@media (max-width: 680px) {
+  main {
+    margin: 0;
+    padding: 16px;
+    border-radius: 0;
+  }
+  header,
+  nav {
+    align-items: flex-start;
+  }
+  nav {
+    flex-wrap: wrap;
+  }
+  .pickers {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

@@ -20,8 +20,12 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm --filter @super-calendar/example-native typecheck
       - run: pnpm --filter @super-calendar/example-web typecheck
-      - run: pnpm test
+      - run: pnpm --filter @super-calendar/example-solid typecheck
+      - run: pnpm test:parity
       - run: pnpm build
+      - run: pnpm test:browser
+      - run: pnpm test:solid:browser
+      - run: pnpm test:solid:browser:dist
 
   package-health:
     runs-on: ubuntu-latest
@@ -30,17 +34,21 @@ jobs:
       - uses: jdx/mise-action@v4
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - run: pnpm test:solid:package
       # Validate every publishable package's type resolution and packaging.
       - name: attw + publint per package
         run: |
-          for pkg in core native dom; do
+          for pkg in core native dom solid; do
             echo "== @super-calendar/$pkg =="
             (
               cd "packages/$pkg"
               # node16 profile: gates node16 (CJS/ESM) + bundler resolution. node10
               # is skipped on purpose; it can't resolve the exports-map subpaths
               # (e.g. native's /picker) and is long EOL.
-              pnpm dlx @arethetypeswrong/cli@latest --pack . --profile node16
+              profile=node16
+              # Solid 2 is ESM-only; its peers do not provide CommonJS builds.
+              if [ "$pkg" = solid ]; then profile=esm-only; fi
+              pnpm dlx @arethetypeswrong/cli@latest --pack . --profile "$profile"
               pnpm dlx publint@latest
             )
           done

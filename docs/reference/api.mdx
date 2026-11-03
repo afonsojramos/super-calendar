@@ -7,6 +7,8 @@ This page documents `@super-calendar/native`. The react-dom renderer
 (`@super-calendar/dom`) shares the same core types and views, with a few web-only
 props and no React Native styling; see the [react-dom renderer](/guides/dom) guide
 for its components and props.
+The experimental [Solid 2 renderer](/guides/solid) shares the React DOM prop
+names and uses Solid JSX and accessors. Its exports are listed below.
 
 The native package declares a React Native peer range of `>=0.74 <2`, which
 includes stable 1.x versions. Use versions of Reanimated, Worklets, and Gesture
@@ -177,6 +179,19 @@ Changing either dimension updates already mounted list and pager months.
 
 ## Core-only helpers
 
+Import `@super-calendar/core/vanilla` to use pure core types and helpers without
+React. The root entry still exports those helpers plus the existing React hooks
+and selection provider. React is an optional package peer but is required when
+you import the root entry.
+
+`loadEventSource({ source, format?, map?, signal? })` loads one JSON/iCalendar
+batch or calls an async event loader. It returns `Promise<CalendarEvent<T>[]>` and
+rejects HTTP, validation, and cancellation errors. `signal` applies to URL
+requests. The default mapper validates calendar fields and converts event and
+recurrence dates. A custom mapper owns its field validation. This helper and the
+`EventSource<T>` and `EventSourceOptions<T>` types are exported from both core
+entries and from `@super-calendar/solid`.
+
 `@super-calendar/core` also exports `clampMoveStartMinutes`. Use it when a custom
 time-grid drag must keep the moved start inside the visible hour window without
 shortening an event that continues past midnight.
@@ -205,3 +220,63 @@ the layout's minimum box. A resize moves the end to the clock time its drawn
 edge is dragged to. That edge is what `drawnEnd(start, end)` returns: the end
 itself, except for a span whose clock runs backwards in the repeated hour, which
 is drawn its elapsed length from its start.
+
+## Shared web behavior
+
+React DOM and Solid `MonthList` apply callback, date-constraint, theme, and slot
+updates to mounted months, even when `date` and `events` keep the same references.
+
+`DatePicker` and `DateRangePicker` apply `theme` to both the picker chrome and
+the nested calendar, including updates while open. Per-slot `styles` take
+precedence. Setting `disabled` closes an open popover and prevents date changes.
+Re-enabling the field leaves the popover closed until you open it again.
+
+## Solid exports
+
+`@super-calendar/solid` is an ESM package for `solid-js@2.0.0-rc.20` and
+`@solidjs/web@2.0.0-rc.20`. It uses the `experimental` npm tag and does not support
+Solid 1. The [Solid guide](/guides/solid) covers compiler setup and hydration.
+
+| Export                                                   | Contract                                                                                                                                                        |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Calendar`                                               | Controlled `date`, `events`, and `mode`; recurring-event expansion and display-zone conversion.                                                                 |
+| `TimeGrid`, `MonthView`, `YearView`                      | Individual calendar views with the React DOM prop names.                                                                                                        |
+| `MonthList`, `Agenda`                                    | Virtualized, measured rows.                                                                                                                                     |
+| `ResourceTimeline`                                       | Horizontal or vertical resource lanes.                                                                                                                          |
+| `DatePicker`, `DateRangePicker`                          | Controlled value and `onChange`, with a month-list popover.                                                                                                     |
+| `createDateRange(options?)`                              | Options accessor with `initialRange`, `minDate`, `maxDate`, `isDateDisabled`; returns `range()` and `setRange`, `onPressDate`, `selectRange`, `reset`.          |
+| `createMonthGrid(month, options?)`                       | Date and options accessors; returns a `MonthGrid` accessor. Options use `UseMonthGridOptions`.                                                                  |
+| `createNow(options?)`                                    | Options accessor with `enabled`, `now`, `timeZone`, `tickMs`; returns a date accessor. Default tick interval is 60 seconds.                                     |
+| `createEventSource(source, options?)`                    | URL or async-loader accessor and optional options accessor; returns `events()`, `loading()`, `error()`, and `refetch()`. Reloads when source or options change. |
+| `defaultSolidTheme`, `darkSolidTheme`, `mergeSolidTheme` | Flat `SolidCalendarTheme` tokens and partial-override merging.                                                                                                  |
+
+Component props and slot types are exported with their component names, such as
+`CalendarProps<T>` and `TimeGridSlot`. Custom renderers use `SolidRenderEvent<T>`,
+`SolidMonthEvent<T>`, `SolidAgendaEvent<T>`, and their `Args` types.
+`ResourceEventArgs<T>`, `Resource`, `CSSProperties`, `SlotStyleProps`,
+`ResolvedSlot`, `SlotDefault`, `DateRangeOptions`, `NowOptions`, and the Solid
+`EventSourceState<T>` are also exported.
+Render callbacks return `JSX.Element` from `@solidjs/web`.
+
+`Calendar` and `TimeGrid` accept a callback `ref` receiving `CalendarHandle`.
+`scrollToTime(minutes, options?)` scrolls the mounted time grid. It has no effect
+after disposal or while `Calendar` displays another type of view.
+
+React DOM and Solid `ResourceTimeline` event buttons support keyboard activation,
+including when dragging is enabled. `draggable: false` blocks moves and resizes
+while preserving activation. Removing the active event or resource lane, losing
+pointer capture, or unmounting cancels a gesture without a drop callback.
+
+`expandRecurringEvents` stops at JavaScript's date limits and omits occurrences
+whose end date would overflow.
+
+`createEventSource` starts on the client, retains the last successful batch on
+errors, and aborts superseded URL requests. It stops polling on disposal and
+ignores later `refetch` calls. Finite `refetchIntervalMs` values greater than zero
+and no larger than `2147483647` ms enable polling; other values disable it.
+Custom async functions cannot be aborted, but
+their stale results are ignored.
+
+The package re-exports shared event, selection, grid, recurrence, iCalendar, and
+label types and helpers. Import `@super-calendar/core/vanilla` for the complete
+pure helper set. React hooks and providers are not exported by the Solid package.

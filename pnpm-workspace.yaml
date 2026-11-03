@@ -3,6 +3,11 @@ packages:
   - "examples/*"
 allowBuilds:
   esbuild: true
+minimumReleaseAgeExclude:
+  - "@solidjs/vite-plugin@3.0.0-next.55"
+  - "@vitest/mocker@5.1.0"
+  - "@vitest/spy@5.1.0"
+  - vitest@5.1.0
 # nub and pnpm interop on this workspace (same lockfile, both isolated layouts).
 # Don't let a pnpm script-run reinstall over a nub-installed node_modules.
 verifyDepsBeforeRun: false

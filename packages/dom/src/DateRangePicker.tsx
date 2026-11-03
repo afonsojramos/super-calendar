@@ -29,7 +29,7 @@ interface PickerBaseProps
   height?: number;
   /** Placeholder shown on the trigger when nothing is selected. */
   placeholder?: string;
-  /** Disable the whole field. */
+  /** Disable the field and close its popover. Re-enabling leaves the popover closed. */
   disabled?: boolean;
   /** Theme overrides for the calendar. */
   theme?: Partial<DomCalendarTheme>;
@@ -66,13 +66,17 @@ const popoverDefault: CSSProperties = {
  * outside-click and Escape, and returns focus to the trigger. `renderCalendar`
  * gets a close callback so a single-date pick can dismiss immediately.
  */
-function usePopover() {
+function usePopover(disabled: boolean | undefined) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
+    if (disabled) {
+      setOpen(false);
+      return;
+    }
     const onDown = (e: MouseEvent) => {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
     };
@@ -88,9 +92,9 @@ function usePopover() {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, disabled]);
 
-  return { open, setOpen, rootRef, triggerRef };
+  return { open: open && !disabled, setOpen, rootRef, triggerRef };
 }
 
 interface ShellProps {
@@ -216,7 +220,7 @@ export function DatePicker({
 }: DatePickerProps): ReactElement {
   const theme = mergeDomTheme(themeOverrides);
   const slot = createSlots<DatePickerSlot | MonthListSlot>({ classNames, styles });
-  const { open, setOpen, rootRef, triggerRef } = usePopover();
+  const { open, setOpen, rootRef, triggerRef } = usePopover(disabled);
 
   return (
     <PickerShell
@@ -235,6 +239,7 @@ export function DatePicker({
       ariaLabel="Choose a date"
     >
       <MonthList
+        theme={themeOverrides}
         date={value ?? new Date()}
         weekStartsOn={weekStartsOn}
         selectedDates={value ? [value] : []}
@@ -299,7 +304,7 @@ export function DateRangePicker({
 }: DateRangePickerProps): ReactElement {
   const theme = mergeDomTheme(themeOverrides);
   const slot = createSlots<DatePickerSlot | MonthListSlot>({ classNames, styles });
-  const { open, setOpen, rootRef, triggerRef } = usePopover();
+  const { open, setOpen, rootRef, triggerRef } = usePopover(disabled);
   const constraints: DateSelectionConstraints = { minDate, maxDate, isDateDisabled };
 
   return (
@@ -319,6 +324,7 @@ export function DateRangePicker({
       ariaLabel="Choose a date range"
     >
       <MonthList
+        theme={themeOverrides}
         date={value?.start ?? new Date()}
         weekStartsOn={weekStartsOn}
         selectedRange={value ?? undefined}

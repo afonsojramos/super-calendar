@@ -75,5 +75,7 @@ through unchanged. These rules map to and from iCal
 
 Expansion fast-forwards to the range you ask for, so a long-lived rule (a daily
 event started years ago) stays cheap to query far in the future. A single
-`expandRecurringEvents` call emits at most 5000 occurrences within the range;
+rule emits at most 5000 occurrences within the range;
 pass a `count`/`until`, or query a tighter window, if you need more.
+Expansion stops if the next date exceeds JavaScript's representable date range
+and omits occurrences whose end would overflow that range.

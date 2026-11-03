@@ -1,16 +1,19 @@
+import * as reanimatedMock from "react-native-reanimated";
+import * as gestureHandlerMock from "react-native-gesture-handler";
+import { vi } from "vitest";
 import { act, fireEvent, within } from "@testing-library/react-native";
 import { createRef } from "react";
 import type { CalendarHandle } from "@super-calendar/core";
 import { Dimensions, Platform, Pressable, StyleSheet, Text } from "react-native";
 import type { CalendarEvent, RenderEventArgs } from "../../types";
-import { render } from "./renderGrid";
+import { render } from "../../../../../tests/support/native-time-grid";
 
 // Capture the props handed to the virtualized list, and render only the active
-// page through `renderItem`. The real LegendList can't lay out under Jest (no
+// page through `renderItem`. The real LegendList can't lay out in the test renderer (no
 // measured dimensions), so it never mounts page content; this stand-in does,
 // while still exposing the props we assert on.
 const lastListProps = () => (globalThis as { __listProps?: Record<string, unknown> }).__listProps;
-jest.mock("@legendapp/list/react-native", () => ({
+vi.mock("@legendapp/list/react-native", () => ({
   __esModule: true,
   LegendList: (props: any) => {
     (globalThis as any).__listProps = props;
@@ -36,7 +39,7 @@ const event: CalendarEvent<WithId> = {
 const noop = () => {};
 
 const moveGestureHarness = (index = 0) => {
-  const { __gestures } = require("react-native-gesture-handler") as {
+  const { __gestures } = gestureHandlerMock as unknown as {
     __gestures: Array<{
       calls: Record<string, unknown[]>;
       handlers: {
@@ -55,20 +58,20 @@ const moveGestureHarness = (index = 0) => {
 };
 
 const animatedReactionHarness = () =>
-  require("react-native-reanimated") as {
+  reanimatedMock as unknown as {
     __reactions: unknown[];
     __flushAnimatedReactions: () => void;
   };
 
 describe("TimeGrid midnight drag", () => {
   beforeEach(() => {
-    const gestureHandler = require("react-native-gesture-handler") as { __gestures: unknown[] };
+    const gestureHandler = gestureHandlerMock as unknown as { __gestures: unknown[] };
     gestureHandler.__gestures.length = 0;
     animatedReactionHarness().__reactions.length = 0;
   });
 
   it("commits an overnight move and exposes only the clipped source height", async () => {
-    const onDragEvent = jest.fn();
+    const onDragEvent = vi.fn();
     let observedBoxHeight: { value: number } | undefined;
     const ProbeEvent = ({ boxHeight, continuesBefore }: RenderEventArgs<WithId>) => {
       if (!continuesBefore) observedBoxHeight = boxHeight;
@@ -129,7 +132,7 @@ describe("TimeGrid midnight drag", () => {
         start: new Date(2026, 0, 6, 17),
         end: new Date(2026, 0, 8, 21),
       };
-      const onDragEvent = jest.fn();
+      const onDragEvent = vi.fn();
       const observed: Array<RenderEventArgs<WithId>> = [];
       const ProbeEvent = (args: RenderEventArgs<WithId>) => {
         observed.push(args);
@@ -204,7 +207,7 @@ describe("TimeGrid midnight drag", () => {
 
   it.each(["cancel", "reject"])("clears the multi-day preview on %s", async (finish) => {
     const trip: CalendarEvent<WithId> = { ...event, end: new Date(2026, 0, 8, 10) };
-    const onDragEvent = jest.fn(() => false);
+    const onDragEvent = vi.fn(() => false);
     const { queryAllByTestId } = await render(
       <TimeGrid
         mode="week"
@@ -246,7 +249,7 @@ describe("TimeGrid midnight drag", () => {
       end: new Date(2026, 2, 30, 10),
     };
     const date = new Date(2026, 2, 30);
-    const onDragEvent = jest.fn();
+    const onDragEvent = vi.fn();
     const observed: Array<RenderEventArgs<WithId>> = [];
     const ProbeEvent = (args: RenderEventArgs<WithId>) => {
       observed.push(args);
@@ -528,7 +531,7 @@ describe("TimeGrid cross-page accessibility actions", () => {
   const date = new Date(2026, 0, 6, 12, 0, 0); // Tue 6 Jan 2026
 
   it("moves an event a whole page via the screen-reader actions, keeping its time", async () => {
-    const onDragEvent = jest.fn();
+    const onDragEvent = vi.fn();
     const { getByLabelText } = await render(
       <Calendar
         mode="week"
@@ -566,7 +569,7 @@ describe("TimeGrid cross-page accessibility actions", () => {
         events={[{ ...event, draggable: false }]}
         onChangeDate={noop}
         onPressEvent={noop}
-        onDragEvent={jest.fn()}
+        onDragEvent={vi.fn()}
       />,
     );
     // Still rendered and reachable (taps unaffected), but exposes no move/resize
@@ -587,7 +590,7 @@ describe("TimeGrid cross-page accessibility actions", () => {
         events={[{ ...event, startEditable: false }]}
         onChangeDate={noop}
         onPressEvent={noop}
-        onDragEvent={jest.fn()}
+        onDragEvent={vi.fn()}
       />,
     );
     const a = names(moveOnly.getByLabelText(/Standup, 09:00 to 10:00/));
@@ -602,7 +605,7 @@ describe("TimeGrid cross-page accessibility actions", () => {
         events={[{ ...event, durationEditable: false }]}
         onChangeDate={noop}
         onPressEvent={noop}
-        onDragEvent={jest.fn()}
+        onDragEvent={vi.fn()}
       />,
     );
     const b = names(resizeless.getByLabelText(/Standup, 09:00 to 10:00/));
@@ -654,7 +657,6 @@ describe("TimeGrid column header", () => {
         }}
       />,
     );
-    const { StyleSheet } = require("react-native");
     const number = getByText("6");
     expect(StyleSheet.flatten(number.props.style).fontSize).toBe(19);
     const weekday = getByText("Tue");
@@ -667,7 +669,7 @@ describe("TimeGrid column header", () => {
   });
 
   it("announces the full date on a pressable header and fires onPressDateHeader", async () => {
-    const onPressDateHeader = jest.fn();
+    const onPressDateHeader = vi.fn();
     const { getByLabelText } = await render(
       <Calendar
         mode="week"
@@ -678,7 +680,6 @@ describe("TimeGrid column header", () => {
         onPressDateHeader={onPressDateHeader}
       />,
     );
-    const { fireEvent } = require("@testing-library/react-native");
     await fireEvent.press(getByLabelText("Tuesday 6 January"));
     expect(onPressDateHeader).toHaveBeenCalledTimes(1);
     expect((onPressDateHeader.mock.calls[0][0] as Date).getDate()).toBe(6);
@@ -1220,7 +1221,7 @@ describe("TimeGrid fast-fling repaint", () => {
   });
 
   it("commits the page a fling settles on, even one viewability never reported", async () => {
-    const onChangeDate = jest.fn();
+    const onChangeDate = vi.fn();
     await render(
       <TimeGrid
         mode="week"
@@ -1247,7 +1248,7 @@ describe("TimeGrid fast-fling repaint", () => {
   });
 
   it("does not re-commit a settle on the page already shown", async () => {
-    const onChangeDate = jest.fn();
+    const onChangeDate = vi.fn();
     await render(
       <TimeGrid
         mode="week"
@@ -1280,7 +1281,7 @@ describe("TimeGrid pager resting off a page", () => {
     act(() => list().onScroll({ nativeEvent: { contentOffset: { x } } }));
   const wait = (ms: number) =>
     act(() => {
-      jest.advanceTimersByTime(ms);
+      vi.advanceTimersByTime(ms);
     });
   const calls = () =>
     (globalThis as { __scrollToIndexCalls?: { index: number; animated: boolean }[] })
@@ -1302,16 +1303,17 @@ describe("TimeGrid pager resting off a page", () => {
 
   beforeEach(() => {
     (globalThis as { __scrollToIndexCalls?: unknown[] }).__scrollToIndexCalls = [];
-    jest.replaceProperty(Platform, "OS", "android");
-    jest.useFakeTimers();
+    Platform.OS = "android";
+    vi.useFakeTimers();
   });
   afterEach(() => {
-    jest.useRealTimers();
-    jest.restoreAllMocks();
+    vi.useRealTimers();
+    Platform.OS = "ios";
+    vi.restoreAllMocks();
   });
 
   it("snaps a pager left a few pixels short of a page back onto it", async () => {
-    const onChangeDate = jest.fn();
+    const onChangeDate = vi.fn();
     await renderPager(onChangeDate);
     const { getFixedItemSize, initialScrollIndex } = list();
     await scrollTo(initialScrollIndex * getFixedItemSize() - 1);
@@ -1321,7 +1323,7 @@ describe("TimeGrid pager resting off a page", () => {
   });
 
   it("commits and snaps to the nearest page when stopped mid-page", async () => {
-    const onChangeDate = jest.fn();
+    const onChangeDate = vi.fn();
     await renderPager(onChangeDate);
     const { getFixedItemSize, initialScrollIndex } = list();
     await scrollTo((initialScrollIndex + 0.6) * getFixedItemSize());
@@ -1386,7 +1388,7 @@ describe("TimeGrid pager resting off a page", () => {
   });
 
   it("does not attach the guard off Android", async () => {
-    jest.replaceProperty(Platform, "OS", "ios");
+    Platform.OS = "ios";
     await renderPager();
     expect(list().onScroll).toBeUndefined();
   });
@@ -1394,13 +1396,13 @@ describe("TimeGrid pager resting off a page", () => {
 
 describe("TimeGrid cross-week drop", () => {
   beforeEach(() => {
-    const gestureHandler = require("react-native-gesture-handler") as { __gestures: unknown[] };
+    const gestureHandler = gestureHandlerMock as unknown as { __gestures: unknown[] };
     gestureHandler.__gestures.length = 0;
     animatedReactionHarness().__reactions.length = 0;
-    jest.useFakeTimers();
+    vi.useFakeTimers();
   });
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   it.each([
@@ -1417,8 +1419,8 @@ describe("TimeGrid cross-week drop", () => {
   ])(
     "selects the destination by the ghost's centre: $label",
     async ({ overlaps, left, day, isRTL, hideWednesday, reject }) => {
-      const onDragEvent = jest.fn(() => !reject);
-      const onChangeDate = jest.fn();
+      const onDragEvent = vi.fn(() => !reject);
+      const onChangeDate = vi.fn();
       const events = Array.from({ length: overlaps }, (_, index) => ({
         ...event,
         id: String(index),
@@ -1454,7 +1456,7 @@ describe("TimeGrid cross-week drop", () => {
           absoluteX: width + 100,
           absoluteY: 750,
         });
-        jest.advanceTimersByTime(600);
+        vi.advanceTimersByTime(600);
       });
       expect(onChangeDate).toHaveBeenCalledTimes(1);
       expect(onDragEvent).not.toHaveBeenCalled();
@@ -1480,8 +1482,8 @@ describe("TimeGrid cross-week drop", () => {
   );
 
   it("maps the lifted ghost's pager-local position to a day column and time", async () => {
-    const onDragEvent = jest.fn();
-    const onChangeDate = jest.fn();
+    const onDragEvent = vi.fn();
+    const onChangeDate = vi.fn();
     const grid = (date: Date) => (
       <TimeGrid
         mode="week"
@@ -1506,7 +1508,7 @@ describe("TimeGrid cross-week drop", () => {
     });
     // The edge dwell lifts the event into the floating ghost and pages the view.
     await act(() => {
-      jest.advanceTimersByTime(600);
+      vi.advanceTimersByTime(600);
     });
     expect(onChangeDate).toHaveBeenCalledWith(new Date(2026, 0, 12));
     // The pager keeps swiping enabled throughout: toggling it made the list
@@ -1590,8 +1592,7 @@ describe("TimeGrid short-event press", () => {
       onStart?: (event: unknown) => void;
     };
   };
-  const chains = () =>
-    (require("react-native-gesture-handler") as { __gestures: Chain[] }).__gestures;
+  const chains = () => (gestureHandlerMock as unknown as { __gestures: Chain[] }).__gestures;
   const brief: CalendarEvent<WithId> = {
     id: "brief",
     title: "Brief",
@@ -1603,7 +1604,7 @@ describe("TimeGrid short-event press", () => {
   });
 
   it("presses the event from a tap on either resize handle", async () => {
-    const onPressEvent = jest.fn();
+    const onPressEvent = vi.fn();
     const { getByTestId } = await render(
       <TimeGrid
         mode="week"
@@ -1639,7 +1640,7 @@ describe("TimeGrid short-event press", () => {
   });
 
   it("long-presses a handle on an event that a long press cannot move", async () => {
-    const onLongPressEvent = jest.fn();
+    const onLongPressEvent = vi.fn();
     const pinned: CalendarEvent<WithId> = { ...brief, startEditable: false };
     await render(
       <TimeGrid
@@ -1704,8 +1705,8 @@ describe("TimeGrid background events", () => {
   });
 
   it("renders a background event through the component and lets it press", async () => {
-    const onPressEvent = jest.fn();
-    const onLongPressEvent = jest.fn();
+    const onPressEvent = vi.fn();
+    const onLongPressEvent = vi.fn();
     const { getByTestId, getByText } = await render(
       grid({ renderBackgroundEvent: BlockedBand, onPressEvent, onLongPressEvent }),
     );

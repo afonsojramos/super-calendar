@@ -1,3 +1,5 @@
+import * as gestureHandlerMock from "react-native-gesture-handler";
+import { vi } from "vitest";
 import { act, fireEvent, render, within } from "@testing-library/react-native";
 import { StyleSheet, Text, type ViewStyle } from "react-native";
 import { CalendarThemeProvider, defaultTheme, mergeTheme } from "../../theme";
@@ -153,7 +155,7 @@ describe("MonthView disabled days", () => {
   });
 
   it("honours an isDateDisabled predicate", async () => {
-    const onPressDay = jest.fn();
+    const onPressDay = vi.fn();
     const { getByLabelText } = await render(
       <MonthView
         {...baseProps}
@@ -271,7 +273,7 @@ describe("MonthView built-in more popover", () => {
   }));
 
   it("opens a popover listing the day's events when onPressMore is absent", async () => {
-    const onPressEvent = jest.fn();
+    const onPressEvent = vi.fn();
     const { getByText, getByRole } = await render(
       <MonthView
         {...baseProps}
@@ -287,7 +289,7 @@ describe("MonthView built-in more popover", () => {
   });
 
   it("defers to a consumer onPressMore instead", async () => {
-    const onPressMore = jest.fn();
+    const onPressMore = vi.fn();
     const { getByText, queryByRole } = await render(
       <MonthView
         {...baseProps}
@@ -361,8 +363,8 @@ describe("MonthView multi-day events", () => {
 
 describe("MonthView onPressCell", () => {
   it("fires with the tapped day at midnight, alongside onPressDay", async () => {
-    const onPressCell = jest.fn();
-    const onPressDay = jest.fn();
+    const onPressCell = vi.fn();
+    const onPressDay = vi.fn();
     const { getByLabelText } = await render(
       <MonthView {...baseProps} onPressCell={onPressCell} onPressDay={onPressDay} />,
     );
@@ -372,14 +374,14 @@ describe("MonthView onPressCell", () => {
   });
 
   it("fires on its own when only onPressCell is wired", async () => {
-    const onPressCell = jest.fn();
+    const onPressCell = vi.fn();
     const { getByLabelText } = await render(<MonthView {...baseProps} onPressCell={onPressCell} />);
     await fireEvent.press(getByLabelText(/15 June 2026/));
     expect(onPressCell).toHaveBeenCalledWith(new Date(2026, 5, 15));
   });
 
   it("ignores a tap on a disabled day", async () => {
-    const onPressCell = jest.fn();
+    const onPressCell = vi.fn();
     const { getByLabelText } = await render(
       <MonthView
         {...baseProps}
@@ -414,7 +416,9 @@ describe("MonthView drag", () => {
 
   // The pan the MonthView built for this render (the mock records every builder).
   const lastGesture = () => {
-    const { __gestures } = require("react-native-gesture-handler");
+    const { __gestures } = gestureHandlerMock as unknown as {
+      __gestures: { handlers: Record<string, (...args: unknown[]) => void> }[];
+    };
     return __gestures[__gestures.length - 1];
   };
 
@@ -447,7 +451,9 @@ describe("MonthView drag", () => {
   };
 
   it("mounts no gesture when neither drag handler is wired", async () => {
-    const { __gestures } = require("react-native-gesture-handler");
+    const { __gestures } = gestureHandlerMock as unknown as {
+      __gestures: { handlers: Record<string, (...args: unknown[]) => void> }[];
+    };
     const before = __gestures.length;
     await mount(<MonthView {...baseProps} events={[standup]} />);
     expect(__gestures.length).toBe(before);
@@ -455,7 +461,7 @@ describe("MonthView drag", () => {
 
   describe("to create", () => {
     it("fires onCreateEvent with the all-day span swept across empty cells", async () => {
-      const onCreateEvent = jest.fn();
+      const onCreateEvent = vi.fn();
       await mount(<MonthView {...baseProps} events={[standup]} onCreateEvent={onCreateEvent} />);
       // Tue 16 June -> Thu 18 June, along the empty top of each cell.
       await drag({ x: colX(2), y: rowY(2, EMPTY_Y) }, { x: colX(4), y: rowY(2, EMPTY_Y) });
@@ -468,7 +474,7 @@ describe("MonthView drag", () => {
     });
 
     it("commits a stationary hold as a single all-day event", async () => {
-      const onCreateEvent = jest.fn();
+      const onCreateEvent = vi.fn();
       await mount(<MonthView {...baseProps} events={[standup]} onCreateEvent={onCreateEvent} />);
       const point = { x: colX(2), y: rowY(2, EMPTY_Y) };
       await drag(point, point);
@@ -479,7 +485,7 @@ describe("MonthView drag", () => {
     });
 
     it("sweeps backwards to the same ordered span", async () => {
-      const onCreateEvent = jest.fn();
+      const onCreateEvent = vi.fn();
       await mount(<MonthView {...baseProps} events={[standup]} onCreateEvent={onCreateEvent} />);
       await drag({ x: colX(4), y: rowY(2, EMPTY_Y) }, { x: colX(2), y: rowY(2, EMPTY_Y) });
 
@@ -504,7 +510,7 @@ describe("MonthView drag", () => {
     });
 
     it("does not start on a disabled day", async () => {
-      const onCreateEvent = jest.fn();
+      const onCreateEvent = vi.fn();
       await mount(
         <MonthView
           {...baseProps}
@@ -520,7 +526,7 @@ describe("MonthView drag", () => {
 
   describe("to select", () => {
     it("reports the swept span live, ordered, as the drag crosses days", async () => {
-      const onSelectDrag = jest.fn();
+      const onSelectDrag = vi.fn();
       await mount(<MonthView {...baseProps} events={[standup]} onSelectDrag={onSelectDrag} />);
       const { handlers } = lastGesture();
       await act(() => {
@@ -536,8 +542,10 @@ describe("MonthView drag", () => {
     });
 
     it("enables the sweep on its own, without onCreateEvent", async () => {
-      const onSelectDrag = jest.fn();
-      const { __gestures } = require("react-native-gesture-handler");
+      const onSelectDrag = vi.fn();
+      const { __gestures } = gestureHandlerMock as unknown as {
+        __gestures: { handlers: Record<string, (...args: unknown[]) => void> }[];
+      };
       const before = __gestures.length;
       await mount(<MonthView {...baseProps} events={[standup]} onSelectDrag={onSelectDrag} />);
       expect(__gestures.length).toBeGreaterThan(before);
@@ -546,13 +554,13 @@ describe("MonthView drag", () => {
     });
 
     it("stays quiet while an event is being carried to another day", async () => {
-      const onSelectDrag = jest.fn();
+      const onSelectDrag = vi.fn();
       await mount(
         <MonthView
           {...baseProps}
           events={[standup]}
           onSelectDrag={onSelectDrag}
-          onDragEvent={jest.fn()}
+          onDragEvent={vi.fn()}
         />,
       );
       // Grab the bar itself (the lane row), not the empty space above it.
@@ -563,8 +571,8 @@ describe("MonthView drag", () => {
 
   describe("to reschedule", () => {
     it("fires onDragEvent with both ends shifted by the days dragged", async () => {
-      const onDragEvent = jest.fn();
-      const onDragStart = jest.fn();
+      const onDragEvent = vi.fn();
+      const onDragStart = vi.fn();
       await mount(
         <MonthView
           {...baseProps}
@@ -586,7 +594,7 @@ describe("MonthView drag", () => {
     });
 
     it("carries an event into another week row", async () => {
-      const onDragEvent = jest.fn();
+      const onDragEvent = vi.fn();
       await mount(<MonthView {...baseProps} events={[standup]} onDragEvent={onDragEvent} />);
       // Row 3 is Sun 21 - Sat 27 June; the same weekday there is Mon 22 June.
       await drag({ x: colX(1), y: rowY(2, LANE_Y) }, { x: colX(1), y: rowY(3, LANE_Y) });
@@ -596,7 +604,7 @@ describe("MonthView drag", () => {
     });
 
     it("commits nothing when the drop lands back on the day it started", async () => {
-      const onDragEvent = jest.fn();
+      const onDragEvent = vi.fn();
       await mount(<MonthView {...baseProps} events={[standup]} onDragEvent={onDragEvent} />);
       const point = { x: colX(1), y: rowY(2, LANE_Y) };
       await drag(point, point);
@@ -604,7 +612,7 @@ describe("MonthView drag", () => {
     });
 
     it("does not pick up an event locked with draggable: false", async () => {
-      const onDragEvent = jest.fn();
+      const onDragEvent = vi.fn();
       await mount(
         <MonthView
           {...baseProps}
@@ -617,7 +625,7 @@ describe("MonthView drag", () => {
     });
 
     it("honours eventStartEditable={false} as the grid-wide lock", async () => {
-      const onDragEvent = jest.fn();
+      const onDragEvent = vi.fn();
       await mount(
         <MonthView
           {...baseProps}
@@ -631,7 +639,7 @@ describe("MonthView drag", () => {
     });
 
     it("rejects a drop onto an overlapping event when eventOverlap is false", async () => {
-      const onDragEvent = jest.fn();
+      const onDragEvent = vi.fn();
       const clash: CalendarEvent = {
         title: "Clash",
         start: new Date(2026, 5, 18, 9, 30),
@@ -668,8 +676,8 @@ describe("MonthView drag", () => {
     });
 
     it("sweeps a new span instead when the grab misses every bar", async () => {
-      const onCreateEvent = jest.fn();
-      const onDragEvent = jest.fn();
+      const onCreateEvent = vi.fn();
+      const onDragEvent = vi.fn();
       await mount(
         <MonthView
           {...baseProps}

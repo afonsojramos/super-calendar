@@ -1,24 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CalendarEvent } from "../types";
-import { parseICalendar } from "./ical";
-
-/** Options for {@link useEventSource}. */
-export interface EventSourceOptions<T> {
-  /**
-   * Feed format for URL sources: `"json"` (default) expects an array of event
-   * objects with ISO `start`/`end` strings; `"ics"` parses an iCalendar feed.
-   * URLs ending in `.ics` default to `"ics"`.
-   */
-  format?: "json" | "ics";
-  /**
-   * Map the parsed JSON array into events, for feeds whose shape doesn't match
-   * `CalendarEvent` (rename fields, attach `resourceId`, filter). The default
-   * revives `start`/`end` ISO strings on each item.
-   */
-  map?: (items: unknown[]) => CalendarEvent<T>[];
-  /** Re-fetch every N ms (a live feed). Omit to fetch once. */
-  refetchIntervalMs?: number;
-}
+import { loadEventSource, type EventSource, type EventSourceOptions } from "./eventSource";
+export type { EventSourceOptions } from "./eventSource";
 
 /** What {@link useEventSource} returns. */
 export interface EventSourceState<T> {
@@ -31,12 +14,6 @@ export interface EventSourceState<T> {
   /** Fetch the source again now. */
   refetch: () => Promise<void>;
 }
-
-const defaultMap = <T>(items: unknown[]): CalendarEvent<T>[] =>
-  items.map((raw) => {
-    const item = raw as Record<string, unknown> & { start: string; end: string };
-    return { ...item, start: new Date(item.start), end: new Date(item.end) } as CalendarEvent<T>;
-  });
 
 /**
  * Load events from a refreshable source: a JSON feed URL, an iCalendar feed
@@ -53,7 +30,7 @@ const defaultMap = <T>(items: unknown[]): CalendarEvent<T>[] =>
  * ```
  */
 export function useEventSource<T = unknown>(
-  source: string | (() => Promise<CalendarEvent<T>[]>),
+  source: EventSource<T>,
   { format, map, refetchIntervalMs }: EventSourceOptions<T> = {},
 ): EventSourceState<T> {
   const [events, setEvents] = useState<CalendarEvent<T>[]>([]);
@@ -64,6 +41,7 @@ export function useEventSource<T = unknown>(
   // Abort the superseded URL request too, so it stops consuming the network
   // instead of just being ignored when it lands.
   const abortRef = useRef<AbortController | null>(null);
+  const active = useRef(false);
 
   // The latest source/options without re-subscribing the interval on every
   // render (inline functions and option literals are expected).
@@ -71,6 +49,7 @@ export function useEventSource<T = unknown>(
   latest.current = { source, format, map };
 
   const load = useCallback(async (isManual: boolean) => {
+    if (!active.current) return;
     const gen = ++generation.current;
     abortRef.current?.abort();
     const controller = typeof AbortController === "undefined" ? null : new AbortController();
@@ -78,20 +57,12 @@ export function useEventSource<T = unknown>(
     const { source: src, format: fmt, map: mapper } = latest.current;
     if (isManual) setLoading(true);
     try {
-      let next: CalendarEvent<T>[];
-      if (typeof src === "function") {
-        next = await src();
-      } else {
-        const response = await fetch(src, controller ? { signal: controller.signal } : undefined);
-        if (!response.ok) throw new Error(`Event source responded ${response.status}`);
-        const isIcs = fmt === "ics" || (fmt == null && /\.ics(\?|$)/.test(src));
-        if (isIcs) {
-          next = parseICalendar(await response.text()) as CalendarEvent<T>[];
-        } else {
-          const body = (await response.json()) as unknown[];
-          next = (mapper ?? defaultMap<T>)(body);
-        }
-      }
+      const next = await loadEventSource({
+        source: src,
+        format: fmt,
+        map: mapper,
+        signal: controller?.signal,
+      });
       if (gen !== generation.current) return;
       setEvents(next);
       setError(null);
@@ -105,15 +76,23 @@ export function useEventSource<T = unknown>(
 
   const sourceKey = typeof source === "string" ? source : "fn";
   useEffect(() => {
+    active.current = true;
     void load(true);
-    if (!refetchIntervalMs) {
+    if (
+      !refetchIntervalMs ||
+      !Number.isFinite(refetchIntervalMs) ||
+      refetchIntervalMs <= 0 ||
+      refetchIntervalMs > 2 ** 31 - 1
+    ) {
       return () => {
+        active.current = false;
         generation.current++;
         abortRef.current?.abort();
       };
     }
     const id = setInterval(() => void load(false), refetchIntervalMs);
     return () => {
+      active.current = false;
       clearInterval(id);
       generation.current++;
       abortRef.current?.abort();

@@ -5,7 +5,7 @@
 // two web outputs can be compared by eye.
 //
 // It is a manual aid, not an automated assertion (real-browser screenshots are too
-// environment-sensitive for CI); the static API guard in tests/renderer-parity.test.ts
+// environment-sensitive for CI); the static API guard in tests/architecture/renderer-parity.test.ts
 // stays the source of truth for prop-name parity. Run this when changing shared
 // layout/styling to confirm the renderers still look alike.
 //

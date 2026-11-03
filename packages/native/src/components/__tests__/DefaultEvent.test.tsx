@@ -4,7 +4,7 @@ import type { SharedValue } from "react-native-reanimated";
 import type { CalendarEvent } from "../../types";
 import { DefaultEvent } from "../DefaultEvent";
 
-// A plain object stands in for the shared value; the reanimated jest mock
+// A plain object stands in for the shared value; the Reanimated test mock
 // evaluates worklets once with its current `.value`.
 const boxHeightOf = (value: number) => ({ value }) as SharedValue<number>;
 

@@ -3,9 +3,10 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "types": ["jest", "node"],
+    "types": ["vitest/globals", "vitest-native/rntl-matchers", "node"],
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
@@ -19,9 +20,22 @@
       "@super-calendar/core": ["./packages/core/src/index.ts"],
       "@super-calendar/native": ["./packages/native/src/index.tsx"],
       "@super-calendar/native/picker": ["./packages/native/src/picker.tsx"],
-      "@super-calendar/dom": ["./packages/dom/src/index.ts"]
+      "@super-calendar/dom": ["./packages/dom/src/index.ts"],
+      "@super-calendar/core/vanilla": ["./packages/core/src/vanilla.ts"],
+      "@calendar-test/renderer": ["./tests/web/adapters/react.tsx"],
+      "@calendar-browser/adapter": ["./tests/web/browser/fixtures/react.ts"],
+      "@calendar-browser/library": ["./packages/dom/src/index.ts"]
     }
   },
-  "include": ["packages/*/src", "tests/types"],
-  "exclude": ["**/dist", "**/node_modules"]
+  "include": [
+    "packages/*/src",
+    "tests/architecture",
+    "tests/tooling",
+    "tests/types",
+    "tests/web/contracts",
+    "tests/web/browser",
+    "vitest.config.mts",
+    "vitest.browser.config.mts"
+  ],
+  "exclude": ["**/dist", "**/node_modules", "packages/solid"]
 }

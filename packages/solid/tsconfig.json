@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxImportSource": "@solidjs/web",
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "@super-calendar/core": ["../../packages/core/src/index.ts"],
+      "@super-calendar/native": ["../../packages/native/src/index.tsx"],
+      "@super-calendar/native/picker": ["../../packages/native/src/picker.tsx"],
+      "@super-calendar/dom": ["../../packages/dom/src/index.ts"],
+      "@super-calendar/core/vanilla": ["../../packages/core/src/vanilla.ts"],
+      "@calendar-test/renderer": ["../../tests/web/adapters/solid.tsx"],
+      "@calendar-browser/adapter": ["../../tests/web/browser/fixtures/solid.ts"],
+      "@calendar-browser/library": ["./src/index.ts"]
+    }
+  },
+  "include": [
+    "src",
+    "../../tests/web/contracts",
+    "../../tests/web/browser/fixtures/Fixture.tsx",
+    "../../tests/web/browser/fixtures/main.tsx"
+  ],
+  "exclude": ["dist", "node_modules"]
+}

@@ -1,0 +1,234 @@
+import { vi } from "vitest";
+import type { CalendarEvent } from "@super-calendar/core/vanilla";
+import { rendererName, fireEvent, render, Calendar } from "@calendar-test/renderer";
+
+describe(rendererName, () => {
+  const date = new Date(2026, 6, 15);
+  // A 2-hour event: tall enough that the time grid keeps its time label visible.
+  const events: CalendarEvent[] = [
+    { title: "Standup", start: new Date(2026, 6, 15, 9), end: new Date(2026, 6, 15, 11) },
+  ];
+
+  describe("Calendar", () => {
+    it("renders a month grid in month mode", () => {
+      const { getByText, queryByText } = render(Calendar, {
+        mode: "month",
+        date: date,
+        events: events,
+        weekStartsOn: 1,
+      });
+      expect(getByText("July 2026")).toBeTruthy(); // month title (MonthView)
+      expect(getByText("Standup")).toBeTruthy(); // chip
+      expect(queryByText("09:00 - 11:00")).toBeNull(); // no time-grid label in month mode
+    });
+
+    it("hides the month title with showTitle={false}, so an app header can own the label", () => {
+      const { queryByText, getByText } = render(Calendar, {
+        mode: "month",
+        date: date,
+        events: events,
+        weekStartsOn: 1,
+        showTitle: false,
+      });
+      expect(queryByText("July 2026")).toBeNull();
+      expect(getByText("Standup")).toBeTruthy(); // the grid itself still renders
+    });
+
+    it("renders a time grid in week mode", () => {
+      const { getByText } = render(Calendar, {
+        mode: "week",
+        date: date,
+        events: events,
+        weekStartsOn: 1,
+        hourHeight: 48,
+      });
+      expect(getByText("Standup")).toBeTruthy();
+      expect(getByText("09:00 - 11:00")).toBeTruthy(); // time-grid label
+    });
+
+    it("defaults to the week time grid", () => {
+      const { getByText } = render(Calendar, { date: date, events: events, hourHeight: 48 });
+      expect(getByText("09:00 - 11:00")).toBeTruthy();
+    });
+
+    it("forwards per-slot classNames to the active view", () => {
+      // Month mode → MonthView's `title` slot.
+      const month = render(Calendar, {
+        mode: "month",
+        date: date,
+        weekStartsOn: 1,
+        classNames: { title: "text-center" },
+      });
+      expect((month.getByText("July 2026") as HTMLElement).className).toBe("text-center");
+
+      // Week mode → TimeGrid's `hourLabel` slot.
+      const week = render(Calendar, {
+        mode: "week",
+        date: date,
+        weekStartsOn: 1,
+        classNames: { hourLabel: "text-xs" },
+      });
+      const label = week.container.querySelector('[data-slot="hourLabel"]') as HTMLElement;
+      expect(label.className).toBe("text-xs");
+    });
+
+    describe("keyboard paging via onChangeDate", () => {
+      it("pages by the view span with PageDown / PageUp in a time-grid mode", () => {
+        const onChangeDate = vi.fn();
+        const { container } = render(Calendar, {
+          mode: "week",
+          date: date,
+          weekStartsOn: 1,
+          onChangeDate: onChangeDate,
+          hourHeight: 48,
+        });
+        // A keydown from the focused grid bubbles to the paging wrapper.
+        fireEvent.keyDown(container.firstElementChild!, { key: "PageDown" });
+        expect((onChangeDate.mock.calls[0][0] as Date).getDate()).toBe(22); // +1 week from 15 Jul
+        fireEvent.keyDown(container.firstElementChild!, { key: "PageUp" });
+        expect((onChangeDate.mock.calls[1][0] as Date).getDate()).toBe(8); // −1 week
+      });
+
+      it("pages by a month in month mode", () => {
+        const onChangeDate = vi.fn();
+        const { container } = render(Calendar, {
+          mode: "month",
+          date: date,
+          weekStartsOn: 1,
+          onChangeDate: onChangeDate,
+        });
+        fireEvent.keyDown(container.firstElementChild!, { key: "PageDown" });
+        expect((onChangeDate.mock.calls[0][0] as Date).getMonth()).toBe(7); // Jul → Aug
+      });
+
+      it("ignores the paging keys when onChangeDate is not provided", () => {
+        const { container } = render(Calendar, {
+          mode: "week",
+          date: date,
+          weekStartsOn: 1,
+          hourHeight: 48,
+        });
+        const event = new KeyboardEvent("keydown", {
+          key: "PageDown",
+          bubbles: true,
+          cancelable: true,
+        });
+        fireEvent(container.firstElementChild!, event);
+        expect(event.defaultPrevented).toBe(false);
+      });
+    });
+
+    describe("recurrence + timeZone", () => {
+      const daily: CalendarEvent[] = [
+        {
+          title: "Daily",
+          start: new Date(2026, 6, 13, 9), // Mon 13 Jul 2026
+          end: new Date(2026, 6, 13, 10),
+          recurrence: { freq: "daily" },
+        },
+      ];
+
+      it("auto-expands a recurring event across the visible week", () => {
+        const { getAllByText } = render(Calendar, {
+          mode: "week",
+          date: date,
+          events: daily,
+          weekStartsOn: 1,
+          hourHeight: 48,
+        });
+        // One occurrence per day across the Mon–Sun week.
+        expect(getAllByText("Daily")).toHaveLength(7);
+      });
+
+      it("auto-expands a recurring event across the visible month grid", () => {
+        const { getAllByText } = render(Calendar, {
+          mode: "month",
+          date: date,
+          events: daily,
+          weekStartsOn: 1,
+        });
+        // A daily rule fills the grid; far more than the single un-expanded seed
+        // (the exact count depends on MonthView's per-cell "+N more" cap).
+        expect(getAllByText("Daily").length).toBeGreaterThan(10);
+      });
+      it("widens the expansion window so a time-zone shift doesn't drop an edge day", () => {
+        // A daily 22:00 event shifted +5:30 into Asia/Kolkata lands each occurrence on
+        // the next calendar day; without widening, the first visible column loses its
+        // event (its source day sits just outside the un-widened range).
+        const late: CalendarEvent[] = [
+          {
+            title: "Late",
+            start: new Date(2026, 6, 1, 22), // starts well before the visible week
+            end: new Date(2026, 6, 1, 23),
+            recurrence: { freq: "daily" },
+          },
+        ];
+        const { getAllByText } = render(Calendar, {
+          mode: "week",
+          date: date,
+          events: late,
+          weekStartsOn: 1,
+          timeZone: "Asia/Kolkata",
+          hourHeight: 48,
+        });
+        // All seven visible days keep their occurrence.
+        expect(getAllByText("Late")).toHaveLength(7);
+      });
+
+      it("renders events in the given IANA time zone", () => {
+        // Authored as an absolute instant so the shift is device-tz-independent.
+        // 06:00–08:00 UTC in Asia/Kolkata (UTC+5:30, no DST) is 11:30–13:30.
+        const inst: CalendarEvent[] = [
+          {
+            title: "Call",
+            start: new Date(Date.UTC(2026, 6, 15, 6, 0)),
+            end: new Date(Date.UTC(2026, 6, 15, 8, 0)),
+          },
+        ];
+        const { getByText } = render(Calendar, {
+          mode: "day",
+          date: new Date(2026, 6, 15),
+          events: inst,
+          timeZone: "Asia/Kolkata",
+          hourHeight: 48,
+        });
+        expect(getByText("11:30 - 13:30")).toBeTruthy();
+      });
+    });
+  });
+
+  describe("Calendar hiddenDays forwarding", () => {
+    it("drops hidden weekdays from the week grid", () => {
+      const { container } = render(Calendar, {
+        mode: "week",
+        date: new Date(2026, 5, 26),
+        events: [],
+        hiddenDays: [0, 6],
+        onChangeDate: () => {},
+      });
+      expect(container.querySelectorAll('[data-slot="columnHeader"]')).toHaveLength(5);
+    });
+  });
+
+  describe("Calendar event box sizing forwarding", () => {
+    it("passes minEventHeight and eventGap through to the time grid", () => {
+      // 15 minutes at 48px/hour is 12px; without the override it would be 14px.
+      const quarter: CalendarEvent[] = [
+        { title: "Quarter", start: new Date(2026, 6, 15, 9, 0), end: new Date(2026, 6, 15, 9, 15) },
+      ];
+      const { getByText } = render(Calendar, {
+        mode: "day",
+        date: new Date(2026, 6, 15),
+        events: quarter,
+        hourHeight: 48,
+        minEventHeight: 0,
+        eventGap: 0,
+        renderTimeEvent: () => <div>Quarter</div>,
+      });
+      const box = getByText("Quarter").parentElement as HTMLElement;
+      expect(box.style.height).toBe("12px");
+      expect(box.style.left).toBe("calc(0% + 0px)");
+      expect(box.style.width).toBe("calc(100% - 0px)");
+    });
+  });
+});

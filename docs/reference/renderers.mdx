@@ -1,19 +1,34 @@
 ---
-title: dom vs native
-description: How the react-dom and React Native renderers compare, feature by feature.
+title: Renderer comparison
+description: Compare the React Native, React DOM, and experimental Solid 2 renderers.
 ---
 
-super-calendar ships two renderers over one shared core (`@super-calendar/core`):
+super-calendar provides three renderers over one shared core (`@super-calendar/core`):
 
-- **`@super-calendar/native`** — React Native (iOS, Android, and web via
+- **`@super-calendar/native`** uses React Native (iOS, Android, and web via
   react-native-web). The reference renderer; gesture-driven and virtualized.
-- **`@super-calendar/dom`** — plain react-dom, for web-only or web-first apps that
+- **`@super-calendar/dom`** uses plain react-dom, for web-only or web-first apps that
   don't want to pull in React Native.
+- **`@super-calendar/solid`** provides experimental Solid 2 web components and
+  imports the React-free `@super-calendar/core/vanilla` entry.
 
-Both expose the same views and the same core types, so the mental model carries
-across. The tables below list where they line up and where they intentionally
+The renderers share calendar views and core types. The tables below compare the
+native and React DOM renderers. Solid follows the DOM column for views and
+features, with the differences listed next. The tables show where the platforms
 differ. Most differences are platform concerns (touch vs pointer, RN styling vs
 CSS), not missing functionality.
+
+## Solid 2 differences
+
+Solid uses `JSX.Element` from `@solidjs/web` for render callbacks, `createDateRange`,
+`createMonthGrid`, and `createNow` for reactive state, and `SolidCalendarTheme`
+with `defaultSolidTheme` and `darkSolidTheme` for styling. Component prop names
+match React DOM, including `className`, `classNames`, and `styles`.
+
+`MonthList` and `Agenda` use measured row virtualization without Legend List.
+The package is ESM and supports server rendering and hydration. It targets exact
+Solid 2 release-candidate peers and uses the `experimental` npm tag. See the
+[Solid 2 guide](/guides/solid) for installation and compiler settings.
 
 ## Views and components
 

@@ -14,7 +14,19 @@ npm install @super-calendar/core
 
 Also on [JSR](https://jsr.io/@super-calendar/core): `deno add jsr:@super-calendar/core`.
 
-Peer dependencies: `date-fns` (>=3) and `react` (>=19).
+Peer dependencies: `date-fns` (>=3) and optional `react` (>=18).
+The root entry includes React hooks and requires React at runtime. Use
+`@super-calendar/core/vanilla` for pure logic without React:
+
+```ts
+import { buildMonthGrid, layoutDayEvents, nextDateRange } from "@super-calendar/core/vanilla";
+```
+
+The vanilla entry exports the pure types, date calculations, selection, layout,
+recurrence, time-zone, iCalendar, presentation, and theme-token utilities. It
+also exports the framework-independent `loadEventSource` loader. It excludes
+React hooks and providers. Existing root imports remain supported.
+`@super-calendar/solid` uses this entry for its Solid 2 renderer.
 
 ## Usage
 
@@ -40,7 +52,7 @@ Manage single, multiple, or range selection with `useDateRange`:
 ```ts
 import { useDateRange } from "@super-calendar/core";
 
-const range = useDateRange({ mode: "range" });
+const range = useDateRange({ minDate: new Date() });
 ```
 
 For a custom time-grid drag, `clampMoveStartMinutes` keeps the moved event's
@@ -66,6 +78,27 @@ saving changes. For a resize, pass zero for the edge you want to keep fixed.
 `CalendarEvent<T>` includes an optional `dragHandleColor: string` for the native
 renderer's time-grid and resource-timeline resize grips. When omitted, those
 grips use `theme.colors.eventText`. Core preserves the field without interpreting it.
+
+## Recurrence limits
+
+Recurring-event expansion stops at JavaScript's date limits and omits occurrences
+whose end would overflow.
+
+## Event sources
+
+`loadEventSource({ source, format?, map?, signal? })` loads one JSON or iCalendar
+batch without React. Import it from `@super-calendar/core/vanilla` or the root
+entry. `source` accepts a URL or an async function returning events. URL requests
+accept an `AbortSignal`. The loader rejects HTTP errors and malformed JSON events;
+the default mapper revives `start`, `end`, and recurrence dates. Custom mappers
+receive an unknown array and own their validation and date conversion.
+
+The React `useEventSource(source, options?)` hook adds `events`, `loading`,
+`error`, and `refetch`. A failed refresh keeps the last successful batch.
+`refetchIntervalMs` enables polling for finite values greater than zero and no
+larger than `2147483647` ms. Other values disable it. Unmounting aborts
+pending URL requests, stops polling, and disables retained `refetch` callbacks.
+Solid consumers use `createEventSource` from `@super-calendar/solid`.
 
 ## Documentation
 

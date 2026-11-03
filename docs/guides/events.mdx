@@ -190,9 +190,37 @@ const { events, loading, error, refetch } = useEventSource("https://example.com/
 
 JSON feeds default to items with ISO `start`/`end` strings; pass `map` to
 reshape anything else (rename fields, attach a `resourceId`, filter).
+The default mapper validates calendar fields and revives recurrence `until`,
+`exdates`, and `rdates`. Invalid data rejects the batch and sets `error`, keeping
+the previous events. A custom `map` receives an array of unknown items and owns
+their validation and conversion. Extra event fields are preserved.
+
+Polling requires a finite `refetchIntervalMs` greater than zero and no larger
+than `2147483647` (the timer limit, about 24.8 days). Other values disable it.
+Unmounting stops polling and aborts pending URL
+requests. Retained `refetch` callbacks do nothing after unmount.
 
 One nuance for function sources: swapping the function itself doesn't trigger a
 refetch (inline functions change identity every render, which would loop).
 The next interval tick or a manual `refetch()` always calls the latest
 function, so change what the function reads, or call `refetch()` after
 swapping it.
+
+In Solid, use [`createEventSource`](/guides/solid#load-an-event-feed). Its source
+and options are accessors, and changes to either trigger a reload, including a
+new async function.
+
+For one batch without a reactive owner, import `loadEventSource` from
+`@super-calendar/core/vanilla` or `@super-calendar/core`:
+
+```ts
+import { loadEventSource } from "@super-calendar/core/vanilla";
+
+const controller = new AbortController();
+const events = await loadEventSource({ source: "/events.json", signal: controller.signal });
+```
+
+The loader accepts `source`, `format`, `map`, and an optional `signal`. It does not
+poll or retain state. HTTP failures, malformed JSON feeds, and cancellation reject
+its promise. The abort signal applies to URL requests; custom async functions
+manage their own cancellation.

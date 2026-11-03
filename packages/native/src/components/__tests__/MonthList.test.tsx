@@ -1,16 +1,17 @@
+import { vi } from "vitest";
 import { cleanup, render } from "@testing-library/react-native";
 import type { CalendarEvent } from "../../types";
 import { DefaultEvent } from "../DefaultEvent";
 import { MonthList } from "../MonthList";
 
 beforeEach(() => {
-  jest.useFakeTimers();
+  vi.useFakeTimers();
 });
 
 afterEach(async () => {
   await cleanup();
-  jest.runOnlyPendingTimers();
-  jest.useRealTimers();
+  vi.runOnlyPendingTimers();
+  vi.useRealTimers();
 });
 
 const baseProps = {
