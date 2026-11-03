@@ -1,3 +1,5 @@
+import * as gestureHandlerMock from "react-native-gesture-handler";
+import { vi } from "vitest";
 import { act, fireEvent, render } from "@testing-library/react-native";
 import { useState } from "react";
 import type { CalendarEvent } from "../../types";
@@ -17,7 +19,7 @@ describe("YearView", () => {
   });
 
   it("fires onPressDay with the tapped day", async () => {
-    const onPressDay = jest.fn();
+    const onPressDay = vi.fn();
     const { getByLabelText } = await render(
       <YearView date={new Date(2026, 6, 20)} weekStartsOn={1} onPressDay={onPressDay} />,
     );
@@ -35,7 +37,7 @@ describe("YearView", () => {
   });
 
   it("fires onPressMonth from a month title", async () => {
-    const onPressMonth = jest.fn();
+    const onPressMonth = vi.fn();
     const { getByLabelText } = await render(
       <YearView date={new Date(2026, 6, 20)} weekStartsOn={1} onPressMonth={onPressMonth} />,
     );
@@ -61,7 +63,7 @@ describe("YearView selection", () => {
   });
 
   it("renders days outside minDate/maxDate as unavailable and ignores their taps", async () => {
-    const onPressDay = jest.fn();
+    const onPressDay = vi.fn();
     const { getByLabelText } = await render(
       <YearView
         date={new Date(2026, 6, 20)}
@@ -84,15 +86,15 @@ describe("YearView drag to select", () => {
   // One pan is built per mini month, in month order, so the current batch is
   // the last twelve gestures the mock recorded.
   const monthPan = (monthIndex: number): PanHandlers => {
-    const { __gestures } = jest.requireMock("react-native-gesture-handler") as {
+    const { __gestures } = gestureHandlerMock as unknown as {
       __gestures: { handlers: PanHandlers }[];
     };
     return __gestures[__gestures.length - 12 + monthIndex].handlers;
   };
 
   it("reports the sweep live and commits an all-day range on release", async () => {
-    const onSelectDrag = jest.fn();
-    const onCreateEvent = jest.fn();
+    const onSelectDrag = vi.fn();
+    const onCreateEvent = vi.fn();
     const { getByTestId } = await render(
       <YearView
         date={new Date(2026, 6, 20)}
@@ -116,12 +118,12 @@ describe("YearView drag to select", () => {
   });
 
   it("lets the next tap through after a sweep, which leaves no press behind", async () => {
-    const onPressDay = jest.fn();
+    const onPressDay = vi.fn();
     const { getByTestId, getByLabelText } = await render(
       <YearView
         date={new Date(2026, 6, 20)}
         weekStartsOn={1}
-        onSelectDrag={jest.fn()}
+        onSelectDrag={vi.fn()}
         onPressDay={onPressDay}
       />,
     );
@@ -138,8 +140,8 @@ describe("YearView drag to select", () => {
   });
 
   it("ignores a hold that lands on a blank adjacent-month cell", async () => {
-    const onSelectDrag = jest.fn();
-    const onCreateEvent = jest.fn();
+    const onSelectDrag = vi.fn();
+    const onCreateEvent = vi.fn();
     const { getByTestId } = await render(
       <YearView
         date={new Date(2026, 6, 20)}
@@ -160,7 +162,7 @@ describe("YearView drag to select", () => {
   });
 
   it("keeps disabled days out of the sweep", async () => {
-    const onCreateEvent = jest.fn();
+    const onCreateEvent = vi.fn();
     const { getByTestId } = await render(
       <YearView
         date={new Date(2026, 6, 20)}
@@ -178,7 +180,7 @@ describe("YearView drag to select", () => {
   });
 
   it("keeps one pan per mini month while a sweep is running", async () => {
-    const { __gestures } = jest.requireMock("react-native-gesture-handler") as {
+    const { __gestures } = gestureHandlerMock as unknown as {
       __gestures: unknown[];
     };
     // The documented wiring: onSelectDrag drives state in the consumer, so every
@@ -207,7 +209,7 @@ describe("YearView drag to select", () => {
   });
 
   it("commits nothing when the hold never leaves its day", async () => {
-    const onCreateEvent = jest.fn();
+    const onCreateEvent = vi.fn();
     const { getByTestId } = await render(
       <YearView date={new Date(2026, 6, 20)} weekStartsOn={1} onCreateEvent={onCreateEvent} />,
     );

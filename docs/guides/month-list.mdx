@@ -45,6 +45,10 @@ list auto-scrolls at the edges so a range can span months). Pass `events` (plus
 an optional `renderEvent`) to show events in the grids too; it reuses
 `MonthView`, so events, selection, and disabled days behave as in the month view.
 
+The React DOM and Solid versions update mounted months when callbacks,
+date constraints, themes, or slots change. You do not need to replace `date` or
+`events` to apply those updates.
+
 ## Props
 
 | Prop                   | Type                       | Notes                                                           |

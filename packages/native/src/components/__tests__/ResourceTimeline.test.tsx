@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 import { fireEvent, render } from "@testing-library/react-native";
 import { StyleSheet, Text } from "react-native";
 import type { CalendarEvent } from "../../types";
@@ -66,7 +67,7 @@ describe("ResourceTimeline", () => {
   });
 
   it("fires onPressEvent with the tapped event", async () => {
-    const onPressEvent = jest.fn();
+    const onPressEvent = vi.fn();
     const { getByText } = await render(
       <ResourceTimeline
         date={at(0)}
@@ -81,8 +82,8 @@ describe("ResourceTimeline", () => {
   });
 
   it("renders a resize grip per event and still taps when onDragEvent is set", async () => {
-    const onDragEvent = jest.fn();
-    const onPressEvent = jest.fn();
+    const onDragEvent = vi.fn();
+    const onPressEvent = vi.fn();
     const { getByLabelText, getAllByTestId } = await render(
       <ResourceTimeline
         date={at(0)}
@@ -113,7 +114,7 @@ describe("ResourceTimeline", () => {
             orientation={orientation}
             resources={resources}
             events={events}
-            onDragEvent={jest.fn()}
+            onDragEvent={vi.fn()}
           />
         </CalendarThemeProvider>
       );
@@ -133,7 +134,7 @@ describe("ResourceTimeline", () => {
   );
 
   it("exposes screen-reader move and resize actions on the draggable bar", async () => {
-    const onDragEvent = jest.fn();
+    const onDragEvent = vi.fn();
     const { getByLabelText } = await render(
       <ResourceTimeline
         date={at(0)}
@@ -173,7 +174,7 @@ describe("ResourceTimeline", () => {
         date={at(0)}
         resources={resources}
         events={events}
-        onDragEvent={jest.fn()}
+        onDragEvent={vi.fn()}
         labels={{
           moveLater: (n) => `Adiar ${n} minutos`,
           moveToResource: (title) => `Mover para ${title}`,
@@ -230,7 +231,7 @@ describe("ResourceTimeline vertical orientation", () => {
   });
 
   it("keeps the screen-reader move and resize actions on vertical bars", async () => {
-    const onDragEvent = jest.fn();
+    const onDragEvent = vi.fn();
     const { getAllByRole } = await render(
       <ResourceTimeline
         date={at(0)}
@@ -248,7 +249,7 @@ describe("ResourceTimeline vertical orientation", () => {
   });
 
   it("fires onPressEvent for a tapped vertical bar", async () => {
-    const onPressEvent = jest.fn();
+    const onPressEvent = vi.fn();
     const { getByText } = await render(
       <ResourceTimeline
         date={at(0)}
@@ -263,7 +264,7 @@ describe("ResourceTimeline vertical orientation", () => {
   });
 
   it("lays a draggable vertical bar out by time with the resize grip at the bottom", async () => {
-    const onDragEvent = jest.fn();
+    const onDragEvent = vi.fn();
     const { getAllByTestId, getByText } = await render(
       <ResourceTimeline
         date={at(0)}
@@ -297,7 +298,7 @@ describe("ResourceTimeline vertical orientation", () => {
 
 describe("ResourceTimeline cell interactions", () => {
   it("fires onPressCell with the snapped time and the lane's resource", async () => {
-    const onPressCell = jest.fn();
+    const onPressCell = vi.fn();
     const { getAllByTestId } = await render(
       <ResourceTimeline
         date={at(0)}
@@ -358,7 +359,7 @@ describe("ResourceTimeline cell interactions", () => {
   });
 
   it("fires onLongPressEvent for a non-draggable bar", async () => {
-    const onLongPressEvent = jest.fn();
+    const onLongPressEvent = vi.fn();
     const { getByText } = await render(
       <ResourceTimeline
         date={at(0)}
@@ -372,7 +373,7 @@ describe("ResourceTimeline cell interactions", () => {
   });
 
   it("fires onPressCell from a vertical lane using locationY", async () => {
-    const onPressCell = jest.fn();
+    const onPressCell = vi.fn();
     const { getAllByTestId } = await render(
       <ResourceTimeline
         date={at(0)}
@@ -400,7 +401,7 @@ describe("ResourceTimeline cell interactions", () => {
         date={at(0)}
         resources={resources}
         events={events}
-        onCreateEvent={jest.fn()}
+        onCreateEvent={vi.fn()}
       />,
     );
     expect(getAllByTestId("resource-create-ghost", { includeHiddenElements: true })).toHaveLength(
@@ -409,7 +410,7 @@ describe("ResourceTimeline cell interactions", () => {
   });
 
   it("fires onLongPressCell with the snapped time when create is off", async () => {
-    const onLongPressCell = jest.fn();
+    const onLongPressCell = vi.fn();
     const { getAllByTestId } = await render(
       <ResourceTimeline
         date={at(0)}
@@ -431,7 +432,7 @@ describe("ResourceTimeline cell interactions", () => {
   });
 
   it("suppresses onLongPressCell when onCreateEvent is set (long-press starts the create drag)", async () => {
-    const onLongPressCell = jest.fn();
+    const onLongPressCell = vi.fn();
     const { getAllByTestId } = await render(
       <ResourceTimeline
         date={at(0)}
@@ -439,7 +440,7 @@ describe("ResourceTimeline cell interactions", () => {
         events={events}
         startHour={8}
         hourWidth={80}
-        onCreateEvent={jest.fn()}
+        onCreateEvent={vi.fn()}
         onLongPressCell={onLongPressCell}
       />,
     );
@@ -543,7 +544,7 @@ describe("ResourceTimeline resource paging", () => {
 
 describe("ResourceTimeline cross-lane drag", () => {
   it("retargets the resource via the cross-lane screen-reader action, keeping the time", async () => {
-    const onDragEvent = jest.fn();
+    const onDragEvent = vi.fn();
     const { getByLabelText } = await render(
       <ResourceTimeline
         date={at(0)}

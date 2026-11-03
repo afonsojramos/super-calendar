@@ -5,7 +5,7 @@ import type {
   ReactElement,
   ReactNode,
 } from "react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   backgroundBandsForDay,
   type BusinessHoursBand,
@@ -170,10 +170,10 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 // Hour-gutter width in the vertical orientation, matching the time grid's axis.
 const GUTTER_WIDTH = 56;
 
-type DragState = {
-  key: string;
-  /** The lane the drag started in, so its row can be lifted while dragging. */
-  resourceId: string;
+type DragState<T> = {
+  pointerId: number;
+  event: CalendarEvent<T>;
+  resource: Resource;
   kind: "move" | "resize";
   startHours: number;
   durationHours: number;
@@ -335,9 +335,11 @@ export function ResourceTimeline<T = unknown>({
 
   // `drag` drives the visual; `dragRef` is the source of truth the pointer
   // handlers read so they never see a stale closure between events.
-  const [drag, setDrag] = useState<DragState | null>(null);
-  const dragRef = useRef<DragState | null>(null);
+  const [drag, setDrag] = useState<DragState<T> | null>(null);
+  const dragRef = useRef<DragState<T> | null>(null);
+  const handledClick = useRef<HTMLButtonElement | null>(null);
   const origin = useRef<{
+    element: HTMLButtonElement;
     x: number;
     cross: number;
     startHours: number;
@@ -346,27 +348,49 @@ export function ResourceTimeline<T = unknown>({
     // for a bar clipped to the day.
     span: { start: Date; end: Date } | null;
   } | null>(null);
-  const applyDrag = (next: DragState | null) => {
+  const applyDrag = (next: DragState<T> | null) => {
     dragRef.current = next;
     setDrag(next);
+  };
+  const clearDrag = () => {
+    const previous = dragRef.current;
+    const element = origin.current?.element;
+    applyDrag(null);
+    origin.current = null;
+    try {
+      if (previous) element?.releasePointerCapture?.(previous.pointerId);
+    } catch {
+      // The browser may have already released capture.
+    }
   };
 
   const beginDrag = (
     e: ReactPointerEvent,
-    key: string,
-    resourceId: string,
+    resource: Resource,
     kind: "move" | "resize",
     pe: PositionedEvent<T>,
   ) => {
     const { startHours, durationHours } = pe;
-    if (!onDragEvent) return;
+    if (e.button === 0 && e.isPrimary !== false && !dragRef.current) handledClick.current = null;
+    if (
+      !onDragEvent ||
+      pe.event.draggable === false ||
+      dragRef.current ||
+      createOrigin.current ||
+      e.isPrimary === false ||
+      e.button !== 0
+    )
+      return;
+    const element = e.currentTarget.closest("button");
+    if (!element) return;
     e.stopPropagation();
     try {
-      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      element.setPointerCapture?.(e.pointerId);
     } catch {
       // Pointer capture is best-effort.
     }
     origin.current = {
+      element,
       x: vertical ? e.clientY : e.clientX,
       cross: vertical ? e.clientX : e.clientY,
       startHours,
@@ -376,11 +400,20 @@ export function ResourceTimeline<T = unknown>({
           ? null
           : { start: pe.event.start, end: pe.event.end },
     };
-    applyDrag({ key, resourceId, kind, startHours, durationHours, crossPx: 0, moved: false });
+    applyDrag({
+      pointerId: e.pointerId,
+      event: pe.event,
+      resource,
+      kind,
+      startHours,
+      durationHours,
+      crossPx: 0,
+      moved: false,
+    });
   };
   const moveDrag = (e: ReactPointerEvent) => {
     const d = dragRef.current;
-    if (!d || !origin.current) return;
+    if (!d || d.pointerId !== e.pointerId || !origin.current) return;
     const dHours = ((vertical ? e.clientY : e.clientX) - origin.current.x) / hourSize;
     const snap = (v: number) => Math.round(v / snapHours) * snapHours;
     if (d.kind === "move") {
@@ -434,22 +467,18 @@ export function ResourceTimeline<T = unknown>({
     const id = laneEl?.getAttribute("data-resource-id");
     return (id && resources.find((r) => r.id === id)) || fallback;
   };
-  const endDrag = (
-    e: ReactPointerEvent,
-    event: CalendarEvent<T>,
-    resource: Resource,
-    onPress: () => void,
-  ) => {
+  const endDrag = (e: ReactPointerEvent) => {
     const d = dragRef.current;
-    if (!d) return;
-    try {
-      (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
-    } catch {
-      // Best-effort release.
-    }
+    if (!d || d.pointerId !== e.pointerId) return;
+    handledClick.current = origin.current?.element ?? null;
     if (!d.moved) {
-      applyDrag(null);
-      onPress();
+      clearDrag();
+      onPressEvent?.(d.event);
+      return;
+    }
+    const resource = resources.find((resource) => resource.id === d.resource.id);
+    if (!resource) {
+      clearDrag();
       return;
     }
     const target = d.kind === "move" ? laneAt(e, resource) : resource;
@@ -462,19 +491,19 @@ export function ResourceTimeline<T = unknown>({
     const endDelta =
       d.kind === "move" ? startDelta : o ? Math.round((d.durationHours - o.durationHours) * 60) : 0;
     const next = resolveDraggedBounds(
-      event.start,
-      event.end,
+      d.event.start,
+      d.event.end,
       startDelta,
       endDelta,
       dragStepMinutes,
     );
-    if (next) onDragEvent?.(event, next.start, next.end, target);
-    applyDrag(null);
-    origin.current = null;
+    clearDrag();
+    if (next) onDragEvent?.(d.event, next.start, next.end, target);
   };
-  const cancelDrag = () => {
-    applyDrag(null);
-    origin.current = null;
+  const cancelDrag = (e: ReactPointerEvent) => {
+    if (dragRef.current?.pointerId !== e.pointerId) return;
+    handledClick.current = origin.current?.element ?? null;
+    clearDrag();
   };
 
   // Create-by-drag / tap on empty lane space, mirroring the time grid: mouse and
@@ -485,9 +514,22 @@ export function ResourceTimeline<T = unknown>({
     startPx: number;
     curPx: number;
   } | null>(null);
-  const createOrigin = useRef<{ el: HTMLElement; resource: Resource; startPx: number } | null>(
-    null,
-  );
+  const createOrigin = useRef<{
+    pointerId: number;
+    el: HTMLElement;
+    resource: Resource;
+    startPx: number;
+  } | null>(null);
+  const clearCreate = () => {
+    const previous = createOrigin.current;
+    createOrigin.current = null;
+    setCreateBox(null);
+    try {
+      previous?.el.releasePointerCapture?.(previous.pointerId);
+    } catch {
+      // The browser may have already released capture.
+    }
+  };
   const cellEnabled = !!onPressCell || !!onCreateEvent;
   const pxAlongAxis = (el: HTMLElement, e: ReactPointerEvent) => {
     const rect = el.getBoundingClientRect();
@@ -495,7 +537,14 @@ export function ResourceTimeline<T = unknown>({
   };
   const beginCreate = (e: ReactPointerEvent, resource: Resource) => {
     // Only from the lane background, primary button, never on an event bar.
-    if (!cellEnabled || e.pointerType === "touch") return;
+    if (
+      !cellEnabled ||
+      e.pointerType === "touch" ||
+      e.isPrimary === false ||
+      createOrigin.current ||
+      dragRef.current
+    )
+      return;
     if (e.target !== e.currentTarget || e.button > 0) return;
     const el = e.currentTarget as HTMLElement;
     const startPx = pxAlongAxis(el, e);
@@ -504,29 +553,27 @@ export function ResourceTimeline<T = unknown>({
     } catch {
       // Best-effort capture.
     }
-    createOrigin.current = { el, resource, startPx };
+    createOrigin.current = { pointerId: e.pointerId, el, resource, startPx };
     // Only preview a ghost when a create can happen; in press-only mode
     // (onPressCell without onCreateEvent) the tap still commits via endCreate.
     if (onCreateEvent) setCreateBox({ resourceKey: resource.id, startPx, curPx: startPx });
   };
   const moveCreate = (e: ReactPointerEvent) => {
     const o = createOrigin.current;
-    if (!o || !onCreateEvent) return;
+    if (!o || o.pointerId !== e.pointerId || !onCreateEvent) return;
     setCreateBox({ resourceKey: o.resource.id, startPx: o.startPx, curPx: pxAlongAxis(o.el, e) });
   };
   const endCreate = (e: ReactPointerEvent) => {
     const o = createOrigin.current;
-    if (!o) return;
-    try {
-      o.el.releasePointerCapture?.(e.pointerId);
-    } catch {
-      // Best-effort release.
-    }
+    if (!o || o.pointerId !== e.pointerId) return;
     const endPx = pxAlongAxis(o.el, e);
     const moved = Math.abs(endPx - o.startPx) > 4;
+    clearCreate();
+    const resource = resources.find((resource) => resource.id === o.resource.id);
+    if (!resource) return;
     if (moved && onCreateEvent) {
       const range = cellRangeFromDrag(date, o.startPx, endPx, hourSize, startHour, dragStepMinutes);
-      if (range) onCreateEvent(range.start, range.end, o.resource);
+      if (range) onCreateEvent(range.start, range.end, resource);
     } else if (onPressCell) {
       const at = cellRangeFromDrag(
         date,
@@ -536,25 +583,56 @@ export function ResourceTimeline<T = unknown>({
         startHour,
         dragStepMinutes,
       );
-      if (at) onPressCell(at.start, o.resource);
+      if (at) onPressCell(at.start, resource);
     }
-    createOrigin.current = null;
-    setCreateBox(null);
   };
   // A gesture the browser cancels (scroll takeover, etc.) must not commit.
-  const cancelCreate = () => {
-    createOrigin.current = null;
-    setCreateBox(null);
+  const cancelCreate = (e: ReactPointerEvent) => {
+    if (createOrigin.current?.pointerId !== e.pointerId) return;
+    clearCreate();
   };
-  const trackInteractionProps = (resource: Resource) =>
-    cellEnabled
-      ? {
-          onPointerDown: (e: ReactPointerEvent) => beginCreate(e, resource),
-          onPointerMove: moveCreate,
-          onPointerUp: endCreate,
-          onPointerCancel: cancelCreate,
-        }
-      : null;
+  const trackInteractionProps = (resource: Resource) => ({
+    onPointerDown: (e: ReactPointerEvent) => beginCreate(e, resource),
+    onPointerMove: moveCreate,
+    onPointerUp: endCreate,
+    onPointerCancel: cancelCreate,
+    onLostPointerCapture: cancelCreate,
+  });
+  useEffect(() => {
+    if (
+      dragRef.current &&
+      (!origin.current?.element.isConnected || !events.includes(dragRef.current.event))
+    )
+      clearDrag();
+    if (createOrigin.current && !createOrigin.current.el.isConnected) clearCreate();
+  });
+  useEffect(
+    () => () => {
+      const captured = origin.current;
+      const currentDrag = dragRef.current;
+      const currentCreate = createOrigin.current;
+      origin.current = null;
+      dragRef.current = null;
+      createOrigin.current = null;
+      try {
+        if (currentDrag) captured?.element.releasePointerCapture?.(currentDrag.pointerId);
+        currentCreate?.el.releasePointerCapture?.(currentCreate.pointerId);
+      } catch {
+        // Removing a captured element may already have released it.
+      }
+    },
+    [],
+  );
+  const eventKeys = useRef(new WeakMap<CalendarEvent<T>, number>());
+  const nextEventKey = useRef(0);
+  const eventKey = (event: CalendarEvent<T>) => {
+    let key = eventKeys.current.get(event);
+    if (key === undefined) {
+      key = nextEventKey.current++;
+      eventKeys.current.set(event, key);
+    }
+    return key;
+  };
   // The closed-hours bands to shade in a lane, resolved per resource.
   const bandsFor = (resource: Resource) =>
     businessHours
@@ -591,7 +669,7 @@ export function ResourceTimeline<T = unknown>({
 
   // The lane a move is dragging in, lifted above its siblings so the ghost
   // stays visible as it crosses into another lane (a later DOM sibling).
-  const dragLaneId = drag?.kind === "move" && drag.moved ? drag.resourceId : null;
+  const dragLaneId = drag?.kind === "move" && drag.moved ? drag.resource.id : null;
 
   if (vertical) {
     // Time flows down like the time grid: hour gutter on the left, one flexed
@@ -736,9 +814,10 @@ export function ResourceTimeline<T = unknown>({
                       themed: { backgroundImage: vGridLines },
                     })}
                   />
-                  {positioned.map((pe, idx) => {
-                    const key = `${resource.id}:${idx}`;
-                    const active = drag?.key === key ? drag : null;
+                  {positioned.map((pe) => {
+                    const key = eventKey(pe.event);
+                    const active =
+                      drag?.event === pe.event && drag.resource.id === resource.id ? drag : null;
                     const startH = active ? active.startHours : pe.startHours;
                     const durH = active ? active.durationHours : pe.durationHours;
                     const top = clamp(startH - startHour, 0, endHour - startHour) * hourHeight;
@@ -758,19 +837,22 @@ export function ResourceTimeline<T = unknown>({
                     const draggable = !!onDragEvent && pe.event.draggable !== false;
                     return (
                       <button
-                        key={idx}
+                        key={key}
                         type="button"
-                        onClick={draggable ? undefined : onPress}
+                        onClick={(e) => {
+                          if (e.detail !== 0 && handledClick.current === e.currentTarget) {
+                            handledClick.current = null;
+                            return;
+                          }
+                          if (!draggable || e.detail === 0) onPress();
+                        }}
                         aria-label={pe.event.title}
                         {...dataState({ "data-dragging": !!active })}
-                        onPointerDown={
-                          draggable ? (e) => beginDrag(e, key, resource.id, "move", pe) : undefined
-                        }
-                        onPointerMove={draggable ? moveDrag : undefined}
-                        onPointerUp={
-                          draggable ? (e) => endDrag(e, pe.event, resource, onPress) : undefined
-                        }
-                        onPointerCancel={draggable ? cancelDrag : undefined}
+                        onPointerDown={(e) => beginDrag(e, resource, "move", pe)}
+                        onPointerMove={moveDrag}
+                        onPointerUp={endDrag}
+                        onPointerCancel={cancelDrag}
+                        onLostPointerCapture={cancelDrag}
                         {...slot("event", {
                           base: {
                             position: "absolute",
@@ -805,7 +887,7 @@ export function ResourceTimeline<T = unknown>({
                             aria-hidden
                             onPointerDown={(e) => {
                               e.stopPropagation();
-                              beginDrag(e, key, resource.id, "resize", pe);
+                              beginDrag(e, resource, "resize", pe);
                             }}
                             style={{
                               position: "absolute",
@@ -976,9 +1058,10 @@ export function ResourceTimeline<T = unknown>({
                     themed: { backgroundImage: gridLines },
                   })}
                 />
-                {positioned.map((pe, idx) => {
-                  const key = `${resource.id}:${idx}`;
-                  const active = drag?.key === key ? drag : null;
+                {positioned.map((pe) => {
+                  const key = eventKey(pe.event);
+                  const active =
+                    drag?.event === pe.event && drag.resource.id === resource.id ? drag : null;
                   const startH = active ? active.startHours : pe.startHours;
                   const durH = active ? active.durationHours : pe.durationHours;
                   const left = clamp(startH - startHour, 0, endHour - startHour) * hourWidth;
@@ -989,22 +1072,25 @@ export function ResourceTimeline<T = unknown>({
                   const laneHeight = rowHeight / pe.columns;
                   const onPress = () => onPressEvent?.(pe.event);
                   const args: ResourceEventArgs<T> = { event: pe.event, width, onPress };
-                  const draggable = !!onDragEvent;
+                  const draggable = !!onDragEvent && pe.event.draggable !== false;
                   return (
                     <button
-                      key={idx}
+                      key={key}
                       type="button"
-                      onClick={draggable ? undefined : onPress}
+                      onClick={(e) => {
+                        if (e.detail !== 0 && handledClick.current === e.currentTarget) {
+                          handledClick.current = null;
+                          return;
+                        }
+                        if (!draggable || e.detail === 0) onPress();
+                      }}
                       aria-label={pe.event.title}
                       {...dataState({ "data-dragging": !!active })}
-                      onPointerDown={
-                        draggable ? (e) => beginDrag(e, key, resource.id, "move", pe) : undefined
-                      }
-                      onPointerMove={draggable ? moveDrag : undefined}
-                      onPointerUp={
-                        draggable ? (e) => endDrag(e, pe.event, resource, onPress) : undefined
-                      }
-                      onPointerCancel={draggable ? cancelDrag : undefined}
+                      onPointerDown={(e) => beginDrag(e, resource, "move", pe)}
+                      onPointerMove={moveDrag}
+                      onPointerUp={endDrag}
+                      onPointerCancel={cancelDrag}
+                      onLostPointerCapture={cancelDrag}
                       {...slot("event", {
                         base: {
                           position: "absolute",
@@ -1037,7 +1123,7 @@ export function ResourceTimeline<T = unknown>({
                           aria-hidden
                           onPointerDown={(e) => {
                             e.stopPropagation();
-                            beginDrag(e, key, resource.id, "resize", pe);
+                            beginDrag(e, resource, "resize", pe);
                           }}
                           style={{
                             position: "absolute",

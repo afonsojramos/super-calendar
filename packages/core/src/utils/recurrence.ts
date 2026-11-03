@@ -71,7 +71,8 @@ function* occurrenceStarts(
   let emitted = 0;
   const consider = (date: Date): "skip" | "stop" | "emit" => {
     if (date.getTime() < start.getTime()) return "skip"; // before the first occurrence
-    if (date.getTime() > rangeEnd.getTime()) return "stop";
+    // A large interval can advance beyond Date's representable range (NaN).
+    if (!(date.getTime() <= rangeEnd.getTime())) return "stop";
     if (rule.until != null && date.getTime() > rule.until.getTime()) return "stop";
     if (rule.count != null && produced >= rule.count) return "stop";
     produced += 1;
@@ -85,18 +86,15 @@ function* occurrenceStarts(
     const weekdays = [...new Set(rule.weekdays)].sort((a, b) => a - b);
     let weekStart = startOfWeek(start, { weekStartsOn: 0 });
     while (true) {
-      let advanced = false;
       for (const weekday of weekdays) {
         const date = withTimeOf(addDays(weekStart, weekday), start);
         const verdict = consider(date);
         if (verdict === "stop") return;
         if (verdict === "skip") continue;
-        advanced = true;
         yield date;
       }
       const nextWeek = addWeeks(weekStart, interval);
-      // Guard against a week that yielded nothing yet hasn't reached the range.
-      if (!advanced && nextWeek.getTime() > rangeEnd.getTime()) return;
+      if (!(nextWeek.getTime() <= rangeEnd.getTime())) return;
       weekStart = nextWeek;
     }
   }
@@ -122,7 +120,7 @@ function* occurrenceStarts(
       year += Math.floor(month / 12);
       month = ((month % 12) + 12) % 12;
       // No occurrence yielded yet but we've run past the range: stop.
-      if (new Date(year, month, 1).getTime() > rangeEnd.getTime()) return;
+      if (!(new Date(year, month, 1).getTime() <= rangeEnd.getTime())) return;
     }
   }
 
@@ -143,7 +141,7 @@ function* occurrenceStarts(
       year += Math.floor(month / 12);
       month = ((month % 12) + 12) % 12;
       // No occurrence yielded yet but we've run past the range: stop.
-      if (new Date(year, month, 1).getTime() > rangeEnd.getTime()) return;
+      if (!(new Date(year, month, 1).getTime() <= rangeEnd.getTime())) return;
     }
   }
 
@@ -163,7 +161,7 @@ function* occurrenceStarts(
         yield date;
       }
       year += interval;
-      if (new Date(year, 0, 1).getTime() > rangeEnd.getTime()) return;
+      if (!(new Date(year, 0, 1).getTime() <= rangeEnd.getTime())) return;
     }
   }
 
@@ -188,7 +186,7 @@ function* occurrenceStarts(
     if (rule.count != null && n >= rule.count) return;
     if (emitted >= MAX_OCCURRENCES) return;
     const date = occAt(n);
-    if (date.getTime() > rangeEnd.getTime()) return;
+    if (!(date.getTime() <= rangeEnd.getTime())) return;
     if (rule.until != null && date.getTime() > rule.until.getTime()) return;
     emitted += 1;
     n += 1;
@@ -253,7 +251,8 @@ export function expandRecurringEvents<T>(
       // Skip occurrences that end before the range opens, but keep iterating.
       if (start.getTime() + durationMs < rangeStart.getTime()) continue;
       if (excludedDays.has(dayKey(start)) || excludedInstants.has(start.getTime())) continue;
-      out.push(instanceAt(event, start, durationMs));
+      const instance = instanceAt(event, start, durationMs);
+      if (Number.isFinite(instance.end.getTime())) out.push(instance);
     }
   }
   return out;

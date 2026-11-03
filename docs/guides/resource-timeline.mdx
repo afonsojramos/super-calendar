@@ -4,9 +4,10 @@ description: A one-day timeline with a lane per resource (room, person, machine)
 ---
 
 <Note>
-  Available on **both renderers**, including drag-to-move and edge-resize via `onDragEvent`. The web
-  renderer (`@super-calendar/dom`) adds per-slot class styling; the React Native renderer
-  (`@super-calendar/native`) styles via `theme.containers`. Import from the package you're using.
+  Available on **React DOM, Solid, and React Native**, including drag-to-move and edge-resize via
+  `onDragEvent`. The web renderer (`@super-calendar/dom`) adds per-slot class styling; the React
+  Native renderer (`@super-calendar/native`) styles via `theme.containers`. Import from the package
+  you're using.
 </Note>
 
 `ResourceTimeline` lays a single day out horizontally: each **resource** is a row,
@@ -136,6 +137,12 @@ lane when it didn't cross); retarget the event's resource from that fourth
 argument. Return `false` to reject the drop (the bar snaps back). Movement snaps
 to `dragStepMinutes` (default 15). Only the currently visible lanes are drop
 targets, so cap a long list with `resourcesPerPage` and page through it.
+
+In React DOM and Solid, `draggable: false` prevents moving and resizing while
+preserving event activation. Enter and Space activate a focused event button.
+An active gesture keeps its original event when other events or lanes are
+reordered. Removing that event or its lane, losing pointer capture, or unmounting
+the board cancels the gesture without committing it.
 
 To keep the board time-only, reject any lane change: compare the dropped
 `resource.id` to the event's current one and `return false` when they differ.

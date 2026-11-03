@@ -31,3 +31,6 @@ export * from "./utils/layout";
 export * from "./utils/monthGrid";
 export * from "./utils/recurrence";
 export * from "./utils/timezone";
+export * from "./utils/useDateRange";
+export * from "./utils/useMonthGrid";
+export * from "./utils/eventSource";

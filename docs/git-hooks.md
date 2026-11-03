@@ -21,6 +21,6 @@ mise exec -- hk check --all
 mise exec -- hk fix
 ```
 
-The pre-commit hook stashes unstaged and untracked work, checks the staged snapshot, and restores the saved work. It runs the existing whole-project formatting, lint, types, and Jest tests; it does not auto-fix files.
+The pre-commit hook stashes unstaged and untracked work, checks the staged snapshot, and restores the saved work. It runs the existing whole-project formatting, lint, types, and Vitest tests with the shared React/Solid parity gate; it does not auto-fix files.
 
 If restoring unstaged work fails, follow hk's recovery message and inspect the index, working tree, and saved stash before continuing.

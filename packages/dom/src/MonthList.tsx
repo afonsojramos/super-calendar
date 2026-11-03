@@ -1,6 +1,6 @@
 import { LegendList } from "@legendapp/list/react";
 import { addMonths, type Locale, startOfMonth } from "date-fns";
-import { type CSSProperties, type ReactElement, useMemo } from "react";
+import { type CSSProperties, type ReactElement, useCallback, useMemo } from "react";
 import {
   buildMonthGrid,
   type CalendarEvent,
@@ -154,10 +154,66 @@ export function MonthList<T = unknown>({
     return map;
   }, [events]);
 
-  // Cached rows refresh when selection, events, or chip dimensions change.
-  const extraData = useMemo(
-    () => [selectedRange, selectedDates, events, chipHeight, chipGap] as const,
-    [selectedRange, selectedDates, events, chipHeight, chipGap],
+  const renderMonth = useCallback(
+    ({ item }: { item: Date }) => (
+      <MonthView<T>
+        date={item}
+        weekStartsOn={weekStartsOn}
+        highlightWeekends={highlightWeekends}
+        events={events}
+        eventsByDay={eventsByDay}
+        renderEvent={renderEvent}
+        eventAccessibilityLabel={eventAccessibilityLabel}
+        maxVisibleEventCount={maxVisibleEventCount}
+        chipHeight={chipHeight}
+        chipGap={chipGap}
+        moreLabel={moreLabel}
+        labels={labels}
+        onPressEvent={onPressEvent}
+        onPressMore={onPressMore}
+        selectedRange={selectedRange}
+        selectedDates={selectedDates}
+        fillCellOnSelection={fillCellOnSelection}
+        showAdjacentMonths={false}
+        showWeekdays={false}
+        locale={locale}
+        theme={themeOverrides}
+        minDate={minDate}
+        maxDate={maxDate}
+        isDateDisabled={isDateDisabled}
+        keyboardDayNavigation={keyboardDayNavigation}
+        onPressDay={onPressDay}
+        classNames={classNames}
+        styles={styles}
+      />
+    ),
+    [
+      weekStartsOn,
+      highlightWeekends,
+      events,
+      eventsByDay,
+      renderEvent,
+      eventAccessibilityLabel,
+      maxVisibleEventCount,
+      chipHeight,
+      chipGap,
+      moreLabel,
+      labels,
+      onPressEvent,
+      onPressMore,
+      selectedRange,
+      selectedDates,
+      fillCellOnSelection,
+      locale,
+      themeOverrides,
+      minDate,
+      maxDate,
+      isDateDisabled,
+      keyboardDayNavigation,
+      onPressDay,
+      classNames,
+      styles,
+    ],
   );
 
   return (
@@ -189,7 +245,8 @@ export function MonthList<T = unknown>({
       </div>
       <LegendList
         data={months}
-        extraData={extraData}
+        // Legend List caches rows independently of renderItem's identity.
+        extraData={renderMonth}
         keyExtractor={(m: Date) => m.toISOString()}
         recycleItems={false}
         estimatedItemSize={theme.cellHeight * 7 + 40}
@@ -197,38 +254,7 @@ export function MonthList<T = unknown>({
         // `months` starts `pastMonths` before the anchor, so it sits at that index.
         initialScrollIndex={pastMonths}
         style={{ height, overflowY: "auto" }}
-        renderItem={({ item }: { item: Date }) => (
-          <MonthView<T>
-            date={item}
-            weekStartsOn={weekStartsOn}
-            highlightWeekends={highlightWeekends}
-            events={events}
-            eventsByDay={eventsByDay}
-            renderEvent={renderEvent}
-            eventAccessibilityLabel={eventAccessibilityLabel}
-            maxVisibleEventCount={maxVisibleEventCount}
-            chipHeight={chipHeight}
-            chipGap={chipGap}
-            moreLabel={moreLabel}
-            labels={labels}
-            onPressEvent={onPressEvent}
-            onPressMore={onPressMore}
-            selectedRange={selectedRange}
-            selectedDates={selectedDates}
-            fillCellOnSelection={fillCellOnSelection}
-            showAdjacentMonths={false}
-            showWeekdays={false}
-            locale={locale}
-            theme={themeOverrides}
-            minDate={minDate}
-            maxDate={maxDate}
-            isDateDisabled={isDateDisabled}
-            keyboardDayNavigation={keyboardDayNavigation}
-            onPressDay={onPressDay}
-            classNames={classNames}
-            styles={styles}
-          />
-        )}
+        renderItem={renderMonth}
       />
     </div>
   );

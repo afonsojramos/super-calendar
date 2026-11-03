@@ -1,16 +1,17 @@
+import { vi } from "vitest";
 import { LegendList } from "@legendapp/list/react-native";
-import { act } from "@testing-library/react-native";
+import { act, fireEvent } from "@testing-library/react-native";
 import { createRef } from "react";
 import type { CalendarHandle } from "@super-calendar/core";
 import { RefreshControl } from "react-native";
-import { render } from "./renderGrid";
+import { render } from "../../../../../tests/support/native-time-grid";
 import type { CalendarEvent } from "../../types";
 
-// The real LegendList can't lay out under Jest (no measured dimensions). This
+// The real LegendList can't lay out in the test renderer (no measured dimensions). This
 // stand-in renders the active page through `renderItem` so page content mounts.
-jest.mock("@legendapp/list/react-native", () => ({
+vi.mock("@legendapp/list/react-native", () => ({
   __esModule: true,
-  LegendList: jest.fn((props: any) => {
+  LegendList: vi.fn((props: any) => {
     const index = props.initialScrollIndex ?? 0;
     const item = props.data?.[index];
     return item === undefined ? null : props.renderItem({ item, index });
@@ -69,13 +70,12 @@ describe("Calendar recurrence + timeZone", () => {
 });
 
 describe("Calendar screen-reader event actions", () => {
-  const { fireEvent } = require("@testing-library/react-native");
   const events: CalendarEvent[] = [
     { title: "Standup", start: new Date(2026, 0, 6, 9, 0), end: new Date(2026, 0, 6, 10, 0) },
   ];
 
   it("exposes move/resize actions on a draggable event and reschedules via them", async () => {
-    const onDragEvent = jest.fn();
+    const onDragEvent = vi.fn();
     const { getByLabelText } = await render(
       <Calendar
         mode="day"
@@ -184,7 +184,7 @@ describe("Calendar refreshControl", () => {
         onPressEvent={noop}
       />,
     );
-    const listProps = jest.mocked(LegendList).mock.calls.at(-1)?.[0];
+    const listProps = vi.mocked(LegendList).mock.calls.at(-1)?.[0];
     expect(listProps?.recycleItems).toBe(false);
     expect(listProps?.refreshControl).toBe(control);
   });

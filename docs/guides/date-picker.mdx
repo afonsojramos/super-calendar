@@ -4,12 +4,13 @@ description: Shipped DatePicker and DateRangePicker inputs, or compose your own 
 ---
 
 <Note>
-  These are **web renderer** (`@super-calendar/dom`) components. On React Native, compose a picker
-  from `MonthList` + `useDateRange` (the same primitives shown below).
+  These are **web renderer** (`@super-calendar/dom` and `@super-calendar/solid`) components. The
+  examples below use React. On React Native, compose a picker from `MonthList` + `useDateRange` (the
+  same primitives shown below).
 </Note>
 
 super-calendar ships two controlled popover inputs, `DatePicker` and
-`DateRangePicker` — and, because both are just thin shells over `MonthList`, you can
+`DateRangePicker`. Both wrap `MonthList`, so you can
 build your own if you need different chrome.
 
 ## DatePicker
@@ -45,7 +46,13 @@ Both accept `minDate` / `maxDate` / `isDateDisabled`, a `placeholder`, `disabled
 a `formatLabel` for the trigger text, and the calendar `theme`. They close on
 outside-click and `Escape`, and return focus to the trigger.
 
+Setting `disabled` closes an open popover and prevents date changes. Re-enabling
+the field leaves the popover closed until you open it again.
+
 ## Styling
+
+The `theme` applies to both the picker chrome and its calendar. Theme changes
+update the open calendar, and per-slot `styles` take precedence over theme values.
 
 The picker chrome has its own slots (`trigger`, `popover`, `footer`, `clear`), and
 any [calendar slot](/guides/styling) you pass through `classNames` reaches the

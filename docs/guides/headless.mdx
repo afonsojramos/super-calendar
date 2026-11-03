@@ -3,17 +3,26 @@ title: Headless core
 description: Build a fully custom calendar from @super-calendar/core's pure logic.
 ---
 
-`@super-calendar/core` is the render-agnostic engine both renderers are built on:
+`@super-calendar/core` is the shared engine the renderers are built on:
 date math, the selection model, event layout, recurrence, time-zone conversion,
 and the neutral theme tokens. Reach for it directly only when you want entirely
 custom UI. Most apps use the [native](/quickstart) or
-[react-dom](/guides/dom) components, which already wrap all of this.
+[react-dom](/guides/dom) or [Solid](/guides/solid) components, which already wrap all of this.
 
 ```bash
 npm install @super-calendar/core date-fns
 ```
 
-`react` is a peer dependency too, for the hooks; the pure functions work without it.
+`react` is an optional peer dependency. The root entry imports React for its
+hooks. Import `@super-calendar/core/vanilla` when you need pure functions without
+React, including on a server or in a Solid app:
+
+```ts
+import { buildMonthGrid, layoutDayEvents, nextDateRange } from "@super-calendar/core/vanilla";
+```
+
+The vanilla entry exports the pure core types and helpers, excluding React hooks
+and providers. Existing `@super-calendar/core` imports continue to work.
 
 ## Month grid
 

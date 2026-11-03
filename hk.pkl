@@ -13,7 +13,7 @@ steps {
     depends = "lint"
   }
   ["test"] {
-    check = "pnpm run test --runInBand"
+    check = "pnpm run test:parity"
     depends = "typecheck"
   }
 }

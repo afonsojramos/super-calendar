@@ -6,7 +6,7 @@
   "packages": {
     ".": {
       "component": "super-calendar",
-      "exclude-paths": ["examples", "docs", "scripts", ".github"],
+      "exclude-paths": ["examples", "docs", "scripts", ".github", "packages/solid"],
       "extra-files": [
         { "type": "json", "path": "packages/core/package.json", "jsonpath": "$.version" },
         { "type": "json", "path": "packages/core/jsr.json", "jsonpath": "$.version" },
@@ -15,6 +15,13 @@
         { "type": "json", "path": "packages/native/package.json", "jsonpath": "$.version" },
         { "type": "json", "path": "packages/native/jsr.json", "jsonpath": "$.version" }
       ]
+    },
+    "packages/solid": {
+      "component": "solid",
+      "include-component-in-tag": true,
+      "versioning": "prerelease",
+      "prerelease-type": "experimental",
+      "prerelease": true
     }
   }
 }

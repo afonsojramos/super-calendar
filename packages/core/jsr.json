@@ -3,7 +3,10 @@
   "version": "2.15.0",
   "description": "Render-agnostic core for super-calendar: date math, selection model, event layout, the month-grid builder, headless hooks, and neutral theme tokens. No renderer.",
   "license": "MIT",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vanilla": "./src/vanilla.ts"
+  },
   "imports": {
     "date-fns": "npm:date-fns@^4",
     "react": "npm:react@^19"

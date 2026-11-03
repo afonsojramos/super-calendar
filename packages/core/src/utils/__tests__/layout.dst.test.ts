@@ -1,7 +1,6 @@
-/**
- * @jest-environment ./tests/timezone-environment.js
- * @jest-environment-options {"timeZone": "America/New_York"}
- */
+/** @vitest-environment jsdom */
+import { useTimeZone } from "../../../../../tests/support/timezone";
+useTimeZone("America/New_York");
 import { cellRangeFromDrag, movedClockSpan, resolveDraggedBounds, shiftMinutes } from "../drag";
 import {
   backgroundBandsForDay,

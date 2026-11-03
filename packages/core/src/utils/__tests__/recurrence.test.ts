@@ -10,6 +10,21 @@ const base: CalendarEvent = {
 };
 
 describe("expandRecurringEvents", () => {
+  it("omits occurrences whose end would exceed Date's representable range", () => {
+    const limit = 8_640_000_000_000_000;
+    const day = 86_400_000;
+    const event: CalendarEvent = {
+      start: new Date(limit - 2 * day),
+      end: new Date(limit - day),
+      recurrence: { freq: "daily" },
+    };
+    const result = expandRecurringEvents([event], event.start, new Date(limit));
+    expect(result.map(({ start, end }) => [start.getTime(), end.getTime()])).toEqual([
+      [limit - 2 * day, limit - day],
+      [limit - day, limit],
+    ]);
+  });
+
   it("passes non-recurring events through untouched", () => {
     const result = expandRecurringEvents([base], at(2026, 0, 1), at(2026, 11, 31));
     expect(result).toEqual([base]);

@@ -1,16 +1,17 @@
+import { useMemo } from "react";
+import { vi } from "vitest";
 import { render } from "@testing-library/react-native";
 import type { CalendarEvent } from "../../types";
 
 // Capture the props handed to the virtualized list, and render only the active
-// page through `renderItem`. The real LegendList can't lay out under Jest (no
+// page through `renderItem`. The real LegendList can't lay out in the test renderer (no
 // measured dimensions), so it never mounts page content; this stand-in does,
 // while still exposing the props we assert on.
 const lastListProps = () => (globalThis as { __listProps?: Record<string, unknown> }).__listProps;
-jest.mock("@legendapp/list/react-native", () => ({
+vi.mock("@legendapp/list/react-native", () => ({
   __esModule: true,
   LegendList: (props: any) => {
     (globalThis as any).__listProps = props;
-    const { useMemo } = jest.requireActual<typeof import("react")>("react");
     return useMemo(() => {
       const index = props.initialScrollIndex ?? 0;
       const item = props.data?.[index];

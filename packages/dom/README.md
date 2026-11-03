@@ -52,6 +52,14 @@ export function MyCalendar() {
 
 For a custom picker, pair the headless hooks (`useDateRange`, `useMonthGrid`) with `MonthList` and `TimeGrid`, all re-exported from this package.
 
+`DatePicker` and `DateRangePicker` apply `theme` to both the popover chrome and
+the calendar inside it. Theme updates apply while open, and per-slot styles take
+precedence. Setting `disabled` closes an open popover; re-enabling the field
+leaves it closed until you open it again.
+
+`MonthList` applies callback, date-constraint, theme, and slot updates to mounted
+months, including when `date` and `events` keep the same references.
+
 ## Touch event gestures
 
 Touch and pen on `TimeGrid` wait for a 300 ms hold within 8 px before dragging.
@@ -72,6 +80,11 @@ See the [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging)
 On the time grid, dragging any segment of a multi-day event previews the whole
 range moving together and preserves its duration. Drag a resize grip to change
 only the start or end. See the [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
+
+`ResourceTimeline` supports keyboard event activation in both orientations.
+`draggable: false` keeps an event clickable while preventing moves and resizes.
+Active gestures retain the original event through live insertions and reordering;
+removing the event or lane, losing capture, or unmounting cancels the gesture.
 
 ## Month chip dimensions
 

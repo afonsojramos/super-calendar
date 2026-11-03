@@ -1,11 +1,13 @@
+import { useMemo } from "react";
+import { vi } from "vitest";
 import type { ReactNode } from "react";
 import { StyleSheet } from "react-native";
 import type { CalendarEvent } from "../../types";
-import { render } from "./renderGrid";
+import { render } from "../../../../../tests/support/native-time-grid";
 
-// Jest cannot measure LegendList pages. Preserve its content cache so prop-only
+// The test renderer cannot measure LegendList pages. Preserve its content cache so prop-only
 // updates must invalidate mounted pages through data or extraData.
-jest.mock("@legendapp/list/reanimated", () => ({
+vi.mock("@legendapp/list/reanimated", () => ({
   __esModule: true,
   AnimatedLegendList: (props: {
     data: Date[];
@@ -13,7 +15,6 @@ jest.mock("@legendapp/list/reanimated", () => ({
     initialScrollIndex?: number;
     renderItem: (item: { item: Date; index: number }) => ReactNode;
   }) => {
-    const { useMemo } = jest.requireActual<typeof import("react")>("react");
     return useMemo(() => {
       const index = props.initialScrollIndex ?? 0;
       const item = props.data[index];

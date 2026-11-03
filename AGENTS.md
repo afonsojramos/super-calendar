@@ -14,7 +14,7 @@ Both renderers depend on core via `workspace:*`. The npm slug and repo are `supe
 
 - This is a library, so customizability is key, but good defaults are equally important. Expose props, theme tokens, and render overrides for flexibility, while making the zero-config path look and behave well out of the box.
 - Treat the public API (the package `exports`) as a contract: don't make breaking changes casually.
-- Keep the dom and native public surfaces aligned. For the shared components (`MonthView`, `MonthList`, `TimeGrid`), a prop added on one renderer should carry the same name on the other; a genuinely web-only prop is allowed but must be allowlisted in `tests/renderer-parity.test.ts`, which guards `dom ⊆ native ∪ platform`. Native is the reference and may carry extra RN-only props (Agenda, MonthPager, styling). The `Calendar` wrappers differ by design and aren't parity-checked, so mirror shared additions there by hand.
+- Keep the dom and native public surfaces aligned. For the shared components (`MonthView`, `MonthList`, `TimeGrid`), a prop added on one renderer should carry the same name on the other; a genuinely web-only prop is allowed but must be allowlisted in `tests/architecture/renderer-parity.test.ts`, which guards `dom ⊆ native ∪ platform`. Native is the reference and may carry extra RN-only props (Agenda, MonthPager, styling). The `Calendar` wrappers differ by design and aren't parity-checked, so mirror shared additions there by hand.
 - Document the public API only (exports from each package). At the end of any piece of work, check whether it changed the public API or behavior; if so, update the docs in the same change before calling it done: `docs/` (Mintlify `.mdx`), `docs/reference/api.mdx`, and the package `README.md`.
 - Core stays render-agnostic. Don't import `react-dom` or `react-native` into `packages/core`, and don't pull a renderer's peers into core.
 
@@ -30,7 +30,9 @@ Both renderers depend on core via `workspace:*`. The npm slug and repo are `supe
 - `pnpm lint` / `pnpm lint:fix` — oxlint (type-aware)
 - `pnpm format` / `pnpm format:fix` — oxfmt
 - `pnpm typecheck` — `tsc --noEmit`
-- `pnpm test` — jest
+- `pnpm test` runs Vitest once; `pnpm test:watch` starts watch mode.
+- `pnpm test:parity` runs all Vitest projects and verifies shared React/Solid case parity.
+- `pnpm test:browser` runs shared Vitest browser contracts for React/Solid source and built packages. Run `pnpm build` first.
 - `pnpm build` — tsdown across all packages (`pnpm -r build`)
 - `pnpm bench` — core benchmarks (runs under bun)
 - `pnpm parity:visual` screenshots both web renderers side by side for manual visual parity (see Scripts)
@@ -41,11 +43,15 @@ Use pnpm or nub, not npm/npx; both install correctly from the shared `pnpm-lock.
 
 `scripts/` holds dev tooling that runs directly with `node` (zero deps, no build step).
 
-- `scripts/visual-parity.mjs` (`pnpm parity:visual`) drives system Chrome over CDP to screenshot the dom (`examples/web`) and native-on-react-native-web (`examples/native`) renderers across every view at one fixed viewport, then writes `visual-parity/index.html` with the pairs side by side for eyeballing. It's a manual aid for keeping the two **web** outputs aligned when changing shared layout/styling; the automated guard is still `tests/renderer-parity.test.ts` (prop-name parity only). Start both dev servers first (`cd examples/web && pnpm dev`, `cd examples/native && pnpm start`). Output is gitignored. Override targets with `DOM_URL`, `NATIVE_URL`, `CHROME`, `VIEWS`, `WIDTH`, `HEIGHT`.
+- `scripts/visual-parity.mjs` (`pnpm parity:visual`) drives system Chrome over CDP to screenshot the dom (`examples/web`) and native-on-react-native-web (`examples/native`) renderers across every view at one fixed viewport, then writes `visual-parity/index.html` with the pairs side by side for eyeballing. It's a manual aid for keeping the two **web** outputs aligned when changing shared layout/styling; the automated guard is still `tests/architecture/renderer-parity.test.ts` (prop-name parity only). Start both dev servers first (`cd examples/web && pnpm dev`, `cd examples/native && pnpm start`). Output is gitignored. Override targets with `DOM_URL`, `NATIVE_URL`, `CHROME`, `VIEWS`, `WIDTH`, `HEIGHT`.
 
 ## Tests
 
-Jest has three projects: `node` (core logic + native non-component tests), `dom` (jsdom, react-dom components), `native` (test-renderer + RN preset). Native tests use Testing Library 14: await rendering, events, and updates, and query host elements. Tests import `@super-calendar/core` by name, resolved to source, so no build is needed first. Add tests next to the code under `packages/*/src/**` (or `tests/**` for cross-cutting ones).
+Vitest has five projects: `node` (core logic + native non-component tests), `dom` (React DOM in jsdom), `solid` (Solid in jsdom), `solid-server` (Solid SSR), and `native` (React Native through vitest-native's native engine). Native tests use Testing Library 14: await rendering, events, and updates, and query host elements. The native setup retains the recording gesture and animation harness; device tests verify actual gestures and layout.
+
+Write shared React DOM/Solid behavior in `tests/web/contracts`; read the [shared web test guide](tests/web/README.md) before adding cases. Both projects compile the same JSX for their framework and use the real calendar components. Keep framework-specific tests beside the source under `packages/*/src/**`; use the [test directory guide](tests/README.md) for repository checks, setup, and reusable helpers. Tests resolve core imports to source, so no build is needed. Use `vi` from `vitest` for mocks and timers. The forks pool isolates process state; DST fixtures use `tests/support/timezone.ts` to select and restore their time zone.
+
+For real layout, scrolling, pointer capture, and touch input, add shared cases to `tests/web/browser/contracts`. `vitest.browser.config.mts` runs them against both frameworks' source and built packages, using Playwright as the Chrome driver. `pnpm test:browser` enforces identical passing cases across all four projects. See the shared web test guide for browser setup and fixtures. Keep Solid-specific hydration and package checks in the existing scripts.
 
 ## Examples
 
