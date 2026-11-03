@@ -488,13 +488,23 @@ try {
     `[...document.querySelectorAll('[data-virtual-row]')].map(e => e.dataset.virtualRow).join(',') !== ${JSON.stringify(before)}`,
   );
   await waitFor(virtualWindow, "bounded month rows fill the viewport after scrolling");
+  // Reserve scrollbar space on every OS, including macOS with overlay scrollbars.
+  await evaluate(`(() => {
+    const style = document.createElement('style');
+    style.textContent = 'html { overflow-y: scroll; } ::-webkit-scrollbar { width: 15px; }';
+    document.head.append(style);
+  })()`);
   await send("Emulation.setDeviceMetricsOverride", {
     width: 390,
     height: 844,
     deviceScaleFactor: 1,
     mobile: false,
   });
-  await waitFor("document.documentElement.clientWidth === 390");
+  await waitFor("window.innerWidth === 390");
+  assert(
+    await evaluate("document.documentElement.clientWidth < window.innerWidth"),
+    "resize coverage includes space reserved for a vertical scrollbar",
+  );
   await waitFor(virtualWindow, "bounded month rows fill the viewport after resizing");
   assert.deepEqual(diagnostics, [], "No browser errors or Solid reactivity/hydration warnings");
   console.log("virtualization: bounded rows through scrolling and viewport resize");
