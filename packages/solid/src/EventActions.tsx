@@ -103,11 +103,15 @@ export function createEventActions<E extends object>(
     return replacements.length === 1 ? replacements[0] : undefined;
   };
 
-  // `list` comes from the caller: effect callbacks must not read props.
-  const close = (restoreFocus: boolean, list = untrack(events), fallbackToRoot = false) => {
+  // Effects pass the resolved event: reading compiled props here can create ownerless memos.
+  const close = (
+    restoreFocus: boolean,
+    currentEvent = current(untrack(events)) ?? null,
+    fallbackToRoot = false,
+  ) => {
     const event = openRef.current;
     if (!event) return;
-    const shown = current(list) ?? event;
+    const shown = currentEvent ?? event;
     pending.current = null;
     const dialog = dialogRef.current;
     // Close before moving focus: the page behind a modal dialog is inert.
@@ -151,8 +155,10 @@ export function createEventActions<E extends object>(
       }
       close(
         document.activeElement === document.body ||
+          // WebKit can focus the root before a newly opened dialog settles.
+          document.activeElement === rootRef.current ||
           !!dialogRef.current?.contains(document.activeElement),
-        state.list,
+        state.next ?? null,
         true,
       );
     },
@@ -171,7 +177,8 @@ export function createEventActions<E extends object>(
 
   const select = (event: E, trigger: HTMLElement) => {
     const identify = untrack(getEventId);
-    identity = identify ? { id: identify(event) } : null;
+    const id = identify?.(event);
+    identity = typeof id === "string" || typeof id === "number" ? { id } : null;
     setRejections(0);
     triggers.set(event, trigger);
     show(event);
@@ -293,6 +300,8 @@ export function EventActionsMenu<E extends object>(props: {
                     {...props.slot("eventAction", {
                       base: {
                         minHeight: 32,
+                        flexShrink: 0,
+                        overflowWrap: "anywhere",
                         font: "inherit",
                         cursor: "pointer",
                         textAlign: "left",
@@ -423,6 +432,8 @@ export function EventActionsDialog(props: {
       }}
       {...props.slot("eventActions", {
         base: {
+          margin: "auto",
+          overflowWrap: "anywhere",
           padding: 0,
           width: "max-content",
           maxWidth: "min(22rem, calc(100vw - 32px))",

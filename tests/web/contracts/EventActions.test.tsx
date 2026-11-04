@@ -26,6 +26,12 @@ describe(rendererName, () => {
   const action = (dialog: HTMLElement, name: string) =>
     [...dialog.querySelectorAll("button")].find((button) => button.textContent === name)!;
   type HTMLElementQuery = (role: string, options?: { name?: string }) => HTMLElement;
+  const untypedEventId = (id: unknown) => {
+    // JavaScript consumers can return values outside the TypeScript contract.
+    // @ts-expect-error Exercise the public callback's runtime boundary.
+    const getEventId: () => string | number = () => id;
+    return getEventId;
+  };
 
   describe("TimeGrid actions", () => {
     const grid = (props: Partial<Parameters<typeof TimeGrid>[0]> = {}) => ({
@@ -103,6 +109,31 @@ describe(rendererName, () => {
       const view = render(TimeGrid, props);
       fireEvent.click(trigger(view, "Planning"));
       view.rerender({ ...props, getEventId: undefined });
+      expect(view.queryByRole("dialog")).toBeNull();
+      expect(view.container.contains(document.activeElement)).toBe(true);
+    });
+
+    it.each([undefined, null, true, { missing: true }])(
+      "refuses an invalid event ID on opening: %j",
+      (id) => {
+        const onDragEvent = vi.fn();
+        const view = render(TimeGrid, grid({ onDragEvent, getEventId: untypedEventId(id) }));
+        fireEvent.click(trigger(view, "Planning"));
+        expect(view.queryByRole("dialog")).toBeNull();
+        expect(onDragEvent).not.toHaveBeenCalled();
+        expect(view.container.contains(document.activeElement)).toBe(true);
+      },
+    );
+
+    it("never edits a different event with the same missing ID", () => {
+      const onDragEvent = vi.fn();
+      const props = grid({ onDragEvent, getEventId: untypedEventId(undefined) });
+      const view = render(TimeGrid, props);
+      fireEvent.click(trigger(view, "Planning"));
+      view.rerender({ ...props, events: [{ ...planning, title: "Different event" }] });
+      const move = view.queryByRole("button", { name: "Move 15 minutes later" });
+      if (move) fireEvent.click(move);
+      expect(onDragEvent).not.toHaveBeenCalled();
       expect(view.queryByRole("dialog")).toBeNull();
       expect(view.container.contains(document.activeElement)).toBe(true);
     });
@@ -416,6 +447,34 @@ describe(rendererName, () => {
         );
         view.rerender({ ...props, events: [] });
         expect(view.queryByRole("dialog")).toBeNull();
+      });
+
+      it.each([undefined, null, true, { missing: true }])(
+        "refuses an invalid booking ID on opening: %j",
+        (id) => {
+          const onDragEvent = vi.fn();
+          const view = render(
+            ResourceTimeline<{ resourceId: string }>,
+            board({ onDragEvent, getEventId: untypedEventId(id) }),
+          );
+          fireEvent.click(trigger(view, "Planning"));
+          expect(view.queryByRole("dialog")).toBeNull();
+          expect(onDragEvent).not.toHaveBeenCalled();
+          expect(view.container.contains(document.activeElement)).toBe(true);
+        },
+      );
+
+      it("never edits a different booking with the same missing ID", () => {
+        const onDragEvent = vi.fn();
+        const props = board({ onDragEvent, getEventId: untypedEventId(undefined) });
+        const view = render(ResourceTimeline<{ resourceId: string }>, props);
+        fireEvent.click(trigger(view, "Planning"));
+        view.rerender({ ...props, events: [{ ...booking, title: "Different booking" }] });
+        const move = view.queryByRole("button", { name: "Move 15 minutes later" });
+        if (move) fireEvent.click(move);
+        expect(onDragEvent).not.toHaveBeenCalled();
+        expect(view.queryByRole("dialog")).toBeNull();
+        expect(view.container.contains(document.activeElement)).toBe(true);
       });
 
       it.each([{ allDay: true }, { display: "background" as const }])(

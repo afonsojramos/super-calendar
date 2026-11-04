@@ -157,7 +157,8 @@ export function useEventActions<E extends object>(
   };
 
   const select = (event: E, trigger: HTMLElement) => {
-    identity.current = getEventId ? { id: getEventId(event) } : null;
+    const id = getEventId?.(event);
+    identity.current = typeof id === "string" || typeof id === "number" ? { id } : null;
     setRejections(0);
     triggers.current.set(event, trigger);
     show(event);
@@ -286,7 +287,14 @@ export function EventActionsMenu<E extends object>({
                 onSelect(event, trigger.current!);
               }}
               {...slot("eventAction", {
-                base: { minHeight: 32, font: "inherit", cursor: "pointer", textAlign: "left" },
+                base: {
+                  minHeight: 32,
+                  flexShrink: 0,
+                  overflowWrap: "anywhere",
+                  font: "inherit",
+                  cursor: "pointer",
+                  textAlign: "left",
+                },
                 themed: {
                   padding: "6px 10px",
                   border: `1px solid ${theme.gridLine}`,
@@ -405,6 +413,8 @@ export function EventActionsDialog({
       }}
       {...slot("eventActions", {
         base: {
+          margin: "auto",
+          overflowWrap: "anywhere",
           padding: 0,
           width: "max-content",
           maxWidth: "min(22rem, calc(100vw - 32px))",

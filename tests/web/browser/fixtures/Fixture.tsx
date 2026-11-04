@@ -67,6 +67,15 @@ const crowdedEvents: FixtureEvent[] = ["First", "Second", "Third"].map((title, i
   start: new Date(2026, 6, 15, 9),
   end: new Date(2026, 6, 15, 10),
 }));
+const manyEvents: FixtureEvent[] = Array.from({ length: 12 }, (_, id) => ({
+  id,
+  title:
+    id === 0
+      ? "https://meet.example.com/quarterlyoperationsreviewwithregionalleadershipandcustomerteams2026"
+      : `Planning session ${id + 1} with the regional operations leadership team`,
+  start: new Date(2026, 6, 15, 9),
+  end: new Date(2026, 6, 15, 10),
+}));
 const clippedEvents: FixtureEvent[] = [
   { id: 0, title: "Morning", start: new Date(2026, 6, 15, 7), end: new Date(2026, 6, 15, 9) },
   { id: 1, title: "Overnight", start: new Date(2026, 6, 15, 22), end: new Date(2026, 6, 16, 10) },
@@ -76,6 +85,7 @@ const crowdedBookings: ResourceEvent[] = crowdedEvents.map((event) => ({
   ...event,
   resourceId: "a",
 }));
+const manyBookings: ResourceEvent[] = manyEvents.map((event) => ({ ...event, resourceId: "a" }));
 const resourceEvents: ResourceEvent[] = [
   {
     id: 0,
@@ -95,6 +105,10 @@ const resourceEvents: ResourceEvent[] = [
 ];
 const clock = (date: Date) => `${date.getDate()}:${date.getHours()}:${date.getMinutes()}`;
 const theme = { text: "rgb(12, 34, 56)", cellHeight: 80, selectedBackground: "rgb(60, 90, 120)" };
+const missingEventId = (): string | number => {
+  // @ts-expect-error Simulate a JavaScript consumer returning an invalid ID.
+  return undefined;
+};
 
 export function Fixture() {
   const view = new URLSearchParams(location.search).get("view") ?? "months";
@@ -122,12 +136,18 @@ export function Fixture() {
         ? clippedEvents
         : view === "edit-crowded"
           ? crowdedEvents
-          : view === "edit"
-            ? editEvents
-            : initialEvents,
+          : view === "edit-many"
+            ? manyEvents
+            : view === "edit"
+              ? editEvents
+              : initialEvents,
   );
   const [boardEvents, setBoardEvents] = useFixtureState(
-    view.endsWith("crowded") ? crowdedBookings : resourceEvents,
+    view.endsWith("crowded")
+      ? crowdedBookings
+      : view.endsWith("many")
+        ? manyBookings
+        : resourceEvents,
   );
   const [rejecting, setRejecting] = useFixtureState(false);
   const [overlapping, setOverlapping] = useFixtureState(true);
@@ -237,7 +257,13 @@ export function Fixture() {
           mode="week"
           weekStartsOn={1}
           events={events()}
-          getEventId={view.endsWith("-stable") ? (event) => event.id : undefined}
+          getEventId={
+            view.endsWith("-invalid-id")
+              ? missingEventId
+              : view.endsWith("-stable")
+                ? (event) => event.id
+                : undefined
+          }
           height={500}
           hourHeight={56}
           minHour={view === "edit-clipped" ? 8 : undefined}
@@ -265,7 +291,13 @@ export function Fixture() {
           orientation={view.includes("vertical") ? "vertical" : "horizontal"}
           resources={resources}
           events={boardEvents()}
-          getEventId={view.endsWith("-stable") ? (event) => event.id : undefined}
+          getEventId={
+            view.endsWith("-invalid-id")
+              ? missingEventId
+              : view.endsWith("-stable")
+                ? (event) => event.id
+                : undefined
+          }
           startHour={8}
           endHour={14}
           onPressEvent={(event) => record(`press:${event.title}`)}

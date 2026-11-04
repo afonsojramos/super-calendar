@@ -17,6 +17,105 @@ const isFocused = (locator: ReturnType<typeof trigger>) =>
 const eventBox = (label: string) => page.locator(`[data-slot="event"][aria-label="${label}"]`);
 
 describe(rendererName, () => {
+  it.each(["edit-invalid-id", "resources-invalid-id", "resources-vertical-invalid-id"])(
+    "returns focus safely when the %s getter returns a missing ID",
+    async (view) => {
+      await open(view);
+      for (const title of ["Planning", "Planning refreshed"]) {
+        await showChoices();
+        await trigger(title).click();
+        await expect.poll(() => dialog().count()).toBe(0);
+        expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true);
+        expect(await calls()).toBe("[]");
+        if (title === "Planning") {
+          await page.getByRole("button", { name: "Refresh events", exact: true }).click();
+        }
+      }
+    },
+  );
+
+  it("centers the action dialog when a consumer resets margins", async () => {
+    for (const width of [320, 1100]) {
+      await page.setViewportSize({ width, height: 640 });
+      await open("edit");
+      await page.addStyleTag({ content: "* { margin: 0; }" });
+      await showChoices();
+      await trigger("Planning").click();
+      const bounds = await dialog().boundingBox();
+      if (!bounds) throw new Error("Missing action dialog");
+      expect(bounds.x).toBeGreaterThanOrEqual(16);
+      expect(bounds.y).toBeGreaterThanOrEqual(16);
+      expect(bounds.x + bounds.width / 2).toBeCloseTo(width / 2, 0);
+      expect(bounds.y + bounds.height / 2).toBeCloseTo(320, 0);
+      await page.keyboard.press("Escape");
+      expect(await isFocused(menu())).toBe(true);
+    }
+  });
+
+  it.each(["edit-many", "resources-many", "resources-vertical-many"])(
+    "wraps unbroken event titles inside the %s action dialog",
+    async (view) => {
+      await page.setViewportSize({ width: 320, height: 640 });
+      await open(view);
+      await showChoices();
+      await page.getByRole("button", { name: /^Move or resize https:/ }).click();
+      expect(await dialog().textContent()).toContain(
+        "https://meet.example.com/quarterlyoperationsreviewwithregionalleadershipandcustomerteams2026",
+      );
+      expect(await dialog().evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+        true,
+      );
+      await page.keyboard.press("Escape");
+      expect(await isFocused(menu())).toBe(true);
+    },
+  );
+
+  it.each(["edit-many", "resources-many", "resources-vertical-many"])(
+    "keeps complete event descriptions readable in a scrolling %s chooser",
+    async (view) => {
+      for (const width of [320, 1100]) {
+        await page.setViewportSize({ width, height: 640 });
+        await open(view);
+        await showChoices();
+        const choices = page.getByRole("group", { name: "Edit events", exact: true });
+        const buttons = choices.getByRole("button");
+        expect(await buttons.count()).toBe(12);
+        expect(
+          await choices.evaluate((element) => element.scrollHeight > element.clientHeight),
+        ).toBe(true);
+        for (const button of await buttons.all()) {
+          expect(
+            await button.evaluate((element) => {
+              const bounds = element.getBoundingClientRect();
+              return [...element.children].every((child) => {
+                const content = child.getBoundingClientRect();
+                return content.top >= bounds.top && content.bottom <= bounds.bottom;
+              });
+            }),
+          ).toBe(true);
+          expect(
+            await button.evaluate((element) => element.scrollWidth <= element.clientWidth),
+          ).toBe(true);
+        }
+        const last = buttons.last();
+        await buttons.first().press("End");
+        expect(await isFocused(last)).toBe(true);
+        expect(
+          await last.evaluate((element) => {
+            const bounds = element.getBoundingClientRect();
+            return element.contains(
+              document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2),
+            );
+          }),
+        ).toBe(true);
+        await last.press("Enter");
+        expect(await dialog().textContent()).toContain("Planning session 12");
+        await page.keyboard.press("Escape");
+        expect(await isFocused(menu())).toBe(true);
+      }
+    },
+  );
+
   it.each([
     "calendar-actions-stable",
     "edit-stable",
@@ -45,6 +144,11 @@ describe(rendererName, () => {
       .evaluate((element) => (element as HTMLButtonElement).click());
     await expect.poll(() => dialog().count()).toBe(0);
     expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true);
+    await showChoices();
+    await trigger("Planning refreshed").first().click();
+    await expect.poll(() => dialog().count()).toBe(0);
+    expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true);
+    expect(JSON.parse((await calls()) ?? "[]")).toHaveLength(2);
   });
 
   it("keeps modal paging keys inside the Calendar wrapper", async () => {

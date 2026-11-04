@@ -240,6 +240,8 @@ for keyboard, click, and tap. The actions call `onDragEvent` with the same bound
 a drop would, so `eventOverlap`, `draggable`, `startEditable`,
 `durationEditable`, and a `false` return apply. Style it with the
 `eventActionsTrigger`, `eventActionsList`, `eventActions`, and `eventAction` slots.
+Long choosers scroll without shrinking their choices. Choices and dialogs wrap
+titles without spaces. The action dialog is centered in the viewport by default.
 The optional `editEvents` and `eventActions(title)` labels name the chooser and
 event actions. `eventChangeRejected` supplies the polite status message for
 rejected edits (default "This change is not allowed."). Both web
@@ -247,9 +249,9 @@ rejected edits (default "This change is not allowed."). Both web
 
 Web `Calendar`, `TimeGrid`, and `ResourceTimeline` accept the optional
 `getEventId: (event) => string | number` prop to keep editing through full
-event-array refreshes. IDs must
-be stable and unique per occurrence. Missing or duplicate IDs close the dialog;
-without this prop, full refreshes close it. The chooser and dialog include both
+event-array refreshes. IDs must be stable and unique per occurrence.
+Missing, invalid, or duplicate IDs close the dialog. Without this prop, full
+refreshes close it. The chooser and dialog include both
 dates for multi-day events. PageUp and PageDown inside the dialog do not change
 the calendar page. See [Move and resize actions](/guides/accessibility#move-and-resize-actions-web).
 
