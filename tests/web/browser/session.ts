@@ -2,33 +2,28 @@ import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { chromium, type Browser, type Page } from "playwright";
+import type { Browser, BrowserContext, Page } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, inject } from "vitest";
-import { solid } from "../../support/solid-plugin.mts";
+import { fixtureConfig } from "./fixture-config";
+import { launchBrowser, type BrowserEngine } from "../../support/browser";
 
 declare module "vitest" {
   export interface ProvidedContext {
     browserRenderer: "react" | "solid";
     browserArtifact: "source" | "dist";
+    browserEngine: BrowserEngine;
   }
 }
 
-const root = path.resolve(import.meta.dirname, "../../..");
 export const renderer = inject("browserRenderer");
 export const artifact = inject("browserArtifact");
-export const rendererName = `${renderer === "react" ? "React DOM" : "Solid"} (${artifact})`;
-const pkg = renderer === "react" ? "dom" : "solid";
-const relativeEntry =
-  artifact === "source"
-    ? "src/index.ts"
-    : renderer === "react"
-      ? "dist/index.mjs"
-      : "dist/client/index.js";
-const entry = path.join(root, "packages", pkg, relativeEntry);
-const fixture = path.join(root, "tests/web/browser/fixtures");
+export const engine = inject("browserEngine");
+export const rendererName = `${renderer === "react" ? "React DOM" : "Solid"} (${artifact}, ${engine})`;
+const { config, entry } = fixtureConfig(renderer, artifact);
 let server: ViteDevServer;
 let browser: Browser;
+let context: BrowserContext;
 export let page: Page;
 let origin: string;
 let cache: string | undefined;
@@ -38,65 +33,53 @@ let loadedLibrary = false;
 beforeAll(async () => {
   if (!existsSync(entry)) throw new Error(`Missing ${entry}. Run pnpm build before browser tests.`);
   cache = await mkdtemp(path.join(tmpdir(), `calendar-web-${renderer}-${artifact}-`));
-  server = await createServer({
-    configFile: false,
-    root: fixture,
-    cacheDir: cache,
-    optimizeDeps: { exclude: ["@calendar-browser/library"] },
-    logLevel: "error",
-    plugins: renderer === "solid" ? [solid("dom")] : [],
-    oxc: { jsx: { runtime: "automatic" } },
-    server: { host: "127.0.0.1", port: 0, fs: { allow: [root] } },
-    resolve: {
-      alias: [
-        { find: "@calendar-browser/adapter", replacement: path.join(fixture, `${renderer}.ts`) },
-        { find: "@calendar-browser/library", replacement: entry },
-        {
-          find: /^@super-calendar\/core$/,
-          replacement: path.join(
-            root,
-            "packages/core",
-            artifact === "source" ? "src/index.ts" : "dist/index.mjs",
-          ),
-        },
-        {
-          find: /^@super-calendar\/core\/vanilla$/,
-          replacement: path.join(
-            root,
-            "packages/core",
-            artifact === "source" ? "src/vanilla.ts" : "dist/vanilla.mjs",
-          ),
-        },
-      ],
-    },
-  });
+  server = await createServer({ ...config, cacheDir: cache });
   await server.listen();
   origin = server.resolvedUrls!.local[0];
-  const executablePath =
-    process.env.CHROME ??
-    [
-      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-      "/usr/bin/google-chrome",
-      "/usr/bin/chromium",
-      "/usr/bin/chromium-browser",
-    ].find(existsSync);
-  browser = await chromium.launch({ headless: true, executablePath });
+  browser = await launchBrowser(engine);
+  // Finish Vite's first dependency crawl before recording browser diagnostics.
+  // Its initial optimizer reload can cancel requests in the warmup page.
+  const warmup = await browser.newPage();
+  const startupErrors: string[] = [];
+  warmup.on("pageerror", (error) => startupErrors.push(error.message));
+  warmup.setDefaultNavigationTimeout(15_000);
+  try {
+    await warmup.goto(origin);
+    await warmup
+      .getByRole("button", { name: "Update props", exact: true })
+      .waitFor({ timeout: 15_000 });
+    await warmup.waitForLoadState("networkidle");
+    expect(startupErrors, "Fixture startup errors").toEqual([]);
+  } finally {
+    await warmup.close();
+  }
 });
 
 beforeEach(async () => {
   diagnostics.length = 0;
   loadedLibrary = false;
-  page = await browser.newPage({
+  context = await browser.newContext({
     viewport: { width: 1100, height: 850 },
     hasTouch: true,
     timezoneId: "Europe/Madrid",
   });
+  page = await context.newPage();
   page.setDefaultTimeout(5_000);
+  page.setDefaultNavigationTimeout(15_000);
   page.on("response", (response) => {
     if (decodeURI(response.url()).includes(entry)) loadedLibrary = true;
   });
   page.on("pageerror", (error) => diagnostics.push(error.message));
   page.on("console", (message) => {
+    // Gecko reports browser privacy/scroll heuristics through the console too.
+    // Keep module-load failures and all application warnings as test failures.
+    if (
+      engine === "firefox" &&
+      message.type() === "warning" &&
+      (message.text().includes("has been classified as a bounce tracker.") ||
+        message.text().includes("This site appears to use a scroll-linked positioning effect."))
+    )
+      return;
     if (message.type() === "error" || message.type() === "warning")
       diagnostics.push(message.text());
   });
@@ -107,7 +90,7 @@ afterEach(async () => {
     expect(diagnostics).toEqual([]);
     expect(loadedLibrary, `Browser loaded ${entry}`).toBe(true);
   } finally {
-    await page?.close();
+    await context?.close();
   }
 });
 

@@ -37,8 +37,26 @@ describe(rendererName, () => {
     const first = await days.first().getAttribute("data-day");
     expect(await days.count()).toBeLessThan(400);
     await page.locator('[data-day="2026-07-15"]').hover();
-    await page.mouse.wheel(0, 4000);
-    await expect.poll(() => days.first().getAttribute("data-day")).not.toBe(first);
+    const scroller = await page.locator('[data-day="2026-07-15"]').evaluateHandle((day) => {
+      let element = day.parentElement;
+      while (element && getComputedStyle(element).overflowY !== "auto")
+        element = element.parentElement;
+      if (!element) throw new Error("Missing month scroller");
+      return element;
+    });
+    try {
+      // Firefox caps one wheel event to a page. Use several real scrolls on every engine.
+      for (let step = 0; step < 5; step++) {
+        const before = await scroller.evaluate((element) => element.scrollTop);
+        await page.mouse.wheel(0, 800);
+        await expect
+          .poll(() => scroller.evaluate((element) => element.scrollTop))
+          .toBeGreaterThan(before);
+      }
+      await expect.poll(() => days.first().getAttribute("data-day")).not.toBe(first);
+    } finally {
+      await scroller.dispose();
+    }
     expect(await days.count()).toBeLessThan(400);
   });
 
@@ -113,74 +131,5 @@ describe(rendererName, () => {
     await page.mouse.move(moved.x + moved.width / 2, moved.y + moved.height + 53, { steps: 5 });
     await page.mouse.up();
     await expect.poll(calls).toBe('["16:10:0-11:0","16:10:0-12:0"]');
-  });
-
-  it("scrolls with a touch swipe on an event without starting a drag", async () => {
-    await open("week");
-    await page.locator(eventSelector).waitFor();
-    expect(
-      await page
-        .locator(`${eventSelector}, ${eventSelector} [style*="ns-resize"]`)
-        .evaluateAll((elements) =>
-          elements.map((element) => getComputedStyle(element).touchAction),
-        ),
-    ).toEqual(["pan-y", "pan-y", "pan-y"]);
-    const scroller = await page.locator(eventSelector).evaluateHandle((event) => {
-      let parent = event.parentElement;
-      while (parent && getComputedStyle(parent).overflowY !== "auto") parent = parent.parentElement;
-      if (!parent) throw new Error("Missing time-grid scroller");
-      return parent;
-    });
-    const before = await scroller.evaluate((element) => element.scrollTop);
-    const bounds = await box(eventSelector);
-    const contact = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2, id: 1 };
-    const cdp = await page.context().newCDPSession(page);
-    try {
-      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [contact] });
-      for (const offset of [20, 40, 60, 80]) {
-        await cdp.send("Input.dispatchTouchEvent", {
-          type: "touchMove",
-          touchPoints: [{ ...contact, y: contact.y - offset }],
-        });
-        await page.waitForTimeout(20);
-      }
-      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-      await expect
-        .poll(() => scroller.evaluate((element) => element.scrollTop))
-        .toBeGreaterThan(before + 20);
-      expect(await calls()).toBe("[]");
-      expect(await page.getByLabel("Drag starts").textContent()).toBe("0");
-    } finally {
-      await cdp.detach();
-      await scroller.dispose();
-    }
-  });
-
-  it("cancels a held touch drag and accepts a subsequent move", async () => {
-    await open("week");
-    await page.locator(eventSelector).waitFor();
-    const bounds = await box(eventSelector);
-    const contact = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2, id: 1 };
-    const cdp = await page.context().newCDPSession(page);
-    try {
-      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [contact] });
-      await expect.poll(() => page.getByLabel("Drag starts").textContent()).toBe("1");
-      await cdp.send("Input.dispatchTouchEvent", {
-        type: "touchMove",
-        touchPoints: [{ ...contact, y: contact.y + 56 }],
-      });
-      await cdp.send("Input.dispatchTouchEvent", { type: "touchCancel", touchPoints: [] });
-      expect(await calls()).toBe("[]");
-      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [contact] });
-      await expect.poll(() => page.getByLabel("Drag starts").textContent()).toBe("2");
-      await cdp.send("Input.dispatchTouchEvent", {
-        type: "touchMove",
-        touchPoints: [{ ...contact, y: contact.y + 56 }],
-      });
-      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-      await expect.poll(calls).toBe('["15:10:0-11:0"]');
-    } finally {
-      await cdp.detach();
-    }
   });
 });

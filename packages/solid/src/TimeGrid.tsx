@@ -53,6 +53,13 @@ import {
   Show,
   untrack,
 } from "solid-js";
+import {
+  createEventActions,
+  EventActionsDialog,
+  type EventActionsSlot,
+  EventActionsMenu,
+  type EventEditAction,
+} from "./EventActions";
 import { withDefaults } from "./props";
 import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
 import { createNow } from "./state";
@@ -90,7 +97,8 @@ export type TimeGridSlot =
   | "event"
   | "eventBox"
   | "nowIndicator"
-  | "createGhost";
+  | "createGhost"
+  | EventActionsSlot;
 const GUTTER_WIDTH = 56;
 const HOURS_PER_DAY = 24;
 // Floor for a timed event box's height, so a very short event still shows a
@@ -764,6 +772,99 @@ export function TimeGrid<T = unknown>(
         : props.onDragEvent,
     (value) => {
       onDragEventRef.current = value;
+    },
+  );
+  // What a drag may change on an event: `draggable: false` locks it, and
+  // `startEditable`/`durationEditable` (per event, falling back to the grid
+  // props) split whether it can be moved vs resized.
+  const editability = (event: CalendarEvent<T>) => {
+    const editable = !!props.onDragEvent && event.draggable !== false;
+    return {
+      canMove: editable && (event.startEditable ?? props.eventStartEditable),
+      canResize: editable && (event.durationEditable ?? props.eventDurationEditable),
+    };
+  };
+  const eventLabel = (event: CalendarEvent<T>) =>
+    props.eventAccessibilityLabel
+      ? props.eventAccessibilityLabel(event, {
+          mode: props.mode,
+          isAllDay: false,
+          ampm: props.ampm,
+        })
+      : defaultEventAccessibilityLabel({
+          title: event.title,
+          isAllDay: false,
+          start: event.start,
+          end: event.end,
+          ampm: props.ampm,
+          labels: labels(),
+        });
+  const eventDescription = (event: CalendarEvent<T>) =>
+    `${format(event.start, "yyyy-MM-dd")}, ${eventLabel(event)}`;
+  // The actions dialog's steps, matching the native screen-reader actions: one
+  // snap step, or one page of days, through the same commit path as a drop.
+  const pageDays = () =>
+    pageStepDays(props.mode, props.date, props.weekStartsOn, props.numberOfDays);
+  const actionDelta = (id: string): [number, number] | null => {
+    const step = snapMinutes();
+    const page = pageDays() * HOURS_PER_DAY * 60;
+    switch (id) {
+      case "move-later":
+        return [step, step];
+      case "move-earlier":
+        return [-step, -step];
+      case "extend":
+        return [0, step];
+      case "shorten":
+        return [0, -step];
+      case "move-next-page":
+        return [page, page];
+      case "move-previous-page":
+        return [-page, -page];
+      default:
+        return null;
+    }
+  };
+  const editActions = (event: CalendarEvent<T>): EventEditAction[] => {
+    const { canMove, canResize } = editability(event);
+    const step = snapMinutes();
+    const words = labels();
+    const action = (id: string, label: string): EventEditAction => {
+      const [startDelta, endDelta] = actionDelta(id) ?? [0, 0];
+      const next = resolveDraggedBounds(event.start, event.end, startDelta, endDelta, step);
+      return { id, label, available: next !== null };
+    };
+    return [
+      ...(canMove
+        ? [
+            action("move-later", words.moveLater(step)),
+            action("move-earlier", words.moveEarlier(step)),
+          ]
+        : []),
+      ...(canResize
+        ? [action("extend", words.extend(step)), action("shorten", words.shorten(step))]
+        : []),
+      ...(canMove
+        ? [
+            action("move-next-page", words.moveToNextPage(pageDays(), props.mode)),
+            action("move-previous-page", words.moveToPreviousPage(pageDays(), props.mode)),
+          ]
+        : []),
+    ];
+  };
+  const eventActions = createEventActions<CalendarEvent<T>>(
+    () => props.events,
+    editActions,
+    (event, id) => {
+      const delta = actionDelta(id);
+      const next =
+        delta && resolveDraggedBounds(event.start, event.end, delta[0], delta[1], snapMinutes());
+      if (!next || onDragEventRef.current?.(event, next.start, next.end) === false) return null;
+      return (candidate) =>
+        candidate !== event &&
+        candidate.start.getTime() === next.start.getTime() &&
+        candidate.end.getTime() === next.end.getTime() &&
+        candidate.title === event.title;
     },
   );
   const allDayByDay = createMemo(
@@ -1612,6 +1713,8 @@ export function TimeGrid<T = unknown>(
   });
   return (
     <div
+      ref={(el) => (eventActions.rootRef.current = el)}
+      tabindex={-1}
       class={props.className}
       style={css({
         fontFamily: theme().fontFamily,
@@ -1621,6 +1724,26 @@ export function TimeGrid<T = unknown>(
         ...props.style,
       })}
     >
+      <EventActionsMenu
+        events={[
+          ...new Set(
+            positionedByDay()
+              .flat()
+              .filter(
+                (pe) =>
+                  pe.startHours < windowEnd() && pe.startHours + pe.durationHours > windowStart(),
+              )
+              .map((pe) => pe.event),
+          ),
+        ].filter((event) => editActions(event).length > 0)}
+        label={labels().editEvents}
+        labelFor={(event) => labels().eventActions(event.title ?? "")}
+        descriptionFor={eventDescription}
+        onSelect={eventActions.select}
+        rootRef={eventActions.rootRef}
+        slot={slot}
+        theme={theme()}
+      />
       {/* Header */}
       <div
         {...slot("header", {
@@ -2205,22 +2328,7 @@ export function TimeGrid<T = unknown>(
                                     data-event-key={
                                       props.keyboardEventNavigation ? key() : undefined
                                     }
-                                    aria-label={
-                                      props.eventAccessibilityLabel
-                                        ? props.eventAccessibilityLabel(pe().event, {
-                                            mode: props.mode,
-                                            isAllDay: false,
-                                            ampm: props.ampm,
-                                          })
-                                        : defaultEventAccessibilityLabel({
-                                            title: pe().event.title,
-                                            isAllDay: false,
-                                            start: pe().event.start,
-                                            end: pe().event.end,
-                                            ampm: props.ampm,
-                                            labels: labels(),
-                                          })
-                                    }
+                                    aria-label={eventLabel(pe().event)}
                                     onKeyDown={(e) => {
                                       if (e.key === "Enter" || e.key === " ") {
                                         e.preventDefault();
@@ -2558,6 +2666,21 @@ export function TimeGrid<T = unknown>(
           )}
         </div>
       ) : null}
+      <Show when={eventActions.openEvent()}>
+        {(event) => (
+          <EventActionsDialog
+            dialogRef={eventActions.dialogRef}
+            title={labels().eventActions(event().title ?? "")}
+            description={eventDescription(event())}
+            actions={editActions(event())}
+            closeLabel={labels().close}
+            onAction={eventActions.run}
+            onClose={() => eventActions.close(true)}
+            slot={slot}
+            theme={theme()}
+          />
+        )}
+      </Show>
     </div>
   );
 }

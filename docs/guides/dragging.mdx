@@ -206,17 +206,27 @@ On the DOM time grid, only mouse drags trigger edge paging. Touch and pen drags
 remain inside the visible period. A resting finger cannot repeatedly change the
 date or detach its captured event through an edge page.
 
-### Screen-reader rescheduling
+### Rescheduling without dragging
 
-Dragging is a gesture, so on the React Native renderer draggable events also carry
+Dragging is a gesture, so every renderer offers the same moves and resizes
+another way. They run through the same commit path as a drag, so `onDragEvent`
+fires exactly as it would from a gesture (and can still return `false` to
+reject). `eventOverlap={false}`, `draggable: false`, `startEditable`, and
+`durationEditable` apply as they do to a drag.
+
+On React DOM and Solid, choose **Edit events**, then an event, to open a dialog with **Move 15 minutes later /
+earlier**, **Extend / Shorten by 15 minutes**, and **Move to next / previous
+week** (per mode: the page span), stepping by `dragStepMinutes`. It works with a
+keyboard, a click, or a tap, and never presses or drags the event itself. See
+[Move and resize actions](/guides/accessibility#move-and-resize-actions-web).
+
+On the React Native renderer draggable events also carry
 **accessibility actions** for VoiceOver / TalkBack users: _move earlier_, _move
 later_, (when the event owns its end) _extend_ / _shorten_, and _move to next /
 previous week_ (per-mode: the page span), each stepping by `dragStepMinutes` or a
-whole page. They run through the same commit path as a drag, so `onDragEvent`
-fires exactly as it would from a gesture (and can still return `false` to reject).
-The built-in event renderer wires these up automatically; a custom `renderEvent`
-should spread the `accessibilityActions` and `onAccessibilityAction` it receives
-onto its pressable to keep the event operable by assistive tech.
+whole page. The built-in event renderer wires these up automatically; a custom
+`renderEvent` should spread the `accessibilityActions` and `onAccessibilityAction`
+it receives onto its pressable to keep the event operable by assistive tech.
 
 ## Drag to create
 

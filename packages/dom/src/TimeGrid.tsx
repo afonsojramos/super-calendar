@@ -60,6 +60,13 @@ import {
   weekdayFormatToken,
   type WeekStartsOn,
 } from "@super-calendar/core";
+import {
+  EventActionsDialog,
+  type EventActionsSlot,
+  EventActionsMenu,
+  type EventEditAction,
+  useEventActions,
+} from "./EventActions";
 import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 import { type EventGrab, waitForHold } from "./touch";
@@ -87,7 +94,8 @@ export type TimeGridSlot =
   | "event"
   | "eventBox"
   | "nowIndicator"
-  | "createGhost";
+  | "createGhost"
+  | EventActionsSlot;
 
 const GUTTER_WIDTH = 56;
 const HOURS_PER_DAY = 24;
@@ -633,6 +641,91 @@ function TimeGridInner<T = unknown>(
       ? (event, start, end) =>
           overlapsOtherEvents(events, event, start, end) ? false : onDragEvent(event, start, end)
       : onDragEvent;
+
+  // What a drag may change on an event: `draggable: false` locks it, and
+  // `startEditable`/`durationEditable` (per event, falling back to the grid
+  // props) split whether it can be moved vs resized.
+  const editability = (event: CalendarEvent<T>) => {
+    const editable = !!onDragEvent && event.draggable !== false;
+    return {
+      canMove: editable && (event.startEditable ?? eventStartEditable),
+      canResize: editable && (event.durationEditable ?? eventDurationEditable),
+    };
+  };
+  const eventLabel = (event: CalendarEvent<T>) =>
+    eventAccessibilityLabel
+      ? eventAccessibilityLabel(event, { mode, isAllDay: false, ampm })
+      : defaultEventAccessibilityLabel({
+          title: event.title,
+          isAllDay: false,
+          start: event.start,
+          end: event.end,
+          ampm,
+          labels,
+        });
+  const eventDescription = (event: CalendarEvent<T>) =>
+    `${format(event.start, "yyyy-MM-dd")}, ${eventLabel(event)}`;
+  // The actions dialog's steps, matching the native screen-reader actions: one
+  // snap step, or one page of days, through the same commit path as a drop.
+  const pageDays = pageStepDays(mode, date, weekStartsOn, numberOfDays);
+  const actionDelta = (id: string): [number, number] | null => {
+    const page = pageDays * HOURS_PER_DAY * 60;
+    switch (id) {
+      case "move-later":
+        return [snapMinutes, snapMinutes];
+      case "move-earlier":
+        return [-snapMinutes, -snapMinutes];
+      case "extend":
+        return [0, snapMinutes];
+      case "shorten":
+        return [0, -snapMinutes];
+      case "move-next-page":
+        return [page, page];
+      case "move-previous-page":
+        return [-page, -page];
+      default:
+        return null;
+    }
+  };
+  const editActions = (event: CalendarEvent<T>): EventEditAction[] => {
+    const { canMove, canResize } = editability(event);
+    const action = (id: string, label: string): EventEditAction => {
+      const [startDelta, endDelta] = actionDelta(id) ?? [0, 0];
+      const next = resolveDraggedBounds(event.start, event.end, startDelta, endDelta, snapMinutes);
+      return { id, label, available: next !== null };
+    };
+    return [
+      ...(canMove
+        ? [
+            action("move-later", labels.moveLater(snapMinutes)),
+            action("move-earlier", labels.moveEarlier(snapMinutes)),
+          ]
+        : []),
+      ...(canResize
+        ? [
+            action("extend", labels.extend(snapMinutes)),
+            action("shorten", labels.shorten(snapMinutes)),
+          ]
+        : []),
+      ...(canMove
+        ? [
+            action("move-next-page", labels.moveToNextPage(pageDays, mode)),
+            action("move-previous-page", labels.moveToPreviousPage(pageDays, mode)),
+          ]
+        : []),
+    ];
+  };
+  const eventActions = useEventActions(events, editActions, (event, id) => {
+    const delta = actionDelta(id);
+    const next =
+      delta && resolveDraggedBounds(event.start, event.end, delta[0], delta[1], snapMinutes);
+    if (!next || onDragEventRef.current?.(event, next.start, next.end) === false) return null;
+    return (candidate) =>
+      candidate !== event &&
+      candidate.start.getTime() === next.start.getTime() &&
+      candidate.end.getTime() === next.end.getTime() &&
+      candidate.title === event.title;
+  });
 
   const allDayByDay = useMemo(
     // A multi-day all-day event shows in every column it overlaps (matching the
@@ -1396,9 +1489,11 @@ function TimeGridInner<T = unknown>(
     const slotHeight = hourHeight / timeslots;
     return `${hourLines}, repeating-linear-gradient(to bottom, transparent 0, transparent ${slotHeight - 1}px, ${theme.gridLine}80 ${slotHeight - 1}px, ${theme.gridLine}80 ${slotHeight}px)`;
   }, [hourHeight, timeslots, theme.gridLine]);
-
+  const openActionsEvent = eventActions.openEvent;
   return (
     <div
+      ref={eventActions.rootRef}
+      tabIndex={-1}
       className={className}
       style={{
         fontFamily: theme.fontFamily,
@@ -1408,6 +1503,25 @@ function TimeGridInner<T = unknown>(
         ...style,
       }}
     >
+      <EventActionsMenu
+        events={[
+          ...new Set(
+            positionedByDay
+              .flat()
+              .filter(
+                (pe) => pe.startHours < windowEnd && pe.startHours + pe.durationHours > windowStart,
+              )
+              .map((pe) => pe.event),
+          ),
+        ].filter((event) => editActions(event).length > 0)}
+        label={labels.editEvents}
+        labelFor={(event) => labels.eventActions(event.title ?? "")}
+        descriptionFor={eventDescription}
+        onSelect={eventActions.select}
+        rootRef={eventActions.rootRef}
+        slot={slot}
+        theme={theme}
+      />
       {/* Header */}
       <div
         {...slot("header", {
@@ -1816,12 +1930,7 @@ function TimeGridInner<T = unknown>(
                   };
                   // `draggable: false` locks a single event: it keeps its normal
                   // look and still responds to clicks, it just can't be dragged.
-                  // `startEditable`/`durationEditable` (per-event, falling back to
-                  // the grid props) split whether it can be moved vs resized.
-                  const editable = !!onDragEvent && pe.event.draggable !== false;
-                  const canMove = editable && (pe.event.startEditable ?? eventStartEditable);
-                  const canResize =
-                    editable && (pe.event.durationEditable ?? eventDurationEditable);
+                  const { canMove, canResize } = editability(pe.event);
                   return (
                     <div
                       key={idx}
@@ -1830,18 +1939,7 @@ function TimeGridInner<T = unknown>(
                       // faster path between events without removing any from Tab order.
                       tabIndex={0}
                       data-event-key={keyboardEventNavigation ? key : undefined}
-                      aria-label={
-                        eventAccessibilityLabel
-                          ? eventAccessibilityLabel(pe.event, { mode, isAllDay: false, ampm })
-                          : defaultEventAccessibilityLabel({
-                              title: pe.event.title,
-                              isAllDay: false,
-                              start: pe.event.start,
-                              end: pe.event.end,
-                              ampm,
-                              labels,
-                            })
-                      }
+                      aria-label={eventLabel(pe.event)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
@@ -2123,6 +2221,19 @@ function TimeGridInner<T = unknown>(
             />
           )}
         </div>
+      ) : null}
+      {openActionsEvent ? (
+        <EventActionsDialog
+          dialogRef={eventActions.dialogRef}
+          title={labels.eventActions(openActionsEvent.title ?? "")}
+          description={eventDescription(openActionsEvent)}
+          actions={editActions(openActionsEvent)}
+          closeLabel={labels.close}
+          onAction={eventActions.run}
+          onClose={() => eventActions.close(true)}
+          slot={slot}
+          theme={theme}
+        />
       ) : null}
     </div>
   );

@@ -3,6 +3,7 @@ import {
   DatePicker,
   DateRangePicker,
   MonthList,
+  ResourceTimeline,
   TimeGrid,
   useFixtureState,
 } from "@calendar-browser/adapter";
@@ -11,6 +12,71 @@ const anchor = new Date(2026, 6, 15);
 const initialEvents: CalendarEvent[] = [
   { title: "Planning", start: new Date(2026, 6, 15, 9), end: new Date(2026, 6, 15, 10) },
 ];
+const denseEvents: CalendarEvent[] = Array.from({ length: 1000 }, (_, index) => {
+  const start = new Date(
+    2026,
+    6,
+    13 + (index % 7),
+    9 + (Math.floor(index / 7) % 8),
+    (index % 4) * 15,
+  );
+  return { title: `Event ${index}`, start, end: new Date(start.getTime() + 30 * 60_000) };
+});
+// Editing scenarios: an editable event beside a neighbour it can overlap, a
+// one-step event at the minimum duration, and events locked in different ways.
+const editEvents: CalendarEvent[] = [
+  { title: "Planning", start: new Date(2026, 6, 15, 9), end: new Date(2026, 6, 15, 10) },
+  { title: "Standup", start: new Date(2026, 6, 15, 10), end: new Date(2026, 6, 15, 10, 30) },
+  { title: "Short", start: new Date(2026, 6, 16, 9), end: new Date(2026, 6, 16, 9, 15) },
+  {
+    title: "Fixed start",
+    start: new Date(2026, 6, 17, 9),
+    end: new Date(2026, 6, 17, 10),
+    startEditable: false,
+  },
+  {
+    title: "Locked",
+    start: new Date(2026, 6, 14, 9),
+    end: new Date(2026, 6, 14, 10),
+    draggable: false,
+  },
+  {
+    title: "Quarterly planning review with the regional operations leadership team",
+    start: new Date(2026, 6, 18, 9),
+    end: new Date(2026, 6, 18, 10),
+  },
+];
+const resources = [
+  { id: "a", title: "Room A" },
+  { id: "b", title: "Room B" },
+  { id: "c", title: "Room C" },
+];
+const crowdedEvents: CalendarEvent[] = ["First", "Second", "Third"].map((title) => ({
+  title,
+  start: new Date(2026, 6, 15, 9),
+  end: new Date(2026, 6, 15, 10),
+}));
+const clippedEvents: CalendarEvent[] = [
+  { title: "Morning", start: new Date(2026, 6, 15, 7), end: new Date(2026, 6, 15, 9) },
+  { title: "Overnight", start: new Date(2026, 6, 15, 22), end: new Date(2026, 6, 16, 10) },
+];
+type ResourceEvent = CalendarEvent<{ resourceId: string }>;
+const resourceEvents: ResourceEvent[] = [
+  {
+    title: "Planning",
+    resourceId: "a",
+    start: new Date(2026, 6, 15, 9),
+    end: new Date(2026, 6, 15, 10),
+  },
+  {
+    title: "Locked",
+    resourceId: "b",
+    start: new Date(2026, 6, 15, 12),
+    end: new Date(2026, 6, 15, 13),
+    draggable: false,
+  },
+];
+const clock = (date: Date) => `${date.getDate()}:${date.getHours()}:${date.getMinutes()}`;
 const theme = { text: "rgb(12, 34, 56)", cellHeight: 80, selectedBackground: "rgb(60, 90, 120)" };
 
 export function Fixture() {
@@ -24,7 +90,26 @@ export function Fixture() {
     start: anchor,
     end: new Date(2026, 6, 16),
   });
-  const [events, setEvents] = useFixtureState(initialEvents);
+  const [events, setEvents] = useFixtureState(
+    view === "dense"
+      ? denseEvents
+      : view === "edit-clipped"
+        ? clippedEvents
+        : view === "edit-crowded"
+          ? crowdedEvents
+          : view === "edit"
+            ? editEvents
+            : initialEvents,
+  );
+  const [boardEvents, setBoardEvents] = useFixtureState(
+    view.endsWith("crowded")
+      ? crowdedEvents.map((event) => ({ ...event, resourceId: "a" }))
+      : resourceEvents,
+  );
+  const [rejecting, setRejecting] = useFixtureState(false);
+  const [overlapping, setOverlapping] = useFixtureState(true);
+  const [editing, setEditing] = useFixtureState(true);
+  const [revision, setRevision] = useFixtureState(0);
   const [dragStarts, setDragStarts] = useFixtureState(0);
   const record = (call: string) => setCalls((previous) => [...previous, call]);
 
@@ -34,6 +119,37 @@ export function Fixture() {
         <button onClick={() => setUpdated(true)}>Update props</button>
         <button onClick={() => setRestricted(true)}>Restrict dates</button>
         <button onClick={() => setDisabled((value) => !value)}>Toggle disabled</button>
+        <button onClick={() => setRejecting((value) => !value)}>Toggle rejection</button>
+        <button onClick={() => setOverlapping((value) => !value)}>Toggle overlap</button>
+        <button onClick={() => setEditing((value) => !value)}>Toggle editing</button>
+        <button
+          onClick={() => {
+            setEvents((current) => [...current].reverse());
+            setBoardEvents((current) => [...current].reverse());
+          }}
+        >
+          Reverse events
+        </button>
+        <button
+          onClick={() => {
+            setEvents([]);
+            setBoardEvents([]);
+          }}
+        >
+          Remove events
+        </button>
+        {view === "dense" ? (
+          <button
+            onClick={() => {
+              setEvents((current) =>
+                current.map((event) => ({ ...event, title: `${event.title}!` })),
+              );
+              setRevision((current) => current + 1);
+            }}
+          >
+            Update events
+          </button>
+        ) : null}
       </nav>
       {view === "months" ? (
         <MonthList
@@ -66,6 +182,57 @@ export function Fixture() {
           disabled={disabled()}
           theme={updated() ? theme : undefined}
         />
+      ) : view.startsWith("edit") ? (
+        <TimeGrid
+          date={anchor}
+          now={anchor}
+          mode="week"
+          weekStartsOn={1}
+          events={events()}
+          height={500}
+          hourHeight={56}
+          minHour={view === "edit-clipped" ? 8 : undefined}
+          maxHour={view === "edit-clipped" ? 18 : undefined}
+          eventOverlap={overlapping()}
+          onPressEvent={(event) => record(`press:${event.title}`)}
+          onPressCell={() => record("cell")}
+          onDragStart={() => setDragStarts((count) => count + 1)}
+          onDragEvent={
+            editing()
+              ? (event, start, end) => {
+                  record(`${event.title}@${clock(start)}-${clock(end)}`);
+                  if (rejecting()) return false;
+                  setEvents((current) =>
+                    current.map((item) => (item === event ? { ...item, start, end } : item)),
+                  );
+                }
+              : undefined
+          }
+        />
+      ) : view.startsWith("resources") ? (
+        <ResourceTimeline
+          date={anchor}
+          now={anchor}
+          orientation={view.includes("vertical") ? "vertical" : "horizontal"}
+          resources={resources}
+          events={boardEvents()}
+          startHour={8}
+          endHour={14}
+          onPressEvent={(event) => record(`press:${event.title}`)}
+          onDragEvent={
+            editing()
+              ? (event, start, end, resource) => {
+                  record(`${event.title}@${clock(start)}-${clock(end)}@${resource.id}`);
+                  if (rejecting()) return false;
+                  setBoardEvents((current) =>
+                    current.map((item) =>
+                      item === event ? { ...item, start, end, resourceId: resource.id } : item,
+                    ),
+                  );
+                }
+              : undefined
+          }
+        />
       ) : (
         <TimeGrid
           date={anchor}
@@ -87,6 +254,7 @@ export function Fixture() {
       )}
       <output aria-label="Calls">{JSON.stringify(calls())}</output>
       <output aria-label="Drag starts">{dragStarts()}</output>
+      <output aria-label="Revision">{revision()}</output>
     </main>
   );
 }

@@ -48,6 +48,14 @@ export interface CalendarLabels {
   moveToPreviousPage: (days: number, mode: CalendarMode) => string;
   /** Resource timeline action that moves an event to another lane. Default "Move to Room A". */
   moveToResource: (title: string) => string;
+  /**
+   * Names the web renderers' move and resize actions button and dialog for an
+   * event, given its title (empty when it has none). Default "Move or resize
+   * Planning", or "Move or resize event" without a title.
+   */
+  eventActions?: (title: string) => string;
+  /** Opens the web event chooser for move and resize actions. Default "Edit events". */
+  editEvents?: string;
 }
 
 const minutes = (n: number) => `${n} minute${n === 1 ? "" : "s"}`;
@@ -55,7 +63,7 @@ const page = (days: number, mode: CalendarMode) =>
   mode === "week" ? "week" : days === 1 ? "day" : `${days} days`;
 
 /** The built-in English {@link CalendarLabels}. */
-export const defaultCalendarLabels: CalendarLabels = {
+export const defaultCalendarLabels: Required<CalendarLabels> = {
   today: "today",
   selected: "selected",
   unavailable: "unavailable",
@@ -73,10 +81,12 @@ export const defaultCalendarLabels: CalendarLabels = {
   moveToNextPage: (days, mode) => `Move to next ${page(days, mode)}`,
   moveToPreviousPage: (days, mode) => `Move to previous ${page(days, mode)}`,
   moveToResource: (title) => `Move to ${title}`,
+  eventActions: (title) => (title ? `Move or resize ${title}` : "Move or resize event"),
+  editEvents: "Edit events",
 };
 
 /** Fill the labels a consumer left out with {@link defaultCalendarLabels}. */
-export function resolveCalendarLabels(labels?: Partial<CalendarLabels>): CalendarLabels {
+export function resolveCalendarLabels(labels?: Partial<CalendarLabels>): Required<CalendarLabels> {
   return labels ? { ...defaultCalendarLabels, ...labels } : defaultCalendarLabels;
 }
 

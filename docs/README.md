@@ -27,6 +27,11 @@ The `demo` page embeds all three example apps, deployed to GitHub Pages by
 `../.github/workflows/demo.yml`. React Native runs at the site root, React DOM at
 `/dom/`, and Solid at `/solid/`.
 
+Run `pnpm build:demos` from the repository root to assemble the exact Pages
+artifact in `dist/demos`, then `pnpm test:demos` to check all three apps in a
+browser. The Demo workflow runs these checks for pull requests. Only `main`
+deploys to Pages; pull-request builds have read-only repository permissions.
+
 ## Publishing
 
 Changes deploy automatically when merged to the default branch, via the Mintlify

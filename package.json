@@ -14,6 +14,8 @@
   },
   "scripts": {
     "build": "pnpm -r build",
+    "build:demos": "node scripts/build-demos.mjs",
+    "test:demos": "vitest run --config vitest.demos.config.mts",
     "typecheck": "tsc --noEmit && pnpm --filter @super-calendar/solid typecheck",
     "test": "vitest run",
     "test:parity": "node scripts/verify-web-test-parity.mjs",
@@ -22,6 +24,7 @@
     "test:solid:browser:dist": "node scripts/verify-solid.mjs --dist",
     "test:solid:package": "node scripts/verify-solid-package.mjs",
     "bench": "pnpm --filter @super-calendar/core bench",
+    "bench:web": "vitest run --config vitest.performance.config.mts",
     "parity:visual": "node scripts/visual-parity.mjs",
     "lint": "oxlint --type-aware packages tests",
     "lint:fix": "oxlint --fix --type-aware packages tests",
@@ -31,6 +34,7 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@babel/core": "^7.29.7",
     "@babel/preset-env": "^7.29.7",
     "@babel/preset-typescript": "^7.29.7",

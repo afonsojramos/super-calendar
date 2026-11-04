@@ -1,10 +1,13 @@
+import { format } from "date-fns";
 import { Dynamic, type JSX } from "@solidjs/web";
 import {
   backgroundBandsForDay,
   type BusinessHoursBand,
   type BusinessHoursValue,
   type CalendarEvent,
+  type CalendarLabels,
   cellRangeFromDrag,
+  eventAccessibilityLabel,
   closedHourBands,
   eventTimeLabel,
   formatHour,
@@ -12,9 +15,17 @@ import {
   layoutDayEvents,
   movedClockSpan,
   type PositionedEvent,
+  resolveCalendarLabels,
   resolveDraggedBounds,
 } from "@super-calendar/core/vanilla";
 import { type Component, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import {
+  createEventActions,
+  EventActionsDialog,
+  type EventActionsSlot,
+  EventActionsMenu,
+  type EventEditAction,
+} from "./EventActions";
 import { withDefaults } from "./props";
 import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
 import { createNow } from "./state";
@@ -39,7 +50,8 @@ export type ResourceTimelineSlot =
   | "event"
   | "eventBox"
   | "nowIndicator"
-  | "createGhost";
+  | "createGhost"
+  | EventActionsSlot;
 
 /** A schedulable lane (room, person, machine) that events are grouped under. */
 export interface Resource {
@@ -153,6 +165,11 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
   renderResourceHeader?: (resource: Resource, index: number) => JSX.Element;
   /** Snap dragged events to this many minutes (default 15). */
   dragStepMinutes?: number;
+  /**
+   * Words for the move and resize actions and the event labels. Keys you omit
+   * stay in English (`defaultCalendarLabels`).
+   */
+  labels?: Partial<CalendarLabels>;
   /** Show the current-time line when `date` is today (default true). */
   showNowIndicator?: boolean;
   /** Fixed "now" instant for the indicator (doesn't tick). Defaults to the device clock. */
@@ -303,6 +320,7 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
   });
   const theme = createMemo(() => mergeSolidTheme(props.theme));
   const slot = createSlots<ResourceTimelineSlot>(props);
+  const labels = createMemo(() => resolveCalendarLabels(props.labels));
   const Renderer = createMemo(() => props.renderEvent);
   const snapHours = createMemo(() => props.dragStepMinutes / 60);
   const vertical = createMemo(() => props.orientation === "vertical");
@@ -699,6 +717,77 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
       `repeating-linear-gradient(to bottom, transparent 0, transparent ${props.hourHeight - 1}px, ${theme().gridLine} ${props.hourHeight - 1}px, ${theme().gridLine} ${props.hourHeight}px)`,
   );
 
+  // The actions dialog's steps, matching the native screen-reader actions: one
+  // snap step along the axis, or one lane across, through the same commit as a
+  // drop. `draggable: false` locks a bar, as it does for a drag.
+  const laneOf = (event: CalendarEvent<T>) =>
+    resources().findIndex((resource) => resource.id === props.resourceId(event));
+  const eventDescription = (event: CalendarEvent<T>) =>
+    `${resources().find((resource) => resource.id === props.resourceId(event))?.title ?? ""}, ${format(event.start, "yyyy-MM-dd")}, ${eventAccessibilityLabel({ title: event.title, isAllDay: false, start: event.start, end: event.end, ampm: props.ampm, labels: labels() })}`;
+  const actionDelta = (id: string): [number, number, number] | null => {
+    const step = props.dragStepMinutes;
+    switch (id) {
+      case "move-later":
+        return [step, step, 0];
+      case "move-earlier":
+        return [-step, -step, 0];
+      case "extend":
+        return [0, step, 0];
+      case "shorten":
+        return [0, -step, 0];
+      case "move-next-resource":
+        return [0, 0, 1];
+      case "move-previous-resource":
+        return [0, 0, -1];
+      default:
+        return null;
+    }
+  };
+  const editActions = (event: CalendarEvent<T>): EventEditAction[] => {
+    const lane = laneOf(event);
+    if (!props.onDragEvent || event.draggable === false || lane < 0) return [];
+    const step = props.dragStepMinutes;
+    const words = labels();
+    const action = (id: string, label: string): EventEditAction => {
+      const [startDelta, endDelta] = actionDelta(id) ?? [0, 0];
+      const next = resolveDraggedBounds(event.start, event.end, startDelta, endDelta, step);
+      return { id, label, available: next !== null };
+    };
+    const laneTitle = (resource?: Resource) => resource && (resource.title || resource.id);
+    const nextLane = laneTitle(resources()[lane + 1]);
+    const previousLane = laneTitle(resources()[lane - 1]);
+    return [
+      action("move-later", words.moveLater(step)),
+      action("move-earlier", words.moveEarlier(step)),
+      action("extend", words.extend(step)),
+      action("shorten", words.shorten(step)),
+      ...(nextLane ? [action("move-next-resource", words.moveToResource(nextLane))] : []),
+      ...(previousLane
+        ? [action("move-previous-resource", words.moveToResource(previousLane))]
+        : []),
+    ];
+  };
+  const eventActions = createEventActions<CalendarEvent<T>>(
+    () => props.events,
+    editActions,
+    (event, id) => {
+      const delta = actionDelta(id);
+      const target = delta ? resources()[laneOf(event) + delta[2]] : undefined;
+      const next =
+        delta &&
+        target &&
+        resolveDraggedBounds(event.start, event.end, delta[0], delta[1], props.dragStepMinutes);
+      if (!next || !target || props.onDragEvent?.(event, next.start, next.end, target) === false)
+        return null;
+      return (candidate) =>
+        candidate !== event &&
+        candidate.start.getTime() === next.start.getTime() &&
+        candidate.end.getTime() === next.end.getTime() &&
+        candidate.title === event.title &&
+        props.resourceId(candidate) === target.id;
+    },
+  );
+
   // Group the positioned (overlap-resolved) events by resource, once.
   const byResource = createMemo(() => {
     const map = new Map<string, ReturnType<typeof layoutDayEvents<T>>>();
@@ -724,6 +813,8 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
           // scrolling sideways.
           return (
             <div
+              ref={(el) => (eventActions.rootRef.current = el)}
+              tabindex={-1}
               class={props.className}
               style={css({
                 fontFamily: theme().fontFamily,
@@ -732,6 +823,19 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
                 ...props.style,
               })}
             >
+              <EventActionsMenu
+                events={[
+                  ...new Set([...byResource().values()].flat().map((pe) => pe.event)),
+                ].filter((event) => editActions(event).length > 0)}
+                label={labels().editEvents}
+                labelFor={(event) => labels().eventActions(event.title ?? "")}
+                descriptionFor={eventDescription}
+                onSelect={eventActions.select}
+                rootRef={eventActions.rootRef}
+                slot={slot}
+                theme={theme()}
+              />
+
               {/* Header: corner above the hour gutter + one label per resource column */}
               <div
                 {...slot("header", {
@@ -1113,6 +1217,8 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
         );
         return (
           <div
+            ref={(el) => (eventActions.rootRef.current = el)}
+            tabindex={-1}
             class={props.className}
             style={css({
               fontFamily: theme().fontFamily,
@@ -1121,6 +1227,18 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
               ...props.style,
             })}
           >
+            <EventActionsMenu
+              events={[...new Set([...byResource().values()].flat().map((pe) => pe.event))].filter(
+                (event) => editActions(event).length > 0,
+              )}
+              label={labels().editEvents}
+              labelFor={(event) => labels().eventActions(event.title ?? "")}
+              descriptionFor={eventDescription}
+              onSelect={eventActions.select}
+              rootRef={eventActions.rootRef}
+              slot={slot}
+              theme={theme()}
+            />
             <div
               style={css({
                 minWidth: props.labelWidth + trackWidth(),
@@ -1476,6 +1594,21 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
           </div>
         );
       })()}
+      <Show when={eventActions.openEvent()}>
+        {(event) => (
+          <EventActionsDialog
+            dialogRef={eventActions.dialogRef}
+            title={labels().eventActions(event().title ?? "")}
+            description={eventDescription(event())}
+            actions={editActions(event())}
+            closeLabel={labels().close}
+            onAction={eventActions.run}
+            onClose={() => eventActions.close(true)}
+            slot={slot}
+            theme={theme()}
+          />
+        )}
+      </Show>
     </>
   );
 }

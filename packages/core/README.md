@@ -79,6 +79,11 @@ saving changes. For a resize, pass zero for the edge you want to keep fixed.
 renderer's time-grid and resource-timeline resize grips. When omitted, those
 grips use `theme.colors.eventText`. Core preserves the field without interpreting it.
 
+`CalendarLabels` supplies shared accessibility and editing text. The optional
+`editEvents` and `eventActions(title)` fields name the web event chooser and its
+move and resize dialog. `resolveCalendarLabels` fills omitted labels with English
+defaults from `defaultCalendarLabels`.
+
 ## Recurrence limits
 
 Recurring-event expansion stops at JavaScript's date limits and omits occurrences

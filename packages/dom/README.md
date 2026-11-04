@@ -81,6 +81,12 @@ On the time grid, dragging any segment of a multi-day event previews the whole
 range moving together and preserves its duration. Drag a resize grip to change
 only the start or end. See the [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
 
+In `TimeGrid` and `ResourceTimeline`, choose **Edit events**, then an event,
+to open move and resize actions (one `dragStepMinutes` step,
+a page, or a neighbouring lane) for keyboard, click, and tap users. The actions
+call `onDragEvent` with the same bounds as a drop. See
+[Move and resize actions](https://super-calendar.afonsojramos.me/guides/accessibility#move-and-resize-actions-web).
+
 `ResourceTimeline` supports keyboard event activation in both orientations.
 `draggable: false` keeps an event clickable while preventing moves and resizes.
 Active gestures retain the original event through live insertions and reordering;

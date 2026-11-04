@@ -97,6 +97,85 @@ describe(rendererName, () => {
     });
   });
 
+  type FocusProps = {
+    selected: Date | null;
+    onChange: () => void;
+    disabled?: boolean;
+    minDate?: Date;
+    theme?: { text: string };
+  };
+
+  describe.each([
+    {
+      name: "DatePicker",
+      View: (props: FocusProps) => (
+        <DatePicker
+          value={props.selected}
+          onChange={props.onChange}
+          disabled={props.disabled}
+          minDate={props.minDate}
+          theme={props.theme}
+        />
+      ),
+    },
+    {
+      name: "DateRangePicker",
+      View: (props: FocusProps) => (
+        <DateRangePicker
+          value={props.selected ? { start: props.selected, end: null } : null}
+          onChange={props.onChange}
+          disabled={props.disabled}
+          minDate={props.minDate}
+          theme={props.theme}
+        />
+      ),
+    },
+  ])("$name keyboard focus", ({ View }) => {
+    const focusedDay = () => (document.activeElement as HTMLElement | null)?.dataset.day;
+
+    it("moves focus to the selected day on open and back to the trigger on Escape", () => {
+      const view = render(View, { selected: new Date(2026, 6, 10), onChange: vi.fn() });
+      fireEvent.click(trigger(view.container));
+      expect(focusedDay()).toBe("2026-07-10");
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(view.queryByRole("dialog")).toBeNull();
+      expect(document.activeElement).toBe(trigger(view.container));
+    });
+
+    it("starts from today, skipping unavailable days", () => {
+      const view = render(View, { selected: null, onChange: vi.fn() });
+      fireEvent.click(trigger(view.container));
+      expect(focusedDay()).toBe("2026-07-01");
+      cleanup();
+      const restricted = render(View, {
+        selected: null,
+        onChange: vi.fn(),
+        minDate: new Date(2026, 6, 5),
+      });
+      fireEvent.click(trigger(restricted.container));
+      expect(focusedDay()).toBe("2026-07-05");
+    });
+
+    it("keeps the user's focus when props update while open", () => {
+      const props: FocusProps = { selected: new Date(2026, 6, 10), onChange: vi.fn() };
+      const view = render(View, props);
+      fireEvent.click(trigger(view.container));
+      view.container.querySelector<HTMLElement>('[data-day="2026-07-20"]')!.focus();
+      view.rerender({ ...props, theme: { text: "red" } });
+      expect(focusedDay()).toBe("2026-07-20");
+    });
+
+    it("closes without focusing the trigger when disabled while open", () => {
+      const props: FocusProps = { selected: new Date(2026, 6, 10), onChange: vi.fn() };
+      const view = render(View, props);
+      fireEvent.click(trigger(view.container));
+      expect(focusedDay()).toBe("2026-07-10");
+      view.rerender({ ...props, disabled: true });
+      expect(view.queryByRole("dialog")).toBeNull();
+      expect(document.activeElement).not.toBe(trigger(view.container));
+    });
+  });
+
   describe("DatePicker", () => {
     it("shows the placeholder until a date is picked, then opens and selects", () => {
       const { container, queryByRole } = render(ControlledDatePicker, {

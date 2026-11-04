@@ -44,11 +44,15 @@ function Field() {
 ```
 
 Both accept `minDate` / `maxDate` / `isDateDisabled`, a `placeholder`, `disabled`,
-a `formatLabel` for the trigger text, and the calendar `theme`. They close on
-outside-click and `Escape`, and return focus to the trigger.
+a `formatLabel` for the trigger text, and the calendar `theme`. Opening the
+popover moves focus to the selected day (the range start for `DateRangePicker`),
+or to today, or to the first available day. Arrow keys move between days. They
+close on outside-click and `Escape`. `Escape`, picking a date, and completing a
+range return focus to the trigger.
 
-Setting `disabled` closes an open popover and prevents date changes. Re-enabling
-the field leaves the popover closed until you open it again.
+Setting `disabled` closes an open popover and prevents date changes, without
+moving focus to the disabled field. Re-enabling the field leaves the popover
+closed until you open it again.
 
 ## Styling
 
