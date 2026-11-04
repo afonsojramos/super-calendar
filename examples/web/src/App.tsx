@@ -246,6 +246,7 @@ export function App() {
       const target = e.target as HTMLElement | null;
       if (target?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target?.tagName ?? ""))
         return;
+      if (target?.closest('dialog, [role="dialog"]')) return;
       // Leave keys to the context menu while it is open.
       if (document.querySelector('[data-slot="context-menu-content"]')) return;
       switch (e.key.toLowerCase()) {
