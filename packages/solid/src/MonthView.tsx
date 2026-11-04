@@ -647,12 +647,13 @@ export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX
     },
   );
   const monthKey = createMemo(() => format(props.date, "yyyy-MM"));
-  createEffect(
-    () => [monthKey()],
-    () =>
-      untrack(() => {
-        setFocusedDate(initialFocusRef.current);
-      }),
+  let focusedMonth = untrack(monthKey);
+  createEffect(monthKey, (month) =>
+    untrack(() => {
+      if (month === focusedMonth) return;
+      focusedMonth = month;
+      setFocusedDate(initialFocusRef.current);
+    }),
   );
   const [hoveredKey, setHoveredKey] = createSignal<string | null>(null);
   const gridRef: ElementRef<HTMLDivElement | null> = {
@@ -1094,6 +1095,10 @@ export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX
                                         <div
                                           role="gridcell"
                                           data-day={day().id}
+                                          onFocusIn={(event) => {
+                                            if (event.target === event.currentTarget)
+                                              setFocusedDate(day().date);
+                                          }}
                                           {...dayData()}
                                           tabindex={
                                             props.keyboardDayNavigation
@@ -1502,6 +1507,10 @@ export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX
                                         type="button"
                                         role="gridcell"
                                         data-day={day().id}
+                                        onFocusIn={(event) => {
+                                          if (event.target === event.currentTarget)
+                                            setFocusedDate(day().date);
+                                        }}
                                         {...dayData()}
                                         tabindex={day().id === focusKey() ? 0 : -1}
                                         aria-disabled={

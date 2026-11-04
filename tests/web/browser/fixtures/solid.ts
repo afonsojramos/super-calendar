@@ -1,6 +1,7 @@
 import { createSignal, type Component } from "solid-js";
 import { render } from "@solidjs/web";
 export {
+  Calendar,
   MonthList,
   ResourceTimeline,
   TimeGrid,

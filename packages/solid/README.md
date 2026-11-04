@@ -83,7 +83,12 @@ reordered. Removing or replacing that event cancels its drag. Locked events
 (`draggable: false`) remain clickable and keyboard accessible in both orientations.
 In `TimeGrid` and `ResourceTimeline`, choose **Edit events**, then an event,
 to open move and resize actions, committed through `onDragEvent`
-like a drop. See
+like a drop. Rejected edits show a polite status message, customizable with
+`labels.eventChangeRejected`. The chooser and dialog include both dates for
+multi-day events. Pass `getEventId` to `Calendar`, `TimeGrid`, or `ResourceTimeline`
+to keep editing across full data refreshes. Return a stable, unique string or
+number per event or recurring occurrence; missing or duplicate IDs close the
+dialog. Without this prop, full refreshes close it. See
 [Move and resize actions](https://super-calendar.afonsojramos.me/guides/accessibility#move-and-resize-actions-web).
 Removing a resource cancels creation in its lane. Losing pointer capture cancels
 the active interaction.

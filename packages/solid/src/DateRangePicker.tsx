@@ -54,14 +54,14 @@ const popoverDefault: CSSProperties = {
 };
 
 // Where keyboard focus lands when the popover opens: the picked (or today's)
-// day, else that month's roving tab stop, else any enabled day. Unavailable days
+// day, else that month's roving tab stop, else an enabled day in that month. Unavailable days
 // stay focusable for arrow navigation but are skipped as a starting point.
 function initialPickerFocus(dialog: HTMLElement, day: string): HTMLElement | null {
   const usable = ':not([aria-disabled="true"]):not([data-outside])';
   return (
     dialog.querySelector<HTMLElement>(`[data-day="${day}"]${usable}`) ??
     dialog.querySelector<HTMLElement>(`[data-day^="${day.slice(0, 7)}"][tabindex="0"]${usable}`) ??
-    dialog.querySelector<HTMLElement>(`[data-day]${usable}`)
+    dialog.querySelector<HTMLElement>(`[data-day^="${day.slice(0, 7)}"]${usable}`)
   );
 }
 
@@ -133,26 +133,34 @@ function PickerShell(props: ShellProps): JSX.Element {
   const dialogId = createUniqueId();
   const dialogRef: ElementRef<HTMLDivElement | null> = { current: null };
   // Move focus into the popover once per opening (not on every reactive update),
-  // so keyboard users land on a date. The month list can mount its rows a frame
-  // after the popover, so retry briefly before falling back to the panel.
+  // so keyboard users land on a date. Wait for the intended month to mount instead
+  // of focusing a neighbouring virtualized row that happens to render first.
   createEffect(
     // Read the day here, untracked: the effect phase must not read props, and a
     // new day while open must not pull focus back.
     () => (props.open ? untrack(() => props.focusDay) : null),
     (day) => {
       if (day === null) return;
-      let frame = 0;
-      let attempts = 0;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
       const place = () => {
-        const dialog = dialogRef.current;
-        if (!dialog || dialog.contains(document.activeElement)) return;
+        if (dialog.contains(document.activeElement)) {
+          observer.disconnect();
+          return;
+        }
         const target = initialPickerFocus(dialog, day);
-        if (target) target.focus();
-        else if (++attempts < 3) frame = requestAnimationFrame(place);
-        else (dialog.querySelector<HTMLElement>("button:not(:disabled)") ?? dialog).focus();
+        const monthMounted = dialog.querySelector(
+          `[data-day^="${day.slice(0, 7)}"]:not([data-outside])`,
+        );
+        if (target || monthMounted) {
+          (target ?? dialog).focus();
+          observer.disconnect();
+        }
       };
+      const observer = new MutationObserver(place);
+      observer.observe(dialog, { childList: true, subtree: true });
       place();
-      return () => cancelAnimationFrame(frame);
+      return () => observer.disconnect();
     },
   );
   return (

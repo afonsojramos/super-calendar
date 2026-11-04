@@ -56,6 +56,7 @@ import {
 import {
   createEventActions,
   EventActionsDialog,
+  describeEventDates,
   type EventActionsSlot,
   EventActionsMenu,
   type EventEditAction,
@@ -292,6 +293,8 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
    * Return `false` to reject the drop (the event snaps back).
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
+  /** Stable, unique event identity for the web editing dialog across data refreshes. */
+  getEventId?: (event: CalendarEvent<T>) => string | number;
   /**
    * Page the grid to a new anchor date. Supplying it alongside `onDragEvent`
    * turns on edge auto-advance: dragging an event to the left/right edge and
@@ -800,7 +803,7 @@ export function TimeGrid<T = unknown>(
           labels: labels(),
         });
   const eventDescription = (event: CalendarEvent<T>) =>
-    `${format(event.start, "yyyy-MM-dd")}, ${eventLabel(event)}`;
+    `${describeEventDates(event)}, ${eventLabel(event)}`;
   // The actions dialog's steps, matching the native screen-reader actions: one
   // snap step, or one page of days, through the same commit path as a drop.
   const pageDays = () =>
@@ -826,6 +829,7 @@ export function TimeGrid<T = unknown>(
     }
   };
   const editActions = (event: CalendarEvent<T>): EventEditAction[] => {
+    if (isAllDayEvent(event) || isBackgroundEvent(event)) return [];
     const { canMove, canResize } = editability(event);
     const step = snapMinutes();
     const words = labels();
@@ -866,6 +870,7 @@ export function TimeGrid<T = unknown>(
         candidate.end.getTime() === next.end.getTime() &&
         candidate.title === event.title;
     },
+    () => props.getEventId,
   );
   const allDayByDay = createMemo(
     // A multi-day all-day event shows in every column it overlaps (matching the
@@ -2674,6 +2679,8 @@ export function TimeGrid<T = unknown>(
             description={eventDescription(event())}
             actions={editActions(event())}
             closeLabel={labels().close}
+            rejectedLabel={labels().eventChangeRejected}
+            rejections={eventActions.rejections()}
             onAction={eventActions.run}
             onClose={() => eventActions.close(true)}
             slot={slot}

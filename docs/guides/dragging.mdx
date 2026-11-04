@@ -217,7 +217,10 @@ reject). `eventOverlap={false}`, `draggable: false`, `startEditable`, and
 On React DOM and Solid, choose **Edit events**, then an event, to open a dialog with **Move 15 minutes later /
 earlier**, **Extend / Shorten by 15 minutes**, and **Move to next / previous
 week** (per mode: the page span), stepping by `dragStepMinutes`. It works with a
-keyboard, a click, or a tap, and never presses or drags the event itself. See
+keyboard, a click, or a tap, and never presses or drags the event itself.
+Rejected edits show a polite status message, customizable with
+`labels.eventChangeRejected`. Pass `getEventId` to retain the dialog's event
+through full data refreshes. See
 [Move and resize actions](/guides/accessibility#move-and-resize-actions-web).
 
 On the React Native renderer draggable events also carry

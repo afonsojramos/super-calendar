@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import type {
   ComponentType,
   CSSProperties,
@@ -22,12 +21,15 @@ import {
   eventTimeLabel,
   formatHour,
   layoutDayEvents,
+  isAllDayEvent,
+  isBackgroundEvent,
   movedClockSpan,
   type PositionedEvent,
   resolveDraggedBounds,
 } from "@super-calendar/core";
 import {
   EventActionsDialog,
+  describeEventDates,
   type EventActionsSlot,
   EventActionsMenu,
   type EventEditAction,
@@ -138,6 +140,8 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
     end: Date,
     resource: Resource,
   ) => void | boolean;
+  /** Stable, unique event identity for the web editing dialog across data refreshes. */
+  getEventId?: (event: CalendarEvent<T>) => string | number;
   /** Tap empty lane space; called with the snapped time and the lane's resource. */
   onPressCell?: (at: Date, resource: Resource) => void;
   /** Drag empty lane space to create; called with the swept start/end and the lane's resource. */
@@ -284,6 +288,7 @@ export function ResourceTimeline<T = unknown>({
   renderEvent,
   onPressEvent,
   onDragEvent,
+  getEventId,
   onPressCell,
   onCreateEvent,
   businessHours,
@@ -658,7 +663,7 @@ export function ResourceTimeline<T = unknown>({
   const laneOf = (event: CalendarEvent<T>) =>
     resources.findIndex((resource) => resource.id === resourceId(event));
   const eventDescription = (event: CalendarEvent<T>) =>
-    `${resources.find((resource) => resource.id === resourceId(event))?.title ?? ""}, ${format(event.start, "yyyy-MM-dd")}, ${eventAccessibilityLabel({ title: event.title, isAllDay: false, start: event.start, end: event.end, ampm: ampm, labels: labels })}`;
+    `${resources.find((resource) => resource.id === resourceId(event))?.title ?? ""}, ${describeEventDates(event)}, ${eventAccessibilityLabel({ title: event.title, isAllDay: false, start: event.start, end: event.end, ampm: ampm, labels: labels })}`;
   const actionDelta = (id: string): [number, number, number] | null => {
     switch (id) {
       case "move-later":
@@ -678,6 +683,7 @@ export function ResourceTimeline<T = unknown>({
     }
   };
   const editActions = (event: CalendarEvent<T>): EventEditAction[] => {
+    if (isAllDayEvent(event) || isBackgroundEvent(event)) return [];
     const lane = laneOf(event);
     if (!onDragEvent || event.draggable === false || lane < 0) return [];
     const action = (id: string, label: string): EventEditAction => {
@@ -705,22 +711,27 @@ export function ResourceTimeline<T = unknown>({
         : []),
     ];
   };
-  const eventActions = useEventActions(events, editActions, (event, id) => {
-    const delta = actionDelta(id);
-    const target = delta ? resources[laneOf(event) + delta[2]] : undefined;
-    const next =
-      delta &&
-      target &&
-      resolveDraggedBounds(event.start, event.end, delta[0], delta[1], dragStepMinutes);
-    if (!next || !target || onDragEvent?.(event, next.start, next.end, target) === false)
-      return null;
-    return (candidate) =>
-      candidate !== event &&
-      candidate.start.getTime() === next.start.getTime() &&
-      candidate.end.getTime() === next.end.getTime() &&
-      candidate.title === event.title &&
-      resourceId(candidate) === target.id;
-  });
+  const eventActions = useEventActions(
+    events,
+    editActions,
+    (event, id) => {
+      const delta = actionDelta(id);
+      const target = delta ? resources[laneOf(event) + delta[2]] : undefined;
+      const next =
+        delta &&
+        target &&
+        resolveDraggedBounds(event.start, event.end, delta[0], delta[1], dragStepMinutes);
+      if (!next || !target || onDragEvent?.(event, next.start, next.end, target) === false)
+        return null;
+      return (candidate) =>
+        candidate !== event &&
+        candidate.start.getTime() === next.start.getTime() &&
+        candidate.end.getTime() === next.end.getTime() &&
+        candidate.title === event.title &&
+        resourceId(candidate) === target.id;
+    },
+    getEventId,
+  );
   const openActionsEvent = eventActions.openEvent;
   const actionsDialog = openActionsEvent ? (
     <EventActionsDialog
@@ -729,6 +740,8 @@ export function ResourceTimeline<T = unknown>({
       description={eventDescription(openActionsEvent)}
       actions={editActions(openActionsEvent)}
       closeLabel={labels.close}
+      rejectedLabel={labels.eventChangeRejected}
+      rejections={eventActions.rejections}
       onAction={eventActions.run}
       onClose={() => eventActions.close(true)}
       slot={slot}

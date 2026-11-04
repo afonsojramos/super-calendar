@@ -2,6 +2,7 @@ import { vi } from "vitest";
 import {
   rendererName,
   cleanup,
+  act,
   fireEvent,
   render,
   DatePicker,
@@ -154,13 +155,16 @@ describe(rendererName, () => {
       });
       fireEvent.click(trigger(restricted.container));
       expect(focusedDay()).toBe("2026-07-05");
+      fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+      expect(focusedDay()).toBe("2026-07-06");
+      expect(document.activeElement?.getAttribute("tabindex")).toBe("0");
     });
 
     it("keeps the user's focus when props update while open", () => {
       const props: FocusProps = { selected: new Date(2026, 6, 10), onChange: vi.fn() };
       const view = render(View, props);
       fireEvent.click(trigger(view.container));
-      view.container.querySelector<HTMLElement>('[data-day="2026-07-20"]')!.focus();
+      act(() => view.container.querySelector<HTMLElement>('[data-day="2026-07-20"]')!.focus());
       view.rerender({ ...props, theme: { text: "red" } });
       expect(focusedDay()).toBe("2026-07-20");
     });

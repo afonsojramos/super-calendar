@@ -81,7 +81,8 @@ grips use `theme.colors.eventText`. Core preserves the field without interpretin
 
 `CalendarLabels` supplies shared accessibility and editing text. The optional
 `editEvents` and `eventActions(title)` fields name the web event chooser and its
-move and resize dialog. `resolveCalendarLabels` fills omitted labels with English
+move and resize dialog. `eventChangeRejected` supplies the web dialog's rejection
+message (default "This change is not allowed."). `resolveCalendarLabels` fills omitted labels with English
 defaults from `defaultCalendarLabels`.
 
 ## Recurrence limits

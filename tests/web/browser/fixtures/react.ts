@@ -1,6 +1,7 @@
 import { createElement, useState, type ComponentType } from "react";
 import { createRoot } from "react-dom/client";
 export {
+  Calendar,
   MonthList,
   ResourceTimeline,
   TimeGrid,

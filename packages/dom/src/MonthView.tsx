@@ -643,7 +643,13 @@ export function MonthView<T = unknown>({
   const initialFocusRef = useRef(initialFocus);
   initialFocusRef.current = initialFocus;
   const monthKey = format(date, "yyyy-MM");
-  useEffect(() => setFocusedDate(initialFocusRef.current), [monthKey]);
+  const focusedMonth = useRef(monthKey);
+  useEffect(() => {
+    // A parent can focus a day before the initial passive effect runs.
+    if (monthKey === focusedMonth.current) return;
+    focusedMonth.current = monthKey;
+    setFocusedDate(initialFocusRef.current);
+  }, [monthKey]);
 
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -917,6 +923,9 @@ export function MonthView<T = unknown>({
                       key={day.id}
                       role="gridcell"
                       data-day={day.id}
+                      onFocus={(event) => {
+                        if (event.target === event.currentTarget) setFocusedDate(day.date);
+                      }}
                       {...dayData}
                       tabIndex={keyboardDayNavigation ? (day.id === focusKey ? 0 : -1) : undefined}
                       aria-disabled={day.isDisabled || undefined}
@@ -1187,6 +1196,9 @@ export function MonthView<T = unknown>({
                     type="button"
                     role="gridcell"
                     data-day={day.id}
+                    onFocus={(event) => {
+                      if (event.target === event.currentTarget) setFocusedDate(day.date);
+                    }}
                     {...dayData}
                     tabIndex={day.id === focusKey ? 0 : -1}
                     aria-disabled={day.isDisabled || undefined}

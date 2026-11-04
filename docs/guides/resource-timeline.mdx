@@ -153,7 +153,10 @@ On the web, drag with a mouse or pen; a bar being dragged carries `data-dragging
 for styling. Choose **Edit events**, then a booking, to open a dialog with **Move 15 minutes later / earlier**, **Extend / Shorten by 15
 minutes**, and **Move to** the neighbouring lanes. It works with a keyboard, a
 click, or a tap, in both orientations, and commits through `onDragEvent` like a
-drop. See [Move and resize actions](/guides/accessibility#move-and-resize-actions-web).
+drop. Pass `getEventId` when you replace booking objects
+on refresh; each booking needs a stable, unique ID. The dialog follows refreshed
+times and resources. Rejected edits show `labels.eventChangeRejected` in a
+polite status region. See [Move and resize actions](/guides/accessibility#move-and-resize-actions-web).
 
 On React Native, long-press a bar to pick it up, then drag along the
 time axis or sideways into another lane; the same move and cross-lane moves are
