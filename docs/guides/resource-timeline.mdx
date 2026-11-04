@@ -150,7 +150,12 @@ To keep the board time-only, reject any lane change: compare the dropped
 `resource.id` to the event's current one and `return false` when they differ.
 
 On the web, drag with a mouse or pen; a bar being dragged carries `data-dragging`
-for styling. On React Native, long-press a bar to pick it up, then drag along the
+for styling. Choose **Edit events**, then a booking, to open a dialog with **Move 15 minutes later / earlier**, **Extend / Shorten by 15
+minutes**, and **Move to** the neighbouring lanes. It works with a keyboard, a
+click, or a tap, in both orientations, and commits through `onDragEvent` like a
+drop. See [Move and resize actions](/guides/accessibility#move-and-resize-actions-web).
+
+On React Native, long-press a bar to pick it up, then drag along the
 time axis or sideways into another lane; the same move and cross-lane moves are
 also exposed as screen-reader actions on the bar. In the vertical orientation the
 time axis runs down and resize moves to the bottom edge; lanes are the columns, so
@@ -286,15 +291,18 @@ reschedule or reassign without a gesture, through the same `onDragEvent`. (The
 visual resize grip is a pointer/touch affordance and isn't a separate focus
 target.)
 
-On native, pass `labels` to translate the action names (`moveLater`, `moveEarlier`,
-`extend`, `shorten`, `moveToResource`). See
+Pass `labels` to translate the action names (`moveLater`, `moveEarlier`,
+`extend`, `shorten`, `moveToResource`, and on the web `editEvents`, `eventActions`, and
+`close`). See
 [Translating the labels](/guides/accessibility#translating-the-labels).
 
 ## Styling
 
 Like the other views, every part is a [slot](/guides/styling): `header`, `corner`,
 `timeAxis`, `hourTick`, `resourceLabel`, `row`, `track`, `gridLines`,
-`businessHours`, `backgroundEvent`, `event`, `eventBox`, `nowIndicator`, and `createGhost`. Pass `classNames` /
+`businessHours`, `backgroundEvent`, `event`, `eventBox`, `nowIndicator`, and `createGhost`, plus
+`eventActionsTrigger`, `eventActionsList`, `eventActions`, and `eventAction` for the web actions button and
+dialog. Pass `classNames` /
 `styles`, or a `renderEvent` for a fully custom bar. It also takes the shared
 [theme](/guides/theming).
 

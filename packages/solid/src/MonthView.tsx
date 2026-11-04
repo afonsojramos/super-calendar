@@ -1512,7 +1512,7 @@ export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX
                                               : "false"
                                         }
                                         aria-label={label()}
-                                        aria-pressed={
+                                        aria-selected={
                                           day().isSelected || day().isInRange ? "true" : "false"
                                         }
                                         {...slot(

@@ -34,8 +34,12 @@
     "tests/types",
     "tests/web/contracts",
     "tests/web/browser",
+    "tests/demos",
+    "tests/performance",
     "vitest.config.mts",
-    "vitest.browser.config.mts"
+    "vitest.browser.config.mts",
+    "vitest.demos.config.mts",
+    "vitest.performance.config.mts"
   ],
   "exclude": ["**/dist", "**/node_modules", "packages/solid"]
 }

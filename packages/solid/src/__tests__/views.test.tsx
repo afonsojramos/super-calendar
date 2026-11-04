@@ -43,7 +43,7 @@ describe("Solid views", () => {
     view.update({ selectedDates: [new Date(2026, 6, 2)] });
     expect(view.getByRole("gridcell", { name: "Thursday, 2 July 2026" })).toBe(next);
     expect(document.activeElement).toBe(next);
-    expect(next.getAttribute("aria-pressed")).toBe("true");
+    expect(next.getAttribute("aria-selected")).toBe("true");
     click(next);
     expect(onPressDay).toHaveBeenCalledWith(new Date(2026, 6, 2));
   });

@@ -63,7 +63,7 @@ driver; Vitest owns discovery, lifecycle, assertions, and results.
 
 `browser/fixtures/Fixture.tsx` is compiled for each framework using the adapters
 beside it. The fixture mounts real calendar components and virtual lists. The
-shared session starts an isolated Vite server, dependency cache, and Chrome
+shared session starts an isolated Vite server, dependency cache, and browser
 instance for each project, and a fresh page for each case. Browser errors and
 warnings fail the test.
 
@@ -72,18 +72,29 @@ pnpm build
 pnpm test:browser
 ```
 
-The browser parity gate requires every case to pass in all four projects:
-`react-source`, `react-dist`, `solid-source`, and `solid-dist`. The tests verify
+The browser parity gate runs both renderers' source and built entries in Chromium,
+Firefox, and WebKit, for twelve projects. The tests verify
 that the browser loads the selected source or built entry. Keep assertions
-shared across projects; add framework wiring to the fixture adapters.
+shared across projects; add framework wiring to the fixture adapters. Real touch
+scroll/hold tests live in `browser/contracts/chromium/` because they use Chromium's
+input protocol. They must pass for all four renderer/artifact combinations;
+the gate rejects missing or skipped cases in either group. WebKit testing does
+not replace physical iOS or Android gesture checks.
 
 The session uses system Chrome when available. Set `CHROME` to an executable
-path to choose another installation, or run `pnpm exec playwright install chromium`
-to install Playwright's Chromium fallback. Run one project while iterating:
+path to choose another Chromium installation. Install the browser engines with
+`pnpm exec playwright install chromium firefox webkit` (add `--with-deps` on
+Linux). Run one project while iterating:
 
 ```sh
-pnpm exec vitest run --config vitest.browser.config.mts --project solid-source
+pnpm exec vitest run --config vitest.browser.config.mts --project solid-source-webkit
 ```
 
 The Solid-specific browser scripts still check server rendering and hydration.
 Shared browser contracts complement those checks and the device gesture workflow.
+
+Accessibility cases use axe alongside real keyboard and focus assertions. Axe
+detects common semantic and contrast failures; it does not replace screen-reader
+testing. Browser errors and application warnings fail the shared tests. Two
+Firefox browser diagnostics about tracking and scroll-linked positioning are
+excluded; failed module loads still fail the test.

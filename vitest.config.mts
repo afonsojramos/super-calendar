@@ -13,6 +13,7 @@ const coreAliases = [
 ];
 
 const common = {
+  maxWorkers: 2,
   globals: true,
   clearMocks: false,
   pool: "forks" as const,
@@ -23,7 +24,6 @@ const common = {
 
 export default defineConfig({
   test: {
-    maxWorkers: 2,
     projects: [
       {
         extends: false,
@@ -79,7 +79,7 @@ export default defineConfig({
             "packages/native/src/**/*.test.ts",
             "tests/**/*.test.ts",
           ],
-          exclude: ["tests/web/browser/**"],
+          exclude: ["tests/web/browser/**", "tests/demos/**", "tests/performance/**"],
         },
       },
       {

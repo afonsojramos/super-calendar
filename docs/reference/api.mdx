@@ -229,7 +229,18 @@ updates to mounted months, even when `date` and `events` keep the same reference
 `DatePicker` and `DateRangePicker` apply `theme` to both the picker chrome and
 the nested calendar, including updates while open. Per-slot `styles` take
 precedence. Setting `disabled` closes an open popover and prevents date changes.
-Re-enabling the field leaves the popover closed until you open it again.
+Re-enabling the field leaves the popover closed until you open it again. Opening
+a picker moves focus to the selected day, today, or the first available day;
+`Escape` closes it and returns focus to the trigger.
+
+Web `TimeGrid` and `ResourceTimeline` expose **Edit events** when visible events
+can be edited. Choose an event to open move and resize actions, an alternative to dragging
+for keyboard, click, and tap. The actions call `onDragEvent` with the same bounds
+a drop would, so `eventOverlap`, `draggable`, `startEditable`,
+`durationEditable`, and a `false` return apply. Style it with the
+`eventActionsTrigger`, `eventActionsList`, `eventActions`, and `eventAction` slots.
+The optional `editEvents` and `eventActions(title)` labels name the chooser and event actions. Both web `ResourceTimeline` components accept
+`labels`. See [Move and resize actions](/guides/accessibility#move-and-resize-actions-web).
 
 ## Solid exports
 

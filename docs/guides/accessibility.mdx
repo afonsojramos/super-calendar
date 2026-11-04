@@ -1,11 +1,13 @@
 ---
 title: Accessibility
-description: Screen-reader labels and actions, keyboard navigation, and reduced motion.
+description: Screen-reader labels, move and resize actions, keyboard navigation, and reduced motion.
 ---
 
-Both renderers ship accessible defaults: every event, day cell, and day-column
-header carries a full label and role out of the box, and the interactions that
-are gesture-only for sighted users have screen-reader and keyboard equivalents.
+Every renderer ships accessible defaults: every event, day cell, and day-column
+header carries a full label and role out of the box, and moving or resizing an
+event has an alternative to dragging. On React Native it is a set of
+screen-reader actions; on the web it is a dialog of buttons that works with a
+keyboard, a single click, or a tap.
 
 ## Labels
 
@@ -62,24 +64,29 @@ const labels: Partial<CalendarLabels> = {
         ? "Mover para o dia anterior"
         : `Mover para os ${days} dias anteriores`,
   moveToResource: (title) => `Mover para ${title}`,
+  editEvents: "Editar eventos",
+  eventActions: (title) =>
+    title ? `Mover ou redimensionar ${title}` : "Mover ou redimensionar evento",
 };
 
 <Calendar locale={pt} labels={labels} /* ... */ />;
 ```
 
-| Key                                                            | Default                                         | Where it appears                                       |
-| -------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------ |
-| `today`, `selected`, `unavailable`                             | "today", "selected", "unavailable"              | Day cells and day-column headers.                      |
-| `hasEvents`                                                    | "has events"                                    | Year-view days.                                        |
-| `eventCount(count)`                                            | "3 events"                                      | Month-view day cells.                                  |
-| `moreEvents(count)`                                            | "3 more events"                                 | The "+N more" control.                                 |
-| `close`                                                        | "Close"                                         | The "+N more" popover backdrop (native).               |
-| `allDay`                                                       | "all-day"                                       | The time-grid gutter text, with `showAllDayLabel`.     |
-| `allDayEvent`                                                  | "all day"                                       | An all-day event's label. `allDayLabel` wins when set. |
-| `timeRange(start, end)`                                        | "09:00 to 10:00"                                | A timed event's label.                                 |
-| `moveLater`, `moveEarlier`, `extend`, `shorten`                | "Move 15 minutes later", "Extend by 15 minutes" | Screen-reader drag actions (native).                   |
-| `moveToNextPage(days, mode)`, `moveToPreviousPage(days, mode)` | "Move to next week"                             | Time-grid drag actions (native).                       |
-| `moveToResource(title)`                                        | "Move to Room A"                                | `ResourceTimeline` drag actions (native).              |
+| Key                                                            | Default                                         | Where it appears                                                                   |
+| -------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `today`, `selected`, `unavailable`                             | "today", "selected", "unavailable"              | Day cells and day-column headers.                                                  |
+| `hasEvents`                                                    | "has events"                                    | Year-view days.                                                                    |
+| `eventCount(count)`                                            | "3 events"                                      | Month-view day cells.                                                              |
+| `moreEvents(count)`                                            | "3 more events"                                 | The "+N more" control.                                                             |
+| `close`                                                        | "Close"                                         | The "+N more" popover backdrop (native) and the web actions dialog's close button. |
+| `allDay`                                                       | "all-day"                                       | The time-grid gutter text, with `showAllDayLabel`.                                 |
+| `allDayEvent`                                                  | "all day"                                       | An all-day event's label. `allDayLabel` wins when set.                             |
+| `timeRange(start, end)`                                        | "09:00 to 10:00"                                | A timed event's label.                                                             |
+| `moveLater`, `moveEarlier`, `extend`, `shorten`                | "Move 15 minutes later", "Extend by 15 minutes" | Move and resize actions.                                                           |
+| `moveToNextPage(days, mode)`, `moveToPreviousPage(days, mode)` | "Move to next week"                             | Time-grid move actions.                                                            |
+| `moveToResource(title)`                                        | "Move to Room A"                                | `ResourceTimeline` lane moves.                                                     |
+| `editEvents`                                                   | "Edit events"                                   | The web event chooser button. Optional.                                            |
+| `eventActions(title)`                                          | "Move or resize Planning"                       | The web event choice and actions dialog. Optional.                                 |
 
 The `", "` separator and the word order are fixed. To word a whole event label
 differently, use `eventAccessibilityLabel`.
@@ -95,6 +102,66 @@ through the same `onDragEvent` path as a gesture. The step follows
 bars both expose them whenever `onDragEvent` is set. Translate their names with
 [`labels`](#translating-the-labels).
 
+## Move and resize actions (web)
+
+In React DOM and Solid, **Edit events** opens a list of the visible events you
+can move or resize in `TimeGrid` and either `ResourceTimeline` orientation.
+The chooser shows each event's date and time, plus its resource on the board.
+Its buttons have separate targets, even when events overlap or the calendar is
+narrow. Choosing an event never activates it or starts a drag.
+Opening the chooser focuses its first event. Use the arrow keys, Home, End,
+or Tab to navigate its choices; Escape closes it and focuses **Edit events**.
+
+Choose an event to open a modal dialog named after the event ("Move or resize
+Planning"). The dialog shows the event's time and lists native buttons:
+
+- **Move 15 minutes later / earlier** and **Extend / Shorten by 15 minutes**,
+  stepping by `dragStepMinutes`.
+- **Move to next / previous week** (or day, or N days) in `TimeGrid`.
+- **Move to** the neighbouring lanes in `ResourceTimeline`, named after the
+  resources.
+
+Each button commits through the same path as a drop. `onDragEvent` receives the
+proposed start and end (and the target resource on the board), the same bounds a
+drag produces. `eventOverlap={false}`, `draggable: false`, `startEditable`,
+and `durationEditable` apply as they do to a drag. A shorten that would leave the
+event below one step is marked unavailable with `aria-disabled`. Returning
+`false` from `onDragEvent` leaves the event where it was.
+
+The calendar stays controlled. After an accepted change, the dialog follows the
+unique new event you render in its place (same title, new times, and new lane
+on the board), so you can press **Move later** several times in a row. The event's new
+time is shown in the dialog, inside a polite live region. If the event
+disappears, a refresh replaces other event objects, its replacement is ambiguous,
+its lane goes away, or editing is turned off, the dialog closes. Reopen the
+chooser to continue after a full data refresh. The live description includes
+the date and, on the board, the resource, so page and lane moves are announced too.
+
+When the dialog opens, focus moves to its first action. The arrow keys, Home,
+and End move between the actions alongside Tab. **Escape**, the **Close**
+button, or a click on the backdrop closes it and returns focus to **Edit events**.
+If that control is gone, focus returns to the calendar.
+
+Style the parts with `eventActionsTrigger` (the chooser button),
+`eventActionsList` (the event list), `eventActions` (the dialog),
+and `eventAction` (each button) slots, and translate the words with
+[`labels`](#translating-the-labels):
+
+```tsx
+import { TimeGrid } from "@super-calendar/dom";
+
+<TimeGrid
+  mode="week"
+  date={date}
+  events={events}
+  onDragEvent={(event, start, end) => {
+    setEvents((current) => current.map((e) => (e === event ? { ...e, start, end } : e)));
+  }}
+  labels={{ eventActions: (title) => `Edit times for ${title}` }}
+  classNames={{ eventActionsTrigger: "rounded-full bg-white shadow" }}
+/>;
+```
+
 ## Keyboard (web)
 
 - **Paging** — on react-native-web the left/right arrow keys page the month and
@@ -106,6 +173,10 @@ bars both expose them whenever `onDragEvent` is set. Translate their names with
   events by time, Left/Right jump to the nearest event in the adjacent day,
   Home/End reach the first/last, Enter/Space activate. Navigation is additive:
   every event stays in the Tab order.
+- **Date pickers**: opening a `DatePicker` or `DateRangePicker` moves focus to
+  the selected day (or today, or the first available day). Arrow keys move
+  between days; **Escape** closes the popover and returns focus to the field.
+  Picking a date or completing a range also returns focus to the field.
 
 ## Reduced motion
 
@@ -115,9 +186,18 @@ month pager's page transitions never animate programmatic jumps in the first
 place. Reanimated drives the remaining transitions on the UI thread, so nothing
 relies on JS-thread timing.
 
+## Automated checks
+
+The shared browser tests run [axe](https://github.com/dequelabs/axe-core) against
+the month list, time grid, resource timelines, date pickers, and the actions
+dialog in Chromium, Firefox, and WebKit, together with keyboard and focus
+assertions. These checks catch common semantic and focus problems. They do not
+replace testing with the screen readers your users rely on.
+
 ## Custom renderers
 
 A custom `renderEvent` receives `accessibilityActions` /
 `onAccessibilityAction` in its args on native; spread them onto your pressable
 root so screen-reader move/resize keeps working (the built-in renderers do this
-for you).
+for you). On the web, the event chooser also works with custom `renderEvent`
+content, so your renderer does not need to add controls.

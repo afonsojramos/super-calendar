@@ -15,7 +15,11 @@ assert(
   "Usage: node scripts/verify-web-test-parity.mjs [--browser] [--report vitest-results.json]",
 );
 const renderers = browser
-  ? ["React DOM (source)", "Solid (source)", "React DOM (dist)", "Solid (dist)"]
+  ? ["React DOM", "Solid"].flatMap((renderer) =>
+      ["source", "dist"].flatMap((artifact) =>
+        ["chromium", "firefox", "webkit"].map((engine) => `${renderer} (${artifact}, ${engine})`),
+      ),
+    )
   : ["React DOM", "Solid"];
 const temporary = args.length ? null : await mkdtemp(join(tmpdir(), "calendar-test-parity-"));
 const reportPath = temporary ? join(temporary, "results.json") : resolve(args[1]);
@@ -51,13 +55,17 @@ try {
   assert(files.length > 0, "No shared web contracts found");
   let matched = 0;
   for (const name of files) {
+    const expectedRenderers =
+      browser && name.startsWith(`chromium/`)
+        ? renderers.filter((renderer) => renderer.endsWith(", chromium)"))
+        : renderers;
     const suites = report.testResults.filter((result) => result.name === join(contractsRoot, name));
     assert.equal(
       suites.length,
-      renderers.length,
-      `${name} must run ${renderers.map((renderer) => `once for ${renderer}`).join(" and ")}`,
+      expectedRenderers.length,
+      `${name} must run ${expectedRenderers.map((renderer) => `once for ${renderer}`).join(" and ")}`,
     );
-    const cases = renderers.map((renderer) => {
+    const cases = expectedRenderers.map((renderer) => {
       const candidates = suites.filter(
         (result) => result.assertionResults[0]?.ancestorTitles[0] === renderer,
       );

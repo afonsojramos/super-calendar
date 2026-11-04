@@ -13,22 +13,31 @@ function passingReport(browser = false) {
     .map(String)
     .filter((name) => /\.test\.tsx?$/.test(name));
   const renderers = browser
-    ? ["React DOM (source)", "Solid (source)", "React DOM (dist)", "Solid (dist)"]
+    ? ["React DOM", "Solid"].flatMap((renderer) =>
+        ["source", "dist"].flatMap((artifact) =>
+          ["chromium", "firefox", "webkit"].map((engine) => `${renderer} (${artifact}, ${engine})`),
+        ),
+      )
     : ["React DOM", "Solid"];
   return {
     success: true,
     testResults: files.flatMap((file) =>
-      renderers.map((renderer) => ({
-        name: path.join(contractsRoot, file),
-        status: "passed",
-        assertionResults: ["first case", "parameterized case", "parameterized case"].map(
-          (name) => ({
-            status: "passed",
-            ancestorTitles: [renderer, "Calendar"],
-            fullName: `${renderer} Calendar ${name}`,
-          }),
-        ),
-      })),
+      renderers
+        .filter(
+          (renderer) =>
+            !browser || !file.startsWith("chromium/") || renderer.endsWith(", chromium)"),
+        )
+        .map((renderer) => ({
+          name: path.join(contractsRoot, file),
+          status: "passed",
+          assertionResults: ["first case", "parameterized case", "parameterized case"].map(
+            (name) => ({
+              status: "passed",
+              ancestorTitles: [renderer, "Calendar"],
+              fullName: `${renderer} Calendar ${name}`,
+            }),
+          ),
+        })),
     ),
   };
 }
@@ -67,6 +76,22 @@ describe("shared web test gate", () => {
     if (kind === "missing") report.testResults.pop();
     if (kind === "duplicate") report.testResults[3] = report.testResults[0];
     if (kind === "different") report.testResults[3].assertionResults.pop();
+    expect(verify(report, true).status).not.toBe(0);
+  });
+
+  it("rejects a missing browser engine", () => {
+    const report = passingReport(true);
+    report.testResults = report.testResults.filter(
+      (suite) => !suite.assertionResults[0].ancestorTitles[0].includes(", webkit)"),
+    );
+    expect(verify(report, true).status).not.toBe(0);
+  });
+
+  it("rejects a missing Chromium touch run", () => {
+    const report = passingReport(true);
+    const index = report.testResults.findIndex((suite) => suite.name.includes("/chromium/"));
+    expect(index).toBeGreaterThanOrEqual(0);
+    report.testResults.splice(index, 1);
     expect(verify(report, true).status).not.toBe(0);
   });
 

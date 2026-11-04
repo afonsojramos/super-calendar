@@ -1191,7 +1191,7 @@ export function MonthView<T = unknown>({
                     tabIndex={day.id === focusKey ? 0 : -1}
                     aria-disabled={day.isDisabled || undefined}
                     aria-label={label}
-                    aria-pressed={day.isSelected || day.isInRange}
+                    aria-selected={day.isSelected || day.isInRange}
                     {...slot("day", dayCellDefault(day, theme, highlightWeekends))}
                     onClick={
                       day.isDisabled

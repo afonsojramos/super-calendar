@@ -1,6 +1,12 @@
 import { createElement, useState, type ComponentType } from "react";
 import { createRoot } from "react-dom/client";
-export { MonthList, TimeGrid, DatePicker, DateRangePicker } from "@calendar-browser/library";
+export {
+  MonthList,
+  ResourceTimeline,
+  TimeGrid,
+  DatePicker,
+  DateRangePicker,
+} from "@calendar-browser/library";
 
 export function useFixtureState<T>(initial: T) {
   const [value, update] = useState(initial);

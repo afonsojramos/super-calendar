@@ -61,6 +61,18 @@ const popoverDefault: CSSProperties = {
   minWidth: 300,
 };
 
+// Where keyboard focus lands when the popover opens: the picked (or today's)
+// day, else that month's roving tab stop, else any enabled day. Unavailable days
+// stay focusable for arrow navigation but are skipped as a starting point.
+function initialPickerFocus(dialog: HTMLElement, day: string): HTMLElement | null {
+  const usable = ':not([aria-disabled="true"]):not([data-outside])';
+  return (
+    dialog.querySelector<HTMLElement>(`[data-day="${day}"]${usable}`) ??
+    dialog.querySelector<HTMLElement>(`[data-day^="${day.slice(0, 7)}"][tabindex="0"]${usable}`) ??
+    dialog.querySelector<HTMLElement>(`[data-day]${usable}`)
+  );
+}
+
 /**
  * The shared popover shell: a trigger button and a calendar panel that closes on
  * outside-click and Escape, and returns focus to the trigger. `renderCalendar`
@@ -111,6 +123,8 @@ interface ShellProps {
   className?: string;
   style?: CSSProperties;
   ariaLabel: string;
+  /** The day (`yyyy-MM-dd`) to focus when the popover opens. */
+  focusDay: string;
   children: ReactNode;
 }
 
@@ -128,9 +142,31 @@ function PickerShell({
   className,
   style,
   ariaLabel,
+  focusDay,
   children,
 }: ShellProps): ReactElement {
   const dialogId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const focusDayRef = useRef(focusDay);
+  focusDayRef.current = focusDay;
+  // Move focus into the popover once per opening (not on every re-render), so
+  // keyboard users land on a date. The month list can mount its rows a frame
+  // after the popover, so retry briefly before falling back to the panel.
+  useEffect(() => {
+    if (!open) return;
+    let frame = 0;
+    let attempts = 0;
+    const place = () => {
+      const dialog = dialogRef.current;
+      if (!dialog || dialog.contains(document.activeElement)) return;
+      const target = initialPickerFocus(dialog, focusDayRef.current);
+      if (target) target.focus();
+      else if (++attempts < 3) frame = requestAnimationFrame(place);
+      else (dialog.querySelector<HTMLElement>("button:not(:disabled)") ?? dialog).focus();
+    };
+    place();
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
   return (
     <div
       ref={rootRef}
@@ -165,8 +201,10 @@ function PickerShell({
       </button>
       {open ? (
         <div
+          ref={dialogRef}
           id={dialogId}
           role="dialog"
+          tabIndex={-1}
           aria-label={ariaLabel}
           {...slot("popover", {
             base: popoverDefault,
@@ -237,6 +275,7 @@ export function DatePicker({
       className={className}
       style={style}
       ariaLabel="Choose a date"
+      focusDay={format(value ?? new Date(), "yyyy-MM-dd")}
     >
       <MonthList
         theme={themeOverrides}
@@ -322,6 +361,7 @@ export function DateRangePicker({
       className={className}
       style={style}
       ariaLabel="Choose a date range"
+      focusDay={format(value?.start ?? new Date(), "yyyy-MM-dd")}
     >
       <MonthList
         theme={themeOverrides}

@@ -81,6 +81,10 @@ selection live, so it does not roll back selection updates on cancellation.
 `ResourceTimeline` keeps the grabbed event when other events are inserted or
 reordered. Removing or replacing that event cancels its drag. Locked events
 (`draggable: false`) remain clickable and keyboard accessible in both orientations.
+In `TimeGrid` and `ResourceTimeline`, choose **Edit events**, then an event,
+to open move and resize actions, committed through `onDragEvent`
+like a drop. See
+[Move and resize actions](https://super-calendar.afonsojramos.me/guides/accessibility#move-and-resize-actions-web).
 Removing a resource cancels creation in its lane. Losing pointer capture cancels
 the active interaction.
 
@@ -117,7 +121,8 @@ cleans up its timer on disposal. Create these inside a Solid component or root.
 `DatePicker` and `DateRangePicker` apply `theme` to both the popover chrome and
 the calendar inside it. Theme updates apply while open, and per-slot styles take
 precedence. Setting `disabled` closes an open popover; re-enabling the field
-leaves it closed until you open it again.
+leaves it closed until you open it again. Opening a picker moves focus to the
+selected day, and `Escape` returns it to the field.
 
 ## Load events
 

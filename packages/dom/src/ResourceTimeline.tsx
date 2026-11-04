@@ -1,3 +1,4 @@
+import { format } from "date-fns";
 import type {
   ComponentType,
   CSSProperties,
@@ -11,6 +12,9 @@ import {
   type BusinessHoursBand,
   type BusinessHoursValue,
   type CalendarEvent,
+  type CalendarLabels,
+  eventAccessibilityLabel,
+  resolveCalendarLabels,
   isSameCalendarDay,
   useNow,
   cellRangeFromDrag,
@@ -22,6 +26,13 @@ import {
   type PositionedEvent,
   resolveDraggedBounds,
 } from "@super-calendar/core";
+import {
+  EventActionsDialog,
+  type EventActionsSlot,
+  EventActionsMenu,
+  type EventEditAction,
+  useEventActions,
+} from "./EventActions";
 import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
@@ -43,7 +54,8 @@ export type ResourceTimelineSlot =
   | "event"
   | "eventBox"
   | "nowIndicator"
-  | "createGhost";
+  | "createGhost"
+  | EventActionsSlot;
 
 /** A schedulable lane (room, person, machine) that events are grouped under. */
 export interface Resource {
@@ -153,6 +165,11 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
   renderResourceHeader?: (resource: Resource, index: number) => ReactNode;
   /** Snap dragged events to this many minutes (default 15). */
   dragStepMinutes?: number;
+  /**
+   * Words for the move and resize actions and the event labels. Keys you omit
+   * stay in English (`defaultCalendarLabels`).
+   */
+  labels?: Partial<CalendarLabels>;
   /** Show the current-time line when `date` is today (default true). */
   showNowIndicator?: boolean;
   /** Fixed "now" instant for the indicator (doesn't tick). Defaults to the device clock. */
@@ -273,6 +290,7 @@ export function ResourceTimeline<T = unknown>({
   renderBusinessHours,
   renderResourceHeader,
   dragStepMinutes = 15,
+  labels: labelsProp,
   showNowIndicator = true,
   now: nowProp,
   timeZone,
@@ -289,6 +307,7 @@ export function ResourceTimeline<T = unknown>({
     return allResources.slice(page * resourcesPerPage, (page + 1) * resourcesPerPage);
   }, [allResources, resourcesPerPage, resourcePage]);
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
+  const labels = useMemo(() => resolveCalendarLabels(labelsProp), [labelsProp]);
   const slot = createSlots<ResourceTimelineSlot>({ classNames, styles });
   const Renderer = renderEvent;
   const snapHours = dragStepMinutes / 60;
@@ -633,6 +652,90 @@ export function ResourceTimeline<T = unknown>({
     }
     return key;
   };
+  // The actions dialog's steps, matching the native screen-reader actions: one
+  // snap step along the axis, or one lane across, through the same commit as a
+  // drop. `draggable: false` locks a bar, as it does for a drag.
+  const laneOf = (event: CalendarEvent<T>) =>
+    resources.findIndex((resource) => resource.id === resourceId(event));
+  const eventDescription = (event: CalendarEvent<T>) =>
+    `${resources.find((resource) => resource.id === resourceId(event))?.title ?? ""}, ${format(event.start, "yyyy-MM-dd")}, ${eventAccessibilityLabel({ title: event.title, isAllDay: false, start: event.start, end: event.end, ampm: ampm, labels: labels })}`;
+  const actionDelta = (id: string): [number, number, number] | null => {
+    switch (id) {
+      case "move-later":
+        return [dragStepMinutes, dragStepMinutes, 0];
+      case "move-earlier":
+        return [-dragStepMinutes, -dragStepMinutes, 0];
+      case "extend":
+        return [0, dragStepMinutes, 0];
+      case "shorten":
+        return [0, -dragStepMinutes, 0];
+      case "move-next-resource":
+        return [0, 0, 1];
+      case "move-previous-resource":
+        return [0, 0, -1];
+      default:
+        return null;
+    }
+  };
+  const editActions = (event: CalendarEvent<T>): EventEditAction[] => {
+    const lane = laneOf(event);
+    if (!onDragEvent || event.draggable === false || lane < 0) return [];
+    const action = (id: string, label: string): EventEditAction => {
+      const [startDelta, endDelta] = actionDelta(id) ?? [0, 0];
+      const next = resolveDraggedBounds(
+        event.start,
+        event.end,
+        startDelta,
+        endDelta,
+        dragStepMinutes,
+      );
+      return { id, label, available: next !== null };
+    };
+    const laneTitle = (resource?: Resource) => resource && (resource.title || resource.id);
+    const nextLane = laneTitle(resources[lane + 1]);
+    const previousLane = laneTitle(resources[lane - 1]);
+    return [
+      action("move-later", labels.moveLater(dragStepMinutes)),
+      action("move-earlier", labels.moveEarlier(dragStepMinutes)),
+      action("extend", labels.extend(dragStepMinutes)),
+      action("shorten", labels.shorten(dragStepMinutes)),
+      ...(nextLane ? [action("move-next-resource", labels.moveToResource(nextLane))] : []),
+      ...(previousLane
+        ? [action("move-previous-resource", labels.moveToResource(previousLane))]
+        : []),
+    ];
+  };
+  const eventActions = useEventActions(events, editActions, (event, id) => {
+    const delta = actionDelta(id);
+    const target = delta ? resources[laneOf(event) + delta[2]] : undefined;
+    const next =
+      delta &&
+      target &&
+      resolveDraggedBounds(event.start, event.end, delta[0], delta[1], dragStepMinutes);
+    if (!next || !target || onDragEvent?.(event, next.start, next.end, target) === false)
+      return null;
+    return (candidate) =>
+      candidate !== event &&
+      candidate.start.getTime() === next.start.getTime() &&
+      candidate.end.getTime() === next.end.getTime() &&
+      candidate.title === event.title &&
+      resourceId(candidate) === target.id;
+  });
+  const openActionsEvent = eventActions.openEvent;
+  const actionsDialog = openActionsEvent ? (
+    <EventActionsDialog
+      dialogRef={eventActions.dialogRef}
+      title={labels.eventActions(openActionsEvent.title ?? "")}
+      description={eventDescription(openActionsEvent)}
+      actions={editActions(openActionsEvent)}
+      closeLabel={labels.close}
+      onAction={eventActions.run}
+      onClose={() => eventActions.close(true)}
+      slot={slot}
+      theme={theme}
+    />
+  ) : null;
+
   // The closed-hours bands to shade in a lane, resolved per resource.
   const bandsFor = (resource: Resource) =>
     businessHours
@@ -679,9 +782,23 @@ export function ResourceTimeline<T = unknown>({
     const vGridLines = `repeating-linear-gradient(to bottom, transparent 0, transparent ${hourHeight - 1}px, ${theme.gridLine} ${hourHeight - 1}px, ${theme.gridLine} ${hourHeight}px)`;
     return (
       <div
+        ref={eventActions.rootRef}
+        tabIndex={-1}
         className={className}
         style={{ fontFamily: theme.fontFamily, color: theme.text, overflowY: "auto", ...style }}
       >
+        <EventActionsMenu
+          events={[...new Set([...byResource.values()].flat().map((pe) => pe.event))].filter(
+            (event) => editActions(event).length > 0,
+          )}
+          label={labels.editEvents}
+          labelFor={(event) => labels.eventActions(event.title ?? "")}
+          descriptionFor={eventDescription}
+          onSelect={eventActions.select}
+          rootRef={eventActions.rootRef}
+          slot={slot}
+          theme={theme}
+        />
         {/* Header: corner above the hour gutter + one label per resource column */}
         <div
           {...slot("header", {
@@ -931,6 +1048,7 @@ export function ResourceTimeline<T = unknown>({
             );
           })}
         </div>
+        {actionsDialog}
       </div>
     );
   }
@@ -939,9 +1057,23 @@ export function ResourceTimeline<T = unknown>({
 
   return (
     <div
+      ref={eventActions.rootRef}
+      tabIndex={-1}
       className={className}
       style={{ fontFamily: theme.fontFamily, color: theme.text, overflowX: "auto", ...style }}
     >
+      <EventActionsMenu
+        events={[...new Set([...byResource.values()].flat().map((pe) => pe.event))].filter(
+          (event) => editActions(event).length > 0,
+        )}
+        label={labels.editEvents}
+        labelFor={(event) => labels.eventActions(event.title ?? "")}
+        descriptionFor={eventDescription}
+        onSelect={eventActions.select}
+        rootRef={eventActions.rootRef}
+        slot={slot}
+        theme={theme}
+      />
       <div style={{ minWidth: labelWidth + trackWidth }}>
         {/* Header: corner + hour axis */}
         <div
@@ -1167,6 +1299,7 @@ export function ResourceTimeline<T = unknown>({
           );
         })}
       </div>
+      {actionsDialog}
     </div>
   );
 }

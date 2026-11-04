@@ -74,7 +74,7 @@ Solid 2 release-candidate peers and uses the `experimental` npm tag. See the
 | Theming                        |      ✅      |    ✅     |   ✅    | `CalendarTheme`, `DomCalendarTheme`, or `SolidCalendarTheme`, respectively.                                                |
 | Per-slot `classNames`/`styles` |      ✅      |    ✅     |   ✅    | A classed slot drops its themed styles. Native needs a Tailwind runtime; web supports CSS. See [Styling](/guides/styling). |
 | Screen-reader labels and roles |      ✅      |    ✅     |   ✅    | Events, month cells, and day headers are labelled.                                                                         |
-| Screen-reader event actions    |      ✅      |    ❌     |   ❌    | Native exposes move / resize as `accessibilityActions` for VoiceOver/TalkBack.                                             |
+| Move / resize without dragging |      ✅      |    ✅     |   ✅    | Native exposes `accessibilityActions` for VoiceOver/TalkBack. Web provides an event chooser and an actions dialog.         |
 | Keyboard navigation            |      ❌      |    ✅     |   ✅    | Web supports `keyboardDayNavigation` and `keyboardEventNavigation`. Native supports arrow-key paging on react-native-web.  |
 
 <Note>
