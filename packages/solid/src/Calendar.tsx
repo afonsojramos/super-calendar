@@ -191,6 +191,8 @@ export interface CalendarProps<T = unknown>
    * days dragged so the time of day and duration are kept.
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
+  /** Stable, unique event identity for the web editing dialog across data refreshes. */
+  getEventId?: (event: CalendarEvent<T>) => string | number;
   /** Tap a day's column header. */
   onPressDateHeader?: (day: Date) => void;
   /** Custom time-grid event renderer. */
@@ -536,6 +538,7 @@ export function Calendar<T = unknown>(
           onCreateEvent={props.onCreateEvent}
           onDragStart={props.onDragStart}
           onDragEvent={props.onDragEvent}
+          getEventId={props.getEventId}
           onChangeDate={props.onChangeDate}
           onPressDateHeader={props.onPressDateHeader}
           renderEvent={props.renderTimeEvent}

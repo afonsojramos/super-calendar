@@ -17,6 +17,48 @@ const isFocused = (locator: ReturnType<typeof trigger>) =>
 const eventBox = (label: string) => page.locator(`[data-slot="event"][aria-label="${label}"]`);
 
 describe(rendererName, () => {
+  it.each([
+    "calendar-actions-stable",
+    "edit-stable",
+    "resources-stable",
+    "resources-vertical-stable",
+  ])("keeps editing the refreshed event by stable ID in %s", async (view) => {
+    await open(view);
+    await showChoices();
+    await trigger("Planning").click();
+    await page
+      .getByRole("button", { name: "Refresh events", exact: true })
+      .evaluate((element) => (element as HTMLButtonElement).click());
+    await expect.poll(() => dialog().textContent()).toContain("Planning refreshed, 10:00 to 11:00");
+    expect(await focusedText()).toBe("Move 15 minutes later");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => dialog().textContent()).toContain("Planning refreshed, 10:15 to 11:15");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => dialog().textContent()).toContain("Planning refreshed, 10:30 to 11:30");
+    const resource = view.startsWith("resources") ? "@a" : "";
+    expect(JSON.parse((await calls()) ?? "[]")).toEqual([
+      `Planning refreshed@15:10:15-15:11:15${resource}`,
+      `Planning refreshed@15:10:30-15:11:30${resource}`,
+    ]);
+    await page
+      .getByRole("button", { name: "Duplicate event ID", exact: true })
+      .evaluate((element) => (element as HTMLButtonElement).click());
+    await expect.poll(() => dialog().count()).toBe(0);
+    expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true);
+  });
+
+  it("keeps modal paging keys inside the Calendar wrapper", async () => {
+    await open("calendar-actions");
+    await showChoices();
+    await trigger("Planning").click();
+    await page.keyboard.press("PageDown");
+    await page.keyboard.press("PageUp");
+    expect(await calls()).toBe("[]");
+    expect(await dialog().isVisible()).toBe(true);
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("PageDown");
+    await expect.poll(calls).toContain("page:");
+  });
   it("moves a time-grid event from the keyboard and returns focus to its button", async () => {
     await open("edit");
     await menu().focus();
@@ -94,6 +136,9 @@ describe(rendererName, () => {
     for (const title of ["Morning", "Overnight"]) {
       await showChoices();
       await trigger(title).click();
+      if (title === "Overnight") {
+        expect(await dialog().textContent()).toContain("2026-07-15 - 2026-07-16");
+      }
       await action("Extend by 15 minutes").click();
       await page.keyboard.press("Escape");
       expect(await isFocused(menu())).toBe(true);
@@ -191,6 +236,9 @@ describe(rendererName, () => {
     await action("Move 15 minutes later").click();
     // eventOverlap={false} refuses the drop before onDragEvent runs.
     await action("Move 15 minutes earlier").waitFor();
+    await expect
+      .poll(() => dialog().getByRole("status").textContent())
+      .toBe("This change is not allowed.");
     expect(await calls()).toBe("[]");
     expect(await eventBox("Planning, 09:00 to 10:00").count()).toBe(1);
     await page.keyboard.press("Escape");
@@ -201,6 +249,15 @@ describe(rendererName, () => {
     await expect.poll(calls).toBe('["Planning@15:8:45-15:9:45"]');
     expect(await eventBox("Planning, 09:00 to 10:00").count()).toBe(1);
     expect(await dialog().textContent()).toContain("Planning, 09:00 to 10:00");
+    await expect
+      .poll(() => dialog().getByRole("status").textContent())
+      .toBe("This change is not allowed.");
+    await page
+      .getByRole("button", { name: "Toggle rejection" })
+      .evaluate((element) => (element as HTMLButtonElement).click());
+    await action("Move 15 minutes earlier").click();
+    await expect.poll(() => dialog().getByRole("status").textContent()).toBe("");
+    await expect.poll(() => dialog().textContent()).toContain("Planning, 08:45 to 09:45");
   });
 
   it("keeps resize actions within the minimum duration and event editability", async () => {

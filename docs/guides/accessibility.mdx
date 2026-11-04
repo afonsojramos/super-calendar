@@ -87,6 +87,7 @@ const labels: Partial<CalendarLabels> = {
 | `moveToResource(title)`                                        | "Move to Room A"                                | `ResourceTimeline` lane moves.                                                     |
 | `editEvents`                                                   | "Edit events"                                   | The web event chooser button. Optional.                                            |
 | `eventActions(title)`                                          | "Move or resize Planning"                       | The web event choice and actions dialog. Optional.                                 |
+| `eventChangeRejected`                                          | "This change is not allowed."                   | Rejected edits in the web actions dialog. Optional.                                |
 
 The `", "` separator and the word order are fixed. To word a whole event label
 differently, use `eventAccessibilityLabel`.
@@ -126,19 +127,30 @@ proposed start and end (and the target resource on the board), the same bounds a
 drag produces. `eventOverlap={false}`, `draggable: false`, `startEditable`,
 and `durationEditable` apply as they do to a drag. A shorten that would leave the
 event below one step is marked unavailable with `aria-disabled`. Returning
-`false` from `onDragEvent` leaves the event where it was.
+`false` from `onDragEvent` leaves the event where it was. A rejected change shows
+`labels.eventChangeRejected` in a polite status region, including overlap
+rejections. Repeated rejections update the region again; an accepted edit clears it.
 
 The calendar stays controlled. After an accepted change, the dialog follows the
 unique new event you render in its place (same title, new times, and new lane
-on the board), so you can press **Move later** several times in a row. The event's new
-time is shown in the dialog, inside a polite live region. If the event
-disappears, a refresh replaces other event objects, its replacement is ambiguous,
-its lane goes away, or editing is turned off, the dialog closes. Reopen the
-chooser to continue after a full data refresh. The live description includes
-the date and, on the board, the resource, so page and lane moves are announced too.
+on the board), so you can press **Move later** several times in a row. Other event
+objects must keep their references for this default matching to work.
+
+For full data refreshes, pass `getEventId` to web `Calendar`, `TimeGrid`, or
+`ResourceTimeline`. Return a stable string or number that uniquely identifies
+each event in `events`. For recurring data, identify each occurrence, not its
+series. Numeric `0` and string `"0"` are distinct IDs. The dialog follows that ID
+when objects, titles, times, or lanes change, and actions use the latest event.
+Without `getEventId`, a full refresh closes the dialog.
+
+The dialog closes if the event disappears, its identity is ambiguous, its lane
+goes away, or editing is turned off. With `getEventId`, removing the getter or
+providing duplicate IDs also closes it. The live description includes both dates
+for multi-day events and, on the board, the resource.
 
 When the dialog opens, focus moves to its first action. The arrow keys, Home,
-and End move between the actions alongside Tab. **Escape**, the **Close**
+and End move between the actions alongside Tab. PageUp and PageDown do not page
+the calendar behind the dialog. **Escape**, the **Close**
 button, or a click on the backdrop closes it and returns focus to **Edit events**.
 If that control is gone, focus returns to the calendar.
 
@@ -148,18 +160,35 @@ and `eventAction` (each button) slots, and translate the words with
 [`labels`](#translating-the-labels):
 
 ```tsx
-import { TimeGrid } from "@super-calendar/dom";
+import { useState } from "react";
+import { type CalendarEvent, TimeGrid } from "@super-calendar/dom";
 
-<TimeGrid
-  mode="week"
-  date={date}
-  events={events}
-  onDragEvent={(event, start, end) => {
-    setEvents((current) => current.map((e) => (e === event ? { ...e, start, end } : e)));
-  }}
-  labels={{ eventActions: (title) => `Edit times for ${title}` }}
-  classNames={{ eventActionsTrigger: "rounded-full bg-white shadow" }}
-/>;
+export function EditableWeek() {
+  const [events, setEvents] = useState<CalendarEvent<{ id: string }>[]>([
+    {
+      id: "planning",
+      title: "Planning",
+      start: new Date(2026, 6, 15, 9),
+      end: new Date(2026, 6, 15, 10),
+    },
+  ]);
+  return (
+    <TimeGrid<{ id: string }>
+      mode="week"
+      date={new Date(2026, 6, 15)}
+      events={events}
+      getEventId={(event) => event.id}
+      onDragEvent={(event, start, end) => {
+        setEvents((current) => current.map((e) => (e.id === event.id ? { ...e, start, end } : e)));
+      }}
+      labels={{
+        eventActions: (title) => `Edit times for ${title}`,
+        eventChangeRejected: "Choose another time.",
+      }}
+      classNames={{ eventActionsTrigger: "rounded-full bg-white shadow" }}
+    />
+  );
+}
 ```
 
 ## Keyboard (web)
@@ -174,7 +203,8 @@ import { TimeGrid } from "@super-calendar/dom";
   Home/End reach the first/last, Enter/Space activate. Navigation is additive:
   every event stays in the Tab order.
 - **Date pickers**: opening a `DatePicker` or `DateRangePicker` moves focus to
-  the selected day (or today, or the first available day). Arrow keys move
+  the selected day (or today, or the first available day in that month). If that
+  month has no available days, focus moves to the popover panel. Arrow keys move
   between days; **Escape** closes the popover and returns focus to the field.
   Picking a date or completing a range also returns focus to the field.
 

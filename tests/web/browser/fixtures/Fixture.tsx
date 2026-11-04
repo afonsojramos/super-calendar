@@ -1,5 +1,6 @@
 import type { CalendarEvent, DateRange } from "@super-calendar/core/vanilla";
 import {
+  Calendar,
   DatePicker,
   DateRangePicker,
   MonthList,
@@ -9,10 +10,11 @@ import {
 } from "@calendar-browser/adapter";
 
 const anchor = new Date(2026, 6, 15);
-const initialEvents: CalendarEvent[] = [
-  { title: "Planning", start: new Date(2026, 6, 15, 9), end: new Date(2026, 6, 15, 10) },
+type FixtureEvent = CalendarEvent<{ id: number }>;
+const initialEvents: FixtureEvent[] = [
+  { id: 0, title: "Planning", start: new Date(2026, 6, 15, 9), end: new Date(2026, 6, 15, 10) },
 ];
-const denseEvents: CalendarEvent[] = Array.from({ length: 1000 }, (_, index) => {
+const denseEvents: FixtureEvent[] = Array.from({ length: 1000 }, (_, index) => {
   const start = new Date(
     2026,
     6,
@@ -20,27 +22,35 @@ const denseEvents: CalendarEvent[] = Array.from({ length: 1000 }, (_, index) => 
     9 + (Math.floor(index / 7) % 8),
     (index % 4) * 15,
   );
-  return { title: `Event ${index}`, start, end: new Date(start.getTime() + 30 * 60_000) };
+  return {
+    id: index,
+    title: `Event ${index}`,
+    start,
+    end: new Date(start.getTime() + 30 * 60_000),
+  };
 });
 // Editing scenarios: an editable event beside a neighbour it can overlap, a
 // one-step event at the minimum duration, and events locked in different ways.
-const editEvents: CalendarEvent[] = [
-  { title: "Planning", start: new Date(2026, 6, 15, 9), end: new Date(2026, 6, 15, 10) },
-  { title: "Standup", start: new Date(2026, 6, 15, 10), end: new Date(2026, 6, 15, 10, 30) },
-  { title: "Short", start: new Date(2026, 6, 16, 9), end: new Date(2026, 6, 16, 9, 15) },
+const editEvents: FixtureEvent[] = [
+  { id: 0, title: "Planning", start: new Date(2026, 6, 15, 9), end: new Date(2026, 6, 15, 10) },
+  { id: 1, title: "Standup", start: new Date(2026, 6, 15, 10), end: new Date(2026, 6, 15, 10, 30) },
+  { id: 2, title: "Short", start: new Date(2026, 6, 16, 9), end: new Date(2026, 6, 16, 9, 15) },
   {
+    id: 3,
     title: "Fixed start",
     start: new Date(2026, 6, 17, 9),
     end: new Date(2026, 6, 17, 10),
     startEditable: false,
   },
   {
+    id: 4,
     title: "Locked",
     start: new Date(2026, 6, 14, 9),
     end: new Date(2026, 6, 14, 10),
     draggable: false,
   },
   {
+    id: 5,
     title: "Quarterly planning review with the regional operations leadership team",
     start: new Date(2026, 6, 18, 9),
     end: new Date(2026, 6, 18, 10),
@@ -51,24 +61,31 @@ const resources = [
   { id: "b", title: "Room B" },
   { id: "c", title: "Room C" },
 ];
-const crowdedEvents: CalendarEvent[] = ["First", "Second", "Third"].map((title) => ({
+const crowdedEvents: FixtureEvent[] = ["First", "Second", "Third"].map((title, id) => ({
+  id,
   title,
   start: new Date(2026, 6, 15, 9),
   end: new Date(2026, 6, 15, 10),
 }));
-const clippedEvents: CalendarEvent[] = [
-  { title: "Morning", start: new Date(2026, 6, 15, 7), end: new Date(2026, 6, 15, 9) },
-  { title: "Overnight", start: new Date(2026, 6, 15, 22), end: new Date(2026, 6, 16, 10) },
+const clippedEvents: FixtureEvent[] = [
+  { id: 0, title: "Morning", start: new Date(2026, 6, 15, 7), end: new Date(2026, 6, 15, 9) },
+  { id: 1, title: "Overnight", start: new Date(2026, 6, 15, 22), end: new Date(2026, 6, 16, 10) },
 ];
-type ResourceEvent = CalendarEvent<{ resourceId: string }>;
+type ResourceEvent = CalendarEvent<{ id: number; resourceId: string }>;
+const crowdedBookings: ResourceEvent[] = crowdedEvents.map((event) => ({
+  ...event,
+  resourceId: "a",
+}));
 const resourceEvents: ResourceEvent[] = [
   {
+    id: 0,
     title: "Planning",
     resourceId: "a",
     start: new Date(2026, 6, 15, 9),
     end: new Date(2026, 6, 15, 10),
   },
   {
+    id: 1,
     title: "Locked",
     resourceId: "b",
     start: new Date(2026, 6, 15, 12),
@@ -81,13 +98,21 @@ const theme = { text: "rgb(12, 34, 56)", cellHeight: 80, selectedBackground: "rg
 
 export function Fixture() {
   const view = new URLSearchParams(location.search).get("view") ?? "months";
+  const unavailable = view.endsWith("-unavailable");
+  const constrained = unavailable || view.endsWith("-constrained");
+  const minDate = unavailable
+    ? new Date(2026, 7, 1)
+    : constrained
+      ? new Date(2026, 6, 5)
+      : undefined;
+  const EditableGrid = view.startsWith("calendar-actions") ? Calendar : TimeGrid;
   const [updated, setUpdated] = useFixtureState(false);
   const [disabled, setDisabled] = useFixtureState(false);
   const [restricted, setRestricted] = useFixtureState(false);
   const [calls, setCalls] = useFixtureState<string[]>([]);
-  const [date, setDate] = useFixtureState<Date | null>(anchor);
+  const [date, setDate] = useFixtureState<Date | null>(constrained ? new Date(2026, 6, 1) : anchor);
   const [range, setRange] = useFixtureState<DateRange | null>({
-    start: anchor,
+    start: constrained ? new Date(2026, 6, 1) : anchor,
     end: new Date(2026, 6, 16),
   });
   const [events, setEvents] = useFixtureState(
@@ -102,9 +127,7 @@ export function Fixture() {
             : initialEvents,
   );
   const [boardEvents, setBoardEvents] = useFixtureState(
-    view.endsWith("crowded")
-      ? crowdedEvents.map((event) => ({ ...event, resourceId: "a" }))
-      : resourceEvents,
+    view.endsWith("crowded") ? crowdedBookings : resourceEvents,
   );
   const [rejecting, setRejecting] = useFixtureState(false);
   const [overlapping, setOverlapping] = useFixtureState(true);
@@ -129,6 +152,28 @@ export function Fixture() {
           }}
         >
           Reverse events
+        </button>
+        <button
+          onClick={() => {
+            const refresh = <T extends CalendarEvent>(event: T) => ({
+              ...event,
+              title: `${event.title} refreshed`,
+              start: new Date(event.start.getTime() + 60 * 60_000),
+              end: new Date(event.end.getTime() + 60 * 60_000),
+            });
+            setEvents((current) => current.map(refresh));
+            setBoardEvents((current) => current.map(refresh));
+          }}
+        >
+          Refresh events
+        </button>
+        <button
+          onClick={() => {
+            setEvents((current) => [...current, { ...current[0] }]);
+            setBoardEvents((current) => [...current, { ...current[0] }]);
+          }}
+        >
+          Duplicate event ID
         </button>
         <button
           onClick={() => {
@@ -162,9 +207,10 @@ export function Fixture() {
           minDate={restricted() ? new Date(2026, 6, 16) : undefined}
           onPressDay={updated() ? () => record("current") : () => record("previous")}
         />
-      ) : view === "picker" ? (
+      ) : view.startsWith("picker") ? (
         <DatePicker
           value={date()}
+          minDate={minDate}
           onChange={(next) => {
             setDate(next);
             record("select");
@@ -172,9 +218,10 @@ export function Fixture() {
           disabled={disabled()}
           theme={updated() ? theme : undefined}
         />
-      ) : view === "range" ? (
+      ) : view.startsWith("range") ? (
         <DateRangePicker
           value={range()}
+          minDate={minDate}
           onChange={(next) => {
             setRange(next);
             record(next ? "select" : "clear");
@@ -182,13 +229,15 @@ export function Fixture() {
           disabled={disabled()}
           theme={updated() ? theme : undefined}
         />
-      ) : view.startsWith("edit") ? (
-        <TimeGrid
+      ) : view.startsWith("edit") || view.startsWith("calendar-actions") ? (
+        <EditableGrid<{ id: number }>
           date={anchor}
+          onChangeDate={(next) => record(`page:${clock(next)}`)}
           now={anchor}
           mode="week"
           weekStartsOn={1}
           events={events()}
+          getEventId={view.endsWith("-stable") ? (event) => event.id : undefined}
           height={500}
           hourHeight={56}
           minHour={view === "edit-clipped" ? 8 : undefined}
@@ -210,12 +259,13 @@ export function Fixture() {
           }
         />
       ) : view.startsWith("resources") ? (
-        <ResourceTimeline
+        <ResourceTimeline<{ id: number; resourceId: string }>
           date={anchor}
           now={anchor}
           orientation={view.includes("vertical") ? "vertical" : "horizontal"}
           resources={resources}
           events={boardEvents()}
+          getEventId={view.endsWith("-stable") ? (event) => event.id : undefined}
           startHour={8}
           endHour={14}
           onPressEvent={(event) => record(`press:${event.title}`)}
@@ -234,7 +284,7 @@ export function Fixture() {
           }
         />
       ) : (
-        <TimeGrid
+        <TimeGrid<{ id: number }>
           date={anchor}
           now={anchor}
           mode="week"

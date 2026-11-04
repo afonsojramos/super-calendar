@@ -1,4 +1,5 @@
 import { type JSX } from "@solidjs/web";
+import { format } from "date-fns";
 import { createEffect, createSignal, createUniqueId, For, onSettled, untrack } from "solid-js";
 import type { ResolvedSlot, SlotDefault } from "./slots";
 import type { ElementRef } from "./styles";
@@ -39,6 +40,12 @@ function moveFocus(event: { key: string; preventDefault(): void }, container: HT
 
 type SlotFn = (name: EventActionsSlot, defaults?: SlotDefault) => ResolvedSlot;
 
+export function describeEventDates(event: { start: Date; end: Date }): string {
+  const start = format(event.start, "yyyy-MM-dd");
+  const end = format(event.end, "yyyy-MM-dd");
+  return start === end ? start : `${start} - ${end}`;
+}
+
 /**
  * Open/close state for one component's actions dialog. `commit` applies an
  * action through the component's drag path and returns a matcher for the event
@@ -50,8 +57,11 @@ export function createEventActions<E extends object>(
   events: () => readonly E[],
   actionsFor: (event: E) => EventEditAction[],
   commit: (event: E, actionId: string) => ((candidate: E) => boolean) | null,
+  getEventId: () => ((event: E) => string | number) | undefined = () => undefined,
 ) {
   const [openEvent, setOpenEvent] = createSignal<E | null>(null);
+  const [rejections, setRejections] = createSignal(0);
+  let identity: { id: string | number } | null = null;
   // Read by handlers, which can run before signal writes settle.
   const openRef: ElementRef<E | null> = { current: null };
   const show = (event: E | null) => {
@@ -70,9 +80,16 @@ export function createEventActions<E extends object>(
   // The open event as the consumer renders it now: itself, or the event that
   // replaced it after an accepted change. Handlers can run after that update
   // renders but before the dialog follows it, so they resolve it here too.
-  const current = (list: readonly E[]): E | undefined => {
+  const current = (list: readonly E[], identify = untrack(getEventId)): E | undefined => {
     const event = openRef.current;
     if (!event) return undefined;
+    if (identity) {
+      if (!identify) return undefined;
+      const id = identity.id;
+      const matches = list.filter((candidate) => identify(candidate) === id);
+      return matches.length === 1 ? matches[0] : undefined;
+    }
+    if (identify) return undefined;
     if (list.includes(event)) return event;
     const committed = pending.current;
     if (committed?.from !== event) return undefined;
@@ -121,7 +138,7 @@ export function createEventActions<E extends object>(
     () => {
       if (!openEvent()) return null;
       const list = events();
-      const next = current(list);
+      const next = current(list, getEventId());
       return { list, next, editable: next ? actionsFor(next).length > 0 : false };
     },
     (state) => {
@@ -148,15 +165,19 @@ export function createEventActions<E extends object>(
     openRef.current = event;
     pending.current = null;
     const matches = commit(event, actionId);
+    setRejections((count) => (matches ? 0 : count + 1));
     if (matches) pending.current = { from: event, events: list, matches };
   };
 
   const select = (event: E, trigger: HTMLElement) => {
+    const identify = untrack(getEventId);
+    identity = identify ? { id: identify(event) } : null;
+    setRejections(0);
     triggers.set(event, trigger);
     show(event);
   };
 
-  return { openEvent, close, run, select, dialogRef, rootRef };
+  return { openEvent, close, run, select, dialogRef, rootRef, rejections };
 }
 
 export function EventActionsMenu<E extends object>(props: {
@@ -307,6 +328,8 @@ export function EventActionsDialog(props: {
   description: string;
   actions: EventEditAction[];
   closeLabel: string;
+  rejectedLabel: string;
+  rejections: number;
   onAction: (actionId: string) => void;
   onClose: () => void;
   slot: SlotFn;
@@ -389,6 +412,7 @@ export function EventActionsDialog(props: {
       // Arrow keys step through the actions, alongside Tab (which some
       // platforms limit to form fields and links).
       onKeyDown={(e) => {
+        if (e.key === "PageUp" || e.key === "PageDown") e.stopPropagation();
         if (e.key === "Escape") {
           e.preventDefault();
           e.stopPropagation();
@@ -443,6 +467,11 @@ export function EventActionsDialog(props: {
             </button>
           )}
         </For>
+        <div role="status" aria-atomic="true" style={{ "font-size": "13px" }}>
+          <For each={props.rejections > 0 ? [props.rejections] : []}>
+            {() => <span>{props.rejectedLabel}</span>}
+          </For>
+        </div>
         <button
           type="button"
           data-action="close"

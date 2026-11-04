@@ -1,4 +1,5 @@
 import { type ReactElement, type RefObject, useEffect, useId, useRef, useState } from "react";
+import { format } from "date-fns";
 import type { ResolvedSlot, SlotDefault } from "./slots";
 import type { DomCalendarTheme } from "./theme";
 
@@ -37,6 +38,12 @@ function moveFocus(event: { key: string; preventDefault(): void }, container: HT
 
 type SlotFn = (name: EventActionsSlot, defaults?: SlotDefault) => ResolvedSlot;
 
+export function describeEventDates(event: { start: Date; end: Date }): string {
+  const start = format(event.start, "yyyy-MM-dd");
+  const end = format(event.end, "yyyy-MM-dd");
+  return start === end ? start : `${start} - ${end}`;
+}
+
 /**
  * Open/close state for one component's actions dialog. `commit` applies an
  * action through the component's drag path and returns a matcher for the event
@@ -48,8 +55,11 @@ export function useEventActions<E extends object>(
   events: readonly E[],
   actionsFor: (event: E) => EventEditAction[],
   commit: (event: E, actionId: string) => ((candidate: E) => boolean) | null,
+  getEventId?: (event: E) => string | number,
 ) {
   const [openEvent, setOpenEvent] = useState<E | null>(null);
+  const [rejections, setRejections] = useState(0);
+  const identity = useRef<{ id: string | number } | null>(null);
   // Read by handlers that can run before the next render (see `current`).
   const openRef = useRef<E | null>(null);
   const show = (event: E | null) => {
@@ -71,6 +81,13 @@ export function useEventActions<E extends object>(
   const current = (): E | undefined => {
     const event = openRef.current;
     if (!event) return undefined;
+    if (identity.current) {
+      if (!getEventId) return undefined;
+      const id = identity.current.id;
+      const matches = events.filter((candidate) => getEventId(candidate) === id);
+      return matches.length === 1 ? matches[0] : undefined;
+    }
+    if (getEventId) return undefined;
     if (events.includes(event)) return event;
     const committed = pending.current;
     if (committed?.from !== event) return undefined;
@@ -135,15 +152,18 @@ export function useEventActions<E extends object>(
     openRef.current = event;
     pending.current = null;
     const matches = commit(event, actionId);
+    setRejections((count) => (matches ? 0 : count + 1));
     if (matches) pending.current = { from: event, events, matches };
   };
 
   const select = (event: E, trigger: HTMLElement) => {
+    identity.current = getEventId ? { id: getEventId(event) } : null;
+    setRejections(0);
     triggers.current.set(event, trigger);
     show(event);
   };
 
-  return { openEvent, close, run, select, dialogRef, rootRef };
+  return { openEvent, close, run, select, dialogRef, rootRef, rejections };
 }
 
 export function EventActionsMenu<E extends object>({
@@ -295,6 +315,8 @@ export function EventActionsDialog({
   description,
   actions,
   closeLabel,
+  rejectedLabel,
+  rejections,
   onAction,
   onClose,
   slot,
@@ -305,6 +327,8 @@ export function EventActionsDialog({
   description: string;
   actions: EventEditAction[];
   closeLabel: string;
+  rejectedLabel: string;
+  rejections: number;
   onAction: (actionId: string) => void;
   onClose: () => void;
   slot: SlotFn;
@@ -370,6 +394,7 @@ export function EventActionsDialog({
       // Arrow keys step through the actions, alongside Tab (which some
       // platforms limit to form fields and links).
       onKeyDown={(e) => {
+        if (e.key === "PageUp" || e.key === "PageDown") e.stopPropagation();
         if (e.key === "Escape") {
           e.preventDefault();
           e.stopPropagation();
@@ -423,6 +448,9 @@ export function EventActionsDialog({
             {action.label}
           </button>
         ))}
+        <div role="status" aria-atomic="true" style={{ fontSize: 13 }}>
+          {rejections > 0 ? <span key={rejections}>{rejectedLabel}</span> : null}
+        </div>
         <button type="button" data-action="close" onClick={() => onClose()} {...buttonSlot(true)}>
           {closeLabel}
         </button>

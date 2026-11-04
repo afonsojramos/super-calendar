@@ -46,7 +46,8 @@ function Field() {
 Both accept `minDate` / `maxDate` / `isDateDisabled`, a `placeholder`, `disabled`,
 a `formatLabel` for the trigger text, and the calendar `theme`. Opening the
 popover moves focus to the selected day (the range start for `DateRangePicker`),
-or to today, or to the first available day. Arrow keys move between days. They
+or to today, or to the first available day in that month. If the month has no
+available days, focus moves to the popover panel. Arrow keys move between days. They
 close on outside-click and `Escape`. `Escape`, picking a date, and completing a
 range return focus to the trigger.
 

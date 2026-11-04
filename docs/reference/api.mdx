@@ -230,7 +230,8 @@ updates to mounted months, even when `date` and `events` keep the same reference
 the nested calendar, including updates while open. Per-slot `styles` take
 precedence. Setting `disabled` closes an open popover and prevents date changes.
 Re-enabling the field leaves the popover closed until you open it again. Opening
-a picker moves focus to the selected day, today, or the first available day;
+a picker moves focus to the selected day, today, or the first available day in
+that month. If the month has no available days, the popover panel receives focus;
 `Escape` closes it and returns focus to the trigger.
 
 Web `TimeGrid` and `ResourceTimeline` expose **Edit events** when visible events
@@ -239,8 +240,18 @@ for keyboard, click, and tap. The actions call `onDragEvent` with the same bound
 a drop would, so `eventOverlap`, `draggable`, `startEditable`,
 `durationEditable`, and a `false` return apply. Style it with the
 `eventActionsTrigger`, `eventActionsList`, `eventActions`, and `eventAction` slots.
-The optional `editEvents` and `eventActions(title)` labels name the chooser and event actions. Both web `ResourceTimeline` components accept
-`labels`. See [Move and resize actions](/guides/accessibility#move-and-resize-actions-web).
+The optional `editEvents` and `eventActions(title)` labels name the chooser and
+event actions. `eventChangeRejected` supplies the polite status message for
+rejected edits (default "This change is not allowed."). Both web
+`ResourceTimeline` components accept `labels`.
+
+Web `Calendar`, `TimeGrid`, and `ResourceTimeline` accept the optional
+`getEventId: (event) => string | number` prop to keep editing through full
+event-array refreshes. IDs must
+be stable and unique per occurrence. Missing or duplicate IDs close the dialog;
+without this prop, full refreshes close it. The chooser and dialog include both
+dates for multi-day events. PageUp and PageDown inside the dialog do not change
+the calendar page. See [Move and resize actions](/guides/accessibility#move-and-resize-actions-web).
 
 ## Solid exports
 

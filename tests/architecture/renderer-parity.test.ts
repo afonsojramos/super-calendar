@@ -40,6 +40,8 @@ const DOM_PLATFORM_PROPS: Record<string, Set<string>> = {
     "touchDragDelay",
     "touchDragThreshold",
     "keyboardEventNavigation",
+    // Only the web renderers keep an editing dialog open across data refreshes.
+    "getEventId",
   ]),
   // showTitle/showWeekdays toggle dom-only chrome; theme/className/style as above.
   // keyboardDayNavigation is a web keyboard-focus concern (roving tabindex); native

@@ -62,6 +62,7 @@ import {
 } from "@super-calendar/core";
 import {
   EventActionsDialog,
+  describeEventDates,
   type EventActionsSlot,
   EventActionsMenu,
   type EventEditAction,
@@ -290,6 +291,8 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
    * Return `false` to reject the drop (the event snaps back).
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
+  /** Stable, unique event identity for the web editing dialog across data refreshes. */
+  getEventId?: (event: CalendarEvent<T>) => string | number;
   /**
    * Page the grid to a new anchor date. Supplying it alongside `onDragEvent`
    * turns on edge auto-advance: dragging an event to the left/right edge and
@@ -511,6 +514,7 @@ function TimeGridInner<T = unknown>(
     onCreateEvent,
     onDragStart,
     onDragEvent,
+    getEventId,
     onChangeDate,
     className,
     style,
@@ -664,7 +668,7 @@ function TimeGridInner<T = unknown>(
           labels,
         });
   const eventDescription = (event: CalendarEvent<T>) =>
-    `${format(event.start, "yyyy-MM-dd")}, ${eventLabel(event)}`;
+    `${describeEventDates(event)}, ${eventLabel(event)}`;
   // The actions dialog's steps, matching the native screen-reader actions: one
   // snap step, or one page of days, through the same commit path as a drop.
   const pageDays = pageStepDays(mode, date, weekStartsOn, numberOfDays);
@@ -688,6 +692,7 @@ function TimeGridInner<T = unknown>(
     }
   };
   const editActions = (event: CalendarEvent<T>): EventEditAction[] => {
+    if (isAllDayEvent(event) || isBackgroundEvent(event)) return [];
     const { canMove, canResize } = editability(event);
     const action = (id: string, label: string): EventEditAction => {
       const [startDelta, endDelta] = actionDelta(id) ?? [0, 0];
@@ -715,17 +720,22 @@ function TimeGridInner<T = unknown>(
         : []),
     ];
   };
-  const eventActions = useEventActions(events, editActions, (event, id) => {
-    const delta = actionDelta(id);
-    const next =
-      delta && resolveDraggedBounds(event.start, event.end, delta[0], delta[1], snapMinutes);
-    if (!next || onDragEventRef.current?.(event, next.start, next.end) === false) return null;
-    return (candidate) =>
-      candidate !== event &&
-      candidate.start.getTime() === next.start.getTime() &&
-      candidate.end.getTime() === next.end.getTime() &&
-      candidate.title === event.title;
-  });
+  const eventActions = useEventActions(
+    events,
+    editActions,
+    (event, id) => {
+      const delta = actionDelta(id);
+      const next =
+        delta && resolveDraggedBounds(event.start, event.end, delta[0], delta[1], snapMinutes);
+      if (!next || onDragEventRef.current?.(event, next.start, next.end) === false) return null;
+      return (candidate) =>
+        candidate !== event &&
+        candidate.start.getTime() === next.start.getTime() &&
+        candidate.end.getTime() === next.end.getTime() &&
+        candidate.title === event.title;
+    },
+    getEventId,
+  );
 
   const allDayByDay = useMemo(
     // A multi-day all-day event shows in every column it overlaps (matching the
@@ -2229,6 +2239,8 @@ function TimeGridInner<T = unknown>(
           description={eventDescription(openActionsEvent)}
           actions={editActions(openActionsEvent)}
           closeLabel={labels.close}
+          rejectedLabel={labels.eventChangeRejected}
+          rejections={eventActions.rejections}
           onAction={eventActions.run}
           onClose={() => eventActions.close(true)}
           slot={slot}

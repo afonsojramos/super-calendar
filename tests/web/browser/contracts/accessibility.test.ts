@@ -3,6 +3,37 @@ import { describe, expect, it } from "vitest";
 import { open, page, rendererName } from "../session";
 
 describe(rendererName, () => {
+  it.each(["picker", "range"])(
+    "focuses the panel when the %s month has no available days",
+    async (view) => {
+      await open(`${view}-unavailable`);
+      const trigger = page.locator('[data-slot="trigger"]');
+      await trigger.click();
+      await expect
+        .poll(() =>
+          page.getByRole("dialog").evaluate((element) => element === document.activeElement),
+        )
+        .toBe(true);
+      await page.keyboard.press("Escape");
+      expect(await trigger.evaluate((element) => element === document.activeElement)).toBe(true);
+    },
+  );
+  it.each(["picker", "range"])(
+    "navigates from the available date in a constrained %s",
+    async (view) => {
+      await open(`${view}-constrained`);
+      await page.locator('[data-slot="trigger"]').click();
+      const focusedDay = () =>
+        page.evaluate(() => document.activeElement?.getAttribute("data-day"));
+      await expect.poll(focusedDay).toBe("2026-07-05");
+      // Firefox can route a page-level keydown to body immediately after autofocus.
+      await page.locator('[data-day="2026-07-05"]:focus').press("ArrowRight");
+      await expect.poll(focusedDay).toBe("2026-07-06");
+      expect(await page.locator('[data-day="2026-07-06"]:focus').getAttribute("tabindex")).toBe(
+        "0",
+      );
+    },
+  );
   it.each([
     "months",
     "week",

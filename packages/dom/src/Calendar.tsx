@@ -199,6 +199,8 @@ export interface CalendarProps<T = unknown>
    * days dragged so the time of day and duration are kept.
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
+  /** Stable, unique event identity for the web editing dialog across data refreshes. */
+  getEventId?: (event: CalendarEvent<T>) => string | number;
   /** Tap a day's column header. */
   onPressDateHeader?: (day: Date) => void;
   /** Custom time-grid event renderer. */
@@ -375,6 +377,7 @@ function CalendarInner<T = unknown>(
     onCreateEvent,
     onDragStart,
     onDragEvent,
+    getEventId,
     onPressDateHeader,
     renderTimeEvent,
     hourComponent,
@@ -584,6 +587,7 @@ function CalendarInner<T = unknown>(
         onCreateEvent={onCreateEvent}
         onDragStart={onDragStart}
         onDragEvent={onDragEvent}
+        getEventId={getEventId}
         onChangeDate={onChangeDate}
         onPressDateHeader={onPressDateHeader}
         renderEvent={renderTimeEvent}

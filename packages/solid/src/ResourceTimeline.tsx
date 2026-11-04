@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import { Dynamic, type JSX } from "@solidjs/web";
 import {
   backgroundBandsForDay,
@@ -13,6 +12,8 @@ import {
   formatHour,
   isSameCalendarDay,
   layoutDayEvents,
+  isAllDayEvent,
+  isBackgroundEvent,
   movedClockSpan,
   type PositionedEvent,
   resolveCalendarLabels,
@@ -22,6 +23,7 @@ import { type Component, createMemo, createSignal, For, onCleanup, Show, untrack
 import {
   createEventActions,
   EventActionsDialog,
+  describeEventDates,
   type EventActionsSlot,
   EventActionsMenu,
   type EventEditAction,
@@ -134,6 +136,8 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
     end: Date,
     resource: Resource,
   ) => void | boolean;
+  /** Stable, unique event identity for the web editing dialog across data refreshes. */
+  getEventId?: (event: CalendarEvent<T>) => string | number;
   /** Tap empty lane space; called with the snapped time and the lane's resource. */
   onPressCell?: (at: Date, resource: Resource) => void;
   /** Drag empty lane space to create; called with the swept start/end and the lane's resource. */
@@ -723,7 +727,7 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
   const laneOf = (event: CalendarEvent<T>) =>
     resources().findIndex((resource) => resource.id === props.resourceId(event));
   const eventDescription = (event: CalendarEvent<T>) =>
-    `${resources().find((resource) => resource.id === props.resourceId(event))?.title ?? ""}, ${format(event.start, "yyyy-MM-dd")}, ${eventAccessibilityLabel({ title: event.title, isAllDay: false, start: event.start, end: event.end, ampm: props.ampm, labels: labels() })}`;
+    `${resources().find((resource) => resource.id === props.resourceId(event))?.title ?? ""}, ${describeEventDates(event)}, ${eventAccessibilityLabel({ title: event.title, isAllDay: false, start: event.start, end: event.end, ampm: props.ampm, labels: labels() })}`;
   const actionDelta = (id: string): [number, number, number] | null => {
     const step = props.dragStepMinutes;
     switch (id) {
@@ -744,6 +748,7 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
     }
   };
   const editActions = (event: CalendarEvent<T>): EventEditAction[] => {
+    if (isAllDayEvent(event) || isBackgroundEvent(event)) return [];
     const lane = laneOf(event);
     if (!props.onDragEvent || event.draggable === false || lane < 0) return [];
     const step = props.dragStepMinutes;
@@ -786,6 +791,7 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
         candidate.title === event.title &&
         props.resourceId(candidate) === target.id;
     },
+    () => props.getEventId,
   );
 
   // Group the positioned (overlap-resolved) events by resource, once.
@@ -1602,6 +1608,8 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
             description={eventDescription(event())}
             actions={editActions(event())}
             closeLabel={labels().close}
+            rejectedLabel={labels().eventChangeRejected}
+            rejections={eventActions.rejections()}
             onAction={eventActions.run}
             onClose={() => eventActions.close(true)}
             slot={slot}

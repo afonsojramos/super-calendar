@@ -37,6 +37,90 @@ describe(rendererName, () => {
       ...props,
     });
 
+    it("distinguishes multi-day events by their ending dates", () => {
+      const view = render(
+        TimeGrid,
+        grid({
+          onDragEvent: vi.fn(),
+          events: [
+            { ...planning, end: at(16, 10) },
+            { ...planning, end: at(17, 10) },
+          ],
+        }),
+      );
+      fireEvent.click(menu(view));
+      const choices = view.getAllByRole("button", { name: "Move or resize Planning" });
+      expect(choices[0].textContent).toContain("2026-07-16");
+      expect(choices[1].textContent).toContain("2026-07-17");
+      fireEvent.click(choices[1]);
+      expect(view.getByRole("dialog").textContent).toContain("2026-07-17");
+    });
+
+    it("announces repeated rejections and clears the message after an accepted edit", () => {
+      const onDragEvent = vi.fn(() => false);
+      const view = render(
+        TimeGrid,
+        grid({ onDragEvent, labels: { eventChangeRejected: "Change refused" } }),
+      );
+      fireEvent.click(trigger(view, "Planning"));
+      const status = view.getByRole("status");
+      expect(status.textContent).toBe("");
+      fireEvent.click(action(view.getByRole("dialog"), "Move 15 minutes later"));
+      expect(status.textContent).toBe("Change refused");
+      const previous = status.firstChild;
+      fireEvent.click(action(view.getByRole("dialog"), "Move 15 minutes later"));
+      expect(status.textContent).toBe("Change refused");
+      expect(status.firstChild).not.toBe(previous);
+      onDragEvent.mockReturnValue(true);
+      fireEvent.click(action(view.getByRole("dialog"), "Move 15 minutes earlier"));
+      expect(status.textContent).toBe("");
+    });
+
+    it("follows a stable ID across full refreshes without confusing numeric and string IDs", () => {
+      const onDragEvent = vi.fn();
+      const original = { ...planning, id: 0 };
+      const other = { ...planning, title: "Other", id: "0" };
+      const props = {
+        date,
+        mode: "week" as const,
+        events: [original, other],
+        onDragEvent,
+        getEventId: (event: CalendarEvent<{ id: string | number }>) => event.id,
+      };
+      const view = render(TimeGrid<{ id: string | number }>, props);
+      fireEvent.click(trigger(view, "Planning"));
+      const refreshed = { ...original, title: "Refreshed", start: at(15, 11), end: at(15, 12) };
+      view.rerender({ ...props, events: [{ ...other }, refreshed] });
+      expect(view.getByRole("dialog").textContent).toContain("Refreshed");
+      fireEvent.click(action(view.getByRole("dialog"), "Move 15 minutes later"));
+      expect(onDragEvent).toHaveBeenLastCalledWith(refreshed, at(15, 11, 15), at(15, 12, 15));
+      view.rerender({ ...props, events: [{ ...refreshed }, { ...refreshed }] });
+      expect(view.queryByRole("dialog")).toBeNull();
+    });
+
+    it("closes safely if the stable ID getter is removed", () => {
+      const props = grid({ onDragEvent: vi.fn(), getEventId: () => "planning" });
+      const view = render(TimeGrid, props);
+      fireEvent.click(trigger(view, "Planning"));
+      view.rerender({ ...props, getEventId: undefined });
+      expect(view.queryByRole("dialog")).toBeNull();
+      expect(view.container.contains(document.activeElement)).toBe(true);
+    });
+
+    it.each([{ allDay: true }, { display: "background" as const }])(
+      "closes when a stable event becomes a non-editable time-grid item: %j",
+      (change) => {
+        const onDragEvent = vi.fn();
+        const props = grid({ onDragEvent, getEventId: () => "planning" });
+        const view = render(TimeGrid, props);
+        fireEvent.click(trigger(view, "Planning"));
+        view.rerender({ ...props, events: [{ ...planning, ...change }] });
+        expect(view.queryByRole("dialog")).toBeNull();
+        expect(onDragEvent).not.toHaveBeenCalled();
+        expect(view.container.contains(document.activeElement)).toBe(true);
+      },
+    );
+
     it("commits a step through onDragEvent without pressing the event", () => {
       const onDragEvent = vi.fn();
       const onPressEvent = vi.fn();
@@ -294,6 +378,59 @@ describe(rendererName, () => {
         events: [booking],
         ...props,
       });
+
+      it("shows ending dates and rejection feedback for multi-day bookings", () => {
+        const onDragEvent = vi.fn(() => false);
+        const view = render(
+          ResourceTimeline<{ resourceId: string }>,
+          board({ onDragEvent, events: [{ ...booking, end: at(17, 10) }] }),
+        );
+        fireEvent.click(trigger(view, "Planning"));
+        expect(view.getByRole("dialog").textContent).toContain("2026-07-17");
+        fireEvent.click(action(view.getByRole("dialog"), "Move to Room B"));
+        expect(view.getByRole("status").textContent).toBe("This change is not allowed.");
+      });
+
+      it("keeps a stable booking selected when every event is refreshed", () => {
+        const onDragEvent = vi.fn();
+        const original = { ...booking, id: "booking" };
+        const props = {
+          date,
+          orientation,
+          resources,
+          events: [original],
+          onDragEvent,
+          getEventId: (event: CalendarEvent<{ resourceId: string; id: string }>) => event.id,
+        };
+        const view = render(ResourceTimeline<{ resourceId: string; id: string }>, props);
+        fireEvent.click(trigger(view, "Planning"));
+        const refreshed = { ...original, resourceId: "b" };
+        view.rerender({ ...props, events: [refreshed] });
+        expect(view.getByRole("dialog").textContent).toContain("Room B");
+        fireEvent.click(action(view.getByRole("dialog"), "Move to Room A"));
+        expect(onDragEvent).toHaveBeenCalledWith(
+          refreshed,
+          refreshed.start,
+          refreshed.end,
+          resources[0],
+        );
+        view.rerender({ ...props, events: [] });
+        expect(view.queryByRole("dialog")).toBeNull();
+      });
+
+      it.each([{ allDay: true }, { display: "background" as const }])(
+        "closes when a stable booking becomes a non-editable board item: %j",
+        (change) => {
+          const onDragEvent = vi.fn();
+          const props = board({ onDragEvent, getEventId: () => "booking" });
+          const view = render(ResourceTimeline<{ resourceId: string }>, props);
+          fireEvent.click(trigger(view, "Planning"));
+          view.rerender({ ...props, events: [{ ...booking, ...change }] });
+          expect(view.queryByRole("dialog")).toBeNull();
+          expect(onDragEvent).not.toHaveBeenCalled();
+          expect(view.container.contains(document.activeElement)).toBe(true);
+        },
+      );
 
       it("moves an event across lanes and in time", () => {
         const onDragEvent = vi.fn();

@@ -56,6 +56,8 @@ export interface CalendarLabels {
   eventActions?: (title: string) => string;
   /** Opens the web event chooser for move and resize actions. Default "Edit events". */
   editEvents?: string;
+  /** Feedback when a web move or resize is rejected. */
+  eventChangeRejected?: string;
 }
 
 const minutes = (n: number) => `${n} minute${n === 1 ? "" : "s"}`;
@@ -83,6 +85,7 @@ export const defaultCalendarLabels: Required<CalendarLabels> = {
   moveToResource: (title) => `Move to ${title}`,
   eventActions: (title) => (title ? `Move or resize ${title}` : "Move or resize event"),
   editEvents: "Edit events",
+  eventChangeRejected: "This change is not allowed.",
 };
 
 /** Fill the labels a consumer left out with {@link defaultCalendarLabels}. */
