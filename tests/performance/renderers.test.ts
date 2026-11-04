@@ -3,12 +3,10 @@ import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { arch, cpus, platform, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
-import { build } from "vite";
 import type { Browser } from "playwright";
 import { afterAll, beforeAll, expect, inject, it } from "vitest";
 import { launchBrowser } from "../support/browser";
 import { serveDirectory } from "../support/static-server";
-import { fixtureConfig } from "../web/browser/fixture-config";
 
 const renderer = inject("browserRenderer");
 const root = resolve(import.meta.dirname, "../..");
@@ -24,8 +22,11 @@ let server: Awaited<ReturnType<typeof serveDirectory>>;
 
 beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), `calendar-performance-${renderer}-`));
-  const { config } = fixtureConfig(renderer, "dist");
-  await build({ ...config, logLevel: "silent", build: { outDir: directory, emptyOutDir: true } });
+  execFileSync(process.execPath, ["scripts/build-performance-fixture.mjs", renderer, directory], {
+    cwd: root,
+    env: { ...process.env, NODE_ENV: "production" },
+    timeout: 45_000,
+  });
   server = await serveDirectory(directory);
   browser = await launchBrowser();
 });

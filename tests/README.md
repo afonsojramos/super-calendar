@@ -55,7 +55,10 @@ gesture checks use the [native example workflow](../AGENTS.md#running-the-native
 `pnpm bench:web` runs Vitest against production builds of the same fixture for
 React DOM and Solid. It measures a 1,000-event week, an update of all event titles,
 and scrolling through 121 months. The scrolling check also verifies bounded
-mounted rows, and both tests fail on browser errors or missing content.
+mounted rows, and both tests fail on browser errors or missing content. Fixture
+builds run in separate Node processes with `NODE_ENV=production`, independently
+of Vitest's test environment. Build guards require Vite's production mode and
+reject bundled React development modules.
 
 Reports in `dist/performance/react.json` and `dist/performance/solid.json` contain
 seven measured samples after one discarded warmup, medians and p95 values, DOM
