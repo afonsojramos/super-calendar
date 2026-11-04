@@ -1,6 +1,6 @@
 name: Demo
 
-# Builds the example as a static web app and publishes it to GitHub Pages so the
+# Builds the examples as static web apps and publishes them to GitHub Pages so the
 # docs can embed a live, interactive demo. Requires Pages to be enabled for the
 # repo with "GitHub Actions" as the source (Settings → Pages).
 
@@ -33,14 +33,17 @@ jobs:
       # The react-dom demo is served from the /dom/ subpath, so Vite needs a
       # matching base so its assets resolve.
       - run: pnpm --filter @super-calendar/example-web exec -- vite build --base=/dom/
-      # Assemble both demos into one Pages artifact: native at the root, dom at /dom/.
+      # Solid imports core's built vanilla entry and is served from /solid/.
+      - run: pnpm --filter @super-calendar/core build
+      - run: pnpm --filter @super-calendar/example-solid exec -- vite build --base=/solid/
+      # Assemble all demos into one Pages artifact.
       - name: Assemble site
         run: |
           rm -rf _site
-          mkdir -p _site
+          mkdir -p _site/dom _site/solid
           cp -r examples/native/dist/. _site/
-          mkdir -p _site/dom
           cp -r examples/web/dist/. _site/dom/
+          cp -r examples/solid/dist/. _site/solid/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

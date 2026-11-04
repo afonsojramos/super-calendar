@@ -1,7 +1,7 @@
 import { Calendar, createEventSource, type SolidCalendarTheme } from "@super-calendar/solid";
 
 export function FeedExample(props: { date: Date; theme?: Partial<SolidCalendarTheme> }) {
-  const feed = createEventSource(() => "/events.json");
+  const feed = createEventSource(() => `${import.meta.env.BASE_URL}events.json`);
   return (
     <>
       <div aria-label="Event feed">
