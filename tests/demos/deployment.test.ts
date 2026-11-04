@@ -43,6 +43,41 @@ async function checkPage(path: string, check: (page: Page) => Promise<void>, wid
 }
 
 describe("published demos", () => {
+  it.each(["event actions", "date range picker"])(
+    "keeps React demo shortcuts outside the %s dialog",
+    async (kind) => {
+      await checkPage("/dom/", async (page) => {
+        if (kind === "event actions") {
+          await page.getByRole("button", { name: "Edit events", exact: true }).click();
+          await page
+            .getByRole("button", { name: /^Move or resize / })
+            .first()
+            .click();
+        } else {
+          await page.getByRole("button", { name: "field", exact: true }).click();
+          await page.getByRole("button", { name: "Select dates", exact: true }).click();
+        }
+        const dialog = page.getByRole("dialog");
+        const focusedInside = () =>
+          dialog.evaluate((element) => element.contains(document.activeElement));
+        await expect.poll(focusedInside).toBe(true);
+        const content = await dialog.textContent();
+        for (const key of ["m", "d", "a", "n", "p", "t", "w", "x", "j", "k"]) {
+          await page.keyboard.press(key);
+          expect(await dialog.count()).toBe(1);
+          expect(await focusedInside()).toBe(true);
+          expect(await dialog.textContent()).toBe(content);
+        }
+        await page.keyboard.press("Escape");
+        expect(await dialog.count()).toBe(0);
+        expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true);
+        await page.keyboard.press("m");
+        await page.getByRole("grid").first().waitFor();
+        expect(await page.locator('[data-slot="dayColumn"]').count()).toBe(0);
+      });
+    },
+  );
+
   it.each([
     [
       "/",
