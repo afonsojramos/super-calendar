@@ -108,13 +108,16 @@ bars both expose them whenever `onDragEvent` is set. Translate their names with
 In React DOM and Solid, **Edit events** opens a list of the visible events you
 can move or resize in `TimeGrid` and either `ResourceTimeline` orientation.
 The chooser shows each event's date and time, plus its resource on the board.
+Long lists scroll while each choice keeps its full title and dates visible.
+Titles without spaces wrap within the choice or dialog.
 Its buttons have separate targets, even when events overlap or the calendar is
 narrow. Choosing an event never activates it or starts a drag.
 Opening the chooser focuses its first event. Use the arrow keys, Home, End,
 or Tab to navigate its choices; Escape closes it and focuses **Edit events**.
 
 Choose an event to open a modal dialog named after the event ("Move or resize
-Planning"). The dialog shows the event's time and lists native buttons:
+Planning"). The dialog is centered in the viewport, shows the event's time,
+and lists native buttons:
 
 - **Move 15 minutes later / earlier** and **Extend / Shorten by 15 minutes**,
   stepping by `dragStepMinutes`.
@@ -145,8 +148,9 @@ Without `getEventId`, a full refresh closes the dialog.
 
 The dialog closes if the event disappears, its identity is ambiguous, its lane
 goes away, or editing is turned off. With `getEventId`, removing the getter or
-providing duplicate IDs also closes it. The live description includes both dates
-for multi-day events and, on the board, the resource.
+providing missing, invalid, or duplicate IDs also closes it. IDs must be strings
+or numbers. The live description includes both dates for multi-day events and,
+on the board, the resource.
 
 When the dialog opens, focus moves to its first action. The arrow keys, Home,
 and End move between the actions alongside Tab. PageUp and PageDown do not page
