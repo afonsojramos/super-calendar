@@ -15,6 +15,7 @@ verifies:
 | `support/`                     | Reusable rendering and time-zone helpers imported by tests.                                |
 | `types/`                       | Test-only ambient type declarations.                                                       |
 | `packages/*/src/**/__tests__/` | Core logic and framework-specific behavior beside the source they exercise.                |
+| `examples/*/src/**/__tests__/` | Example integration behavior, including deployment paths.                                  |
 
 Read the [shared web test guide](web/README.md) before adding a React DOM/Solid
 contract. Keep assertions in test files and reusable harness code in adapters or

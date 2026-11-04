@@ -44,6 +44,10 @@ export default defineConfig({
           alias: [
             ...coreAliases,
             {
+              find: /^@super-calendar\/solid$/,
+              replacement: source("./packages/solid/src/index.ts"),
+            },
+            {
               find: "@calendar-test/renderer",
               replacement: source("./tests/web/adapters/solid.tsx"),
             },
@@ -54,7 +58,11 @@ export default defineConfig({
           name: "solid",
           environment: "jsdom",
           server: { deps: { inline: [/solid-js/, /@solidjs\//] } },
-          include: ["packages/solid/src/**/*.test.tsx", "tests/web/contracts/**/*.test.tsx"],
+          include: [
+            "packages/solid/src/**/*.test.tsx",
+            "examples/solid/src/**/*.test.tsx",
+            "tests/web/contracts/**/*.test.tsx",
+          ],
           exclude: ["**/*.ssr.test.tsx"],
           setupFiles: ["./tests/setup/dom.js"],
         },

@@ -24,6 +24,14 @@ const initialEvents: CalendarEvent<{ room: string }>[] = [
 ];
 const modes: CalendarMode[] = ["month", "week", "day", "3days", "custom", "schedule", "year"];
 const views = [...modes, "months", "resources", "feed"];
+const pickerStyles = {
+  popover: {
+    bottom: "calc(100% + 6px)",
+    marginTop: 0,
+    minWidth: 0,
+    width: "min(300px, calc(100vw - 36px))",
+  },
+};
 
 export function viewFromSearch(search: string) {
   const requested = new URLSearchParams(search).get("view");
@@ -173,7 +181,8 @@ export function App(props: { initialView?: string }) {
       </section>
       <div class="pickers">
         <label>
-          Jump to date <DatePicker value={date()} onChange={setDate} theme={theme()} />
+          Jump to date{" "}
+          <DatePicker value={date()} onChange={setDate} theme={theme()} styles={pickerStyles} />
         </label>
         <label>
           Select a range{" "}
@@ -181,6 +190,7 @@ export function App(props: { initialView?: string }) {
             value={selection.range()}
             onChange={selection.setRange}
             theme={theme()}
+            styles={pickerStyles}
           />
         </label>
       </div>

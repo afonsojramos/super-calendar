@@ -1,6 +1,6 @@
 ---
 title: Live demo
-description: Both renderers, running live on the web.
+description: Try the React Native, React DOM, and Solid renderers on the web.
 ---
 
 One example app per renderer, hosted on GitHub Pages. Everything here runs the
@@ -39,9 +39,27 @@ real library, no mocks.
     </Frame>
 
   </Tab>
+  <Tab title="Solid 2">
+    The [`examples/solid`](https://github.com/afonsojramos/super-calendar/tree/main/examples/solid)
+    app uses the experimental [`@super-calendar/solid`](/guides/solid) renderer.
+    Choose a calendar mode, scrolling months, resources, or the event feed with
+    **View**. Try dragging events, selecting dates with the pickers, and switching
+    themes. In the resources view, toggle **Vertical resources** to change the
+    layout.
+
+    <Frame>
+      <iframe
+        src="https://demo.super-calendar.afonsojramos.me/solid/"
+        title="super-calendar Solid 2 web demo"
+        style={{ width: "100%", height: "880px", border: "0", borderRadius: "12px" }}
+        loading="lazy"
+      />
+    </Frame>
+
+  </Tab>
 </Tabs>
 
-## Things to try
+## Things to try in the React demos
 
 - **Switch modes** with the tabs: month, week, 3-day, day, schedule.
 - **Pinch / Ctrl-scroll** on the week or day grid to zoom the hours.

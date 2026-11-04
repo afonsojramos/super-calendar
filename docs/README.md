@@ -23,8 +23,9 @@ The preview runs at `http://localhost:3000`.
 - `reference/api.mdx` — the `Calendar` props and package exports.
 - `images/` — screenshots used in the pages.
 
-The `demo` page embeds the example app's web build, deployed to GitHub Pages by
-`../.github/workflows/demo.yml`.
+The `demo` page embeds all three example apps, deployed to GitHub Pages by
+`../.github/workflows/demo.yml`. React Native runs at the site root, React DOM at
+`/dom/`, and Solid at `/solid/`.
 
 ## Publishing
 
