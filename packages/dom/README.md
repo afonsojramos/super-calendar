@@ -128,6 +128,9 @@ On the time grid, an empty-slot touch tap calls `onPressCell` from the column's
 click. Swipes and cancelled contacts do not press the slot. Mouse and pen retain
 drag-to-create behavior. See the [DOM guide](https://super-calendar.afonsojramos.me/guides/dom).
 
+The drag-to-create preview stays within the visible hours of the pressed column,
+with its border inside the column.
+
 ## Documentation
 
 See the [full documentation](https://super-calendar.afonsojramos.me), the [quickstart](https://super-calendar.afonsojramos.me/quickstart), and the [API reference](https://super-calendar.afonsojramos.me/reference/api).

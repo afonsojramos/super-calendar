@@ -109,6 +109,21 @@ const DEFAULT_MIN_EVENT_HEIGHT = 14;
 // via `eventGap`.
 const DEFAULT_EVENT_GAP = 1;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+// Floor for the create-by-drag preview, so a press shows a line before it moves.
+const CREATE_PREVIEW_MIN_HEIGHT = 2;
+// Vertical placement of the create preview inside a day column `gridHeight` px
+// tall. Both ends are clamped to the visible hours. The preview is anchored to
+// the nearer column edge, so its minimum height and any custom border
+// grow toward the middle of the grid instead of past its first or last hour.
+function createPreviewPlacement(topPx: number, heightPx: number, gridHeight: number) {
+  const start = clamp(topPx, 0, gridHeight);
+  const end = clamp(topPx + heightPx, 0, gridHeight);
+  const height = Math.min(gridHeight, Math.max(end - start, CREATE_PREVIEW_MIN_HEIGHT));
+  const top = Math.min(start, gridHeight - height);
+  return top + height / 2 > gridHeight / 2
+    ? { bottom: gridHeight - top - height, height }
+    : { top, height };
+}
 
 // Edge auto-advance: how close to the day-columns edge (px) counts as "at the
 // edge", how long to dwell there before paging, and the repeat interval while
@@ -2604,8 +2619,13 @@ export function TimeGrid<T = unknown>(
                                 position: "absolute",
                                 left: props.eventGap,
                                 right: props.eventGap,
-                                top: ghost().topPx,
-                                height: Math.max(ghost().heightPx, 2),
+                                ...createPreviewPlacement(
+                                  ghost().topPx,
+                                  ghost().heightPx,
+                                  totalHeight(),
+                                ),
+                                // Borders, including custom ones, stay inside the placed box.
+                                boxSizing: "border-box",
                                 opacity: 0.7,
                                 pointerEvents: "none",
                                 zIndex: 2,

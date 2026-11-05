@@ -315,6 +315,28 @@ export function Fixture() {
               : undefined
           }
         />
+      ) : view.startsWith("create") ? (
+        // Create-by-drag scenarios. The whole column fits in the viewport, so a
+        // pointer can overshoot it in either direction. `-window` narrows the
+        // visible hours; `-classed` and `-styled` restyle the preview's border.
+        <TimeGrid<{ id: number }>
+          date={anchor}
+          now={anchor}
+          mode={view.startsWith("create-day") ? "day" : "week"}
+          weekStartsOn={1}
+          events={[]}
+          height={700}
+          hourHeight={24}
+          minHour={view.endsWith("-window") ? 8 : undefined}
+          maxHour={view.endsWith("-window") ? 18 : undefined}
+          classNames={view.endsWith("-classed") ? { createGhost: "fixture-ghost" } : undefined}
+          styles={
+            view.endsWith("-styled")
+              ? { createGhost: { border: "3px solid rgb(60, 90, 120)" } }
+              : undefined
+          }
+          onCreateEvent={(start, end) => record(`${clock(start)}-${clock(end)}`)}
+        />
       ) : (
         <TimeGrid<{ id: number }>
           date={anchor}

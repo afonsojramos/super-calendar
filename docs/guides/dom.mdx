@@ -59,6 +59,10 @@ On empty time-grid space, a touch tap calls `onPressCell` from the column's clic
 A swipe or cancelled contact does not create an event. Mouse and pen retain
 drag-to-create behavior. This also applies through DOM `Calendar`.
 
+The drag-to-create preview stays within the visible hours of the pressed column,
+with its border inside the column. See
+[Drag to create](/guides/dragging#drag-to-create).
+
 ## The Calendar wrapper
 
 The quickest start mirrors the native component: pick a `mode` and pass events.

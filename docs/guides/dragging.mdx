@@ -255,6 +255,13 @@ in-progress sweep before it commits.
   "drag to create a range."
 </Note>
 
+On the web, the time-grid preview stays inside the visible hours. When a sweep
+passes the start or end of those hours (00:00 and 24:00 by default, or `minHour`
+and `maxHour`), the preview stops at that edge. Its border and minimum height stay
+inside the column, including borders from a `createGhost` class or style. The
+preview does not change `onCreateEvent`, which still receives the snapped range
+within the pressed day.
+
 ## On the month grid
 
 The same two handlers work in `month` mode on both renderers. Nothing extra to
