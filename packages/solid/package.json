@@ -39,8 +39,7 @@
     "./package.json": "./package.json"
   },
   "publishConfig": {
-    "access": "public",
-    "tag": "experimental"
+    "access": "public"
   },
   "scripts": {
     "build": "node scripts/build.mjs",

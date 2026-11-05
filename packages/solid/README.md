@@ -4,15 +4,15 @@ Calendar views and date pickers for Solid 2. The renderer uses Solid signals and
 the React-free `@super-calendar/core/vanilla` entry. It does not require React,
 React DOM, React Native, or Legend List.
 
-This package is experimental and targets `solid-js@2.0.0-rc.20` and
+This package targets `solid-js@2.0.0-rc.20` and
 `@solidjs/web@2.0.0-rc.20`. Install both exact versions. Solid 1 is not supported.
-Its version follows the other calendar packages, but releases use the
-`experimental` npm tag while Solid 2 support remains experimental.
+Its version follows the other calendar packages, and releases use the `latest`
+npm tag.
 
 ## Install
 
 ```sh
-pnpm add @super-calendar/solid@experimental solid-js@2.0.0-rc.20 @solidjs/web@2.0.0-rc.20 date-fns
+pnpm add @super-calendar/solid solid-js@2.0.0-rc.20 @solidjs/web@2.0.0-rc.20 date-fns
 pnpm add -D @solidjs/vite-plugin@3.0.0-next.55 vite@^8
 ```
 
