@@ -6,7 +6,7 @@
   "last-release-sha": "b2f02d1ecf9b88e66caa0fcb9e7f385218da6172",
   "packages": {
     ".": {
-      "component": "super-calendar",
+      "package-name": "",
       "exclude-paths": ["examples", "docs", "scripts", ".github"],
       "extra-files": [
         { "type": "json", "path": "packages/core/package.json", "jsonpath": "$.version" },
