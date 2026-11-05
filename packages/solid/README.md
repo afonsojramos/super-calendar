@@ -96,6 +96,9 @@ close the dialog. Without this prop, full refreshes close it. See
 Removing a resource cancels creation in its lane. Losing pointer capture cancels
 the active interaction.
 
+In `TimeGrid`, the drag-to-create preview stays within the visible hours of the
+pressed column, with its border inside the column.
+
 ## Select dates
 
 ```tsx

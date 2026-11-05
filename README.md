@@ -387,6 +387,8 @@ one-step range) — create your own event in response. On native it supersedes
 `onLongPressCell` on empty space; on web, dragging empty space creates instead of
 scrolling (use the wheel to scroll), matching desktop calendars, and **Escape**
 cancels an in-progress sweep before it commits.
+On the web, the time-grid preview stays within the visible hours, with its border
+inside the column.
 
 ```tsx
 <Calendar
