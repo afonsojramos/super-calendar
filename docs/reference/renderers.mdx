@@ -1,6 +1,6 @@
 ---
 title: Renderer comparison
-description: Compare the React Native, React DOM, and experimental Solid 2 renderers.
+description: Compare the React Native, React DOM, and Solid 2 renderers.
 ---
 
 super-calendar provides three renderers over one shared core (`@super-calendar/core`):
@@ -9,11 +9,11 @@ super-calendar provides three renderers over one shared core (`@super-calendar/c
   react-native-web). The reference renderer; gesture-driven and virtualized.
 - **`@super-calendar/dom`** uses plain react-dom, for web-only or web-first apps that
   don't want to pull in React Native.
-- **`@super-calendar/solid`** provides experimental Solid 2 web components and
+- **`@super-calendar/solid`** provides Solid 2 web components and
   imports the React-free `@super-calendar/core/vanilla` entry.
 
 The renderers share calendar views and core types. The tables compare their
-components, interactions, and styling. Solid support is experimental.
+components, interactions, and styling.
 
 ## Solid 2 differences
 
@@ -24,7 +24,7 @@ match React DOM, including `className`, `classNames`, and `styles`.
 
 `MonthList` and `Agenda` use measured row virtualization without Legend List.
 The package is ESM and supports server rendering and hydration. It targets exact
-Solid 2 release-candidate peers and uses the `experimental` npm tag. See the
+Solid 2 release-candidate peers and uses the `latest` npm tag. See the
 [Solid 2 guide](/guides/solid) for installation and compiler settings.
 
 ## Views and components

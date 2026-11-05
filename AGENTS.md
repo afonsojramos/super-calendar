@@ -8,7 +8,7 @@ A render-agnostic calendar, gesture-driven and virtualized, with four packages i
 - `@super-calendar/dom` — `packages/dom`. react-dom renderer. Adds `@legendapp/list`, `react-dom`.
 - `@super-calendar/native` — `packages/native`. React Native renderer. Adds `@legendapp/list`, `react-native`, `react-native-gesture-handler`, `react-native-reanimated`, `react-native-worklets`. Has a `./picker` subpath export. Entry: `packages/native/src/index.tsx`.
 
-- `@super-calendar/solid`: `packages/solid`. Experimental Solid 2 renderer. Exact `solid-js` and `@solidjs/web` RC peers, with no React dependency. Entry: `packages/solid/src/index.ts`.
+- `@super-calendar/solid`: `packages/solid`. Solid 2 renderer. Exact `solid-js` and `@solidjs/web` RC peers, with no React dependency. Entry: `packages/solid/src/index.ts`.
 
 All renderers depend on core via `workspace:*`.
 

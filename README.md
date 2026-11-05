@@ -32,13 +32,13 @@
 
 ## Packages
 
-Pick the renderer for your app. The renderers share calendar types and logic. Solid 2 support is experimental.
+Pick the renderer for your app. The renderers share calendar types and logic.
 
 | Package                                                                          | Use it for                                                                                                     |
 | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | [`@super-calendar/native`](https://www.npmjs.com/package/@super-calendar/native) | React Native apps on iOS and Android, plus the web through react-native-web                                    |
 | [`@super-calendar/dom`](https://www.npmjs.com/package/@super-calendar/dom)       | React web apps (react-dom), with no React Native runtime; see [React DOM](#react-dom-web-without-react-native) |
-| `@super-calendar/solid`                                                          | Solid 2 web apps, with no React runtime; see [Solid 2](#solid-2-experimental)                                  |
+| `@super-calendar/solid`                                                          | Solid 2 web apps, with no React runtime; see [Solid 2](#solid-2)                                               |
 | [`@super-calendar/core`](https://www.npmjs.com/package/@super-calendar/core)     | Pure logic through `@super-calendar/core/vanilla`, plus React hooks through the root entry                     |
 
 See the [quickstart](https://super-calendar.afonsojramos.me/quickstart) for React, or the [Solid 2 guide](https://super-calendar.afonsojramos.me/guides/solid).
@@ -184,14 +184,14 @@ peers, so this subpath won't pull them in. (Metro doesn't tree-shake the
 `@super-calendar/native` barrel, so the subpath is what guarantees the timetable
 code is left out.)
 
-### Solid 2 (experimental)
+### Solid 2
 
 `@super-calendar/solid` provides the calendar views, virtualized month list and
 agenda, resource timeline, and date pickers as Solid components. It uses Solid
 signals and the React-free `@super-calendar/core/vanilla` entry.
 
 ```sh
-pnpm add @super-calendar/solid@experimental solid-js@2.0.0-rc.20 @solidjs/web@2.0.0-rc.20 date-fns
+pnpm add @super-calendar/solid solid-js@2.0.0-rc.20 @solidjs/web@2.0.0-rc.20 date-fns
 ```
 
 Keep both Solid peers on these exact release-candidate versions. Solid 1 is not
