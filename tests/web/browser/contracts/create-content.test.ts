@@ -196,24 +196,26 @@ describe(rendererName, () => {
       await page.mouse.down();
       await page.mouse.move(point(11).x, point(11).y, { steps: 6 });
       await expect.poll(draft).toBe("Draft a 15:9:0-15:11:0");
-      await page.mouse.wheel(
-        orientation === "horizontal" ? 160 : 0,
-        orientation === "vertical" ? 96 : 0,
-      );
+      // Finish the scroll before sampling the preview. Wheel input can keep
+      // animating between that sample and pointer release in WebKit.
+      await page.locator(".fixture-resource-scroll").evaluate((element, direction) => {
+        element.scrollBy({
+          left: direction === "horizontal" ? 160 : 0,
+          top: direction === "vertical" ? 96 : 0,
+          behavior: "instant",
+        });
+      }, orientation);
       await expect
         .poll(
           async () =>
             (await bounds('[data-slot="track"]'))[orientation === "horizontal" ? "x" : "y"],
         )
-        .toBeLessThan(lane[orientation === "horizontal" ? "x" : "y"]);
-      await page.evaluate(
-        () =>
-          new Promise<void>((resolve) =>
-            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-          ),
-      );
+        .toBe(
+          lane[orientation === "horizontal" ? "x" : "y"] -
+            (orientation === "horizontal" ? 160 : 96),
+        );
+      await expect.poll(draft).toBe("Draft a 15:9:0-15:13:0");
       const shown = await draft();
-      expect(shown).toMatch(/^Draft a /);
       await page.mouse.up();
       expect(await calls()).toBe(JSON.stringify([`${shown!.slice("Draft a ".length)}@a`]));
       await expect.poll(() => page.locator(GHOST).count()).toBe(0);
