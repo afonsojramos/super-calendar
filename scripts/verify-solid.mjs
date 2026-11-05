@@ -718,5 +718,6 @@ try {
   }
   await server.close();
   await reactServer?.close();
-  await rm(profile, { recursive: true, force: true });
+  // Retry transient profile cleanup races without hiding persistent failures.
+  await rm(profile, { recursive: true, force: true, maxRetries: 5 });
 }
