@@ -17,6 +17,7 @@ import {
   type ReactElement,
   type ReactNode,
   type RefAttributes,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -614,6 +615,7 @@ function TimeGridInner<T = unknown>(
   // the sweep's origin, exactly as the commit does.
   const [createBox, setCreateBox] = useState<{
     dayIndex: number;
+    dayTime: number;
     startPx: number;
     curPx: number;
   } | null>(null);
@@ -621,6 +623,8 @@ function TimeGridInner<T = unknown>(
     pointerId: number;
     el: HTMLElement;
     dayIndex: number;
+    dayTime: number;
+    creating: boolean;
     startPx: number;
   } | null>(null);
   // Touch never sweeps, so a tap presses the cell from its click, which the
@@ -1296,8 +1300,16 @@ function TimeGridInner<T = unknown>(
     } catch {
       // Best-effort capture.
     }
-    createOrigin.current = { pointerId: e.pointerId, el, dayIndex, startPx };
-    setCreateBox({ dayIndex, startPx, curPx: startPx });
+    const dayTime = days[dayIndex].getTime();
+    createOrigin.current = {
+      pointerId: e.pointerId,
+      el,
+      dayIndex,
+      dayTime,
+      creating: !!onCreateEvent,
+      startPx,
+    };
+    setCreateBox({ dayIndex, dayTime, startPx, curPx: startPx });
   };
   const moveCreate = (e: ReactPointerEvent) => {
     const touch = cellTouchRef.current;
@@ -1310,7 +1322,12 @@ function TimeGridInner<T = unknown>(
     }
     const o = createOrigin.current;
     if (!o) return;
-    setCreateBox({ dayIndex: o.dayIndex, startPx: o.startPx, curPx: pxFromTop(o.el, e.clientY) });
+    setCreateBox({
+      dayIndex: o.dayIndex,
+      dayTime: o.dayTime,
+      startPx: o.startPx,
+      curPx: pxFromTop(o.el, e.clientY),
+    });
   };
   const endCreate = (e: ReactPointerEvent) => {
     const o = createOrigin.current;
@@ -1349,23 +1366,45 @@ function TimeGridInner<T = unknown>(
   };
   // A gesture the browser/OS cancels (scroll takeover, etc.) must not commit a
   // create — just drop the in-progress state.
-  const cancelCreate = () => {
-    cellTouchRef.current = null;
+  const clearCreate = useCallback(() => {
+    const previous = createOrigin.current;
     createOrigin.current = null;
     setCreateBox(null);
+    try {
+      previous?.el.releasePointerCapture?.(previous.pointerId);
+    } catch {
+      // The browser may have already released capture.
+    }
+  }, []);
+  const cancelCreate = () => {
+    cellTouchRef.current = null;
+    clearCreate();
   };
   // Without capture the column stops seeing the sweep's moves and release, so
   // drop it. Leaves `cellTouchRef` alone: touch taps resolve on the later click.
   const loseCreateCapture = (e: ReactPointerEvent) => {
     if (createOrigin.current?.pointerId !== e.pointerId) return;
-    createOrigin.current = null;
-    setCreateBox(null);
+    clearCreate();
   };
+  // Pointer capture does not move keyboard focus to the grid.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !createOrigin.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      clearCreate();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [clearCreate]);
   // What `onCreateEvent` would receive if the sweep ended here. The props keep
   // the same `Date`s while that range holds, so content effects keyed on them
   // re-run only when it changes.
   const liveRange =
-    createBox && RenderCreateGhost && onCreateEvent && days[createBox.dayIndex]
+    createBox &&
+    RenderCreateGhost &&
+    onCreateEvent &&
+    days[createBox.dayIndex]?.getTime() === createBox.dayTime
       ? cellRangeFromDrag(
           days[createBox.dayIndex],
           createBox.startPx,
@@ -1384,12 +1423,17 @@ function TimeGridInner<T = unknown>(
         : { start: new Date(liveStart), end: new Date(liveEnd) },
     [liveStart, liveEnd],
   );
-  // A sweep whose column unmounted (the visible days changed) can't finish.
+  // Disabling creation or replacing the pressed day invalidates the whole sweep.
   useEffect(() => {
-    if (createOrigin.current && !createOrigin.current.el.isConnected) {
-      createOrigin.current = null;
-      setCreateBox(null);
-    }
+    const origin = createOrigin.current;
+    if (
+      origin &&
+      (!origin.el.isConnected ||
+        !cellEnabled ||
+        (origin.creating && !onCreateEvent) ||
+        days[origin.dayIndex]?.getTime() !== origin.dayTime)
+    )
+      clearCreate();
   });
 
   // Per-day layout and shading are pure functions of days/events/businessHours,
@@ -1856,7 +1900,10 @@ function TimeGridInner<T = unknown>(
               nowHours <= windowEnd;
             const nowTop = (nowHours - windowStart) * hourHeight;
             const bands = bandsByDay[dayIndex];
-            const ghost = createBox?.dayIndex === dayIndex ? createBox : null;
+            const ghost =
+              createBox?.dayIndex === dayIndex && createBox.dayTime === day.getTime()
+                ? createBox
+                : null;
             const ghostRange = ghost ? createRange : null;
             // The tail of a move that runs past midnight, previewed at the top of
             // this column. The dragged event is looked up from its `drag.key`

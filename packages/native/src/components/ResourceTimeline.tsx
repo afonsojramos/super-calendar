@@ -1,5 +1,5 @@
 import type { ComponentType, ReactElement, ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
@@ -603,8 +603,6 @@ function LaneInteractionLayer({
   // The last endpoints sent to JS, in snap steps from midnight; NaN when none is shown.
   const sentFrom = useSharedValue(Number.NaN);
   const sentTo = useSharedValue(Number.NaN);
-  // The latest raw sweep, so a prop change re-resolves the range in place.
-  const sweep = useRef<{ fromPx: number; toPx: number } | null>(null);
   const resolveRange = useCallback(
     (fromPx: number, toPx: number) =>
       cellRangeFromDrag(date, fromPx, toPx, hourSize, startHour, snapMinutes),
@@ -620,29 +618,58 @@ function LaneInteractionLayer({
         : next,
     );
   }, []);
-  const showRange = useCallback(
-    (fromPx: number, toPx: number) => {
-      sweep.current = { fromPx, toPx };
-      applyRange(resolveRange(fromPx, toPx));
-    },
-    [applyRange, resolveRange],
-  );
+  const currentResolver = useRef<typeof resolveRange | null>(null);
+  const showRange = useCallback(() => {
+    const resolve = currentResolver.current;
+    if (!ghostVisible.value || !resolve) return;
+    // A queued UI notification may arrive after props or the pointer changed.
+    applyRange(resolve(ghostStart.value, ghostStart.value + ghostSize.value));
+  }, [applyRange, ghostVisible, ghostStart, ghostSize]);
   const clearRange = useCallback(() => {
-    sweep.current = null;
     setCreateRange(null);
   }, []);
-  useEffect(() => {
-    if (sweep.current) applyRange(resolveRange(sweep.current.fromPx, sweep.current.toPx));
-  }, [applyRange, resolveRange]);
+  const dayKey = date.toDateString();
+  const createDay = useRef(dayKey);
+  useLayoutEffect(() => {
+    currentResolver.current = liveCreate ? resolveRange : null;
+    if (createDay.current !== dayKey) {
+      createDay.current = dayKey;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      ghostVisible.value = 0;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      sentFrom.value = Number.NaN;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      sentTo.value = Number.NaN;
+      clearRange();
+      return;
+    }
+    if (liveCreate && ghostVisible.value)
+      applyRange(resolveRange(ghostStart.value, ghostStart.value + ghostSize.value));
+  }, [
+    applyRange,
+    resolveRange,
+    liveCreate,
+    dayKey,
+    ghostVisible,
+    ghostStart,
+    ghostSize,
+    sentFrom,
+    sentTo,
+    clearRange,
+  ]);
   // Removing the renderer (or `onCreateEvent`) drops any content still shown.
   useEffect(() => {
-    if (liveCreate || !sweep.current) return;
+    if (liveCreate) return;
     // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
     sentFrom.value = Number.NaN;
     // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
     sentTo.value = Number.NaN;
+    if (!onCreateEvent) {
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      ghostVisible.value = 0;
+    }
     clearRange();
-  }, [liveCreate, sentFrom, sentTo, clearRange]);
+  }, [liveCreate, onCreateEvent, sentFrom, sentTo, clearRange, ghostVisible]);
   // Which snap step from midnight a position falls on, as `cellRangeFromDrag`
   // rounds it, so the sweep can tell on the UI thread when its range changes.
   const snapStep = useCallback(
@@ -689,7 +716,7 @@ function LaneInteractionLayer({
               const step = snapStep(ghostStart.value);
               sentFrom.value = step;
               sentTo.value = step;
-              runOnJS(showRange)(ghostStart.value, ghostStart.value);
+              runOnJS(showRange)();
             }
           })
           .onUpdate((e) => {
@@ -701,15 +728,16 @@ function LaneInteractionLayer({
               if (fromStep !== sentFrom.value || toStep !== sentTo.value) {
                 sentFrom.value = fromStep;
                 sentTo.value = toStep;
-                runOnJS(showRange)(ghostStart.value, at);
+                runOnJS(showRange)();
               }
             }
           })
           // `success` is false when the gesture is cancelled/failed after it
           // activated (RNGH still calls onEnd); only a real end should create.
           .onEnd((e, success) => {
+            const active = ghostVisible.value;
             ghostVisible.value = 0;
-            if (success) runOnJS(commitCreate)(ghostStart.value, vertical ? e.y : e.x);
+            if (success && active) runOnJS(commitCreate)(ghostStart.value, vertical ? e.y : e.x);
           })
           .onFinalize(() => {
             ghostVisible.value = 0;

@@ -338,7 +338,8 @@ can't be reached.
 A few rules apply:
 
 - `renderCreateGhost` needs `onCreateEvent`. On its own it does not enable
-  creation, and with only `onPressCell` the preview stays empty.
+  creation, and with only `onPressCell` the preview stays empty. Removing
+  `onCreateEvent` cancels an active sweep.
 - In React, define the component once outside render, as with `renderEvent`. A
   new inline function on every render remounts the content and drops its state.
 - `Calendar` forwards it in the time-grid modes (`day`, `3days`, `week`,
@@ -349,13 +350,13 @@ A few rules apply:
   what `onCreateEvent` will receive, which is clamped to the pressed day, not
   to the visible hours.
 - The content clears when the sweep ends or is cancelled, and each new sweep
-  mounts it fresh. On the web, losing pointer capture also cancels the sweep,
+  mounts it fresh. Changing the pressed column to another day cancels the sweep.
+  In React DOM and Solid, **Escape** or losing pointer capture cancels the sweep,
   and a press without a drag shows the one-step range while held, then fires
   `onPressCell` instead of creating. On React Native, a stationary hold creates
   that one-step range.
-- On React Native, the preview geometry stays on the UI thread. The range
-  crosses to JavaScript only when the sweep moves into a new snap step, so the
-  content updates once per step.
+- On React Native, the preview geometry stays on the UI thread. Pointer and
+  zoom updates cross to JavaScript only when the snapped range changes.
 
 ## On the month grid
 

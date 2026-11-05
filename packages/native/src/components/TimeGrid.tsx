@@ -30,6 +30,7 @@ import {
   useContext,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -1821,6 +1822,7 @@ function TimetablePageInner<T>({
   const createLeft = useSharedValue(0);
   const createWidth = useSharedValue(0);
   const createStartY = useSharedValue(0);
+  const createEndY = useSharedValue(0);
   const createDayIndex = useSharedValue(0);
   // Set when the sweep is cancelled mid-drag (Escape on web); the gesture then
   // bails instead of committing.
@@ -1844,8 +1846,6 @@ function TimetablePageInner<T>({
   // The last endpoints sent to JS, in snap steps from midnight; NaN when none is shown.
   const createSentStart = useSharedValue(Number.NaN);
   const createSentEnd = useSharedValue(Number.NaN);
-  // The latest raw sweep, so a prop change re-resolves the range in place.
-  const createSweep = useRef<{ startY: number; endY: number; dayIndex: number } | null>(null);
   const resolveCreateRange = useCallback(
     (startY: number, endY: number, dayIndex: number) => {
       const day = days[dayIndex];
@@ -1865,30 +1865,81 @@ function TimetablePageInner<T>({
         : next,
     );
   }, []);
-  const showCreateRange = useCallback(
-    (startY: number, endY: number, dayIndex: number) => {
-      createSweep.current = { startY, endY, dayIndex };
-      applyCreateRange(resolveCreateRange(startY, endY, dayIndex));
-    },
-    [applyCreateRange, resolveCreateRange],
-  );
+  const currentCreateResolver = useRef<typeof resolveCreateRange | null>(null);
+  const showCreateRange = useCallback(() => {
+    const resolve = currentCreateResolver.current;
+    if (!createActive.value || !resolve) return;
+    // A queued UI notification may arrive after props or the pointer changed.
+    applyCreateRange(resolve(createStartY.value, createEndY.value, createDayIndex.value));
+  }, [applyCreateRange, createActive, createStartY, createEndY, createDayIndex]);
   const clearCreateRange = useCallback(() => {
-    createSweep.current = null;
     setCreateRange(null);
   }, []);
-  useEffect(() => {
-    const sweep = createSweep.current;
-    if (sweep) applyCreateRange(resolveCreateRange(sweep.startY, sweep.endY, sweep.dayIndex));
-  }, [applyCreateRange, resolveCreateRange]);
+  const previousCreateDays = useRef(days);
+  useLayoutEffect(() => {
+    currentCreateResolver.current = liveCreate ? resolveCreateRange : null;
+    const previousDay = previousCreateDays.current[createDayIndex.value];
+    const currentDay = days[createDayIndex.value];
+    previousCreateDays.current = days;
+    if (createActive.value && previousDay?.getTime() !== currentDay?.getTime()) {
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createCancelled.value = 1;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createActive.value = 0;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createHeight.value = 0;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createSentStart.value = Number.NaN;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createSentEnd.value = Number.NaN;
+      clearCreateRange();
+      return;
+    }
+    if (liveCreate && createActive.value)
+      applyCreateRange(
+        resolveCreateRange(createStartY.value, createEndY.value, createDayIndex.value),
+      );
+  }, [
+    applyCreateRange,
+    resolveCreateRange,
+    days,
+    liveCreate,
+    createActive,
+    createStartY,
+    createEndY,
+    createDayIndex,
+    createCancelled,
+    createHeight,
+    createSentStart,
+    createSentEnd,
+    clearCreateRange,
+  ]);
   // Removing the renderer (or `onCreateEvent`) drops any content still shown.
   useEffect(() => {
-    if (liveCreate || !createSweep.current) return;
+    if (liveCreate) return;
     // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
     createSentStart.value = Number.NaN;
     // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
     createSentEnd.value = Number.NaN;
+    if (!createEnabled) {
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createCancelled.value = 1;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createActive.value = 0;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createHeight.value = 0;
+    }
     clearCreateRange();
-  }, [liveCreate, createSentStart, createSentEnd, clearCreateRange]);
+  }, [
+    liveCreate,
+    createEnabled,
+    createSentStart,
+    createSentEnd,
+    clearCreateRange,
+    createCancelled,
+    createActive,
+    createHeight,
+  ]);
 
   // Web taps fall through to here: react-native-web doesn't fire the background
   // Pressable's onPress, so a click on empty space reports the cell via a Tap
@@ -1919,6 +1970,20 @@ function TimetablePageInner<T>({
     [minHour, heightSource, snapMinutes],
   );
 
+  // Zoom can change the candidate range without another pointer update.
+  useAnimatedReaction(
+    () => (liveCreate && createActive.value ? heightSource.value : null),
+    (height, previous) => {
+      if (height === null || previous === null || height === previous) return;
+      const fromStep = snapStep(createStartY.value);
+      const toStep = snapStep(createEndY.value);
+      if (fromStep === createSentStart.value && toStep === createSentEnd.value) return;
+      createSentStart.value = fromStep;
+      createSentEnd.value = toStep;
+      runOnJS(showCreateRange)();
+    },
+  );
+
   const createGesture = useMemo(() => {
     const pan = Gesture.Pan()
       .enabled(createEnabled)
@@ -1926,6 +1991,7 @@ function TimetablePageInner<T>({
         const idx = dayCount === 1 ? 0 : Math.floor(event.x / dayWidth);
         createDayIndex.value = idx;
         createStartY.value = event.y;
+        createEndY.value = event.y;
         createLeft.value = idx * dayWidth;
         createWidth.value = dayWidth;
         createTop.value = event.y;
@@ -1936,11 +2002,12 @@ function TimetablePageInner<T>({
           const step = snapStep(event.y);
           createSentStart.value = step;
           createSentEnd.value = step;
-          runOnJS(showCreateRange)(event.y, event.y, idx);
+          runOnJS(showCreateRange)();
         }
       })
       .onUpdate((event) => {
         if (createCancelled.value) return;
+        createEndY.value = createStartY.value + event.translationY;
         const stepPx = (snapMinutes / MINUTES_PER_HOUR) * heightSource.value;
         const snap = (y: number) => (stepPx > 0 ? Math.round(y / stepPx) * stepPx : y);
         const startSnap = snap(createStartY.value);
@@ -1955,14 +2022,14 @@ function TimetablePageInner<T>({
           if (fromStep !== createSentStart.value || toStep !== createSentEnd.value) {
             createSentStart.value = fromStep;
             createSentEnd.value = toStep;
-            runOnJS(showCreateRange)(startY, endY, createDayIndex.value);
+            runOnJS(showCreateRange)();
           }
         }
       })
-      .onEnd((event) => {
+      .onEnd((event, success) => {
         createActive.value = 0;
         createHeight.value = 0;
-        if (createCancelled.value) return; // Escape pressed mid-sweep
+        if (!success || createCancelled.value) return;
         runOnJS(commitCreate)(
           createStartY.value,
           createStartY.value + event.translationY,
@@ -1970,6 +2037,8 @@ function TimetablePageInner<T>({
         );
       })
       .onFinalize(() => {
+        createActive.value = 0;
+        createHeight.value = 0;
         // Every touch finalizes; only a sweep that showed content goes back to JS.
         if (!liveCreate || Number.isNaN(createSentEnd.value)) return;
         createSentStart.value = Number.NaN;
@@ -1994,6 +2063,7 @@ function TimetablePageInner<T>({
     createLeft,
     createWidth,
     createStartY,
+    createEndY,
     createDayIndex,
     createCancelled,
     liveCreate,
@@ -3434,8 +3504,28 @@ function TimeGridInner<T>(
   // `showDragHandle` refreshes grips without requiring an event-data change, and
   // `renderCreateGhost` swaps the preview content of mounted pages.
   const listExtraData = useMemo(
-    () => ({ events, activeIndex, columnsWidth, showDragHandle, renderCreateGhost }),
-    [events, activeIndex, columnsWidth, showDragHandle, renderCreateGhost],
+    () => ({
+      events,
+      activeIndex,
+      columnsWidth,
+      showDragHandle,
+      renderCreateGhost,
+      onCreateEvent,
+      dragStepMinutes,
+      minHour,
+      maxHour,
+    }),
+    [
+      events,
+      activeIndex,
+      columnsWidth,
+      showDragHandle,
+      renderCreateGhost,
+      onCreateEvent,
+      dragStepMinutes,
+      minHour,
+      maxHour,
+    ],
   );
 
   return (

@@ -5,7 +5,7 @@ import type {
   ReactElement,
   ReactNode,
 } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   backgroundBandsForDay,
   type BusinessHoursBand,
@@ -556,8 +556,10 @@ export function ResourceTimeline<T = unknown>({
     el: HTMLElement;
     resource: Resource;
     startPx: number;
+    dayKey: string;
+    creating: boolean;
   } | null>(null);
-  const clearCreate = () => {
+  const clearCreate = useCallback(() => {
     const previous = createOrigin.current;
     createOrigin.current = null;
     setCreateBox(null);
@@ -566,7 +568,17 @@ export function ResourceTimeline<T = unknown>({
     } catch {
       // The browser may have already released capture.
     }
-  };
+  }, []);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !createOrigin.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      clearCreate();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [clearCreate]);
   const cellEnabled = !!onPressCell || !!onCreateEvent;
   const pxAlongAxis = (el: HTMLElement, e: ReactPointerEvent) => {
     const rect = el.getBoundingClientRect();
@@ -590,7 +602,14 @@ export function ResourceTimeline<T = unknown>({
     } catch {
       // Best-effort capture.
     }
-    createOrigin.current = { pointerId: e.pointerId, el, resource, startPx };
+    createOrigin.current = {
+      pointerId: e.pointerId,
+      el,
+      resource,
+      startPx,
+      dayKey: date.toDateString(),
+      creating: !!onCreateEvent,
+    };
     // Only preview a ghost when a create can happen; in press-only mode
     // (onPressCell without onCreateEvent) the tap still commits via endCreate.
     if (onCreateEvent) setCreateBox({ resourceKey: resource.id, startPx, curPx: startPx });
@@ -665,7 +684,15 @@ export function ResourceTimeline<T = unknown>({
       (!origin.current?.element.isConnected || !events.includes(dragRef.current.event))
     )
       clearDrag();
-    if (createOrigin.current && !createOrigin.current.el.isConnected) clearCreate();
+    const creating = createOrigin.current;
+    if (
+      creating &&
+      (!creating.el.isConnected ||
+        !cellEnabled ||
+        (creating.creating && !onCreateEvent) ||
+        creating.dayKey !== date.toDateString())
+    )
+      clearCreate();
   });
   useEffect(
     () => () => {

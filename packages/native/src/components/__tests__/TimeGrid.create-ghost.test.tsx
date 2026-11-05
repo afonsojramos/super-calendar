@@ -1,4 +1,5 @@
 import * as gestureHandlerMock from "react-native-gesture-handler";
+import * as reanimatedMock from "react-native-reanimated";
 import { vi } from "vitest";
 import { act } from "@testing-library/react-native";
 import { useState } from "react";
@@ -17,6 +18,11 @@ type Handlers = {
 };
 type Chain = { kind: string; calls: Record<string, unknown[]>; handlers: Handlers };
 const chains = () => (gestureHandlerMock as unknown as { __gestures: Chain[] }).__gestures;
+const animation = reanimatedMock as unknown as {
+  __jsQueue: Array<() => void>;
+  __deferRunOnJS: (enabled: boolean) => void;
+  __flushAnimatedReactions: () => void;
+};
 
 // The latest drag-to-create pan: the only Pan that waits for the 300ms hold.
 const createPan = () => {
@@ -69,7 +75,9 @@ const sweep = {
 describe("native TimeGrid renderCreateGhost", () => {
   beforeEach(() => {
     chains().length = 0;
+    animation.__deferRunOnJS(false);
   });
+  afterEach(() => animation.__deferRunOnJS(false));
 
   it("shows the live range, deduplicates in-step moves and commits the shown range", async () => {
     const { Draft, mounts, renders } = probe();
@@ -155,6 +163,7 @@ describe("native TimeGrid renderCreateGhost", () => {
     );
     await sweep.start(96);
     await sweep.update(200);
+    await act(async () => createPan().onEnd?.({ translationY: 200 }, false));
     await sweep.finalize();
     expect(view.queryByText(/draft/, { includeHiddenElements: true })).toBeNull();
     expect(onCreateEvent).not.toHaveBeenCalled();
@@ -236,6 +245,154 @@ describe("native TimeGrid renderCreateGhost", () => {
     expect(onCreateEvent).toHaveBeenCalledWith(
       new Date(2026, 0, 6, 2),
       new Date(2026, 0, 6, 3, 15),
+    );
+  });
+
+  it.each([false, true])(
+    "uses the latest pointer and snapping settings, deferred bridge: %s",
+    async (deferred) => {
+      const { Draft, renders } = probe();
+      const onCreateEvent = vi.fn();
+      const grid = (dragStepMinutes: number) => (
+        <TimeGrid
+          {...gridProps}
+          dragStepMinutes={dragStepMinutes}
+          onCreateEvent={onCreateEvent}
+          renderCreateGhost={Draft}
+        />
+      );
+      const view = await render(grid(15));
+      await sweep.start(96);
+      animation.__deferRunOnJS(deferred);
+      await sweep.update(10);
+      await sweep.update(16);
+      await view.rerender(grid(10));
+      await act(async () => {
+        for (const deliver of animation.__jsQueue.splice(0)) deliver();
+      });
+      expect(renders.at(-1)).toBe("draft 0 6 02:00-6 02:20");
+      animation.__deferRunOnJS(false);
+      await sweep.end(16);
+      expect(onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+        new Date(2026, 0, 6, 2),
+        new Date(2026, 0, 6, 2, 20),
+      );
+    },
+  );
+
+  it("does not bridge height changes within the same snapped range", async () => {
+    const { Draft } = probe();
+    const cellHeight = { value: 48 };
+    await render(
+      <TimeGrid
+        {...gridProps}
+        cellHeight={cellHeight as never}
+        onCreateEvent={vi.fn()}
+        renderCreateGhost={Draft}
+      />,
+    );
+    await sweep.start(96);
+    await sweep.update(96);
+    await act(async () => animation.__flushAnimatedReactions());
+    animation.__deferRunOnJS(true);
+    await act(async () => {
+      for (let step = 1; step <= 100; step++) {
+        cellHeight.value = 48 + step / 1000;
+        animation.__flushAnimatedReactions();
+      }
+    });
+    expect(animation.__jsQueue).toHaveLength(0);
+  });
+
+  it.each([
+    { mode: "day" as const, change: "hidden day", hiddenDays: [2], isRTL: false, nextDay: 7 },
+    { mode: "week" as const, change: "RTL", hiddenDays: [], isRTL: true, nextDay: 11 },
+  ])("cancels a held draft when $change replaces its column's day", async (settings) => {
+    const { Draft } = probe();
+    const onCreateEvent = vi.fn();
+    const grid = (changed: boolean) => (
+      <TimeGrid
+        {...gridProps}
+        mode={settings.mode}
+        events={[]}
+        hiddenDays={changed ? settings.hiddenDays : []}
+        isRTL={changed && settings.isRTL}
+        onCreateEvent={onCreateEvent}
+        renderCreateGhost={Draft}
+      />
+    );
+    const view = await render(grid(false));
+    await sweep.start(96);
+    await sweep.update(96);
+    expect(view.queryByText(/draft/, { includeHiddenElements: true })).not.toBeNull();
+    await view.rerender(grid(true));
+    expect(view.queryByText(/draft/, { includeHiddenElements: true })).toBeNull();
+    await sweep.end(96);
+    await sweep.finalize();
+    expect(onCreateEvent).not.toHaveBeenCalled();
+    await sweep.start(240);
+    await sweep.end(48);
+    expect(onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+      new Date(2026, 0, settings.nextDay, 5),
+      new Date(2026, 0, settings.nextDay, 6),
+    );
+  });
+
+  it("keeps a held draft when refreshed columns still show the pressed day", async () => {
+    const { Draft, renders } = probe();
+    const onCreateEvent = vi.fn();
+    const grid = (hiddenDays: number[]) => (
+      <TimeGrid
+        {...gridProps}
+        events={[]}
+        hiddenDays={hiddenDays}
+        onCreateEvent={onCreateEvent}
+        renderCreateGhost={Draft}
+      />
+    );
+    const view = await render(grid([]));
+    await sweep.start(96);
+    await sweep.update(96);
+    await view.rerender(grid([0]));
+    expect(renders.at(-1)).toBe("draft 0 6 02:00-6 04:00");
+    await sweep.end(96);
+    expect(onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+      new Date(2026, 0, 6, 2),
+      new Date(2026, 0, 6, 4),
+    );
+  });
+
+  it("updates the held range when the shared hour height changes", async () => {
+    const { Draft, renders } = probe();
+    const onCreateEvent = vi.fn();
+    const cellHeight = { value: 48 };
+    await render(
+      <TimeGrid
+        {...gridProps}
+        cellHeight={cellHeight as never}
+        onCreateEvent={onCreateEvent}
+        renderCreateGhost={Draft}
+      />,
+    );
+    await sweep.start(96);
+    await sweep.update(96);
+    await act(async () => {
+      (
+        reanimatedMock as unknown as { __flushAnimatedReactions: () => void }
+      ).__flushAnimatedReactions();
+    });
+    expect(renders.at(-1)).toBe("draft 0 6 02:00-6 04:00");
+    await act(async () => {
+      cellHeight.value = 96;
+      (
+        reanimatedMock as unknown as { __flushAnimatedReactions: () => void }
+      ).__flushAnimatedReactions();
+    });
+    expect(renders.at(-1)).toBe("draft 0 6 01:00-6 02:00");
+    await sweep.end(96);
+    expect(onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+      new Date(2026, 0, 6, 1),
+      new Date(2026, 0, 6, 2),
     );
   });
 });

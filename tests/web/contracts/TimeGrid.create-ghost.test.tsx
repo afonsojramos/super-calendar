@@ -196,6 +196,29 @@ describe(rendererName, () => {
       expect(view.content()).toBe("New event 26 10:00-26 10:15");
     });
 
+    it.each([true, false])("Escape cancels a sweep with custom content: %s", (custom) => {
+      const onPressCell = vi.fn();
+      const view = setup({ renderCreateGhost: custom ? Draft : undefined, onPressCell });
+      expect(fireEvent.keyDown(document, { key: "Escape" })).toBe(true);
+      view.down(96);
+      view.move(300);
+      fireEvent.keyDown(document, { key: "Enter" });
+      expect(view.ghost()).not.toBeNull();
+      expect(fireEvent.keyDown(document, { key: "Escape" })).toBe(false);
+      expect(view.ghost()).toBeNull();
+      view.move(400);
+      view.up(400);
+      expect(view.onCreateEvent).not.toHaveBeenCalled();
+      expect(onPressCell).not.toHaveBeenCalled();
+      view.down(480);
+      view.move(528);
+      view.up(528);
+      expect(view.onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+        new Date(2026, 5, 26, 10),
+        new Date(2026, 5, 26, 11),
+      );
+    });
+
     it("clears the content when the sweep loses pointer capture", () => {
       const view = setup();
       view.down(96);
@@ -220,7 +243,7 @@ describe(rendererName, () => {
       view.update({ dragStepMinutes: 60 });
       expect(view.content()).toBe("Other 26 02:00-26 04:00");
       view.update({ onCreateEvent: undefined, onPressCell: vi.fn() });
-      expect(view.content()).toBe("");
+      expect(view.content()).toBeNull();
     });
 
     it("is forwarded by Calendar in time-grid modes", () => {
@@ -242,6 +265,32 @@ describe(rendererName, () => {
         new Date(2026, 5, 26, 2),
         new Date(2026, 5, 26, 3, 15),
       );
+    });
+
+    it("cancels the sweep when its date changes", () => {
+      const view = setup();
+      view.down(96);
+      view.move(150);
+      view.update({ date: new Date(2026, 5, 27) });
+      expect(view.ghost()).toBeNull();
+      const column = view.container.querySelector<HTMLElement>('[data-slot="dayColumn"]')!;
+      fireEvent.pointerUp(column, { clientY: 150, pointerId: 1 });
+      expect(view.onCreateEvent).not.toHaveBeenCalled();
+      fireEvent.pointerDown(column, { clientY: 480, pointerId: 1, button: 0 });
+      expect(view.content()).toBe("New event 27 10:00-27 10:15");
+    });
+
+    it("does not revive a sweep after creation is disabled and re-enabled", () => {
+      const view = setup();
+      view.down(96);
+      view.move(150);
+      view.update({ onCreateEvent: undefined });
+      view.up(150);
+      view.update({ onCreateEvent: view.onCreateEvent });
+      expect(view.ghost()).toBeNull();
+      expect(view.onCreateEvent).not.toHaveBeenCalled();
+      view.down(480);
+      expect(view.content()).toBe("New event 26 10:00-26 10:15");
     });
   });
 });

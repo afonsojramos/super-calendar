@@ -663,6 +663,7 @@ export function TimeGrid<T = unknown>(
   // the sweep's origin, exactly as the commit does.
   const [createBox, setCreateBox] = createSignal<{
     dayIndex: number;
+    dayTime: number;
     startPx: number;
     curPx: number;
   } | null>(null);
@@ -670,6 +671,8 @@ export function TimeGrid<T = unknown>(
     pointerId: number;
     el: HTMLElement;
     dayIndex: number;
+    dayTime: number;
+    creating: boolean;
     startPx: number;
   } | null> = {
     current: null,
@@ -1488,10 +1491,13 @@ export function TimeGrid<T = unknown>(
       pointerId: e.pointerId,
       el,
       dayIndex,
+      dayTime: days()[dayIndex].getTime(),
+      creating: !!props.onCreateEvent,
       startPx,
     };
     setCreateBox({
       dayIndex,
+      dayTime: days()[dayIndex].getTime(),
       startPx,
       curPx: startPx,
     });
@@ -1509,6 +1515,7 @@ export function TimeGrid<T = unknown>(
     if (!o || o.pointerId !== e.pointerId) return;
     setCreateBox({
       dayIndex: o.dayIndex,
+      dayTime: o.dayTime,
       startPx: o.startPx,
       curPx: pxFromTop(o.el, e.clientY),
     });
@@ -1550,19 +1557,54 @@ export function TimeGrid<T = unknown>(
   };
   // A gesture the browser/OS cancels (scroll takeover, etc.) must not commit a
   // create, just drop the in-progress state.
+  const clearCreate = () => {
+    const previous = createOrigin.current;
+    createOrigin.current = null;
+    setCreateBox(null);
+    try {
+      previous?.el.releasePointerCapture?.(previous.pointerId);
+    } catch {
+      // The browser may have already released capture.
+    }
+  };
+  createEffect(
+    () => ({ days: days(), creating: !!props.onCreateEvent, enabled: cellEnabled() }),
+    (state) => {
+      const origin = createOrigin.current;
+      if (
+        origin &&
+        (!state.enabled ||
+          (origin.creating && !state.creating) ||
+          state.days[origin.dayIndex]?.getTime() !== origin.dayTime)
+      )
+        clearCreate();
+    },
+  );
   const cancelCreate = (e: DomPointerEvent) => {
     if (cellTouchRef.current?.pointerId === e.pointerId) cellTouchRef.current = null;
     if (createOrigin.current?.pointerId !== e.pointerId) return;
-    createOrigin.current = null;
-    setCreateBox(null);
+    clearCreate();
   };
   // Without capture the column stops seeing the sweep's moves and release, so
   // drop it. Leaves `cellTouchRef` alone: touch taps resolve on the later click.
   const loseCreateCapture = (e: DomPointerEvent) => {
     if (createOrigin.current?.pointerId !== e.pointerId) return;
-    createOrigin.current = null;
-    setCreateBox(null);
+    clearCreate();
   };
+  // Pointer capture does not move keyboard focus to the grid.
+  createEffect(
+    () => [],
+    () => {
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key !== "Escape" || !createOrigin.current) return;
+        event.preventDefault();
+        event.stopPropagation();
+        clearCreate();
+      };
+      document.addEventListener("keydown", onKeyDown);
+      return () => document.removeEventListener("keydown", onKeyDown);
+    },
+  );
 
   // Per-day layout and shading are pure functions of days/events/businessHours,
   // so memoize them, otherwise every drag pointermove (which calls setDrag)
@@ -2127,7 +2169,10 @@ export function TimeGrid<T = unknown>(
                 const bands = createMemo(() => bandsByDay()[dayIndex]);
                 const ghost = createMemo(() => {
                   const currentCreateBox = createBox();
-                  return currentCreateBox?.dayIndex === dayIndex ? currentCreateBox : null;
+                  return currentCreateBox?.dayIndex === dayIndex &&
+                    currentCreateBox.dayTime === day().getTime()
+                    ? currentCreateBox
+                    : null;
                 });
                 // What `onCreateEvent` would receive if the sweep ended here. Kept
                 // while the range holds, so content updates only when it changes.

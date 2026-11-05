@@ -20,7 +20,16 @@ import {
   resolveCalendarLabels,
   resolveDraggedBounds,
 } from "@super-calendar/core/vanilla";
-import { type Component, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import {
+  type Component,
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  onCleanup,
+  Show,
+  untrack,
+} from "solid-js";
 import {
   createEventActions,
   EventActionsDialog,
@@ -596,6 +605,8 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
     el: HTMLElement;
     resource: Resource;
     startPx: number;
+    dayKey: string;
+    creating: boolean;
   } | null> = {
     current: null,
   };
@@ -609,7 +620,35 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
       // The browser may have already released capture.
     }
   };
+  createEffect(
+    () => [],
+    () => {
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key !== "Escape" || !createOrigin.current) return;
+        event.preventDefault();
+        event.stopPropagation();
+        clearCreate();
+      };
+      document.addEventListener("keydown", onKeyDown);
+      return () => document.removeEventListener("keydown", onKeyDown);
+    },
+  );
   const cellEnabled = createMemo(() => !!props.onPressCell || !!props.onCreateEvent);
+  createEffect(
+    () => ({
+      dayKey: props.date.toDateString(),
+      creating: !!props.onCreateEvent,
+      enabled: cellEnabled(),
+    }),
+    (state) => {
+      const origin = createOrigin.current;
+      if (
+        origin &&
+        (!state.enabled || (origin.creating && !state.creating) || origin.dayKey !== state.dayKey)
+      )
+        clearCreate();
+    },
+  );
   const pxAlongAxis = (el: HTMLElement, e: DomPointerEvent) => {
     const rect = el.getBoundingClientRect();
     return vertical() ? e.clientY - rect.top : e.clientX - rect.left;
@@ -637,6 +676,8 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
       el,
       resource,
       startPx,
+      dayKey: props.date.toDateString(),
+      creating: !!props.onCreateEvent,
     };
     // Only preview a ghost when a create can happen; in press-only mode
     // (onPressCell without onCreateEvent) the tap still commits via endCreate.

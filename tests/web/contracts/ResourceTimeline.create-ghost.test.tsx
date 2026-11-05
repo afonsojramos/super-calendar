@@ -32,7 +32,7 @@ describe(rendererName, () => {
 
     function setup(extra: Partial<ResourceTimelineProps> = {}) {
       const onCreateEvent = vi.fn();
-      const props: ResourceTimelineProps = {
+      let props: ResourceTimelineProps = {
         date,
         now: date,
         events: [],
@@ -47,7 +47,17 @@ describe(rendererName, () => {
       const view = render(ResourceTimeline, props);
       const lanes = view.container.querySelectorAll<HTMLElement>('[data-slot="track"]');
       const ghost = () => view.container.querySelector<HTMLElement>('[data-slot="createGhost"]');
-      return { ...view, lanes, ghost, onCreateEvent, content: () => ghost()?.textContent ?? null };
+      return {
+        ...view,
+        lanes,
+        ghost,
+        onCreateEvent,
+        content: () => ghost()?.textContent ?? null,
+        update(next: Partial<ResourceTimelineProps>) {
+          props = { ...props, ...next };
+          view.rerender(props);
+        },
+      };
     }
 
     it("shows the lane's resource and live range, then commits the shown range", () => {
@@ -115,5 +125,65 @@ describe(rendererName, () => {
         expect(view.content()).toBe("Booth 05:00-05:15");
       },
     );
+
+    it.each([true, false])("Escape cancels a sweep with custom content: %s", (custom) => {
+      const onPressCell = vi.fn();
+      const view = setup({ renderCreateGhost: custom ? Draft : undefined, onPressCell });
+      expect(fireEvent.keyDown(document, { key: "Escape" })).toBe(true);
+      const lane = view.lanes[0];
+      fireEvent.pointerDown(lane, at(100));
+      fireEvent.pointerMove(lane, at(250));
+      fireEvent.keyDown(document, { key: "Enter" });
+      expect(view.ghost()).not.toBeNull();
+      expect(fireEvent.keyDown(document, { key: "Escape" })).toBe(false);
+      expect(view.ghost()).toBeNull();
+      fireEvent.pointerMove(lane, at(300));
+      fireEvent.pointerUp(lane, at(300));
+      expect(view.onCreateEvent).not.toHaveBeenCalled();
+      expect(onPressCell).not.toHaveBeenCalled();
+      fireEvent.pointerDown(view.lanes[1], at(400));
+      fireEvent.pointerMove(view.lanes[1], at(480));
+      fireEvent.pointerUp(view.lanes[1], at(480));
+      expect(view.onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+        new Date(2026, 6, 15, 5),
+        new Date(2026, 6, 15, 6),
+        resources[1],
+      );
+    });
+
+    it.each([true, false])(
+      "does not revive a disabled sweep, released while disabled: %s",
+      (released) => {
+        const view = setup();
+        fireEvent.pointerDown(view.lanes[0], at(100));
+        fireEvent.pointerMove(view.lanes[0], at(250));
+        view.update({ onCreateEvent: undefined });
+        if (released) fireEvent.pointerUp(view.lanes[0], at(250));
+        view.update({ onCreateEvent: view.onCreateEvent });
+        expect(view.ghost()).toBeNull();
+        fireEvent.pointerUp(view.lanes[0], at(250));
+        expect(view.onCreateEvent).not.toHaveBeenCalled();
+        fireEvent.pointerDown(view.lanes[1], at(400));
+        expect(view.content()).toBe("Booth 05:00-05:15");
+      },
+    );
+
+    it("cancels a held draft when the date changes", () => {
+      const view = setup();
+      fireEvent.pointerDown(view.lanes[0], at(100));
+      fireEvent.pointerMove(view.lanes[0], at(250));
+      view.update({ date: new Date(2026, 6, 16) });
+      expect(view.ghost()).toBeNull();
+      fireEvent.pointerUp(view.lanes[0], at(250));
+      expect(view.onCreateEvent).not.toHaveBeenCalled();
+      fireEvent.pointerDown(view.lanes[1], at(400));
+      fireEvent.pointerMove(view.lanes[1], at(480));
+      fireEvent.pointerUp(view.lanes[1], at(480));
+      expect(view.onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+        new Date(2026, 6, 16, 5),
+        new Date(2026, 6, 16, 6),
+        resources[1],
+      );
+    });
   });
 });

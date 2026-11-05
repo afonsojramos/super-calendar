@@ -117,6 +117,37 @@ describe(rendererName, () => {
     await expect.poll(() => page.locator(GHOST).count()).toBe(0);
   });
 
+  it.each(["draft-day", "draft-resources", "draft-resources-vertical"])(
+    "Escape cancels the $0 preview and allows a fresh sweep",
+    async (view) => {
+      await page.setViewportSize({ width: 1100, height: 1000 });
+      await open(view);
+      const resources = view.startsWith("draft-resources");
+      const vertical = view !== "draft-resources";
+      const column = await bounds(resources ? '[data-slot="track"]' : '[data-slot="dayColumn"]');
+      const point = (hours: number) => ({
+        x: vertical ? column.x + column.width / 2 : column.x + (hours - 8) * 80 + 2,
+        y: vertical
+          ? at(column, hours, resources ? 48 : 24, resources ? 8 : 0)
+          : column.y + column.height / 2,
+      });
+      await page.mouse.move(point(9).x, point(9).y);
+      await page.mouse.down();
+      await page.mouse.move(point(11).x, point(11).y, { steps: 6 });
+      await page.locator(GHOST).waitFor();
+      await page.keyboard.press("Escape");
+      await expect.poll(() => page.locator(GHOST).count()).toBe(0);
+      await page.mouse.move(point(12).x, point(12).y);
+      await page.mouse.up();
+      expect(await calls()).toBe("[]");
+      await page.mouse.move(point(9).x, point(9).y);
+      await page.mouse.down();
+      await page.mouse.move(point(10).x, point(10).y, { steps: 6 });
+      await page.mouse.up();
+      expect(await calls()).toBe(JSON.stringify([`15:9:0-15:10:0${resources ? "@a" : ""}`]));
+    },
+  );
+
   it("clears the content without creating when the sweep loses pointer capture", async () => {
     const column = await openColumn("draft-day");
     await page.evaluate(() => {

@@ -189,7 +189,9 @@ lane's resource added to each callback so you know **where** as well as when:
   `dragStepMinutes`.
 - `onCreateEvent(start, end, resource)` — sweep out a new event on empty lane
   space: drag with a mouse or pen on the web, long-press then drag on React
-  Native. A ghost previews the range while you drag.
+  Native. A ghost previews the range while you drag. In React DOM and Solid,
+  **Escape** cancels the sweep without creating an event. In all renderers,
+  removing `onCreateEvent` or changing `date` to another day cancels the sweep.
 - `onLongPressEvent(event)` / `onLongPressCell(at, resource)` — React Native
   long-presses. A bar's long-press is claimed by `onDragEvent` when set (so
   `onLongPressEvent` fires only for non-draggable bars), and empty-space

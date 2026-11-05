@@ -1,4 +1,5 @@
 import * as gestureHandlerMock from "react-native-gesture-handler";
+import * as reanimatedMock from "react-native-reanimated";
 import { vi } from "vitest";
 import { act, render } from "@testing-library/react-native";
 import { useState } from "react";
@@ -14,6 +15,10 @@ type Handlers = {
 };
 type Chain = { kind: string; calls: Record<string, unknown[]>; handlers: Handlers };
 const chains = () => (gestureHandlerMock as unknown as { __gestures: Chain[] }).__gestures;
+const animation = reanimatedMock as unknown as {
+  __jsQueue: Array<() => void>;
+  __deferRunOnJS: (enabled: boolean) => void;
+};
 // Each lane's create pan waits for the 250ms hold; with no bars there are no others.
 const lanePans = () =>
   chains()
@@ -47,7 +52,9 @@ describe.each(["horizontal", "vertical"] as const)(
 
     beforeEach(() => {
       chains().length = 0;
+      animation.__deferRunOnJS(false);
     });
+    afterEach(() => animation.__deferRunOnJS(false));
 
     it("shows the lane's resource and live range, then commits the shown range", async () => {
       const { Draft, mounts, renders } = probe();
@@ -148,6 +155,75 @@ describe.each(["horizontal", "vertical"] as const)(
         view.queryAllByTestId("resource-create-ghost", { includeHiddenElements: true }),
       ).toHaveLength(0);
       expect(renders).toHaveLength(0);
+    });
+
+    it.each([false, true])(
+      "uses the latest pointer and snapping settings, deferred bridge: %s",
+      async (deferred) => {
+        const { Draft, renders } = probe();
+        const onCreateEvent = vi.fn();
+        const board = (dragStepMinutes: number) => (
+          <ResourceTimeline
+            date={date}
+            resources={resources}
+            events={[]}
+            orientation={orientation}
+            hourWidth={80}
+            hourHeight={80}
+            dragStepMinutes={dragStepMinutes}
+            onCreateEvent={onCreateEvent}
+            renderCreateGhost={Draft}
+          />
+        );
+        const view = await render(board(15));
+        await act(async () => lanePans()[0].onStart?.(axis(160)));
+        animation.__deferRunOnJS(deferred);
+        await act(async () => lanePans()[0].onUpdate?.(axis(176)));
+        await act(async () => lanePans()[0].onUpdate?.(axis(184)));
+        await view.rerender(board(10));
+        await act(async () => {
+          for (const deliver of animation.__jsQueue.splice(0)) deliver();
+        });
+        expect(renders.at(-1)).toBe("Studio 0 02:00-02:20");
+        animation.__deferRunOnJS(false);
+        await act(async () => lanePans().at(-2)?.onEnd?.(axis(184), true));
+        expect(onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+          new Date(2026, 0, 1, 2),
+          new Date(2026, 0, 1, 2, 20),
+          resources[0],
+        );
+      },
+    );
+
+    it("cancels a held draft when the date changes", async () => {
+      const { Draft } = probe();
+      const onCreateEvent = vi.fn();
+      const board = (date: Date) => (
+        <ResourceTimeline
+          date={date}
+          resources={resources}
+          events={[]}
+          orientation={orientation}
+          hourWidth={80}
+          hourHeight={80}
+          onCreateEvent={onCreateEvent}
+          renderCreateGhost={Draft}
+        />
+      );
+      const view = await render(board(date));
+      await act(async () => lanePans()[0].onStart?.(axis(100)));
+      await act(async () => lanePans()[0].onUpdate?.(axis(250)));
+      await view.rerender(board(new Date(2026, 0, 2)));
+      expect(view.queryByText(/Studio \d/, { includeHiddenElements: true })).toBeNull();
+      await act(async () => lanePans().at(-2)?.onEnd?.(axis(250), true));
+      expect(onCreateEvent).not.toHaveBeenCalled();
+      await act(async () => lanePans().at(-1)?.onStart?.(axis(400)));
+      await act(async () => lanePans().at(-1)?.onEnd?.(axis(480), true));
+      expect(onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+        new Date(2026, 0, 2, 5),
+        new Date(2026, 0, 2, 6),
+        resources[1],
+      );
     });
   },
 );
