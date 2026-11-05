@@ -371,6 +371,7 @@ export function Fixture() {
       ) : view.startsWith("draft-resources") ? (
         // Create-preview content on the resource timeline, along either axis.
         <ResourceTimeline<{ id: number; resourceId: string }>
+          className="fixture-resource-scroll"
           date={anchor}
           now={anchor}
           orientation={view.includes("-vertical") ? "vertical" : "horizontal"}
