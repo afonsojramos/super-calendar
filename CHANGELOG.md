@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.16.0](https://github.com/afonsojramos/super-calendar/compare/v2.15.0...v2.16.0) (2026-11-05)
+
+
+### Features
+
+* add accessible event editing and web quality checks ([a1a1fab](https://github.com/afonsojramos/super-calendar/commit/a1a1fab4b95ccbbabbc3c24382f7be60e0bd8691))
+* render live content in drag-to-create previews ([#106](https://github.com/afonsojramos/super-calendar/issues/106)) ([3e55c5a](https://github.com/afonsojramos/super-calendar/commit/3e55c5a872ffc4f8025b4fecdeca8b30ae42ed45))
+* **solid:** add Solid 2 renderer and shared Vitest coverage ([ad61089](https://github.com/afonsojramos/super-calendar/commit/ad610892e1eeab1cdd457cdf64cdcdd1cd3ea5bd))
+
+
+### Bug Fixes
+
+* build renderer benchmarks in production ([a239082](https://github.com/afonsojramos/super-calendar/commit/a2390824789ac44246f3c55bdf7af367e5ea7d66))
+* **demo:** contain page shortcuts while dialogs are open ([2877d67](https://github.com/afonsojramos/super-calendar/commit/2877d67f7e9e848333e975114373d7bbe7d618a7))
+* retain web editing state and date picker focus ([b1b499c](https://github.com/afonsojramos/super-calendar/commit/b1b499c7278dccebdc98ee9bb7153e73333a1dd9))
+* **solid:** publish releases on the latest tag ([#109](https://github.com/afonsojramos/super-calendar/issues/109)) ([7abe4c6](https://github.com/afonsojramos/super-calendar/commit/7abe4c6b2a64083464f5b0d28b2243466d3a6d3d))
+* **web:** correct event action identity, focus and layout ([9682819](https://github.com/afonsojramos/super-calendar/commit/9682819c9954e41a51e6bcc649166e138930d68e))
+* **web:** keep time-grid creation previews inside the grid ([#105](https://github.com/afonsojramos/super-calendar/issues/105)) ([4fb87f6](https://github.com/afonsojramos/super-calendar/commit/4fb87f62bfdff01b2f82cf6d65ba2ef1b8a0cc7d))
+
 ## [2.15.0](https://github.com/afonsojramos/super-calendar/compare/v2.14.2...v2.15.0) (2026-11-02)
 
 
