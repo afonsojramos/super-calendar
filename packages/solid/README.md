@@ -6,6 +6,8 @@ React DOM, React Native, or Legend List.
 
 This package is experimental and targets `solid-js@2.0.0-rc.20` and
 `@solidjs/web@2.0.0-rc.20`. Install both exact versions. Solid 1 is not supported.
+Its version follows the other calendar packages, but releases use the
+`experimental` npm tag while Solid 2 support remains experimental.
 
 ## Install
 

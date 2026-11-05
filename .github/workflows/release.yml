@@ -9,9 +9,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Opens/updates a release PR aggregating conventional commits, and tags
-  # releases for the changed @super-calendar/* packages when that PR merges.
-  # The node-workspace plugin rolls an internal bump (core) into its dependents.
+  # Opens/updates one release PR and tags the shared version when it merges.
+  # The manifest's extra-files keep all four package versions aligned.
   release-please:
     runs-on: ubuntu-latest
     outputs:
