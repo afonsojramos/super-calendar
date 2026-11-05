@@ -1,6 +1,6 @@
 {
   "name": "@super-calendar/solid",
-  "version": "2.16.0",
+  "version": "2.16.1",
   "description": "Solid 2 calendar and date picker with virtualized views, keyboard navigation, and pointer gestures.",
   "keywords": [
     "calendar",

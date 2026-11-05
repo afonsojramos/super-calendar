@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.16.1](https://github.com/afonsojramos/super-calendar/compare/v2.16.0...v2.16.1) (2026-11-05)
+
+
+### Bug Fixes
+
+* recognize unified release pull requests ([#112](https://github.com/afonsojramos/super-calendar/issues/112)) ([a8646f1](https://github.com/afonsojramos/super-calendar/commit/a8646f1e108c233ba262d3ddec623771e9ad2b19))
+
 ## [2.16.0](https://github.com/afonsojramos/super-calendar/compare/v2.15.0...v2.16.0) (2026-11-05)
 
 
