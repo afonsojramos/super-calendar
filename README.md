@@ -399,6 +399,24 @@ inside the column.
 />
 ```
 
+To show a draft in the preview while it is swept, pass a `renderCreateGhost`
+component. It receives `start` and `end`, the range `onCreateEvent` would get if
+released now, and the calendar clips it to the preview. It needs
+`onCreateEvent`, applies to the time grid and `ResourceTimeline` (which adds the
+lane's `resource`), and is not used by month or year sweeps.
+
+```tsx
+import { Calendar, type CreateGhostArgs } from "@super-calendar/native";
+import { format } from "date-fns";
+import { Text } from "react-native";
+
+function DraftPreview({ start, end }: CreateGhostArgs) {
+  return <Text>{`New event ${format(start, "HH:mm")} - ${format(end, "HH:mm")}`}</Text>;
+}
+
+<Calendar mode="week" /* ... */ onCreateEvent={createEvent} renderCreateGhost={DraftPreview} />;
+```
+
 **On the month grid.** Both handlers also work in `mode="month"`, on both
 renderers. `onCreateEvent` sweeps across day cells to create an **all-day** span
 (`start` at midnight of the first day, `end` at midnight after the last), and

@@ -11,6 +11,7 @@ import {
   darkSolidTheme,
   type CalendarEvent,
   type CalendarMode,
+  type CreateGhostArgs,
 } from "@super-calendar/solid";
 
 const anchor = new Date(2026, 10, 2);
@@ -32,6 +33,17 @@ const pickerStyles = {
     width: "min(300px, calc(100vw - 36px))",
   },
 };
+
+// Drag-to-create preview content: the draft's title and live time range, the
+// same range onCreateEvent receives on release.
+function DraftPreview(props: CreateGhostArgs) {
+  return (
+    <div class="draft">
+      <strong>New event</strong>
+      <div>{`${format(props.start, "HH:mm")} - ${format(props.end, "HH:mm")}`}</div>
+    </div>
+  );
+}
 
 export function viewFromSearch(search: string) {
   const requested = new URLSearchParams(search).get("view");
@@ -127,6 +139,7 @@ export function App(props: { initialView?: string }) {
                       onSelectDrag={selection.selectRange}
                       onDragEvent={move}
                       onCreateEvent={create}
+                      renderCreateGhost={DraftPreview}
                       onPressEvent={(event) => setStatus(`Selected ${event.title}`)}
                     />
                   }

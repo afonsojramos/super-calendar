@@ -1,4 +1,4 @@
-import { createSignal, type Component } from "solid-js";
+import { createEffect, createSignal, type Component } from "solid-js";
 import { render } from "@solidjs/web";
 export {
   Calendar,
@@ -11,6 +11,10 @@ export {
 
 export function useFixtureState<T>(initial: T) {
   return createSignal<T>(() => initial);
+}
+
+export function useFixtureMount(callback: () => void) {
+  createEffect(() => true, callback);
 }
 
 export function mount(View: Component) {

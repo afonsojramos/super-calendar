@@ -262,6 +262,105 @@ inside the column, including borders from a `createGhost` class or style. The
 preview does not change `onCreateEvent`, which still receives the snapped range
 within the pressed day.
 
+### Show a draft in the preview
+
+The preview is empty by default. To show a draft title or the live time range
+inside it, pass a `renderCreateGhost` component. It receives `start` and `end`
+as `Date`s: the snapped range `onCreateEvent` would receive if the sweep ended
+at the pointer's current position. They are ordered, at least one
+`dragStepMinutes` step long, and clamped to the pressed day, exactly as on
+release. The component re-renders whenever the range changes, before
+`onCreateEvent` fires.
+
+```tsx
+import { Calendar, type CreateGhostArgs } from "@super-calendar/dom";
+import { format } from "date-fns";
+
+function DraftPreview({ start, end }: CreateGhostArgs) {
+  return (
+    <div style={{ padding: "2px 6px", fontSize: 12 }}>
+      <strong>New event</strong>
+      <div>{`${format(start, "HH:mm")} - ${format(end, "HH:mm")}`}</div>
+    </div>
+  );
+}
+
+<Calendar
+  mode="week"
+  /* ... */
+  onCreateEvent={(start, end) =>
+    setEvents((prev) => [...prev, { id: makeId(), title: "New event", start, end }])
+  }
+  renderCreateGhost={DraftPreview}
+/>;
+```
+
+On React Native, return `Text` (and views) instead of DOM elements:
+
+```tsx
+import { Calendar, type CreateGhostArgs } from "@super-calendar/native";
+import { format } from "date-fns";
+import { Text } from "react-native";
+
+function DraftPreview({ start, end }: CreateGhostArgs) {
+  return (
+    <Text
+      numberOfLines={2}
+    >{`New event\n${format(start, "HH:mm")} - ${format(end, "HH:mm")}`}</Text>
+  );
+}
+
+<Calendar mode="week" /* ... */ onCreateEvent={createEvent} renderCreateGhost={DraftPreview} />;
+```
+
+In Solid, read the props inside JSX instead of destructuring them, so the text
+follows the sweep:
+
+```tsx
+import { Calendar, type CreateGhostArgs } from "@super-calendar/solid";
+import { format } from "date-fns";
+
+function DraftPreview(props: CreateGhostArgs) {
+  return (
+    <strong>{`New event ${format(props.start, "HH:mm")} - ${format(props.end, "HH:mm")}`}</strong>
+  );
+}
+
+<Calendar mode="week" /* ... */ onCreateEvent={createEvent} renderCreateGhost={DraftPreview} />;
+```
+
+The calendar still positions, sizes, and styles the preview (including the
+`createGhost` slot), and you own only its content. That content is clipped to
+the preview box, ignores the pointer, and stays out of the tab order and the
+accessibility tree, like the empty preview. Keep it visual: controls inside it
+can't be reached.
+
+A few rules apply:
+
+- `renderCreateGhost` needs `onCreateEvent`. On its own it does not enable
+  creation, and with only `onPressCell` the preview stays empty. Removing
+  `onCreateEvent` cancels an active sweep.
+- In React, define the component once outside render, as with `renderEvent`. A
+  new inline function on every render remounts the content and drops its state.
+- `Calendar` forwards it in the time-grid modes (`day`, `3days`, `week`,
+  `custom`). Month and year sweeps don't use it. `ResourceTimeline` accepts the
+  same prop and adds the lane's `resource` to the props, in both orientations.
+- The range can extend past a narrowed `minHour`/`maxHour` window. On the web
+  the preview box stops at the visible edge, but `start` and `end` keep matching
+  what `onCreateEvent` will receive, which is clamped to the pressed day, not
+  to the visible hours.
+- In React DOM and Solid, scrolling or zooming during a held sweep updates the
+  preview range even if the pointer does not move again before release.
+- The content clears when the sweep ends or is cancelled, and each new sweep
+  mounts it fresh. Changing the pressed column to another day cancels the sweep.
+  In React DOM and Solid, **Escape** or losing pointer capture cancels the sweep,
+  and a press without a drag shows the one-step range while held, then fires
+  `onPressCell` instead of creating. On React Native, a stationary hold creates
+  that one-step range. A cancelled native gesture clears the preview without
+  calling `onCreateEvent`.
+- On React Native, the preview geometry stays on the UI thread. Pointer and
+  zoom updates cross to JavaScript only when the snapped range changes.
+
 ## On the month grid
 
 The same two handlers work in `month` mode on both renderers. Nothing extra to

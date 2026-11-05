@@ -13,14 +13,16 @@ declare module "vitest" {
     browserRenderer: "react" | "solid";
     browserArtifact: "source" | "dist";
     browserEngine: BrowserEngine;
+    browserReactVersion?: 18 | 19;
   }
 }
 
 export const renderer = inject("browserRenderer");
 export const artifact = inject("browserArtifact");
 export const engine = inject("browserEngine");
-export const rendererName = `${renderer === "react" ? "React DOM" : "Solid"} (${artifact}, ${engine})`;
-const { config, entry } = fixtureConfig(renderer, artifact);
+const reactVersion = inject("browserReactVersion") ?? 19;
+export const rendererName = `${renderer === "react" ? `React DOM${reactVersion === 18 ? " 18" : ""}` : "Solid"} (${artifact}, ${engine})`;
+const { config, entry } = fixtureConfig(renderer, artifact, reactVersion);
 let server: ViteDevServer;
 let browser: Browser;
 let context: BrowserContext;
@@ -45,10 +47,11 @@ beforeAll(async () => {
   warmup.setDefaultNavigationTimeout(15_000);
   try {
     await warmup.goto(origin);
+    // The next test page needs Vite's static imports to be ready.
+    await server.waitForRequestsIdle();
     await warmup
       .getByRole("button", { name: "Update props", exact: true })
       .waitFor({ timeout: 15_000 });
-    await warmup.waitForLoadState("networkidle");
     expect(startupErrors, "Fixture startup errors").toEqual([]);
   } finally {
     await warmup.close();
@@ -109,6 +112,10 @@ afterAll(async () => {
 export async function open(view: string) {
   await page.goto(`${origin}?view=${view}`);
   await page.getByRole("button", { name: "Update props", exact: true }).waitFor();
+  if (renderer === "react")
+    expect(await page.locator("html").getAttribute("data-react-version")).toMatch(
+      new RegExp(`^${reactVersion}\\.`),
+    );
 }
 
 export async function box(selector: string) {

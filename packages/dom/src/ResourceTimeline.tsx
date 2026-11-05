@@ -5,13 +5,14 @@ import type {
   ReactElement,
   ReactNode,
 } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   backgroundBandsForDay,
   type BusinessHoursBand,
   type BusinessHoursValue,
   type CalendarEvent,
   type CalendarLabels,
+  type CreateGhostArgs,
   eventAccessibilityLabel,
   resolveCalendarLabels,
   isSameCalendarDay,
@@ -36,6 +37,7 @@ import {
   useEventActions,
 } from "./EventActions";
 import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
+import { InertDiv } from "./InertDiv";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
 /**
@@ -146,6 +148,17 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
   onPressCell?: (at: Date, resource: Resource) => void;
   /** Drag empty lane space to create; called with the swept start/end and the lane's resource. */
   onCreateEvent?: (start: Date, end: Date, resource: Resource) => void;
+  /**
+   * A component that draws content inside the drag-to-create preview, such as a
+   * draft title and the live time range. It receives the snapped `start` and
+   * `end` that `onCreateEvent` would get if the pointer were released now, plus
+   * the lane's resource, and re-renders as the sweep changes them. The board
+   * keeps positioning, sizing and styling the preview and clips the content to
+   * it; the content is non-interactive and hidden from assistive tech. Renders
+   * only while a sweep can create, so it needs `onCreateEvent` and does not
+   * enable creation itself. Applies to both orientations.
+   */
+  renderCreateGhost?: ComponentType<CreateGhostArgs & { resource: Resource }>;
   /**
    * Shade the hours outside this window, per lane. Same shape as the Calendar's
    * `businessHours` plus the lane's resource, so per-resource opening hours work
@@ -291,6 +304,7 @@ export function ResourceTimeline<T = unknown>({
   getEventId,
   onPressCell,
   onCreateEvent,
+  renderCreateGhost,
   businessHours,
   renderBusinessHours,
   renderResourceHeader,
@@ -540,11 +554,30 @@ export function ResourceTimeline<T = unknown>({
   } | null>(null);
   const createOrigin = useRef<{
     pointerId: number;
+    clientX: number;
+    clientY: number;
     el: HTMLElement;
     resource: Resource;
     startPx: number;
+    dayKey: string;
+    creating: boolean;
   } | null>(null);
-  const clearCreate = () => {
+  const createActive = createBox !== null;
+  useEffect(() => {
+    if (!createActive) return;
+    const onScroll = () => {
+      const origin = createOrigin.current;
+      if (!origin) return;
+      const rect = origin.el.getBoundingClientRect();
+      const curPx = vertical ? origin.clientY - rect.top : origin.clientX - rect.left;
+      setCreateBox((current) =>
+        current && current.curPx !== curPx ? { ...current, curPx } : current,
+      );
+    };
+    window.addEventListener("scroll", onScroll, true);
+    return () => window.removeEventListener("scroll", onScroll, true);
+  }, [createActive, vertical]);
+  const clearCreate = useCallback(() => {
     const previous = createOrigin.current;
     createOrigin.current = null;
     setCreateBox(null);
@@ -553,7 +586,17 @@ export function ResourceTimeline<T = unknown>({
     } catch {
       // The browser may have already released capture.
     }
-  };
+  }, []);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !createOrigin.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      clearCreate();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [clearCreate]);
   const cellEnabled = !!onPressCell || !!onCreateEvent;
   const pxAlongAxis = (el: HTMLElement, e: ReactPointerEvent) => {
     const rect = el.getBoundingClientRect();
@@ -577,7 +620,16 @@ export function ResourceTimeline<T = unknown>({
     } catch {
       // Best-effort capture.
     }
-    createOrigin.current = { pointerId: e.pointerId, el, resource, startPx };
+    createOrigin.current = {
+      pointerId: e.pointerId,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      el,
+      resource,
+      startPx,
+      dayKey: date.toDateString(),
+      creating: !!onCreateEvent,
+    };
     // Only preview a ghost when a create can happen; in press-only mode
     // (onPressCell without onCreateEvent) the tap still commits via endCreate.
     if (onCreateEvent) setCreateBox({ resourceKey: resource.id, startPx, curPx: startPx });
@@ -585,6 +637,8 @@ export function ResourceTimeline<T = unknown>({
   const moveCreate = (e: ReactPointerEvent) => {
     const o = createOrigin.current;
     if (!o || o.pointerId !== e.pointerId || !onCreateEvent) return;
+    o.clientX = e.clientX;
+    o.clientY = e.clientY;
     setCreateBox({ resourceKey: o.resource.id, startPx: o.startPx, curPx: pxAlongAxis(o.el, e) });
   };
   const endCreate = (e: ReactPointerEvent) => {
@@ -615,6 +669,30 @@ export function ResourceTimeline<T = unknown>({
     if (createOrigin.current?.pointerId !== e.pointerId) return;
     clearCreate();
   };
+  const RenderCreateGhost = renderCreateGhost;
+  // What `onCreateEvent` would receive if the sweep ended here. The props keep
+  // the same `Date`s while that range holds, so content effects keyed on them
+  // re-run only when it changes.
+  const liveRange =
+    createBox && RenderCreateGhost && onCreateEvent
+      ? cellRangeFromDrag(
+          date,
+          createBox.startPx,
+          createBox.curPx,
+          hourSize,
+          startHour,
+          dragStepMinutes,
+        )
+      : null;
+  const liveStart = liveRange?.start.getTime();
+  const liveEnd = liveRange?.end.getTime();
+  const createRange = useMemo(
+    () =>
+      liveStart === undefined || liveEnd === undefined
+        ? null
+        : { start: new Date(liveStart), end: new Date(liveEnd) },
+    [liveStart, liveEnd],
+  );
   const trackInteractionProps = (resource: Resource) => ({
     onPointerDown: (e: ReactPointerEvent) => beginCreate(e, resource),
     onPointerMove: moveCreate,
@@ -628,7 +706,15 @@ export function ResourceTimeline<T = unknown>({
       (!origin.current?.element.isConnected || !events.includes(dragRef.current.event))
     )
       clearDrag();
-    if (createOrigin.current && !createOrigin.current.el.isConnected) clearCreate();
+    const creating = createOrigin.current;
+    if (
+      creating &&
+      (!creating.el.isConnected ||
+        !cellEnabled ||
+        (creating.creating && !onCreateEvent) ||
+        creating.dayKey !== date.toDateString())
+    )
+      clearCreate();
   });
   useEffect(
     () => () => {
@@ -1035,8 +1121,10 @@ export function ResourceTimeline<T = unknown>({
                   })}
                   {nowLine(resource.id)}
                   {createBox?.resourceKey === resource.id ? (
-                    <div
+                    <InertDiv
                       aria-hidden
+                      // Custom content stays out of the tab order and pointer input.
+                      inert={!!createRange}
                       {...slot("createGhost", {
                         base: {
                           position: "absolute",
@@ -1044,6 +1132,7 @@ export function ResourceTimeline<T = unknown>({
                           right: 1,
                           top: Math.min(createBox.startPx, createBox.curPx),
                           height: Math.max(Math.abs(createBox.curPx - createBox.startPx), 2),
+                          ...(createRange ? { overflow: "hidden" } : null),
                           opacity: 0.7,
                           pointerEvents: "none",
                           zIndex: 2,
@@ -1054,7 +1143,15 @@ export function ResourceTimeline<T = unknown>({
                           borderRadius: 6,
                         },
                       })}
-                    />
+                    >
+                      {createRange && RenderCreateGhost ? (
+                        <RenderCreateGhost
+                          start={createRange.start}
+                          end={createRange.end}
+                          resource={resource}
+                        />
+                      ) : null}
+                    </InertDiv>
                   ) : null}
                 </div>
               </div>
@@ -1286,8 +1383,10 @@ export function ResourceTimeline<T = unknown>({
                 })}
                 {nowLine(resource.id)}
                 {createBox?.resourceKey === resource.id ? (
-                  <div
+                  <InertDiv
                     aria-hidden
+                    // Custom content stays out of the tab order and pointer input.
+                    inert={!!createRange}
                     {...slot("createGhost", {
                       base: {
                         position: "absolute",
@@ -1295,6 +1394,7 @@ export function ResourceTimeline<T = unknown>({
                         bottom: 1,
                         left: Math.min(createBox.startPx, createBox.curPx),
                         width: Math.max(Math.abs(createBox.curPx - createBox.startPx), 2),
+                        ...(createRange ? { overflow: "hidden" } : null),
                         opacity: 0.7,
                         pointerEvents: "none",
                         zIndex: 2,
@@ -1305,7 +1405,15 @@ export function ResourceTimeline<T = unknown>({
                         borderRadius: 6,
                       },
                     })}
-                  />
+                  >
+                    {createRange && RenderCreateGhost ? (
+                      <RenderCreateGhost
+                        start={createRange.start}
+                        end={createRange.end}
+                        resource={resource}
+                      />
+                    ) : null}
+                  </InertDiv>
                 ) : null}
               </div>
             </div>

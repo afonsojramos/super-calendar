@@ -5,6 +5,7 @@ import {
   type BusinessHoursValue,
   type CalendarEvent,
   type CalendarLabels,
+  type CreateGhostArgs,
   cellRangeFromDrag,
   eventAccessibilityLabel,
   closedHourBands,
@@ -19,7 +20,16 @@ import {
   resolveCalendarLabels,
   resolveDraggedBounds,
 } from "@super-calendar/core/vanilla";
-import { type Component, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import {
+  type Component,
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  onCleanup,
+  Show,
+  untrack,
+} from "solid-js";
 import {
   createEventActions,
   EventActionsDialog,
@@ -143,6 +153,17 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
   /** Drag empty lane space to create; called with the swept start/end and the lane's resource. */
   onCreateEvent?: (start: Date, end: Date, resource: Resource) => void;
   /**
+   * A component that draws content inside the drag-to-create preview, such as a
+   * draft title and the live time range. It receives the snapped `start` and
+   * `end` that `onCreateEvent` would get if the pointer were released now, plus
+   * the lane's resource, and its props update as the sweep changes them. The
+   * board keeps positioning, sizing and styling the preview and clips the
+   * content to it; the content is non-interactive and hidden from assistive
+   * tech. Renders only while a sweep can create, so it needs `onCreateEvent` and
+   * does not enable creation itself. Applies to both orientations.
+   */
+  renderCreateGhost?: Component<CreateGhostArgs & { resource: Resource }>;
+  /**
    * Shade the hours outside this window, per lane. Same shape as the Calendar's
    * `businessHours` plus the lane's resource, so per-resource opening hours work
    * (return `null` for a fully closed lane). A date-only function is accepted.
@@ -186,6 +207,10 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
   style?: CSSProperties;
 }
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+// Two create-preview ranges cover the same times.
+const sameRange = (a: CreateGhostArgs | null, b: CreateGhostArgs | null) =>
+  a === b ||
+  (!!a && !!b && a.start.getTime() === b.start.getTime() && a.end.getTime() === b.end.getTime());
 
 // Hour-gutter width in the vertical orientation, matching the time grid's axis.
 const GUTTER_WIDTH = 56;
@@ -577,12 +602,33 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
   } | null>(null);
   const createOrigin: ElementRef<{
     pointerId: number;
+    clientX: number;
+    clientY: number;
     el: HTMLElement;
     resource: Resource;
     startPx: number;
+    dayKey: string;
+    creating: boolean;
   } | null> = {
     current: null,
   };
+  createEffect(
+    () => (createBox() ? (vertical() ? "vertical" : "horizontal") : null),
+    (axis) => {
+      if (!axis) return;
+      const onScroll = () => {
+        const origin = createOrigin.current;
+        if (!origin) return;
+        const rect = origin.el.getBoundingClientRect();
+        const curPx = axis === "vertical" ? origin.clientY - rect.top : origin.clientX - rect.left;
+        setCreateBox((current) =>
+          current && current.curPx !== curPx ? { ...current, curPx } : current,
+        );
+      };
+      window.addEventListener("scroll", onScroll, true);
+      return () => window.removeEventListener("scroll", onScroll, true);
+    },
+  );
   const clearCreate = () => {
     const previous = createOrigin.current;
     createOrigin.current = null;
@@ -593,7 +639,35 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
       // The browser may have already released capture.
     }
   };
+  createEffect(
+    () => [],
+    () => {
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key !== "Escape" || !createOrigin.current) return;
+        event.preventDefault();
+        event.stopPropagation();
+        clearCreate();
+      };
+      document.addEventListener("keydown", onKeyDown);
+      return () => document.removeEventListener("keydown", onKeyDown);
+    },
+  );
   const cellEnabled = createMemo(() => !!props.onPressCell || !!props.onCreateEvent);
+  createEffect(
+    () => ({
+      dayKey: props.date.toDateString(),
+      creating: !!props.onCreateEvent,
+      enabled: cellEnabled(),
+    }),
+    (state) => {
+      const origin = createOrigin.current;
+      if (
+        origin &&
+        (!state.enabled || (origin.creating && !state.creating) || origin.dayKey !== state.dayKey)
+      )
+        clearCreate();
+    },
+  );
   const pxAlongAxis = (el: HTMLElement, e: DomPointerEvent) => {
     const rect = el.getBoundingClientRect();
     return vertical() ? e.clientY - rect.top : e.clientX - rect.left;
@@ -618,9 +692,13 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
     }
     createOrigin.current = {
       pointerId: e.pointerId,
+      clientX: e.clientX,
+      clientY: e.clientY,
       el,
       resource,
       startPx,
+      dayKey: props.date.toDateString(),
+      creating: !!props.onCreateEvent,
     };
     // Only preview a ghost when a create can happen; in press-only mode
     // (onPressCell without onCreateEvent) the tap still commits via endCreate.
@@ -634,6 +712,8 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
   const moveCreate = (e: DomPointerEvent) => {
     const o = createOrigin.current;
     if (!o || o.pointerId !== e.pointerId || !props.onCreateEvent) return;
+    o.clientX = e.clientX;
+    o.clientY = e.clientY;
     setCreateBox({
       resourceKey: o.resource.id,
       startPx: o.startPx,
@@ -675,6 +755,24 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
     if (createOrigin.current?.pointerId !== e.pointerId) return;
     clearCreate();
   };
+  // What `onCreateEvent` would receive if the sweep ended here. Kept while the
+  // range holds, so content updates only when it changes.
+  const createRange = createMemo(
+    () => {
+      const box = createBox();
+      return box && props.renderCreateGhost && props.onCreateEvent
+        ? cellRangeFromDrag(
+            props.date,
+            box.startPx,
+            box.curPx,
+            hourSize(),
+            props.startHour,
+            props.dragStepMinutes,
+          )
+        : null;
+    },
+    { equals: sameRange },
+  );
   const trackInteractionProps = (resource: Resource) => ({
     onPointerDown: (e: DomPointerEvent) => beginCreate(e, resource),
     onPointerMove: moveCreate,
@@ -1183,6 +1281,8 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
                                 {(ghost) => (
                                   <div
                                     aria-hidden="true"
+                                    // Custom content stays out of the tab order and pointer input.
+                                    inert={createRange() ? true : undefined}
                                     {...slot("createGhost", {
                                       base: {
                                         position: "absolute",
@@ -1193,6 +1293,7 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
                                           Math.abs(ghost().curPx - ghost().startPx),
                                           2,
                                         ),
+                                        ...(createRange() ? { overflow: "hidden" } : null),
                                         opacity: 0.7,
                                         pointerEvents: "none",
                                         zIndex: 2,
@@ -1203,7 +1304,18 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
                                         borderRadius: 6,
                                       },
                                     })}
-                                  />
+                                  >
+                                    <Show when={createRange()}>
+                                      {(range) => (
+                                        <Dynamic
+                                          component={props.renderCreateGhost}
+                                          start={range().start}
+                                          end={range().end}
+                                          resource={resource()}
+                                        />
+                                      )}
+                                    </Show>
+                                  </div>
                                 )}
                               </Show>
                             }
@@ -1569,6 +1681,8 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
                               {(ghost) => (
                                 <div
                                   aria-hidden="true"
+                                  // Custom content stays out of the tab order and pointer input.
+                                  inert={createRange() ? true : undefined}
                                   {...slot("createGhost", {
                                     base: {
                                       position: "absolute",
@@ -1576,6 +1690,7 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
                                       bottom: 1,
                                       left: Math.min(ghost().startPx, ghost().curPx),
                                       width: Math.max(Math.abs(ghost().curPx - ghost().startPx), 2),
+                                      ...(createRange() ? { overflow: "hidden" } : null),
                                       opacity: 0.7,
                                       pointerEvents: "none",
                                       zIndex: 2,
@@ -1586,7 +1701,18 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
                                       borderRadius: 6,
                                     },
                                   })}
-                                />
+                                >
+                                  <Show when={createRange()}>
+                                    {(range) => (
+                                      <Dynamic
+                                        component={props.renderCreateGhost}
+                                        start={range().start}
+                                        end={range().end}
+                                        resource={resource()}
+                                      />
+                                    )}
+                                  </Show>
+                                </div>
                               )}
                             </Show>
                           }

@@ -63,6 +63,11 @@ The drag-to-create preview stays within the visible hours of the pressed column,
 with its border inside the column. See
 [Drag to create](/guides/dragging#drag-to-create).
 
+Pass `renderCreateGhost` to `TimeGrid`, `Calendar`, or `ResourceTimeline` to draw
+a draft inside that preview. It receives the live `start` and `end` that
+`onCreateEvent` would get on release. See
+[Show a draft in the preview](/guides/dragging#show-a-draft-in-the-preview).
+
 ## The Calendar wrapper
 
 The quickest start mirrors the native component: pick a `mode` and pass events.

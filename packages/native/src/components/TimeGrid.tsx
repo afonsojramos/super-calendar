@@ -17,6 +17,7 @@ import {
 } from "date-fns";
 import {
   type ComponentRef,
+  type ComponentType,
   createContext,
   type Dispatch,
   type ForwardedRef,
@@ -29,6 +30,7 @@ import {
   useContext,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -69,6 +71,7 @@ import type {
   BusinessHoursBand,
   CalendarEvent,
   CalendarMode,
+  CreateGhostArgs,
   EventDragHandler,
   EventDragStartHandler,
   EventKeyExtractor,
@@ -1608,6 +1611,7 @@ type TimetablePageProps<T> = {
   onPressCell?: (date: Date) => void;
   onLongPressCell?: (date: Date) => void;
   onCreateEvent?: (start: Date, end: Date) => void;
+  renderCreateGhost?: ComponentType<CreateGhostArgs>;
   onEdgeAdvance?: (dir: number) => void;
   /** This page's index in the pager: the key its all-day lane height is reported under. */
   pageIndex: number;
@@ -1676,6 +1680,7 @@ function TimetablePageInner<T>({
   onPressCell,
   onLongPressCell,
   onCreateEvent,
+  renderCreateGhost: RenderCreateGhost,
   onEdgeAdvance,
   pageIndex,
   laneHeight,
@@ -1817,6 +1822,7 @@ function TimetablePageInner<T>({
   const createLeft = useSharedValue(0);
   const createWidth = useSharedValue(0);
   const createStartY = useSharedValue(0);
+  const createEndY = useSharedValue(0);
   const createDayIndex = useSharedValue(0);
   // Set when the sweep is cancelled mid-drag (Escape on web); the gesture then
   // bails instead of committing.
@@ -1831,6 +1837,109 @@ function TimetablePageInner<T>({
     },
     [days, heightSource, minHour, snapMinutes, onCreateEvent],
   );
+
+  // Custom preview content. The sweep reports its raw endpoints to JS only when a
+  // custom renderer is set, and only when one of them crosses a snap step, so the
+  // default preview and in-step movement stay on the UI thread.
+  const liveCreate = createEnabled && RenderCreateGhost != null;
+  const [createRange, setCreateRange] = useState<CreateGhostArgs | null>(null);
+  // The last endpoints sent to JS, in snap steps from midnight; NaN when none is shown.
+  const createSentStart = useSharedValue(Number.NaN);
+  const createSentEnd = useSharedValue(Number.NaN);
+  const resolveCreateRange = useCallback(
+    (startY: number, endY: number, dayIndex: number) => {
+      const day = days[dayIndex];
+      return day
+        ? cellRangeFromDrag(day, startY, endY, heightSource.value, minHour, snapMinutes)
+        : null;
+    },
+    [days, heightSource, minHour, snapMinutes],
+  );
+  const applyCreateRange = useCallback((next: CreateGhostArgs | null) => {
+    setCreateRange((previous) =>
+      previous &&
+      next &&
+      previous.start.getTime() === next.start.getTime() &&
+      previous.end.getTime() === next.end.getTime()
+        ? previous
+        : next,
+    );
+  }, []);
+  const currentCreateResolver = useRef<typeof resolveCreateRange | null>(null);
+  const showCreateRange = useCallback(() => {
+    const resolve = currentCreateResolver.current;
+    if (!createActive.value || !resolve) return;
+    // A queued UI notification may arrive after props or the pointer changed.
+    applyCreateRange(resolve(createStartY.value, createEndY.value, createDayIndex.value));
+  }, [applyCreateRange, createActive, createStartY, createEndY, createDayIndex]);
+  const clearCreateRange = useCallback(() => {
+    setCreateRange(null);
+  }, []);
+  const previousCreateDays = useRef(days);
+  useLayoutEffect(() => {
+    currentCreateResolver.current = liveCreate ? resolveCreateRange : null;
+    const previousDay = previousCreateDays.current[createDayIndex.value];
+    const currentDay = days[createDayIndex.value];
+    previousCreateDays.current = days;
+    if (createActive.value && previousDay?.getTime() !== currentDay?.getTime()) {
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createCancelled.value = 1;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createActive.value = 0;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createHeight.value = 0;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createSentStart.value = Number.NaN;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createSentEnd.value = Number.NaN;
+      clearCreateRange();
+      return;
+    }
+    if (liveCreate && createActive.value)
+      applyCreateRange(
+        resolveCreateRange(createStartY.value, createEndY.value, createDayIndex.value),
+      );
+  }, [
+    applyCreateRange,
+    resolveCreateRange,
+    days,
+    liveCreate,
+    createActive,
+    createStartY,
+    createEndY,
+    createDayIndex,
+    createCancelled,
+    createHeight,
+    createSentStart,
+    createSentEnd,
+    clearCreateRange,
+  ]);
+  // Removing the renderer (or `onCreateEvent`) drops any content still shown.
+  useEffect(() => {
+    if (liveCreate) return;
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+    createSentStart.value = Number.NaN;
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+    createSentEnd.value = Number.NaN;
+    if (!createEnabled) {
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createCancelled.value = 1;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createActive.value = 0;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createHeight.value = 0;
+    }
+    clearCreateRange();
+  }, [
+    liveCreate,
+    createEnabled,
+    createSentStart,
+    createSentEnd,
+    clearCreateRange,
+    createCancelled,
+    createActive,
+    createHeight,
+  ]);
 
   // Web taps fall through to here: react-native-web doesn't fire the background
   // Pressable's onPress, so a click on empty space reports the cell via a Tap
@@ -1849,6 +1958,32 @@ function TimetablePageInner<T>({
     [days, dayWidth, minHour, heightSource, onPressCell],
   );
 
+  // Which snap step from midnight a y offset falls on, as `cellRangeFromDrag`
+  // rounds it. Plain numbers, so the sweep can tell on the UI thread when the
+  // range it would create changes.
+  const snapStep = useCallback(
+    (y: number) => {
+      "worklet";
+      const h = heightSource.value;
+      return h > 0 ? Math.round(((minHour + y / h) * MINUTES_PER_HOUR) / snapMinutes) : 0;
+    },
+    [minHour, heightSource, snapMinutes],
+  );
+
+  // Zoom can change the candidate range without another pointer update.
+  useAnimatedReaction(
+    () => (liveCreate && createActive.value ? heightSource.value : null),
+    (height, previous) => {
+      if (height === null || previous === null || height === previous) return;
+      const fromStep = snapStep(createStartY.value);
+      const toStep = snapStep(createEndY.value);
+      if (fromStep === createSentStart.value && toStep === createSentEnd.value) return;
+      createSentStart.value = fromStep;
+      createSentEnd.value = toStep;
+      runOnJS(showCreateRange)();
+    },
+  );
+
   const createGesture = useMemo(() => {
     const pan = Gesture.Pan()
       .enabled(createEnabled)
@@ -1856,31 +1991,59 @@ function TimetablePageInner<T>({
         const idx = dayCount === 1 ? 0 : Math.floor(event.x / dayWidth);
         createDayIndex.value = idx;
         createStartY.value = event.y;
+        createEndY.value = event.y;
         createLeft.value = idx * dayWidth;
         createWidth.value = dayWidth;
         createTop.value = event.y;
         createHeight.value = 0;
         createActive.value = 1;
         createCancelled.value = 0;
+        if (liveCreate) {
+          const step = snapStep(event.y);
+          createSentStart.value = step;
+          createSentEnd.value = step;
+          runOnJS(showCreateRange)();
+        }
       })
       .onUpdate((event) => {
         if (createCancelled.value) return;
+        createEndY.value = createStartY.value + event.translationY;
         const stepPx = (snapMinutes / MINUTES_PER_HOUR) * heightSource.value;
         const snap = (y: number) => (stepPx > 0 ? Math.round(y / stepPx) * stepPx : y);
         const startSnap = snap(createStartY.value);
         const endSnap = snap(createStartY.value + event.translationY);
         createTop.value = Math.min(startSnap, endSnap);
         createHeight.value = Math.max(Math.abs(endSnap - startSnap), stepPx);
+        if (liveCreate) {
+          const startY = createStartY.value;
+          const endY = startY + event.translationY;
+          const fromStep = snapStep(startY);
+          const toStep = snapStep(endY);
+          if (fromStep !== createSentStart.value || toStep !== createSentEnd.value) {
+            createSentStart.value = fromStep;
+            createSentEnd.value = toStep;
+            runOnJS(showCreateRange)();
+          }
+        }
       })
-      .onEnd((event) => {
+      .onEnd((event, success) => {
         createActive.value = 0;
         createHeight.value = 0;
-        if (createCancelled.value) return; // Escape pressed mid-sweep
+        if (!success || createCancelled.value) return;
         runOnJS(commitCreate)(
           createStartY.value,
           createStartY.value + event.translationY,
           createDayIndex.value,
         );
+      })
+      .onFinalize(() => {
+        createActive.value = 0;
+        createHeight.value = 0;
+        // Every touch finalizes; only a sweep that showed content goes back to JS.
+        if (!liveCreate || Number.isNaN(createSentEnd.value)) return;
+        createSentStart.value = Number.NaN;
+        createSentEnd.value = Number.NaN;
+        runOnJS(clearCreateRange)();
       });
     // Native: hold to start. Web: activate past a small vertical drag so a plain
     // tap still falls through to onPressCell.
@@ -1900,8 +2063,15 @@ function TimetablePageInner<T>({
     createLeft,
     createWidth,
     createStartY,
+    createEndY,
     createDayIndex,
     createCancelled,
+    liveCreate,
+    snapStep,
+    showCreateRange,
+    clearCreateRange,
+    createSentStart,
+    createSentEnd,
   ]);
 
   // Compose with a Tap so a plain web click reports the cell (onPressCell);
@@ -1931,10 +2101,23 @@ function TimetablePageInner<T>({
       createActive.value = 0;
       // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
       createHeight.value = 0;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createSentStart.value = Number.NaN;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      createSentEnd.value = Number.NaN;
+      clearCreateRange();
     };
     doc.addEventListener("keydown", handler);
     return () => doc.removeEventListener("keydown", handler);
-  }, [createEnabled, createActive, createCancelled, createHeight]);
+  }, [
+    createEnabled,
+    createActive,
+    createCancelled,
+    createHeight,
+    createSentStart,
+    createSentEnd,
+    clearCreateRange,
+  ]);
 
   const createGhostStyle = useAnimatedStyle(() => ({
     top: createTop.value,
@@ -2229,7 +2412,21 @@ function TimetablePageInner<T>({
         ) : null}
 
         {createEnabled ? (
-          <Animated.View {...ghostSlot} style={[ghostSlot.style, createGhostStyle]} />
+          liveCreate ? (
+            <Animated.View
+              {...ghostSlot}
+              style={[ghostSlot.style, styles.createGhostContent, createGhostStyle]}
+              // Pointer-only preview: its content stays out of screen-reader traversal.
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              {createRange ? (
+                <RenderCreateGhost start={createRange.start} end={createRange.end} />
+              ) : null}
+            </Animated.View>
+          ) : (
+            <Animated.View {...ghostSlot} style={[ghostSlot.style, createGhostStyle]} />
+          )
         ) : null}
       </Animated.View>
     </View>
@@ -2402,6 +2599,17 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   onPressCell?: (date: Date) => void;
   onLongPressCell?: (date: Date) => void;
   onCreateEvent?: (start: Date, end: Date) => void;
+  /**
+   * A component that draws content inside the drag-to-create preview, such as a
+   * draft title and the live time range. It receives the snapped `start` and
+   * `end` that `onCreateEvent` would get if the sweep ended now, and re-renders
+   * when the sweep crosses a snap step. The grid keeps positioning, sizing and
+   * styling the preview on the UI thread and clips the content to it; the
+   * content is non-interactive and hidden from screen readers. Renders only
+   * while a sweep can create, so it needs `onCreateEvent` and does not enable
+   * creation itself.
+   */
+  renderCreateGhost?: ComponentType<CreateGhostArgs>;
   /** Tap a day's column header (default header only). */
   onPressDateHeader?: (date: Date) => void;
   onChangeDate: (date: Date) => void;
@@ -2471,6 +2679,7 @@ function TimeGridInner<T>(
     onPressCell,
     onLongPressCell,
     onCreateEvent,
+    renderCreateGhost,
     onPressDateHeader,
     onChangeDate,
     renderHeader,
@@ -3216,6 +3425,7 @@ function TimeGridInner<T>(
         onPressCell={handlePressCell}
         onLongPressCell={onLongPressCell}
         onCreateEvent={onCreateEvent}
+        renderCreateGhost={renderCreateGhost}
         onEdgeAdvance={goToPage}
         pageIndex={index}
         laneHeight={laneHeight}
@@ -3277,6 +3487,7 @@ function TimeGridInner<T>(
       handlePressCell,
       onLongPressCell,
       onCreateEvent,
+      renderCreateGhost,
       goToPage,
       hiddenDays,
       now,
@@ -3290,10 +3501,31 @@ function TimeGridInner<T>(
   // `isActive` updates as you swipe). Without `activeIndex`, a page that pages in
   // never learns it became active, so its zoom source and now line would lag.
   // `columnsWidth` resizes the mounted pages when the grid is re-measured.
-  // `showDragHandle` refreshes grips without requiring an event-data change.
+  // `showDragHandle` refreshes grips without requiring an event-data change, and
+  // `renderCreateGhost` swaps the preview content of mounted pages.
   const listExtraData = useMemo(
-    () => ({ events, activeIndex, columnsWidth, showDragHandle }),
-    [events, activeIndex, columnsWidth, showDragHandle],
+    () => ({
+      events,
+      activeIndex,
+      columnsWidth,
+      showDragHandle,
+      renderCreateGhost,
+      onCreateEvent,
+      dragStepMinutes,
+      minHour,
+      maxHour,
+    }),
+    [
+      events,
+      activeIndex,
+      columnsWidth,
+      showDragHandle,
+      renderCreateGhost,
+      onCreateEvent,
+      dragStepMinutes,
+      minHour,
+      maxHour,
+    ],
   );
 
   return (
@@ -3752,6 +3984,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  // Clips custom preview content to the ghost.
+  createGhostContent: { overflow: "hidden" },
   weekendColumn: {
     position: "absolute",
     top: 0,

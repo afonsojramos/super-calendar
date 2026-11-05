@@ -59,6 +59,8 @@ vi.mock("react-native-reanimated", async () => {
   const React = await import("react");
   const { View } = await import("react-native");
   const reactions = [];
+  const jsQueue = [];
+  let deferJS = false;
   const flushAnimatedReactions = () => {
     // Snapshot the list because callbacks can mount components and register more reactions.
     // oxlint-disable-next-line unicorn/no-useless-spread
@@ -112,7 +114,17 @@ vi.mock("react-native-reanimated", async () => {
     },
     useAnimatedScrollHandler: () => () => {},
     useReducedMotion: () => false,
-    runOnJS: (fn) => fn,
+    runOnJS:
+      (fn) =>
+      (...args) => {
+        if (deferJS) jsQueue.push(() => fn(...args));
+        else fn(...args);
+      },
+    __jsQueue: jsQueue,
+    __deferRunOnJS: (enabled) => {
+      deferJS = enabled;
+      jsQueue.length = 0;
+    },
     scrollTo: () => {},
     __reactions: reactions,
     __flushAnimatedReactions: flushAnimatedReactions,

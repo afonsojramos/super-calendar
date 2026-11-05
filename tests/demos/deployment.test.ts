@@ -136,6 +136,51 @@ describe("published demos", () => {
     );
   });
 
+  it.each([
+    ["/dom/", "✨ New event"],
+    ["/solid/", "New event"],
+  ])("previews the draft range on %s and creates that range", async (path, title) => {
+    await checkPage(path, async (page) => {
+      await page.locator('[data-slot="dayColumn"]').first().waitFor();
+      // A point on empty column background with 120px of free space below it.
+      const start = await page.evaluate(() => {
+        for (const column of document.querySelectorAll<HTMLElement>('[data-slot="dayColumn"]')) {
+          let scroller = column.parentElement;
+          while (scroller && getComputedStyle(scroller).overflowY !== "auto") {
+            scroller = scroller.parentElement;
+          }
+          const view = (scroller ?? column).getBoundingClientRect();
+          const box = column.getBoundingClientRect();
+          const x = box.left + box.width / 2;
+          for (let y = Math.max(box.top, view.top) + 80; y < view.bottom - 140; y += 8) {
+            let free = true;
+            for (let dy = 0; dy <= 128 && free; dy += 4) {
+              free = document.elementFromPoint(x, y + dy) === column;
+            }
+            if (free) return { x, y };
+          }
+        }
+        return null;
+      });
+      if (!start) throw new Error("No empty slot to sweep");
+      const created = () => page.getByText(title, { exact: true }).count();
+      const before = await created();
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await page.mouse.move(start.x, start.y + 120, { steps: 8 });
+      const ghost = page.locator('[data-slot="createGhost"]');
+      await ghost.waitFor();
+      const range = (await ghost.locator("div").last().textContent()) ?? "";
+      expect(range).toMatch(/^\d\d:\d\d - \d\d:\d\d$/);
+      expect(await ghost.locator("strong").textContent()).toBe(title);
+      expect(await created()).toBe(before + 1);
+      await page.mouse.up();
+      await expect.poll(() => ghost.count()).toBe(0);
+      await expect.poll(created).toBe(before + 1);
+      await page.getByText(range, { exact: true }).first().waitFor();
+    });
+  });
+
   it("returns 404 for missing assets instead of an application shell", async () => {
     const response = await fetch(`${server.url}/solid/assets/missing.js`);
     expect(response.status).toBe(404);

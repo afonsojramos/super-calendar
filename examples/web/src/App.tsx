@@ -4,6 +4,7 @@ import {
   Calendar,
   type CalendarEvent,
   type CalendarSlot,
+  type CreateGhostArgs,
   type DateRange,
   DateRangePicker,
   expandRecurringEvents,
@@ -151,6 +152,15 @@ const FocusBand = ({ event, onPress }: DomRenderEventArgs) => (
   >
     {event.title}
   </button>
+);
+
+// Drag-to-create preview content: the draft's title and live time range, the
+// same range onCreateEvent receives on release.
+const DraftPreview = ({ start, end }: CreateGhostArgs) => (
+  <div style={{ padding: "2px 6px", fontSize: 11, lineHeight: 1.3 }}>
+    <strong>✨ New event</strong>
+    <div>{`${format(start, "HH:mm")} - ${format(end, "HH:mm")}`}</div>
+  </div>
 );
 
 export function App() {
@@ -557,6 +567,7 @@ export function App() {
                   return [...prev, { id: nextId, kind: "work", title: "✨ New event", start, end }];
                 })
               }
+              renderCreateGhost={DraftPreview}
               onPressEvent={(event) => console.log("press event:", event.title)}
               onPressDay={(day) => {
                 setDate(day);

@@ -161,6 +161,21 @@ export interface BusinessHoursBand {
   end: number;
 }
 
+/**
+ * Props passed to a `renderCreateGhost` component while a drag-to-create sweep is
+ * in progress. `start` and `end` are the snapped range `onCreateEvent` would
+ * receive if the pointer were released at its current position: ordered, at
+ * least one snap step long, and clamped to the pressed day. They can extend past
+ * a narrowed visible-hour window, where the preview box itself stops at the edge.
+ * `ResourceTimeline` adds the lane's resource.
+ */
+export interface CreateGhostArgs {
+  /** Start of the range the sweep would create. */
+  start: Date;
+  /** End of the range the sweep would create. */
+  end: Date;
+}
+
 /** Options for {@link CalendarHandle.scrollToTime}. */
 export interface ScrollToTimeOptions {
   /** Animate the scroll. Default true; off when the OS asks to reduce motion. */

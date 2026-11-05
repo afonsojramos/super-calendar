@@ -67,6 +67,9 @@ shared session starts an isolated Vite server, dependency cache, and browser
 instance for each project, and a fresh page for each case. Browser errors and
 warnings fail the test.
 
+Warmup waits for Vite's static module crawl and the visible fixture controls.
+Keep the startup-error assertion and per-case browser diagnostics enabled.
+
 ```sh
 pnpm build
 pnpm test:browser
@@ -92,6 +95,12 @@ pnpm exec vitest run --config vitest.browser.config.mts --project solid-source-w
 
 The Solid-specific browser scripts still check server rendering and hydration.
 Shared browser contracts complement those checks and the device gesture workflow.
+
+`pnpm test:react18:browser` reuses the creation-preview contracts against React
+18.3.1 in Chromium, for both source and built entries. Its private workspace
+fixture pins matching React and React DOM versions independently of React 19 in
+the main matrix. The session verifies the loaded React version and rejects
+console warnings, including unsupported DOM attributes. Run `pnpm build` first.
 
 Accessibility cases use axe alongside real keyboard and focus assertions. Axe
 detects common semantic and contrast failures; it does not replace screen-reader

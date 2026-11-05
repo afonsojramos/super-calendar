@@ -17,6 +17,7 @@ import {
   type ReactElement,
   type ReactNode,
   type RefAttributes,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -29,6 +30,7 @@ import {
   type CalendarEvent,
   type CalendarHandle,
   type CalendarMode,
+  type CreateGhostArgs,
   cellRangeFromDrag,
   clampMoveStartMinutes,
   resolveDraggedBounds,
@@ -69,6 +71,7 @@ import {
   useEventActions,
 } from "./EventActions";
 import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
+import { InertDiv } from "./InertDiv";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 import { type EventGrab, waitForHold } from "./touch";
 
@@ -299,6 +302,16 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   onPressCell?: (date: Date) => void;
   /** Drag empty grid space to create; called with the swept start/end. */
   onCreateEvent?: (start: Date, end: Date) => void;
+  /**
+   * A component that draws content inside the drag-to-create preview, such as a
+   * draft title and the live time range. It receives the snapped `start` and
+   * `end` that `onCreateEvent` would get if the pointer were released now, and
+   * re-renders as the sweep changes them. The grid keeps positioning, sizing and
+   * styling the preview and clips the content to it; the content is
+   * non-interactive and hidden from assistive tech. Renders only while a sweep
+   * can create, so it needs `onCreateEvent` and does not enable creation itself.
+   */
+  renderCreateGhost?: ComponentType<CreateGhostArgs>;
   /** Fires when an event drag begins (e.g. to trigger haptics). */
   onDragStart?: (event: CalendarEvent<T>) => void;
   /**
@@ -527,6 +540,7 @@ function TimeGridInner<T = unknown>(
     onPressDateHeader,
     onPressCell,
     onCreateEvent,
+    renderCreateGhost,
     onDragStart,
     onDragEvent,
     getEventId,
@@ -555,6 +569,7 @@ function TimeGridInner<T = unknown>(
   const windowHours = windowEnd - windowStart;
   const gutterWidth = hideHours ? 0 : GUTTER_WIDTH;
   const RenderBackground = renderBackgroundEvent;
+  const RenderCreateGhost = renderCreateGhost;
   const visibleHours = useMemo(
     () => Array.from({ length: windowHours }, (_, i) => windowStart + i),
     [windowStart, windowHours],
@@ -597,12 +612,38 @@ function TimeGridInner<T = unknown>(
 
   // Create-by-drag / tap on empty grid space. Mouse and pen sweep out a new
   // event; on touch the column scrolls instead, so a tap still hits onPressCell.
+  // `startPx` stays unsorted: the live range passes it to `cellRangeFromDrag` as
+  // the sweep's origin, exactly as the commit does.
   const [createBox, setCreateBox] = useState<{
     dayIndex: number;
-    topPx: number;
-    heightPx: number;
+    dayTime: number;
+    startPx: number;
+    curPx: number;
   } | null>(null);
-  const createOrigin = useRef<{ el: HTMLElement; dayIndex: number; startPx: number } | null>(null);
+  const createOrigin = useRef<{
+    pointerId: number;
+    clientY: number;
+    el: HTMLElement;
+    dayIndex: number;
+    dayTime: number;
+    creating: boolean;
+    startPx: number;
+  } | null>(null);
+  const createActive = createBox !== null;
+  useEffect(() => {
+    if (!createActive) return;
+    // Scrolling a column or an ancestor moves it beneath the held pointer.
+    const onScroll = () => {
+      const origin = createOrigin.current;
+      if (!origin) return;
+      const curPx = origin.clientY - origin.el.getBoundingClientRect().top;
+      setCreateBox((current) =>
+        current && current.curPx !== curPx ? { ...current, curPx } : current,
+      );
+    };
+    window.addEventListener("scroll", onScroll, true);
+    return () => window.removeEventListener("scroll", onScroll, true);
+  }, [createActive]);
   // Touch never sweeps, so a tap presses the cell from its click, which the
   // browser skips when the finger scrolled the grid instead.
   const cellTouchRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
@@ -1276,8 +1317,17 @@ function TimeGridInner<T = unknown>(
     } catch {
       // Best-effort capture.
     }
-    createOrigin.current = { el, dayIndex, startPx };
-    setCreateBox({ dayIndex, topPx: startPx, heightPx: 0 });
+    const dayTime = days[dayIndex].getTime();
+    createOrigin.current = {
+      pointerId: e.pointerId,
+      clientY: e.clientY,
+      el,
+      dayIndex,
+      dayTime,
+      creating: !!onCreateEvent,
+      startPx,
+    };
+    setCreateBox({ dayIndex, dayTime, startPx, curPx: startPx });
   };
   const moveCreate = (e: ReactPointerEvent) => {
     const touch = cellTouchRef.current;
@@ -1290,11 +1340,12 @@ function TimeGridInner<T = unknown>(
     }
     const o = createOrigin.current;
     if (!o) return;
-    const cur = pxFromTop(o.el, e.clientY);
+    o.clientY = e.clientY;
     setCreateBox({
       dayIndex: o.dayIndex,
-      topPx: Math.min(o.startPx, cur),
-      heightPx: Math.abs(cur - o.startPx),
+      dayTime: o.dayTime,
+      startPx: o.startPx,
+      curPx: pxFromTop(o.el, e.clientY),
     });
   };
   const endCreate = (e: ReactPointerEvent) => {
@@ -1334,11 +1385,75 @@ function TimeGridInner<T = unknown>(
   };
   // A gesture the browser/OS cancels (scroll takeover, etc.) must not commit a
   // create — just drop the in-progress state.
-  const cancelCreate = () => {
-    cellTouchRef.current = null;
+  const clearCreate = useCallback(() => {
+    const previous = createOrigin.current;
     createOrigin.current = null;
     setCreateBox(null);
+    try {
+      previous?.el.releasePointerCapture?.(previous.pointerId);
+    } catch {
+      // The browser may have already released capture.
+    }
+  }, []);
+  const cancelCreate = () => {
+    cellTouchRef.current = null;
+    clearCreate();
   };
+  // Without capture the column stops seeing the sweep's moves and release, so
+  // drop it. Leaves `cellTouchRef` alone: touch taps resolve on the later click.
+  const loseCreateCapture = (e: ReactPointerEvent) => {
+    if (createOrigin.current?.pointerId !== e.pointerId) return;
+    clearCreate();
+  };
+  // Pointer capture does not move keyboard focus to the grid.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !createOrigin.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      clearCreate();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [clearCreate]);
+  // What `onCreateEvent` would receive if the sweep ended here. The props keep
+  // the same `Date`s while that range holds, so content effects keyed on them
+  // re-run only when it changes.
+  const liveRange =
+    createBox &&
+    RenderCreateGhost &&
+    onCreateEvent &&
+    days[createBox.dayIndex]?.getTime() === createBox.dayTime
+      ? cellRangeFromDrag(
+          days[createBox.dayIndex],
+          createBox.startPx,
+          createBox.curPx,
+          hourHeight,
+          windowStart,
+          snapMinutes,
+        )
+      : null;
+  const liveStart = liveRange?.start.getTime();
+  const liveEnd = liveRange?.end.getTime();
+  const createRange = useMemo(
+    () =>
+      liveStart === undefined || liveEnd === undefined
+        ? null
+        : { start: new Date(liveStart), end: new Date(liveEnd) },
+    [liveStart, liveEnd],
+  );
+  // Disabling creation or replacing the pressed day invalidates the whole sweep.
+  useEffect(() => {
+    const origin = createOrigin.current;
+    if (
+      origin &&
+      (!origin.el.isConnected ||
+        !cellEnabled ||
+        (origin.creating && !onCreateEvent) ||
+        days[origin.dayIndex]?.getTime() !== origin.dayTime)
+    )
+      clearCreate();
+  });
 
   // Per-day layout and shading are pure functions of days/events/businessHours,
   // so memoize them — otherwise every drag pointermove (which calls setDrag)
@@ -1804,7 +1919,11 @@ function TimeGridInner<T = unknown>(
               nowHours <= windowEnd;
             const nowTop = (nowHours - windowStart) * hourHeight;
             const bands = bandsByDay[dayIndex];
-            const ghost = createBox?.dayIndex === dayIndex ? createBox : null;
+            const ghost =
+              createBox?.dayIndex === dayIndex && createBox.dayTime === day.getTime()
+                ? createBox
+                : null;
+            const ghostRange = ghost ? createRange : null;
             // The tail of a move that runs past midnight, previewed at the top of
             // this column. The dragged event is looked up from its `drag.key`
             // ("<originColumn>:<index>"), so no extra state has to track it.
@@ -1824,6 +1943,7 @@ function TimeGridInner<T = unknown>(
                 onPointerMove={cellEnabled ? moveCreate : undefined}
                 onPointerUp={cellEnabled ? endCreate : undefined}
                 onPointerCancel={cellEnabled ? cancelCreate : undefined}
+                onLostPointerCapture={cellEnabled ? loseCreateCapture : undefined}
                 onClick={cellEnabled ? (e) => tapCell(e, dayIndex) : undefined}
                 {...dataState({ "data-today": getIsToday(day), "data-weekend": isWeekend(day) })}
                 {...slot("dayColumn", {
@@ -2176,16 +2296,23 @@ function TimeGridInner<T = unknown>(
                   </div>
                 ) : null}
                 {ghost ? (
-                  <div
+                  <InertDiv
                     aria-hidden
+                    // Custom content stays out of the tab order and pointer input.
+                    inert={!!ghostRange}
                     {...slot("createGhost", {
                       base: {
                         position: "absolute",
                         left: eventGap,
                         right: eventGap,
-                        ...createPreviewPlacement(ghost.topPx, ghost.heightPx, totalHeight),
+                        ...createPreviewPlacement(
+                          Math.min(ghost.startPx, ghost.curPx),
+                          Math.abs(ghost.curPx - ghost.startPx),
+                          totalHeight,
+                        ),
                         // Borders, including custom ones, stay inside the placed box.
                         boxSizing: "border-box",
+                        ...(ghostRange ? { overflow: "hidden" } : null),
                         opacity: 0.7,
                         pointerEvents: "none",
                         zIndex: 2,
@@ -2196,7 +2323,11 @@ function TimeGridInner<T = unknown>(
                         borderRadius: 6,
                       },
                     })}
-                  />
+                  >
+                    {ghostRange && RenderCreateGhost ? (
+                      <RenderCreateGhost start={ghostRange.start} end={ghostRange.end} />
+                    ) : null}
+                  </InertDiv>
                 ) : null}
               </div>
             );

@@ -13,6 +13,7 @@ import {
   startOfYear,
 } from "date-fns";
 import {
+  type ComponentType,
   type ForwardedRef,
   forwardRef,
   type ReactElement,
@@ -30,6 +31,7 @@ import type {
   BusinessHoursBand,
   CalendarEvent,
   CalendarMode,
+  CreateGhostArgs,
   EventKeyExtractor,
   RenderEvent,
   RenderEventArgs,
@@ -139,6 +141,11 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
    * on empty space when set.
    */
   onCreateEvent?: (start: Date, end: Date) => void;
+  /**
+   * A component that draws content inside the time-grid drag-to-create preview;
+   * see `TimeGrid`'s prop of the same name. Applies to the week/day grid only.
+   */
+  renderCreateGhost?: ComponentType<CreateGhostArgs>;
   /**
    * Month and year modes: reports a create sweep's day span as it happens, as the
    * ordered inclusive `[start, end]` days, so a selection highlight can follow the
@@ -484,6 +491,7 @@ function CalendarInner<T>(
     resetPageOnPressCell,
     onLongPressCell,
     onCreateEvent,
+    renderCreateGhost,
     onSelectDrag,
     selectedDates,
     selectedRange,
@@ -823,6 +831,7 @@ function CalendarInner<T>(
             resetPageOnPressCell={resetPageOnPressCell}
             onLongPressCell={onLongPressCell}
             onCreateEvent={onCreateEvent}
+            renderCreateGhost={renderCreateGhost}
             onPressDateHeader={onPressDateHeader}
             onChangeDate={handleChangeDate}
             renderHeader={renderTimeGridHeader}

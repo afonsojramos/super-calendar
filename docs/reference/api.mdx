@@ -77,6 +77,7 @@ See [DOM held presses](/guides/dragging#dom-held-presses).
 | `onDragEvent`           | `(event, start, end) => void \| boolean` | Enable move/resize; return `false` to reject. Month: drop on another day.         |
 | `onDragStart`           | `(event) => void`                        | Fires on grab (e.g. haptics).                                                     |
 | `onCreateEvent`         | `(start, end) => void`                   | Drag empty space to create. Month and year: an all-day span.                      |
+| `renderCreateGhost`     | `ComponentType<CreateGhostArgs>`         | Time grid: draw content in the create preview from its live `start`/`end`.        |
 | `onSelectDrag`          | `(start, end) => void`                   | Month and year: drag to sweep a date range; fires live.                           |
 | `dragStepMinutes`       | `number`                                 | Snap step (default 15).                                                           |
 | `showDragHandle`        | `boolean`                                | Show the resize grip (default true).                                              |
@@ -105,6 +106,19 @@ The DOM renderer has no visible resize grips.
 DOM `onPressCell` also handles touch taps on empty time-grid slots. The callback
 runs from the column's click, after pointer-up. Swipes and cancelled contacts
 do not call it. Mouse and pen retain their existing behavior.
+
+`renderCreateGhost` is a component (`ComponentType` in React, `Component` in
+Solid) that receives `CreateGhostArgs`: `{ start: Date; end: Date }`. These are
+the snapped, ordered range `onCreateEvent` would receive if the sweep ended at
+the current pointer position, clamped to the pressed day. The range can extend
+past a narrowed `minHour`/`maxHour` window, while the web preview box stops at
+the visible edge. It renders only while `onCreateEvent` is set and never enables
+creation itself. `TimeGrid`, `Calendar` (time-grid modes), and
+`ResourceTimeline` accept it on every renderer; `ResourceTimeline` adds the
+lane's `resource`. Web previews follow scrolling and zooming while the pointer
+is held. Cancelled native gestures do not call `onCreateEvent`. The content is clipped to the preview, non-interactive, and
+hidden from assistive tech. On React Native it updates when the sweep crosses a
+snap step. See [Show a draft in the preview](/guides/dragging#show-a-draft-in-the-preview).
 
 ## Selection
 
@@ -173,7 +187,7 @@ Changing either dimension updates already mounted list and pager months.
     `CalendarEvent`, `CalendarMode`, `RenderEventArgs`, `RecurrenceRule`, `BusinessHours`,
     `EventDragHandler`, `CalendarTheme`, `PositionedEvent`, `DateRange`, `MonthGrid`,
     `MonthEventSegment`, `MonthWeekEvents`, `MonthListProps`, `CalendarSlot`, `SlotStyleProps`,
-    `CalendarLabels`, `CalendarHandle`, `ScrollToTimeOptions`
+    `CalendarLabels`, `CalendarHandle`, `ScrollToTimeOptions`, `CreateGhostArgs`
   </Card>
 </CardGroup>
 

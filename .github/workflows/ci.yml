@@ -25,6 +25,7 @@ jobs:
       - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
       - run: pnpm test:browser
+      - run: pnpm test:react18:browser
       - run: pnpm test:solid:browser
       - run: pnpm test:solid:browser:dist
 

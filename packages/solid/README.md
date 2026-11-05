@@ -99,6 +99,41 @@ the active interaction.
 In `TimeGrid`, the drag-to-create preview stays within the visible hours of the
 pressed column, with its border inside the column.
 
+Pass `renderCreateGhost` to `TimeGrid`, `Calendar`, or `ResourceTimeline` to draw
+a draft inside that preview. Read the props inside JSX so the text follows the
+sweep:
+
+```tsx
+import { createSignal } from "solid-js";
+import { TimeGrid, type CalendarEvent, type CreateGhostArgs } from "@super-calendar/solid";
+import { format } from "date-fns";
+
+function DraftPreview(props: CreateGhostArgs) {
+  return (
+    <strong>{`New event ${format(props.start, "HH:mm")} - ${format(props.end, "HH:mm")}`}</strong>
+  );
+}
+
+export function Planner() {
+  const [events, setEvents] = createSignal<CalendarEvent[]>([]);
+  return (
+    <TimeGrid
+      date={new Date(2026, 10, 2)}
+      mode="week"
+      events={events()}
+      onCreateEvent={(start, end) => setEvents((current) => [...current, { start, end }])}
+      renderCreateGhost={DraftPreview}
+    />
+  );
+}
+```
+
+`start` and `end` are the range `onCreateEvent` would receive on release, which
+can extend past a narrowed `minHour`/`maxHour` window. `ResourceTimeline` also
+passes the lane's `resource`. The content is clipped to the preview,
+non-interactive, and hidden from assistive tech.
+The range follows scrolling and zooming during a held sweep, even without another pointer move.
+
 ## Select dates
 
 ```tsx

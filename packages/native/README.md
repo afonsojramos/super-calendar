@@ -78,6 +78,30 @@ Set an event's `dragHandleColor` to colour its resize grips in `TimeGrid` and
 `showDragHandle={false}` still hides the time-grid grips.
 You can toggle it after mounting without replacing the `events` array.
 
+## Creating events
+
+Pass `onCreateEvent` to long-press and sweep out a new event. To show a draft in
+the preview while it is swept, add a `renderCreateGhost` component. It receives
+the `start` and `end` that `onCreateEvent` would get on release and updates each
+time the sweep crosses a snap step:
+
+```tsx
+import { Calendar, type CreateGhostArgs } from "@super-calendar/native";
+import { format } from "date-fns";
+import { Text } from "react-native";
+
+function DraftPreview({ start, end }: CreateGhostArgs) {
+  return <Text>{`New event ${format(start, "HH:mm")} - ${format(end, "HH:mm")}`}</Text>;
+}
+
+<Calendar mode="week" /* ... */ onCreateEvent={createEvent} renderCreateGhost={DraftPreview} />;
+```
+
+`TimeGrid` and `ResourceTimeline` accept the same prop; `ResourceTimeline` also
+passes the lane's `resource`. The preview geometry stays on the UI thread, and
+the content is clipped to it and hidden from screen readers.
+A cancelled gesture clears the preview without calling `onCreateEvent`.
+
 ## Styling with Tailwind
 
 Every styleable part is a named slot that accepts a class (resolved by a Tailwind runtime such as [uniwind](https://docs.uniwind.dev) or NativeWind) and/or a style override. A classed slot drops its built-in themed styles, so your classes own the look:
