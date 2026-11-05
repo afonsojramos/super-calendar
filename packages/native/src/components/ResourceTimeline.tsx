@@ -20,6 +20,7 @@ import Animated, {
 import {
   backgroundBandsForDay,
   type CalendarEvent,
+  type CreateGhostArgs,
   cellRangeFromDrag,
   isSameCalendarDay,
   useNow,
@@ -148,6 +149,17 @@ export interface ResourceTimelineProps<T = unknown> {
    * event; called with the swept start/end and the lane's resource.
    */
   onCreateEvent?: (start: Date, end: Date, resource: Resource) => void;
+  /**
+   * A component that draws content inside the drag-to-create preview, such as a
+   * draft title and the live time range. It receives the snapped `start` and
+   * `end` that `onCreateEvent` would get if the sweep ended now, plus the lane's
+   * resource, and re-renders when the sweep crosses a snap step. The board keeps
+   * positioning, sizing and styling the preview on the UI thread and clips the
+   * content to it; the content is non-interactive and hidden from screen
+   * readers. Renders only while a sweep can create, so it needs `onCreateEvent`
+   * and does not enable creation itself. Applies to both orientations.
+   */
+  renderCreateGhost?: ComponentType<CreateGhostArgs & { resource: Resource }>;
   /**
    * Shade the hours outside this window, per lane. Same shape as the Calendar's
    * `businessHours` plus the lane's resource, so per-resource opening hours work
@@ -557,6 +569,7 @@ type LaneInteractionLayerProps = {
   onPressCell?: (at: Date, resource: Resource) => void;
   onLongPressCell?: (at: Date, resource: Resource) => void;
   onCreateEvent?: (start: Date, end: Date, resource: Resource) => void;
+  renderCreateGhost?: ComponentType<CreateGhostArgs & { resource: Resource }>;
   theme: ReturnType<typeof useCalendarTheme>;
 };
 
@@ -575,11 +588,71 @@ function LaneInteractionLayer({
   onPressCell,
   onLongPressCell,
   onCreateEvent,
+  renderCreateGhost: RenderCreateGhost,
   theme,
 }: LaneInteractionLayerProps): ReactElement {
   const ghostStart = useSharedValue(0);
   const ghostSize = useSharedValue(0);
   const ghostVisible = useSharedValue(0);
+
+  // Custom preview content. The sweep reports its raw endpoints to JS only when a
+  // custom renderer is set, and only when one of them crosses a snap step, so the
+  // default preview and in-step movement stay on the UI thread.
+  const liveCreate = onCreateEvent != null && RenderCreateGhost != null;
+  const [createRange, setCreateRange] = useState<CreateGhostArgs | null>(null);
+  // The last endpoints sent to JS, in snap steps from midnight; NaN when none is shown.
+  const sentFrom = useSharedValue(Number.NaN);
+  const sentTo = useSharedValue(Number.NaN);
+  // The latest raw sweep, so a prop change re-resolves the range in place.
+  const sweep = useRef<{ fromPx: number; toPx: number } | null>(null);
+  const resolveRange = useCallback(
+    (fromPx: number, toPx: number) =>
+      cellRangeFromDrag(date, fromPx, toPx, hourSize, startHour, snapMinutes),
+    [date, hourSize, startHour, snapMinutes],
+  );
+  const applyRange = useCallback((next: CreateGhostArgs | null) => {
+    setCreateRange((previous) =>
+      previous &&
+      next &&
+      previous.start.getTime() === next.start.getTime() &&
+      previous.end.getTime() === next.end.getTime()
+        ? previous
+        : next,
+    );
+  }, []);
+  const showRange = useCallback(
+    (fromPx: number, toPx: number) => {
+      sweep.current = { fromPx, toPx };
+      applyRange(resolveRange(fromPx, toPx));
+    },
+    [applyRange, resolveRange],
+  );
+  const clearRange = useCallback(() => {
+    sweep.current = null;
+    setCreateRange(null);
+  }, []);
+  useEffect(() => {
+    if (sweep.current) applyRange(resolveRange(sweep.current.fromPx, sweep.current.toPx));
+  }, [applyRange, resolveRange]);
+  // Removing the renderer (or `onCreateEvent`) drops any content still shown.
+  useEffect(() => {
+    if (liveCreate || !sweep.current) return;
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+    sentFrom.value = Number.NaN;
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+    sentTo.value = Number.NaN;
+    clearRange();
+  }, [liveCreate, sentFrom, sentTo, clearRange]);
+  // Which snap step from midnight a position falls on, as `cellRangeFromDrag`
+  // rounds it, so the sweep can tell on the UI thread when its range changes.
+  const snapStep = useCallback(
+    (px: number) => {
+      "worklet";
+      if (hourSize <= 0 || snapMinutes <= 0) return 0;
+      return Math.round(((startHour + px / hourSize) * MINUTES_PER_HOUR) / snapMinutes);
+    },
+    [hourSize, startHour, snapMinutes],
+  );
 
   const timeAt = useCallback(
     (px: number) => cellRangeFromDrag(date, px, px, hourSize, startHour, snapMinutes)?.start,
@@ -612,9 +685,25 @@ function LaneInteractionLayer({
             ghostStart.value = vertical ? e.y : e.x;
             ghostSize.value = 0;
             ghostVisible.value = 1;
+            if (liveCreate) {
+              const step = snapStep(ghostStart.value);
+              sentFrom.value = step;
+              sentTo.value = step;
+              runOnJS(showRange)(ghostStart.value, ghostStart.value);
+            }
           })
           .onUpdate((e) => {
-            ghostSize.value = (vertical ? e.y : e.x) - ghostStart.value;
+            const at = vertical ? e.y : e.x;
+            ghostSize.value = at - ghostStart.value;
+            if (liveCreate) {
+              const fromStep = snapStep(ghostStart.value);
+              const toStep = snapStep(at);
+              if (fromStep !== sentFrom.value || toStep !== sentTo.value) {
+                sentFrom.value = fromStep;
+                sentTo.value = toStep;
+                runOnJS(showRange)(ghostStart.value, at);
+              }
+            }
           })
           // `success` is false when the gesture is cancelled/failed after it
           // activated (RNGH still calls onEnd); only a real end should create.
@@ -624,6 +713,11 @@ function LaneInteractionLayer({
           })
           .onFinalize(() => {
             ghostVisible.value = 0;
+            // Every touch finalizes; only a sweep that showed content goes back to JS.
+            if (!liveCreate || Number.isNaN(sentTo.value)) return;
+            sentFrom.value = Number.NaN;
+            sentTo.value = Number.NaN;
+            runOnJS(clearRange)();
           })
       : null;
     const activatedPan = pan
@@ -650,6 +744,12 @@ function LaneInteractionLayer({
     ghostStart,
     ghostSize,
     ghostVisible,
+    liveCreate,
+    snapStep,
+    showRange,
+    clearRange,
+    sentFrom,
+    sentTo,
   ]);
 
   const ghostStyle = useAnimatedStyle(() => {
@@ -702,9 +802,25 @@ function LaneInteractionLayer({
               backgroundColor: theme.colors.eventBackground,
               borderColor: theme.colors.todayBackground,
             },
+            liveCreate ? styles.createGhostContent : null,
             ghostStyle,
           ]}
-        />
+          // Pointer-only preview: its content stays out of screen-reader traversal.
+          {...(liveCreate
+            ? {
+                accessibilityElementsHidden: true,
+                importantForAccessibility: "no-hide-descendants" as const,
+              }
+            : null)}
+        >
+          {liveCreate && createRange && RenderCreateGhost ? (
+            <RenderCreateGhost
+              start={createRange.start}
+              end={createRange.end}
+              resource={resource}
+            />
+          ) : null}
+        </Animated.View>
       ) : null}
     </>
   );
@@ -750,6 +866,7 @@ export function ResourceTimeline<T = unknown>({
   onPressCell,
   onLongPressCell,
   onCreateEvent,
+  renderCreateGhost,
   businessHours,
   renderBusinessHours,
   renderResourceHeader,
@@ -959,6 +1076,7 @@ export function ResourceTimeline<T = unknown>({
                       onPressCell={onPressCell}
                       onLongPressCell={onLongPressCell}
                       onCreateEvent={onCreateEvent}
+                      renderCreateGhost={renderCreateGhost}
                       theme={theme}
                     />
                   ) : null}
@@ -1142,6 +1260,7 @@ export function ResourceTimeline<T = unknown>({
                     onPressCell={onPressCell}
                     onLongPressCell={onLongPressCell}
                     onCreateEvent={onCreateEvent}
+                    renderCreateGhost={renderCreateGhost}
                     theme={theme}
                   />
                 ) : null}
@@ -1281,6 +1400,8 @@ const styles = StyleSheet.create({
     opacity: 0,
     zIndex: 2,
   },
+  // Clips custom preview content to the ghost.
+  createGhostContent: { overflow: "hidden" },
   hshadeBand: { position: "absolute", top: 0, bottom: 0 },
   vshadeBand: { position: "absolute", left: 0, right: 0 },
 });

@@ -1,9 +1,20 @@
+import * as gestureHandlerMock from "react-native-gesture-handler";
 import { useMemo } from "react";
 import { vi } from "vitest";
 import type { ReactNode } from "react";
-import { StyleSheet } from "react-native";
-import type { CalendarEvent } from "../../types";
+import { act } from "@testing-library/react-native";
+import { StyleSheet, Text } from "react-native";
+import type { CalendarEvent, CreateGhostArgs } from "../../types";
 import { render } from "../../../../../tests/support/native-time-grid";
+
+type GestureChain = {
+  kind: string;
+  calls: Record<string, unknown[]>;
+  handlers: {
+    onStart?: (event: Record<string, number>) => void;
+    onUpdate?: (event: Record<string, number>) => void;
+  };
+};
 
 // The test renderer cannot measure LegendList pages. Preserve its content cache so prop-only
 // updates must invalidate mounted pages through data or extraData.
@@ -83,4 +94,50 @@ describe.each(["TimeGrid", "Calendar"])("%s mounted grip visibility", (component
       expectVisibility(initialVisibility);
     },
   );
+});
+
+describe.each(["TimeGrid", "Calendar"])("%s mounted create preview content", (component) => {
+  it("swaps renderCreateGhost on a cached page during a held sweep", async () => {
+    const chains = (gestureHandlerMock as unknown as { __gestures: GestureChain[] }).__gestures;
+    chains.length = 0;
+    const Label =
+      (name: string) =>
+      ({ start, end }: CreateGhostArgs) => (
+        <Text>{`${name} ${start.getHours()}-${end.getHours()}`}</Text>
+      );
+    const first = Label("first");
+    const second = Label("second");
+    const grid = (renderCreateGhost: typeof first) => {
+      const props = {
+        date,
+        events,
+        keyExtractor: (event: CalendarEvent) => event.start.toISOString(),
+        onChangeDate: noop,
+        onPressEvent: noop,
+        onCreateEvent: noop,
+        renderCreateGhost,
+      };
+      return component === "Calendar" ? (
+        <Calendar {...props} mode="day" hourHeight={48} />
+      ) : (
+        <TimeGrid
+          {...props}
+          mode="day"
+          cellHeight={{ value: 48 } as never}
+          weekStartsOn={1}
+          renderEvent={DefaultEvent}
+        />
+      );
+    };
+    const view = await render(grid(first));
+    const pan = chains
+      .filter((chain) => chain.kind === "Pan" && chain.calls.activateAfterLongPress?.[0] === 300)
+      .at(-1)!.handlers;
+    await act(async () => pan.onStart?.({ x: 10, y: 96 }));
+    await act(async () => pan.onUpdate?.({ translationY: 96 }));
+    expect(view.getByText("first 2-4", { includeHiddenElements: true })).toBeTruthy();
+    await view.rerender(grid(second));
+    expect(view.queryByText("first 2-4", { includeHiddenElements: true })).toBeNull();
+    expect(view.getByText("second 2-4", { includeHiddenElements: true })).toBeTruthy();
+  });
 });
