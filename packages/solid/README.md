@@ -104,7 +104,8 @@ a draft inside that preview. Read the props inside JSX so the text follows the
 sweep:
 
 ```tsx
-import { TimeGrid, type CreateGhostArgs } from "@super-calendar/solid";
+import { createSignal } from "solid-js";
+import { TimeGrid, type CalendarEvent, type CreateGhostArgs } from "@super-calendar/solid";
 import { format } from "date-fns";
 
 function DraftPreview(props: CreateGhostArgs) {
@@ -113,7 +114,18 @@ function DraftPreview(props: CreateGhostArgs) {
   );
 }
 
-<TimeGrid date={date} events={events()} onCreateEvent={create} renderCreateGhost={DraftPreview} />;
+export function Planner() {
+  const [events, setEvents] = createSignal<CalendarEvent[]>([]);
+  return (
+    <TimeGrid
+      date={new Date(2026, 10, 2)}
+      mode="week"
+      events={events()}
+      onCreateEvent={(start, end) => setEvents((current) => [...current, { start, end }])}
+      renderCreateGhost={DraftPreview}
+    />
+  );
+}
 ```
 
 `start` and `end` are the range `onCreateEvent` would receive on release, which
