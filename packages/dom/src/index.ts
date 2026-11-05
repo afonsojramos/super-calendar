@@ -67,6 +67,7 @@ export {
   type CalendarLabels,
   defaultCalendarLabels,
   type CalendarMode,
+  type CreateGhostArgs,
   type DateRange,
   type DateSelectionConstraints,
   type DaySelectionState,

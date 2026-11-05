@@ -5,6 +5,7 @@ import {
   type BusinessHoursBand,
   type CalendarEvent,
   type CalendarMode,
+  type CreateGhostArgs,
   type DateRange,
   type DateSelectionConstraints,
   type EventAccessibilityLabeler,
@@ -28,7 +29,7 @@ import {
   startOfWeek,
   startOfYear,
 } from "date-fns";
-import { createMemo, onSettled } from "solid-js";
+import { type Component, createMemo, onSettled } from "solid-js";
 import { Agenda, type AgendaSlot, type SolidAgendaEvent } from "./Agenda";
 import { MonthView, type MonthViewSlot, type SolidMonthEvent } from "./MonthView";
 import { withDefaults } from "./props";
@@ -183,6 +184,11 @@ export interface CalendarProps<T = unknown>
    * dragged (`start` at midnight of the first, `end` at midnight after the last).
    */
   onCreateEvent?: (start: Date, end: Date) => void;
+  /**
+   * A component that draws content inside the time-grid drag-to-create preview;
+   * see `TimeGrid`'s prop of the same name. Applies to the week/day grid only.
+   */
+  renderCreateGhost?: Component<CreateGhostArgs>;
   /** Fires when an event drag begins. */
   onDragStart?: (event: CalendarEvent<T>) => void;
   /**
@@ -536,6 +542,7 @@ export function Calendar<T = unknown>(
           onPressEvent={props.onPressEvent}
           onPressCell={props.onPressCell}
           onCreateEvent={props.onCreateEvent}
+          renderCreateGhost={props.renderCreateGhost}
           onDragStart={props.onDragStart}
           onDragEvent={props.onDragEvent}
           getEventId={props.getEventId}

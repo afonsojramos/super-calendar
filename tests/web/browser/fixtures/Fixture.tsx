@@ -1,4 +1,4 @@
-import type { CalendarEvent, DateRange } from "@super-calendar/core/vanilla";
+import type { CalendarEvent, CreateGhostArgs, DateRange } from "@super-calendar/core/vanilla";
 import {
   Calendar,
   DatePicker,
@@ -105,6 +105,15 @@ const resourceEvents: ResourceEvent[] = [
 ];
 const clock = (date: Date) => `${date.getDate()}:${date.getHours()}:${date.getMinutes()}`;
 const theme = { text: "rgb(12, 34, 56)", cellHeight: 80, selectedBackground: "rgb(60, 90, 120)" };
+// Custom create-preview content: the live range, an unbroken word wider than
+// any preview, and a control that must stay unreachable.
+const Draft = (props: CreateGhostArgs & { resource?: { id: string } }) => (
+  <div>
+    <strong>{`Draft ${props.resource ? `${props.resource.id} ` : ""}${clock(props.start)}-${clock(props.end)}`}</strong>
+    <span>{"Quarterlyoperationsreviewwithregionalleadership".repeat(4)}</span>
+    <button>Draft action</button>
+  </div>
+);
 const missingEventId = (): string | number => {
   // @ts-expect-error Simulate a JavaScript consumer returning an invalid ID.
   return undefined;
@@ -336,6 +345,37 @@ export function Fixture() {
               : undefined
           }
           onCreateEvent={(start, end) => record(`${clock(start)}-${clock(end)}`)}
+        />
+      ) : view.startsWith("draft-resources") ? (
+        // Create-preview content on the resource timeline, along either axis.
+        <ResourceTimeline<{ id: number; resourceId: string }>
+          date={anchor}
+          now={anchor}
+          orientation={view.endsWith("-vertical") ? "vertical" : "horizontal"}
+          resources={resources}
+          events={[]}
+          startHour={8}
+          endHour={14}
+          onCreateEvent={(start, end, resource) =>
+            record(`${clock(start)}-${clock(end)}@${resource.id}`)
+          }
+          renderCreateGhost={Draft}
+        />
+      ) : view.startsWith("draft") ? (
+        // Create-preview content on the time grid. `-window` narrows the visible
+        // hours; `-scrolled` makes the column taller than the viewport, which
+        // opens scrolled to 08:00.
+        <TimeGrid<{ id: number }>
+          date={anchor}
+          now={anchor}
+          mode="day"
+          events={[]}
+          height={700}
+          hourHeight={view.endsWith("-scrolled") ? 48 : 24}
+          minHour={view.endsWith("-window") ? 8 : undefined}
+          maxHour={view.endsWith("-window") ? 18 : undefined}
+          onCreateEvent={(start, end) => record(`${clock(start)}-${clock(end)}`)}
+          renderCreateGhost={Draft}
         />
       ) : (
         <TimeGrid<{ id: number }>

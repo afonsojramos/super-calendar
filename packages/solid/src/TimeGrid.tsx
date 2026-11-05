@@ -7,6 +7,7 @@ import {
   type CalendarHandle,
   type CalendarLabels,
   type CalendarMode,
+  type CreateGhostArgs,
   cellRangeFromDrag,
   clampMoveStartMinutes,
   closedHourBands,
@@ -109,6 +110,10 @@ const DEFAULT_MIN_EVENT_HEIGHT = 14;
 // via `eventGap`.
 const DEFAULT_EVENT_GAP = 1;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+// Two create-preview ranges cover the same times.
+const sameRange = (a: CreateGhostArgs | null, b: CreateGhostArgs | null) =>
+  a === b ||
+  (!!a && !!b && a.start.getTime() === b.start.getTime() && a.end.getTime() === b.end.getTime());
 // Floor for the create-by-drag preview, so a press shows a line before it moves.
 const CREATE_PREVIEW_MIN_HEIGHT = 2;
 // Vertical placement of the create preview inside a day column `gridHeight` px
@@ -301,6 +306,16 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   onPressCell?: (date: Date) => void;
   /** Drag empty grid space to create; called with the swept start/end. */
   onCreateEvent?: (start: Date, end: Date) => void;
+  /**
+   * A component that draws content inside the drag-to-create preview, such as a
+   * draft title and the live time range. It receives the snapped `start` and
+   * `end` that `onCreateEvent` would get if the pointer were released now, and
+   * its props update as the sweep changes them. The grid keeps positioning,
+   * sizing and styling the preview and clips the content to it; the content is
+   * non-interactive and hidden from assistive tech. Renders only while a sweep
+   * can create, so it needs `onCreateEvent` and does not enable creation itself.
+   */
+  renderCreateGhost?: Component<CreateGhostArgs>;
   /** Fires when an event drag begins (e.g. to trigger haptics). */
   onDragStart?: (event: CalendarEvent<T>) => void;
   /**
@@ -644,10 +659,12 @@ export function TimeGrid<T = unknown>(
 
   // Create-by-drag / tap on empty grid space. Mouse and pen sweep out a new
   // event; on touch the column scrolls instead, so a tap still hits onPressCell.
+  // `startPx` stays unsorted: the live range passes it to `cellRangeFromDrag` as
+  // the sweep's origin, exactly as the commit does.
   const [createBox, setCreateBox] = createSignal<{
     dayIndex: number;
-    topPx: number;
-    heightPx: number;
+    startPx: number;
+    curPx: number;
   } | null>(null);
   const createOrigin: ElementRef<{
     pointerId: number;
@@ -1475,8 +1492,8 @@ export function TimeGrid<T = unknown>(
     };
     setCreateBox({
       dayIndex,
-      topPx: startPx,
-      heightPx: 0,
+      startPx,
+      curPx: startPx,
     });
   };
   const moveCreate = (e: DomPointerEvent) => {
@@ -1490,11 +1507,10 @@ export function TimeGrid<T = unknown>(
     }
     const o = createOrigin.current;
     if (!o || o.pointerId !== e.pointerId) return;
-    const cur = pxFromTop(o.el, e.clientY);
     setCreateBox({
       dayIndex: o.dayIndex,
-      topPx: Math.min(o.startPx, cur),
-      heightPx: Math.abs(cur - o.startPx),
+      startPx: o.startPx,
+      curPx: pxFromTop(o.el, e.clientY),
     });
   };
   const endCreate = (e: DomPointerEvent) => {
@@ -1536,6 +1552,13 @@ export function TimeGrid<T = unknown>(
   // create, just drop the in-progress state.
   const cancelCreate = (e: DomPointerEvent) => {
     if (cellTouchRef.current?.pointerId === e.pointerId) cellTouchRef.current = null;
+    if (createOrigin.current?.pointerId !== e.pointerId) return;
+    createOrigin.current = null;
+    setCreateBox(null);
+  };
+  // Without capture the column stops seeing the sweep's moves and release, so
+  // drop it. Leaves `cellTouchRef` alone: touch taps resolve on the later click.
+  const loseCreateCapture = (e: DomPointerEvent) => {
     if (createOrigin.current?.pointerId !== e.pointerId) return;
     createOrigin.current = null;
     setCreateBox(null);
@@ -2106,6 +2129,24 @@ export function TimeGrid<T = unknown>(
                   const currentCreateBox = createBox();
                   return currentCreateBox?.dayIndex === dayIndex ? currentCreateBox : null;
                 });
+                // What `onCreateEvent` would receive if the sweep ended here. Kept
+                // while the range holds, so content updates only when it changes.
+                const ghostRange = createMemo(
+                  () => {
+                    const currentGhost = ghost();
+                    return currentGhost && props.renderCreateGhost && props.onCreateEvent
+                      ? cellRangeFromDrag(
+                          day(),
+                          currentGhost.startPx,
+                          currentGhost.curPx,
+                          hourHeight(),
+                          windowStart(),
+                          snapMinutes(),
+                        )
+                      : null;
+                  },
+                  { equals: sameRange },
+                );
                 // The tail of a move that runs past midnight, previewed at the top of
                 // this column. The dragged event is looked up from its `drag.key`
                 // ("<originColumn>:<index>"), so no extra state has to track it.
@@ -2127,6 +2168,7 @@ export function TimeGrid<T = unknown>(
                     onPointerMove={cellEnabled() ? moveCreate : undefined}
                     onPointerUp={cellEnabled() ? endCreate : undefined}
                     onPointerCancel={cellEnabled() ? cancelCreate : undefined}
+                    onLostPointerCapture={cellEnabled() ? loseCreateCapture : undefined}
                     onClick={cellEnabled() ? (e) => tapCell(e, dayIndex) : undefined}
                     {...dataState({
                       "data-today": getIsToday(day()),
@@ -2614,18 +2656,21 @@ export function TimeGrid<T = unknown>(
                         {(ghost) => (
                           <div
                             aria-hidden="true"
+                            // Custom content stays out of the tab order and pointer input.
+                            inert={ghostRange() ? true : undefined}
                             {...slot("createGhost", {
                               base: {
                                 position: "absolute",
                                 left: props.eventGap,
                                 right: props.eventGap,
                                 ...createPreviewPlacement(
-                                  ghost().topPx,
-                                  ghost().heightPx,
+                                  Math.min(ghost().startPx, ghost().curPx),
+                                  Math.abs(ghost().curPx - ghost().startPx),
                                   totalHeight(),
                                 ),
                                 // Borders, including custom ones, stay inside the placed box.
                                 boxSizing: "border-box",
+                                ...(ghostRange() ? { overflow: "hidden" } : null),
                                 opacity: 0.7,
                                 pointerEvents: "none",
                                 zIndex: 2,
@@ -2636,7 +2681,17 @@ export function TimeGrid<T = unknown>(
                                 borderRadius: 6,
                               },
                             })}
-                          />
+                          >
+                            <Show when={ghostRange()}>
+                              {(range) => (
+                                <Dynamic
+                                  component={props.renderCreateGhost}
+                                  start={range().start}
+                                  end={range().end}
+                                />
+                              )}
+                            </Show>
+                          </div>
                         )}
                       </Show>
                     }

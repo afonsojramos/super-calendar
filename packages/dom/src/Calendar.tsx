@@ -13,6 +13,7 @@ import {
   startOfYear,
 } from "date-fns";
 import {
+  type ComponentType,
   type CSSProperties,
   type ForwardedRef,
   forwardRef,
@@ -29,6 +30,7 @@ import {
   type BusinessHours,
   type BusinessHoursBand,
   type CalendarEvent,
+  type CreateGhostArgs,
   type DateRange,
   type DateSelectionConstraints,
   type EventAccessibilityLabeler,
@@ -191,6 +193,11 @@ export interface CalendarProps<T = unknown>
    * dragged (`start` at midnight of the first, `end` at midnight after the last).
    */
   onCreateEvent?: (start: Date, end: Date) => void;
+  /**
+   * A component that draws content inside the time-grid drag-to-create preview;
+   * see `TimeGrid`'s prop of the same name. Applies to the week/day grid only.
+   */
+  renderCreateGhost?: ComponentType<CreateGhostArgs>;
   /** Fires when an event drag begins. */
   onDragStart?: (event: CalendarEvent<T>) => void;
   /**
@@ -375,6 +382,7 @@ function CalendarInner<T = unknown>(
     touchDragThreshold,
     onPressCell,
     onCreateEvent,
+    renderCreateGhost,
     onDragStart,
     onDragEvent,
     getEventId,
@@ -585,6 +593,7 @@ function CalendarInner<T = unknown>(
         onPressEvent={onPressEvent}
         onPressCell={onPressCell}
         onCreateEvent={onCreateEvent}
+        renderCreateGhost={renderCreateGhost}
         onDragStart={onDragStart}
         onDragEvent={onDragEvent}
         getEventId={getEventId}

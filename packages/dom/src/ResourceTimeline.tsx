@@ -12,6 +12,7 @@ import {
   type BusinessHoursValue,
   type CalendarEvent,
   type CalendarLabels,
+  type CreateGhostArgs,
   eventAccessibilityLabel,
   resolveCalendarLabels,
   isSameCalendarDay,
@@ -146,6 +147,17 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
   onPressCell?: (at: Date, resource: Resource) => void;
   /** Drag empty lane space to create; called with the swept start/end and the lane's resource. */
   onCreateEvent?: (start: Date, end: Date, resource: Resource) => void;
+  /**
+   * A component that draws content inside the drag-to-create preview, such as a
+   * draft title and the live time range. It receives the snapped `start` and
+   * `end` that `onCreateEvent` would get if the pointer were released now, plus
+   * the lane's resource, and re-renders as the sweep changes them. The board
+   * keeps positioning, sizing and styling the preview and clips the content to
+   * it; the content is non-interactive and hidden from assistive tech. Renders
+   * only while a sweep can create, so it needs `onCreateEvent` and does not
+   * enable creation itself. Applies to both orientations.
+   */
+  renderCreateGhost?: ComponentType<CreateGhostArgs & { resource: Resource }>;
   /**
    * Shade the hours outside this window, per lane. Same shape as the Calendar's
    * `businessHours` plus the lane's resource, so per-resource opening hours work
@@ -291,6 +303,7 @@ export function ResourceTimeline<T = unknown>({
   getEventId,
   onPressCell,
   onCreateEvent,
+  renderCreateGhost,
   businessHours,
   renderBusinessHours,
   renderResourceHeader,
@@ -615,6 +628,30 @@ export function ResourceTimeline<T = unknown>({
     if (createOrigin.current?.pointerId !== e.pointerId) return;
     clearCreate();
   };
+  const RenderCreateGhost = renderCreateGhost;
+  // What `onCreateEvent` would receive if the sweep ended here. The props keep
+  // the same `Date`s while that range holds, so content effects keyed on them
+  // re-run only when it changes.
+  const liveRange =
+    createBox && RenderCreateGhost && onCreateEvent
+      ? cellRangeFromDrag(
+          date,
+          createBox.startPx,
+          createBox.curPx,
+          hourSize,
+          startHour,
+          dragStepMinutes,
+        )
+      : null;
+  const liveStart = liveRange?.start.getTime();
+  const liveEnd = liveRange?.end.getTime();
+  const createRange = useMemo(
+    () =>
+      liveStart === undefined || liveEnd === undefined
+        ? null
+        : { start: new Date(liveStart), end: new Date(liveEnd) },
+    [liveStart, liveEnd],
+  );
   const trackInteractionProps = (resource: Resource) => ({
     onPointerDown: (e: ReactPointerEvent) => beginCreate(e, resource),
     onPointerMove: moveCreate,
@@ -1037,6 +1074,8 @@ export function ResourceTimeline<T = unknown>({
                   {createBox?.resourceKey === resource.id ? (
                     <div
                       aria-hidden
+                      // Custom content stays out of the tab order and pointer input.
+                      inert={createRange ? true : undefined}
                       {...slot("createGhost", {
                         base: {
                           position: "absolute",
@@ -1044,6 +1083,7 @@ export function ResourceTimeline<T = unknown>({
                           right: 1,
                           top: Math.min(createBox.startPx, createBox.curPx),
                           height: Math.max(Math.abs(createBox.curPx - createBox.startPx), 2),
+                          ...(createRange ? { overflow: "hidden" } : null),
                           opacity: 0.7,
                           pointerEvents: "none",
                           zIndex: 2,
@@ -1054,7 +1094,15 @@ export function ResourceTimeline<T = unknown>({
                           borderRadius: 6,
                         },
                       })}
-                    />
+                    >
+                      {createRange && RenderCreateGhost ? (
+                        <RenderCreateGhost
+                          start={createRange.start}
+                          end={createRange.end}
+                          resource={resource}
+                        />
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
               </div>
@@ -1288,6 +1336,8 @@ export function ResourceTimeline<T = unknown>({
                 {createBox?.resourceKey === resource.id ? (
                   <div
                     aria-hidden
+                    // Custom content stays out of the tab order and pointer input.
+                    inert={createRange ? true : undefined}
                     {...slot("createGhost", {
                       base: {
                         position: "absolute",
@@ -1295,6 +1345,7 @@ export function ResourceTimeline<T = unknown>({
                         bottom: 1,
                         left: Math.min(createBox.startPx, createBox.curPx),
                         width: Math.max(Math.abs(createBox.curPx - createBox.startPx), 2),
+                        ...(createRange ? { overflow: "hidden" } : null),
                         opacity: 0.7,
                         pointerEvents: "none",
                         zIndex: 2,
@@ -1305,7 +1356,15 @@ export function ResourceTimeline<T = unknown>({
                         borderRadius: 6,
                       },
                     })}
-                  />
+                  >
+                    {createRange && RenderCreateGhost ? (
+                      <RenderCreateGhost
+                        start={createRange.start}
+                        end={createRange.end}
+                        resource={resource}
+                      />
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             </div>
