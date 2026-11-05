@@ -99,6 +99,28 @@ the active interaction.
 In `TimeGrid`, the drag-to-create preview stays within the visible hours of the
 pressed column, with its border inside the column.
 
+Pass `renderCreateGhost` to `TimeGrid`, `Calendar`, or `ResourceTimeline` to draw
+a draft inside that preview. Read the props inside JSX so the text follows the
+sweep:
+
+```tsx
+import { TimeGrid, type CreateGhostArgs } from "@super-calendar/solid";
+import { format } from "date-fns";
+
+function DraftPreview(props: CreateGhostArgs) {
+  return (
+    <strong>{`New event ${format(props.start, "HH:mm")} - ${format(props.end, "HH:mm")}`}</strong>
+  );
+}
+
+<TimeGrid date={date} events={events()} onCreateEvent={create} renderCreateGhost={DraftPreview} />;
+```
+
+`start` and `end` are the range `onCreateEvent` would receive on release, which
+can extend past a narrowed `minHour`/`maxHour` window. `ResourceTimeline` also
+passes the lane's `resource`. The content is clipped to the preview,
+non-interactive, and hidden from assistive tech.
+
 ## Select dates
 
 ```tsx

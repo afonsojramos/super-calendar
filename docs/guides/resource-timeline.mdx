@@ -208,6 +208,34 @@ lane's resource added to each callback so you know **where** as well as when:
 />
 ```
 
+To show a draft inside the preview while it is swept, pass `renderCreateGhost`.
+It receives the live `start` and `end` that `onCreateEvent` would get on release,
+plus the lane's `resource`, in both orientations. The board keeps positioning and
+styling the preview and clips your content to it. See
+[Show a draft in the preview](/guides/dragging#show-a-draft-in-the-preview).
+
+```tsx
+import { type CreateGhostArgs, type Resource, ResourceTimeline } from "@super-calendar/dom";
+import { format } from "date-fns";
+
+// Define the component once, outside render, so it stays mounted during the sweep.
+function DraftBooking({ start, end, resource }: CreateGhostArgs & { resource: Resource }) {
+  return (
+    <div style={{ padding: "2px 6px", fontSize: 12 }}>
+      {`${resource.title}: ${format(start, "HH:mm")} - ${format(end, "HH:mm")}`}
+    </div>
+  );
+}
+
+<ResourceTimeline
+  date={date}
+  resources={resources}
+  events={events}
+  onCreateEvent={createBooking}
+  renderCreateGhost={DraftBooking}
+/>;
+```
+
 ## Business hours
 
 `businessHours` shades the closed hours of each lane. It takes the same shape
@@ -264,7 +292,7 @@ cells when `orientation="vertical"`, the left row labels when horizontal.
 
 The native renderer exposes the same board and props (`date`, `resources`, `events`,
 `orientation`, `resourceId`, `resourcesPerPage`, `resourcePage`, `startHour`/`endHour`, `hourWidth`, `hourHeight`, `rowHeight`, `labelWidth`, `ampm`,
-`renderEvent`, `onPressEvent`, `onPressCell`, `onCreateEvent`, `businessHours`,
+`renderEvent`, `onPressEvent`, `onPressCell`, `onCreateEvent`, `renderCreateGhost`, `businessHours`,
 `renderBusinessHours`, `renderResourceHeader`), plus
 `onDragEvent` / `dragStepMinutes` for **long-press drag-to-move, cross-lane drag, and edge-resize**
 and the long-press variants `onLongPressEvent` / `onLongPressCell`. It reads the theme from context, so

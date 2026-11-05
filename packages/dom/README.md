@@ -131,6 +131,24 @@ drag-to-create behavior. See the [DOM guide](https://super-calendar.afonsojramos
 The drag-to-create preview stays within the visible hours of the pressed column,
 with its border inside the column.
 
+Pass `renderCreateGhost` to `TimeGrid`, `Calendar`, or `ResourceTimeline` to draw
+a draft inside that preview. Define the component once, outside render:
+
+```tsx
+import { TimeGrid, type CreateGhostArgs } from "@super-calendar/dom";
+import { format } from "date-fns";
+
+function DraftPreview({ start, end }: CreateGhostArgs) {
+  return <strong>{`New event ${format(start, "HH:mm")} - ${format(end, "HH:mm")}`}</strong>;
+}
+
+<TimeGrid date={date} events={events} onCreateEvent={create} renderCreateGhost={DraftPreview} />;
+```
+
+`start` and `end` are the range `onCreateEvent` would receive on release, which
+can extend past a narrowed `minHour`/`maxHour` window. The content is clipped to
+the preview, non-interactive, and hidden from assistive tech.
+
 ## Documentation
 
 See the [full documentation](https://super-calendar.afonsojramos.me), the [quickstart](https://super-calendar.afonsojramos.me/quickstart), and the [API reference](https://super-calendar.afonsojramos.me/reference/api).

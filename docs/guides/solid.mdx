@@ -188,7 +188,11 @@ export function Rooms() {
 
 Set `orientation="vertical"` to place resources in columns. See
 [resource timelines](/guides/resource-timeline) for paging, business hours, and
-custom headers. Direct views expect already expanded events; use
+custom headers. To draw a draft inside the create preview, pass a
+`renderCreateGhost` component and read `props.start`, `props.end`, and
+`props.resource` inside its JSX. `TimeGrid` and `Calendar` take the same prop,
+without `resource`. See
+[Show a draft in the preview](/guides/dragging#show-a-draft-in-the-preview). Direct views expect already expanded events; use
 `expandRecurringEvents` when your bookings recur.
 
 ## Render custom events
