@@ -45,10 +45,11 @@ beforeAll(async () => {
   warmup.setDefaultNavigationTimeout(15_000);
   try {
     await warmup.goto(origin);
+    // The next test page needs Vite's static imports to be ready.
+    await server.waitForRequestsIdle();
     await warmup
       .getByRole("button", { name: "Update props", exact: true })
       .waitFor({ timeout: 15_000 });
-    await warmup.waitForLoadState("networkidle");
     expect(startupErrors, "Fixture startup errors").toEqual([]);
   } finally {
     await warmup.close();

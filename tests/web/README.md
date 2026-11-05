@@ -67,6 +67,9 @@ shared session starts an isolated Vite server, dependency cache, and browser
 instance for each project, and a fresh page for each case. Browser errors and
 warnings fail the test.
 
+Warmup waits for Vite's static module crawl and the visible fixture controls.
+Keep the startup-error assertion and per-case browser diagnostics enabled.
+
 ```sh
 pnpm build
 pnpm test:browser
