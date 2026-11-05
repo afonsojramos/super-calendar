@@ -38,6 +38,7 @@
     "tests/performance",
     "vitest.config.mts",
     "vitest.browser.config.mts",
+    "vitest.react18.config.mts",
     "vitest.demos.config.mts",
     "vitest.performance.config.mts"
   ],

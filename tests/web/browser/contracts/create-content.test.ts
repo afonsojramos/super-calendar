@@ -89,21 +89,136 @@ describe(rendererName, () => {
     },
   );
 
-  it("keeps the content out of focus and assistive tech", async () => {
-    const column = await openColumn("draft-day");
-    const x = column.x + column.width / 2;
-    await page.mouse.move(x, at(column, 9, 24));
+  it.each(
+    ["draft-day", "draft-resources", "draft-resources-vertical"].flatMap((view) => [
+      view,
+      `${view}-focus`,
+    ]),
+  )("keeps the $0 content out of focus and assistive tech", async (view) => {
+    await page.setViewportSize({ width: 1100, height: 1000 });
+    await open(view);
+    await page.evaluate(() => {
+      document.addEventListener("focusin", (event) => {
+        if (event.target instanceof Element && event.target.closest('[data-slot="createGhost"]'))
+          document.body.dataset.focusedDraft = "true";
+      });
+    });
+    const resources = view.startsWith("draft-resources");
+    const horizontal = resources && !view.includes("-vertical");
+    const column = await bounds(resources ? '[data-slot="track"]' : '[data-slot="dayColumn"]');
+    const point = (hour: number) => ({
+      x: horizontal ? column.x + (hour - 8) * 80 + 2 : column.x + column.width / 2,
+      y: horizontal
+        ? column.y + column.height / 2
+        : at(column, hour, resources ? 48 : 24, resources ? 8 : 0),
+    });
+    await page.mouse.move(point(9).x, point(9).y);
     await page.mouse.down();
-    await page.mouse.move(x, at(column, 12, 24), { steps: 6 });
-    const button = page.locator(`${GHOST} button`);
+    await page.mouse.move(point(12).x, point(12).y, { steps: 6 });
+    const button = page.locator(`${GHOST} button`).first();
     await button.waitFor({ state: "attached" });
+    if (view.endsWith("-focus"))
+      await expect
+        .poll(() => page.locator("body").getAttribute("data-draft-focus-connected"))
+        .toBe("true");
     expect(await page.locator(GHOST).getAttribute("aria-hidden")).toBe("true");
+    expect(await page.locator("body").getAttribute("data-focused-draft")).toBeNull();
+    expect(await page.locator(GHOST).getAttribute("inert")).not.toBeNull();
     await button.evaluate((element) => (element as HTMLElement).focus());
+    expect(await button.evaluate((element) => element === document.activeElement)).toBe(false);
     for (let i = 0; i < 6; i++) await page.keyboard.press("Tab");
     expect(await button.evaluate((element) => element === document.activeElement)).toBe(false);
     expect(await page.getByRole("button", { name: "Draft action" }).count()).toBe(0);
     await page.mouse.up();
   });
+
+  it.each(["scroll", "ancestor scroll", "zoom in", "zoom out"])(
+    "commits the shown range after %s without another pointer move",
+    async (change) => {
+      const column = await openColumn("draft-day-scrolled");
+      const x = column.x + column.width / 2;
+      await page.mouse.move(x, at(column, 9, 48));
+      await page.mouse.down();
+      await page.mouse.move(x, at(column, 11, 48), { steps: 6 });
+      await expect.poll(draft).toBe("Draft 15:9:0-15:11:0");
+      if (change.startsWith("zoom")) {
+        await page.keyboard.down("Control");
+        await page.mouse.wheel(0, change === "zoom in" ? -150 : 600);
+        await page.keyboard.up("Control");
+        await expect
+          .poll(async () => (await bounds('[data-slot="dayColumn"]')).height)
+          .not.toBe(column.height);
+      } else if (change === "ancestor scroll") {
+        await page.evaluate(() => {
+          const spacer = document.createElement("div");
+          spacer.style.height = "1500px";
+          document.body.append(spacer);
+          window.scrollBy(0, 96);
+        });
+        await expect
+          .poll(async () => (await bounds('[data-slot="dayColumn"]')).y)
+          .toBeLessThan(column.y);
+      } else {
+        await page.mouse.wheel(0, 96);
+        await expect
+          .poll(async () => (await bounds('[data-slot="dayColumn"]')).y)
+          .toBeLessThan(column.y);
+      }
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      );
+      const shown = await draft();
+      expect(shown).toMatch(/^Draft /);
+      await page.mouse.up();
+      expect(await calls()).toBe(JSON.stringify([shown!.slice("Draft ".length)]));
+      await expect.poll(() => page.locator(GHOST).count()).toBe(0);
+    },
+  );
+
+  it.each(["horizontal", "vertical"] as const)(
+    "commits the shown resource range after %s scrolling without another pointer move",
+    async (orientation) => {
+      await page.setViewportSize({ width: 1100, height: 1000 });
+      await open(
+        orientation === "vertical"
+          ? "draft-resources-vertical-scrolled"
+          : "draft-resources-scrolled",
+      );
+      const lane = await bounds('[data-slot="track"]');
+      const point = (hours: number) =>
+        orientation === "vertical"
+          ? { x: lane.x + lane.width / 2, y: lane.y + (hours - 8) * 48 + 2 }
+          : { x: lane.x + (hours - 8) * 80 + 2, y: lane.y + lane.height / 2 };
+      await page.mouse.move(point(9).x, point(9).y);
+      await page.mouse.down();
+      await page.mouse.move(point(11).x, point(11).y, { steps: 6 });
+      await expect.poll(draft).toBe("Draft a 15:9:0-15:11:0");
+      await page.mouse.wheel(
+        orientation === "horizontal" ? 160 : 0,
+        orientation === "vertical" ? 96 : 0,
+      );
+      await expect
+        .poll(
+          async () =>
+            (await bounds('[data-slot="track"]'))[orientation === "horizontal" ? "x" : "y"],
+        )
+        .toBeLessThan(lane[orientation === "horizontal" ? "x" : "y"]);
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      );
+      const shown = await draft();
+      expect(shown).toMatch(/^Draft a /);
+      await page.mouse.up();
+      expect(await calls()).toBe(JSON.stringify([`${shown!.slice("Draft a ".length)}@a`]));
+      await expect.poll(() => page.locator(GHOST).count()).toBe(0);
+    },
+  );
 
   it("shows content for a press without creating", async () => {
     const column = await openColumn("draft-day");

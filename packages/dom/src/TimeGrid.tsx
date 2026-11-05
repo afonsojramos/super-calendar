@@ -71,6 +71,7 @@ import {
   useEventActions,
 } from "./EventActions";
 import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
+import { InertDiv } from "./InertDiv";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 import { type EventGrab, waitForHold } from "./touch";
 
@@ -621,12 +622,28 @@ function TimeGridInner<T = unknown>(
   } | null>(null);
   const createOrigin = useRef<{
     pointerId: number;
+    clientY: number;
     el: HTMLElement;
     dayIndex: number;
     dayTime: number;
     creating: boolean;
     startPx: number;
   } | null>(null);
+  const createActive = createBox !== null;
+  useEffect(() => {
+    if (!createActive) return;
+    // Scrolling a column or an ancestor moves it beneath the held pointer.
+    const onScroll = () => {
+      const origin = createOrigin.current;
+      if (!origin) return;
+      const curPx = origin.clientY - origin.el.getBoundingClientRect().top;
+      setCreateBox((current) =>
+        current && current.curPx !== curPx ? { ...current, curPx } : current,
+      );
+    };
+    window.addEventListener("scroll", onScroll, true);
+    return () => window.removeEventListener("scroll", onScroll, true);
+  }, [createActive]);
   // Touch never sweeps, so a tap presses the cell from its click, which the
   // browser skips when the finger scrolled the grid instead.
   const cellTouchRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
@@ -1303,6 +1320,7 @@ function TimeGridInner<T = unknown>(
     const dayTime = days[dayIndex].getTime();
     createOrigin.current = {
       pointerId: e.pointerId,
+      clientY: e.clientY,
       el,
       dayIndex,
       dayTime,
@@ -1322,6 +1340,7 @@ function TimeGridInner<T = unknown>(
     }
     const o = createOrigin.current;
     if (!o) return;
+    o.clientY = e.clientY;
     setCreateBox({
       dayIndex: o.dayIndex,
       dayTime: o.dayTime,
@@ -2277,10 +2296,10 @@ function TimeGridInner<T = unknown>(
                   </div>
                 ) : null}
                 {ghost ? (
-                  <div
+                  <InertDiv
                     aria-hidden
                     // Custom content stays out of the tab order and pointer input.
-                    inert={ghostRange ? true : undefined}
+                    inert={!!ghostRange}
                     {...slot("createGhost", {
                       base: {
                         position: "absolute",
@@ -2308,7 +2327,7 @@ function TimeGridInner<T = unknown>(
                     {ghostRange && RenderCreateGhost ? (
                       <RenderCreateGhost start={ghostRange.start} end={ghostRange.end} />
                     ) : null}
-                  </div>
+                  </InertDiv>
                 ) : null}
               </div>
             );

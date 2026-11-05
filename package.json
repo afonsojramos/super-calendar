@@ -20,6 +20,7 @@
     "test": "vitest run",
     "test:parity": "node scripts/verify-web-test-parity.mjs",
     "test:browser": "node scripts/verify-web-test-parity.mjs --browser",
+    "test:react18:browser": "vitest run --config vitest.react18.config.mts",
     "test:solid:browser": "node scripts/verify-solid.mjs",
     "test:solid:browser:dist": "node scripts/verify-solid.mjs --dist",
     "test:solid:package": "node scripts/verify-solid-package.mjs",

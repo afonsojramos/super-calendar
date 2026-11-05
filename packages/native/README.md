@@ -100,6 +100,7 @@ function DraftPreview({ start, end }: CreateGhostArgs) {
 `TimeGrid` and `ResourceTimeline` accept the same prop; `ResourceTimeline` also
 passes the lane's `resource`. The preview geometry stays on the UI thread, and
 the content is clipped to it and hidden from screen readers.
+A cancelled gesture clears the preview without calling `onCreateEvent`.
 
 ## Styling with Tailwind
 

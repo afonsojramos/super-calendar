@@ -37,6 +37,7 @@ import {
   useEventActions,
 } from "./EventActions";
 import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
+import { InertDiv } from "./InertDiv";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
 /**
@@ -553,12 +554,29 @@ export function ResourceTimeline<T = unknown>({
   } | null>(null);
   const createOrigin = useRef<{
     pointerId: number;
+    clientX: number;
+    clientY: number;
     el: HTMLElement;
     resource: Resource;
     startPx: number;
     dayKey: string;
     creating: boolean;
   } | null>(null);
+  const createActive = createBox !== null;
+  useEffect(() => {
+    if (!createActive) return;
+    const onScroll = () => {
+      const origin = createOrigin.current;
+      if (!origin) return;
+      const rect = origin.el.getBoundingClientRect();
+      const curPx = vertical ? origin.clientY - rect.top : origin.clientX - rect.left;
+      setCreateBox((current) =>
+        current && current.curPx !== curPx ? { ...current, curPx } : current,
+      );
+    };
+    window.addEventListener("scroll", onScroll, true);
+    return () => window.removeEventListener("scroll", onScroll, true);
+  }, [createActive, vertical]);
   const clearCreate = useCallback(() => {
     const previous = createOrigin.current;
     createOrigin.current = null;
@@ -604,6 +622,8 @@ export function ResourceTimeline<T = unknown>({
     }
     createOrigin.current = {
       pointerId: e.pointerId,
+      clientX: e.clientX,
+      clientY: e.clientY,
       el,
       resource,
       startPx,
@@ -617,6 +637,8 @@ export function ResourceTimeline<T = unknown>({
   const moveCreate = (e: ReactPointerEvent) => {
     const o = createOrigin.current;
     if (!o || o.pointerId !== e.pointerId || !onCreateEvent) return;
+    o.clientX = e.clientX;
+    o.clientY = e.clientY;
     setCreateBox({ resourceKey: o.resource.id, startPx: o.startPx, curPx: pxAlongAxis(o.el, e) });
   };
   const endCreate = (e: ReactPointerEvent) => {
@@ -1099,10 +1121,10 @@ export function ResourceTimeline<T = unknown>({
                   })}
                   {nowLine(resource.id)}
                   {createBox?.resourceKey === resource.id ? (
-                    <div
+                    <InertDiv
                       aria-hidden
                       // Custom content stays out of the tab order and pointer input.
-                      inert={createRange ? true : undefined}
+                      inert={!!createRange}
                       {...slot("createGhost", {
                         base: {
                           position: "absolute",
@@ -1129,7 +1151,7 @@ export function ResourceTimeline<T = unknown>({
                           resource={resource}
                         />
                       ) : null}
-                    </div>
+                    </InertDiv>
                   ) : null}
                 </div>
               </div>
@@ -1361,10 +1383,10 @@ export function ResourceTimeline<T = unknown>({
                 })}
                 {nowLine(resource.id)}
                 {createBox?.resourceKey === resource.id ? (
-                  <div
+                  <InertDiv
                     aria-hidden
                     // Custom content stays out of the tab order and pointer input.
-                    inert={createRange ? true : undefined}
+                    inert={!!createRange}
                     {...slot("createGhost", {
                       base: {
                         position: "absolute",
@@ -1391,7 +1413,7 @@ export function ResourceTimeline<T = unknown>({
                         resource={resource}
                       />
                     ) : null}
-                  </div>
+                  </InertDiv>
                 ) : null}
               </div>
             </div>

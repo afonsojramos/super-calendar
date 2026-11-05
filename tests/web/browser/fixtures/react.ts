@@ -1,4 +1,4 @@
-import { createElement, useState, type ComponentType } from "react";
+import { createElement, useLayoutEffect, useState, version, type ComponentType } from "react";
 import { createRoot } from "react-dom/client";
 export {
   Calendar,
@@ -14,6 +14,11 @@ export function useFixtureState<T>(initial: T) {
   return [() => value, update] as const;
 }
 
+export function useFixtureMount(callback: () => void) {
+  useLayoutEffect(callback, []);
+}
+
 export function mount(View: ComponentType) {
+  document.documentElement.dataset.reactVersion = version;
   createRoot(document.getElementById("root")!).render(createElement(View));
 }

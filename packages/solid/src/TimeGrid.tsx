@@ -669,6 +669,7 @@ export function TimeGrid<T = unknown>(
   } | null>(null);
   const createOrigin: ElementRef<{
     pointerId: number;
+    clientY: number;
     el: HTMLElement;
     dayIndex: number;
     dayTime: number;
@@ -677,6 +678,23 @@ export function TimeGrid<T = unknown>(
   } | null> = {
     current: null,
   };
+  createEffect(
+    () => createBox() !== null,
+    (active) => {
+      if (!active) return;
+      // Scrolling a column or an ancestor moves it beneath the held pointer.
+      const onScroll = () => {
+        const origin = createOrigin.current;
+        if (!origin) return;
+        const curPx = origin.clientY - origin.el.getBoundingClientRect().top;
+        setCreateBox((current) =>
+          current && current.curPx !== curPx ? { ...current, curPx } : current,
+        );
+      };
+      window.addEventListener("scroll", onScroll, true);
+      return () => window.removeEventListener("scroll", onScroll, true);
+    },
+  );
   // Touch never sweeps, so a tap presses the cell from its click, which the
   // browser skips when the finger scrolled the grid instead.
   const cellTouchRef: ElementRef<{
@@ -1489,6 +1507,7 @@ export function TimeGrid<T = unknown>(
     }
     createOrigin.current = {
       pointerId: e.pointerId,
+      clientY: e.clientY,
       el,
       dayIndex,
       dayTime: days()[dayIndex].getTime(),
@@ -1513,6 +1532,7 @@ export function TimeGrid<T = unknown>(
     }
     const o = createOrigin.current;
     if (!o || o.pointerId !== e.pointerId) return;
+    o.clientY = e.clientY;
     setCreateBox({
       dayIndex: o.dayIndex,
       dayTime: o.dayTime,

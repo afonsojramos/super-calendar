@@ -96,6 +96,12 @@ pnpm exec vitest run --config vitest.browser.config.mts --project solid-source-w
 The Solid-specific browser scripts still check server rendering and hydration.
 Shared browser contracts complement those checks and the device gesture workflow.
 
+`pnpm test:react18:browser` reuses the creation-preview contracts against React
+18.3.1 in Chromium, for both source and built entries. Its private workspace
+fixture pins matching React and React DOM versions independently of React 19 in
+the main matrix. The session verifies the loaded React version and rejects
+console warnings, including unsupported DOM attributes. Run `pnpm build` first.
+
 Accessibility cases use axe alongside real keyboard and focus assertions. Axe
 detects common semantic and contrast failures; it does not replace screen-reader
 testing. Browser errors and application warnings fail the shared tests. Two

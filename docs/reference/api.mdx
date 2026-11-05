@@ -115,7 +115,8 @@ past a narrowed `minHour`/`maxHour` window, while the web preview box stops at
 the visible edge. It renders only while `onCreateEvent` is set and never enables
 creation itself. `TimeGrid`, `Calendar` (time-grid modes), and
 `ResourceTimeline` accept it on every renderer; `ResourceTimeline` adds the
-lane's `resource`. The content is clipped to the preview, non-interactive, and
+lane's `resource`. Web previews follow scrolling and zooming while the pointer
+is held. Cancelled native gestures do not call `onCreateEvent`. The content is clipped to the preview, non-interactive, and
 hidden from assistive tech. On React Native it updates when the sweep crosses a
 snap step. See [Show a draft in the preview](/guides/dragging#show-a-draft-in-the-preview).
 

@@ -1,9 +1,15 @@
 import path from "node:path";
+import { createRequire } from "node:module";
 import type { InlineConfig } from "vite";
 import { solid } from "../../support/solid-plugin.mts";
 
-export function fixtureConfig(renderer: "react" | "solid", artifact: "source" | "dist") {
+export function fixtureConfig(
+  renderer: "react" | "solid",
+  artifact: "source" | "dist",
+  reactVersion: 18 | 19 = 19,
+) {
   const root = path.resolve(import.meta.dirname, "../../..");
+  const require = createRequire(path.join(root, "tests/web/browser/fixtures/react18/package.json"));
   const pkg = renderer === "react" ? "dom" : "solid";
   const relativeEntry =
     artifact === "source"
@@ -27,6 +33,15 @@ export function fixtureConfig(renderer: "react" | "solid", artifact: "source" | 
     resolve: {
       dedupe: ["react", "react-dom", "solid-js", "@solidjs/web"],
       alias: [
+        ...(renderer === "react" && reactVersion === 18
+          ? [
+              { find: "react", replacement: path.dirname(require.resolve("react/package.json")) },
+              {
+                find: "react-dom",
+                replacement: path.dirname(require.resolve("react-dom/package.json")),
+              },
+            ]
+          : []),
         { find: "@calendar-browser/adapter", replacement: path.join(fixture, `${renderer}.ts`) },
         { find: "@calendar-browser/library", replacement: entry },
         {

@@ -132,6 +132,7 @@ export function Planner() {
 can extend past a narrowed `minHour`/`maxHour` window. `ResourceTimeline` also
 passes the lane's `resource`. The content is clipped to the preview,
 non-interactive, and hidden from assistive tech.
+The range follows scrolling and zooming during a held sweep, even without another pointer move.
 
 ## Select dates
 

@@ -6,6 +6,7 @@ import {
   MonthList,
   ResourceTimeline,
   TimeGrid,
+  useFixtureMount,
   useFixtureState,
 } from "@calendar-browser/adapter";
 
@@ -114,6 +115,27 @@ const Draft = (props: CreateGhostArgs & { resource?: { id: string } }) => (
     <button>Draft action</button>
   </div>
 );
+const FocusingDraft = (props: CreateGhostArgs & { resource?: { id: string } }) => {
+  let button: HTMLButtonElement | null = null;
+  // Solid refs run before attachment, so also attempt focus in its mount effect.
+  useFixtureMount(() => {
+    document.body.dataset.draftFocusConnected = String(button?.isConnected);
+    button?.focus();
+  });
+  return (
+    <div>
+      <Draft {...props} />
+      <button
+        ref={(element) => {
+          button = element;
+          element?.focus();
+        }}
+      >
+        Focus on mount
+      </button>
+    </div>
+  );
+};
 const missingEventId = (): string | number => {
   // @ts-expect-error Simulate a JavaScript consumer returning an invalid ID.
   return undefined;
@@ -351,15 +373,16 @@ export function Fixture() {
         <ResourceTimeline<{ id: number; resourceId: string }>
           date={anchor}
           now={anchor}
-          orientation={view.endsWith("-vertical") ? "vertical" : "horizontal"}
+          orientation={view.includes("-vertical") ? "vertical" : "horizontal"}
           resources={resources}
           events={[]}
+          style={view.endsWith("-scrolled") ? { height: 240 } : undefined}
           startHour={8}
-          endHour={14}
+          endHour={view.endsWith("-scrolled") ? 24 : 14}
           onCreateEvent={(start, end, resource) =>
             record(`${clock(start)}-${clock(end)}@${resource.id}`)
           }
-          renderCreateGhost={Draft}
+          renderCreateGhost={view.endsWith("-focus") ? FocusingDraft : Draft}
         />
       ) : view.startsWith("draft") ? (
         // Create-preview content on the time grid. `-window` narrows the visible
@@ -375,7 +398,7 @@ export function Fixture() {
           minHour={view.endsWith("-window") ? 8 : undefined}
           maxHour={view.endsWith("-window") ? 18 : undefined}
           onCreateEvent={(start, end) => record(`${clock(start)}-${clock(end)}`)}
-          renderCreateGhost={Draft}
+          renderCreateGhost={view.endsWith("-focus") ? FocusingDraft : Draft}
         />
       ) : (
         <TimeGrid<{ id: number }>

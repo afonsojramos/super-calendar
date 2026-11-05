@@ -602,6 +602,8 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
   } | null>(null);
   const createOrigin: ElementRef<{
     pointerId: number;
+    clientX: number;
+    clientY: number;
     el: HTMLElement;
     resource: Resource;
     startPx: number;
@@ -610,6 +612,23 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
   } | null> = {
     current: null,
   };
+  createEffect(
+    () => (createBox() ? (vertical() ? "vertical" : "horizontal") : null),
+    (axis) => {
+      if (!axis) return;
+      const onScroll = () => {
+        const origin = createOrigin.current;
+        if (!origin) return;
+        const rect = origin.el.getBoundingClientRect();
+        const curPx = axis === "vertical" ? origin.clientY - rect.top : origin.clientX - rect.left;
+        setCreateBox((current) =>
+          current && current.curPx !== curPx ? { ...current, curPx } : current,
+        );
+      };
+      window.addEventListener("scroll", onScroll, true);
+      return () => window.removeEventListener("scroll", onScroll, true);
+    },
+  );
   const clearCreate = () => {
     const previous = createOrigin.current;
     createOrigin.current = null;
@@ -673,6 +692,8 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
     }
     createOrigin.current = {
       pointerId: e.pointerId,
+      clientX: e.clientX,
+      clientY: e.clientY,
       el,
       resource,
       startPx,
@@ -691,6 +712,8 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
   const moveCreate = (e: DomPointerEvent) => {
     const o = createOrigin.current;
     if (!o || o.pointerId !== e.pointerId || !props.onCreateEvent) return;
+    o.clientX = e.clientX;
+    o.clientY = e.clientY;
     setCreateBox({
       resourceKey: o.resource.id,
       startPx: o.startPx,

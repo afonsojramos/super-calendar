@@ -31,6 +31,8 @@ support files.
   once for React DOM and once for Solid.
 - `pnpm test:browser`: after `pnpm build`, run the shared browser contracts and
   require the same cases to pass for each framework's source and built packages.
+- `pnpm test:react18:browser`: after `pnpm build`, run the shared creation-preview
+  contracts against React 18 source and built entries in Chromium.
 - `pnpm build:demos && pnpm test:demos`: build and check the three published demos.
 - `pnpm build && pnpm bench:web`: collect production renderer and bundle baselines.
 - `pnpm exec vitest run --project native`: run one project. Other project names are

@@ -349,12 +349,15 @@ A few rules apply:
   the preview box stops at the visible edge, but `start` and `end` keep matching
   what `onCreateEvent` will receive, which is clamped to the pressed day, not
   to the visible hours.
+- In React DOM and Solid, scrolling or zooming during a held sweep updates the
+  preview range even if the pointer does not move again before release.
 - The content clears when the sweep ends or is cancelled, and each new sweep
   mounts it fresh. Changing the pressed column to another day cancels the sweep.
   In React DOM and Solid, **Escape** or losing pointer capture cancels the sweep,
   and a press without a drag shows the one-step range while held, then fires
   `onPressCell` instead of creating. On React Native, a stationary hold creates
-  that one-step range.
+  that one-step range. A cancelled native gesture clears the preview without
+  calling `onCreateEvent`.
 - On React Native, the preview geometry stays on the UI thread. Pointer and
   zoom updates cross to JavaScript only when the snapped range changes.
 

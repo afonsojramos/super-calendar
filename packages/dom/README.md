@@ -148,6 +148,7 @@ function DraftPreview({ start, end }: CreateGhostArgs) {
 `start` and `end` are the range `onCreateEvent` would receive on release, which
 can extend past a narrowed `minHour`/`maxHour` window. The content is clipped to
 the preview, non-interactive, and hidden from assistive tech.
+The range follows scrolling and zooming during a held sweep, even without another pointer move.
 
 ## Documentation
 
