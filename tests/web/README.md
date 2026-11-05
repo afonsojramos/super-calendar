@@ -84,8 +84,10 @@ input protocol. They must pass for all four renderer/artifact combinations;
 the gate rejects missing or skipped cases in either group. WebKit testing does
 not replace physical iOS or Android gesture checks.
 
-The session uses system Chrome when available. Set `CHROME` to an executable
-path to choose another Chromium installation. Install the browser engines with
+With `CI` set, the session uses Playwright's pinned Chromium headless shell.
+Outside CI, it uses system Chrome when available. Set `CHROME` to an executable
+path to override Chromium in either environment. Firefox and WebKit always use
+Playwright's pinned binaries. Install the browser engines with
 `pnpm exec playwright install chromium firefox webkit` (add `--with-deps` on
 Linux). Run one project while iterating:
 
