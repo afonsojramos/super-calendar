@@ -2,26 +2,21 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "release-type": "node",
   "include-component-in-tag": false,
+  "separate-pull-requests": false,
   "last-release-sha": "b2f02d1ecf9b88e66caa0fcb9e7f385218da6172",
   "packages": {
     ".": {
       "component": "super-calendar",
-      "exclude-paths": ["examples", "docs", "scripts", ".github", "packages/solid"],
+      "exclude-paths": ["examples", "docs", "scripts", ".github"],
       "extra-files": [
         { "type": "json", "path": "packages/core/package.json", "jsonpath": "$.version" },
         { "type": "json", "path": "packages/core/jsr.json", "jsonpath": "$.version" },
         { "type": "json", "path": "packages/dom/package.json", "jsonpath": "$.version" },
         { "type": "json", "path": "packages/dom/jsr.json", "jsonpath": "$.version" },
         { "type": "json", "path": "packages/native/package.json", "jsonpath": "$.version" },
-        { "type": "json", "path": "packages/native/jsr.json", "jsonpath": "$.version" }
+        { "type": "json", "path": "packages/native/jsr.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "packages/solid/package.json", "jsonpath": "$.version" }
       ]
-    },
-    "packages/solid": {
-      "component": "solid",
-      "include-component-in-tag": true,
-      "versioning": "prerelease",
-      "prerelease-type": "experimental",
-      "prerelease": true
     }
   }
 }
