@@ -2,6 +2,7 @@ import { Dynamic, type JSX } from "@solidjs/web";
 import {
   bandRounding,
   buildMonthGrid,
+  buildMultiWeekGrid,
   type CalendarEvent,
   type CalendarLabels,
   compareDayEvents,
@@ -16,8 +17,8 @@ import {
   layoutMonthWeek,
   monthCreateRange,
   monthDropBounds,
-  type MonthGridDay,
-  type MonthGridWeek,
+  type MonthGridWeekday,
+  type MultiWeekGridDay,
   overlapsOtherEvents,
   rangeBandKind,
   resolveCalendarLabels,
@@ -42,6 +43,7 @@ import {
   Show,
   untrack,
 } from "solid-js";
+import { holdDateDrag } from "./touch";
 import { withDefaults } from "./props";
 import { createSlots, dataState, type SlotDefault, type SlotStyleProps } from "./slots";
 import { css, type CSSProperties, type DomKeyboardEvent, type ElementRef } from "./styles";
@@ -86,6 +88,8 @@ export interface SolidMonthEventArgs<T = unknown> {
   event: CalendarEvent<T>;
   /** Call to fire the view's `onPressEvent` for this chip. */
   onPress: () => void;
+  /** The current row view. Supplied by the calendar; optional for existing standalone chip callers. */
+  mode?: "month" | "multiweek";
 }
 
 /** A component that renders a single month-grid event chip. */
@@ -94,7 +98,7 @@ export type SolidMonthEvent<T = unknown> = Component<SolidMonthEventArgs<T>>;
 // An in-progress month drag: either a day span being swept out for a new event,
 // or an existing event being carried to another day. Days are held as start-of-day
 // timestamps, so the reducer-ish updates compare cheaply.
-type MonthDrag<T> =
+type MonthDrag<T> = (
   | {
       kind: "create";
       pointerId: number;
@@ -107,7 +111,19 @@ type MonthDrag<T> =
       event: CalendarEvent<T>;
       from: number;
       to: number;
-    };
+    }
+) & {
+  // The rows the drag began in, so a drag never commits into a different window.
+  windowKey: string;
+};
+
+// A day as the shared rows render it. Month days carry `isCurrentMonth`;
+// multi-week days omit it because every one of them is inside the period.
+type RowDay = MultiWeekGridDay & { isCurrentMonth?: boolean };
+type RowWeek = { id: string; days: RowDay[] };
+
+// A leading or trailing day of a neighbouring month in the month grid.
+const isOutsidePeriod = (day: RowDay) => day.isCurrentMonth === false;
 
 /** Props for {@link MonthView}. */
 export interface MonthViewProps<T = unknown>
@@ -228,7 +244,7 @@ export interface MonthViewProps<T = unknown>
 // always applied) and `themed` (colour/type/spacing, dropped when a class is set).
 
 function dayCellDefault(
-  day: MonthGridDay,
+  day: RowDay,
   theme: SolidCalendarTheme,
   highlightWeekends: boolean,
 ): SlotDefault {
@@ -268,7 +284,7 @@ function dayCellDefault(
  * event chips (and matches the native renderer's month grid).
  */
 function rangeBandDefault(
-  day: MonthGridDay,
+  day: RowDay,
   theme: SolidCalendarTheme,
   fillCell: boolean,
   eventsMode: boolean,
@@ -318,7 +334,7 @@ function rangeBandDefault(
     },
   };
 }
-function badgeDefault(day: MonthGridDay, theme: SolidCalendarTheme, hovered: boolean): SlotDefault {
+function badgeDefault(day: RowDay, theme: SolidCalendarTheme, hovered: boolean): SlotDefault {
   const badge = dayBadgeKind(day, day.isToday);
   const filled = badge !== "none";
   const background = filled
@@ -349,7 +365,7 @@ function badgeDefault(day: MonthGridDay, theme: SolidCalendarTheme, hovered: boo
 // --- Calendar (events) layout styles -------------------------------------
 
 function eventCellDefault(
-  day: MonthGridDay,
+  day: RowDay,
   theme: SolidCalendarTheme,
   height: number,
   highlightWeekends: boolean,
@@ -384,7 +400,7 @@ function eventCellDefault(
     },
   };
 }
-function compactBadgeDefault(day: MonthGridDay, theme: SolidCalendarTheme): SlotDefault {
+function compactBadgeDefault(day: RowDay, theme: SolidCalendarTheme): SlotDefault {
   const badge = dayBadgeKind(day, day.isToday);
   const filled = badge !== "none";
   return {
@@ -443,7 +459,11 @@ function chipDefault(theme: SolidCalendarTheme, chipHeight: number): SlotDefault
     },
   };
 }
-function moreButtonDefault(theme: SolidCalendarTheme, chipHeight: number): SlotDefault {
+function moreButtonDefault(
+  theme: SolidCalendarTheme,
+  chipHeight: number,
+  multiWeek = false,
+): SlotDefault {
   return {
     base: {
       position: "relative",
@@ -455,6 +475,7 @@ function moreButtonDefault(theme: SolidCalendarTheme, chipHeight: number): SlotD
       height: chipHeight,
       lineHeight: `${chipHeight}px`,
       fontFamily: "inherit",
+      ...(multiWeek ? { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } : {}),
     },
     themed: {
       padding: "0 6px",
@@ -476,7 +497,7 @@ interface MonthViewInternalProps<T = unknown> extends MonthViewProps<T> {
 // A multi-day event lives in each covered day's bucket, so dedupe by reference;
 // this scans only the row's days, not every event in the month.
 function collectRowEvents<T>(
-  week: MonthGridWeek,
+  week: RowWeek,
   eventsByDay: ReadonlyMap<string, CalendarEvent<T>[]>,
 ): CalendarEvent<T>[] {
   const seen = new Set<CalendarEvent<T>>();
@@ -498,12 +519,25 @@ function collectRowEvents<T>(
  * Which rows a {@link DateRows} grid shows. Internal to the package: the public
  * views adapt their own props to it.
  */
-export type DateRowsSource = {
-  kind: "month";
-  /** Any day within the month to render. */
-  date: Date;
-  showAdjacentMonths: boolean;
-};
+export type DateRowsSource =
+  | {
+      kind: "month";
+      /** Any day within the month to render. */
+      date: Date;
+      showAdjacentMonths: boolean;
+    }
+  | {
+      kind: "multiweek";
+      /** Any day within the first week to render. */
+      date: Date;
+      numberOfWeeks: number;
+    };
+
+// The localized first and last displayed days, e.g. "Nov 1, 2026 – Nov 14, 2026".
+function rangeTitle(start: Date, endExclusive: Date, locale?: Locale): string {
+  const options = locale ? { locale } : undefined;
+  return `${format(start, "PP", options)} – ${format(addDays(endExclusive, -1), "PP", options)}`;
+}
 
 /** Props for the private {@link DateRows} grid shared by the public row views. */
 export interface DateRowsProps<T = unknown> extends Omit<
@@ -564,10 +598,21 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
   const theme = createMemo(() => mergeSolidTheme(props.theme));
   const labels = createMemo(() => resolveCalendarLabels(props.labels));
   const slot = createSlots<MonthViewSlot>(props);
+  const multiWeek = createMemo(() => props.source.kind === "multiweek");
+  // Multi-week rows only contain days of the requested period, so nothing is blanked.
+  const showAdjacentMonths = createMemo(() =>
+    props.source.kind === "month" ? props.source.showAdjacentMonths : true,
+  );
+  const numberOfWeeks = createMemo(() =>
+    props.source.kind === "multiweek" ? props.source.numberOfWeeks : undefined,
+  );
+  // The mode reported to custom renderers and accessibility labels.
+  const viewMode = createMemo((): "month" | "multiweek" => (multiWeek() ? "multiweek" : "month"));
 
   // Calendar layout (date in the corner + event chips) is on whenever `events`
-  // is provided; otherwise the compact picker badge layout is used.
-  const eventsMode = createMemo(() => props.events !== undefined);
+  // is provided; otherwise the compact picker badge layout is used. Multi-week
+  // rows always use the calendar layout.
+  const eventsMode = createMemo(() => props.events !== undefined || multiWeek());
   // The day cells form a roving tab stop (arrow keys + Enter) in the picker
   // always, and in events mode only when the consumer opts in. Otherwise events
   // mode tabs through the event chips alone.
@@ -636,20 +681,50 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
   // Reserve `maxVisibleEventCount` rows below the date so every cell is uniform;
   // when a day overflows, the last row becomes the "+N more" affordance.
   const eventRowHeight = createMemo(
-    () => CELL_PAD * 2 + DATE_ROW + props.maxVisibleEventCount * (props.chipHeight + props.chipGap),
+    () =>
+      CELL_PAD * 2 +
+      DATE_ROW +
+      (multiWeek() ? Math.max(1, props.maxVisibleEventCount) : props.maxVisibleEventCount) *
+        (props.chipHeight + props.chipGap),
   );
-  const _grid = createMemo(() =>
-    buildMonthGrid(props.source.date, {
-      weekStartsOn: props.weekStartsOn,
-      hiddenDays: props.hiddenDays,
-      weekdayFormat: props.weekdayFormat,
-      selectedRange: props.selectedRange,
-      selectedDates: props.selectedDates,
-      minDate: props.minDate,
-      maxDate: props.maxDate,
-      isDateDisabled: props.isDateDisabled,
-      locale: props.locale,
-    }),
+  const _grid = createMemo(
+    (): {
+      weeks: RowWeek[];
+      weekdays: MonthGridWeekday[];
+      title: string;
+      period: { start: Date; endExclusive: Date } | null;
+    } => {
+      const options = {
+        weekStartsOn: props.weekStartsOn,
+        hiddenDays: props.hiddenDays,
+        weekdayFormat: props.weekdayFormat,
+        selectedRange: props.selectedRange,
+        selectedDates: props.selectedDates,
+        minDate: props.minDate,
+        maxDate: props.maxDate,
+        isDateDisabled: props.isDateDisabled,
+        locale: props.locale,
+      };
+      const weeks = numberOfWeeks();
+      if (weeks === undefined) {
+        return {
+          ...buildMonthGrid(props.source.date, options),
+          title: format(
+            props.source.date,
+            "MMMM yyyy",
+            props.locale ? { locale: props.locale } : undefined,
+          ),
+          period: null,
+        };
+      }
+      const grid = buildMultiWeekGrid(props.source.date, { ...options, numberOfWeeks: weeks });
+      return {
+        weeks: grid.weeks,
+        weekdays: grid.weekdays,
+        title: rangeTitle(grid.visibleRange.start, grid.visibleRange.endExclusive, props.locale),
+        period: grid.period,
+      };
+    },
   );
 
   // Lay out each week row's spanning bars once per data change, not per render, so
@@ -665,9 +740,39 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       : [],
   );
 
+  // Multi-week rows rove over the rendered, enabled days only (oldest first), so
+  // focus skips hidden and disabled days and never leaves the displayed weeks.
+  const focusableDays = createMemo(() =>
+    _grid().period
+      ? _grid()
+          .weeks.flatMap((week) => week.days)
+          .filter((day) => !day.isDisabled)
+          .map((day) => startOfDay(day.date))
+          .sort((a, b) => a.getTime() - b.getTime())
+      : null,
+  );
+  const focusableKeys = createMemo(() => {
+    const days = focusableDays();
+    return days ? new Set(days.map((d) => format(d, "yyyy-MM-dd"))) : null;
+  });
+
   // Roving tabindex: only one day is in the tab order; arrow keys move focus
   // within the month, so the grid is a single, sensible tab stop.
-  const initialFocus = createMemo(() => {
+  const initialFocus = createMemo((): Date | null => {
+    const days = focusableDays();
+    const keys = focusableKeys();
+    if (days && keys) {
+      // The selected day, then today, then the first enabled day; none when every
+      // displayed day is disabled.
+      const rendered = (d?: Date | null): d is Date => !!d && keys.has(format(d, "yyyy-MM-dd"));
+      const rangeStart = props.selectedRange?.start;
+      if (rendered(rangeStart)) return startOfDay(rangeStart);
+      const picked = props.selectedDates?.find(rendered);
+      if (picked) return startOfDay(picked);
+      const today = new Date();
+      if (rendered(today)) return startOfDay(today);
+      return days[0] ?? null;
+    }
     const inMonth = (d?: Date | null) => !!d && isSameMonth(d, props.source.date);
     if (inMonth(props.selectedRange?.start)) return startOfDay(props.selectedRange!.start);
     const picked = props.selectedDates?.find(inMonth);
@@ -687,12 +792,20 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       initialFocusRef.current = value;
     },
   );
-  const monthKey = createMemo(() => format(props.source.date, "yyyy-MM"));
-  let focusedMonth = untrack(monthKey);
-  createEffect(monthKey, (month) =>
+  // The displayed window: the month, or the first week and count of multi-week rows.
+  const windowKey = createMemo(() => {
+    const period = _grid().period;
+    return period
+      ? `${format(period.start, "yyyy-MM-dd")}+${numberOfWeeks()}:${_grid()
+          .weekdays.map((day) => day.date.getDay())
+          .join(",")}`
+      : format(props.source.date, "yyyy-MM");
+  });
+  let focusedWindow = untrack(windowKey);
+  createEffect(windowKey, (key) =>
     untrack(() => {
-      if (month === focusedMonth) return;
-      focusedMonth = month;
+      if (key === focusedWindow) return;
+      focusedWindow = key;
       setFocusedDate(initialFocusRef.current);
     }),
   );
@@ -700,7 +813,40 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
   const gridRef: ElementRef<HTMLDivElement | null> = {
     current: null,
   };
-  const focusKey = createMemo(() => format(focusedDate(), "yyyy-MM-dd"));
+  const lastDayFocus: ElementRef<HTMLElement | null> = { current: null };
+  // A multi-week focus target that hidden days or new constraints removed falls
+  // back to the initial target, without moving DOM focus.
+  const focusKey = createMemo(() => {
+    const focused = focusedDate();
+    const stored = focused ? format(focused, "yyyy-MM-dd") : null;
+    const keys = focusableKeys();
+    if (!keys || (stored !== null && keys.has(stored))) return stored;
+    const initial = initialFocus();
+    return initial && format(initial, "yyyy-MM-dd");
+  });
+
+  createEffect(
+    () => ({ enabled: multiWeek(), key: focusKey() }),
+    ({ enabled, key }) => {
+      if (!enabled) return;
+      const active = gridRef.current?.ownerDocument.activeElement;
+      const removedDay =
+        active === gridRef.current?.ownerDocument.body &&
+        lastDayFocus.current !== null &&
+        !lastDayFocus.current.isConnected;
+      if (!removedDay && (!active?.hasAttribute("data-day") || !gridRef.current?.contains(active)))
+        return;
+      if (
+        active?.getAttribute("data-day") === key &&
+        active?.getAttribute("aria-disabled") !== "true"
+      )
+        return;
+      const next = key
+        ? gridRef.current?.querySelector<HTMLElement>(`[data-day="${key}"]`)
+        : gridRef.current;
+      next?.focus();
+    },
+  );
 
   // Dragging (events mode): press a day and drag across others to sketch an
   // all-day span, or press an event chip and drop it on another day. Both are
@@ -750,6 +896,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       pointerId,
       anchor: t,
       hover: t,
+      windowKey: windowKey(),
     });
   };
   const beginMove = (event: CalendarEvent<T>, day: Date, pointerId: number) => {
@@ -761,6 +908,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       event,
       from: t,
       to: t,
+      windowKey: windowKey(),
     });
     props.onDragStart?.(event);
   };
@@ -788,6 +936,61 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       props.onSelectDrag?.(new Date(lo), new Date(hi));
     }
   };
+  let heldTouch: (() => void) | null = null;
+  const pressRow = (event: PointerEvent & { currentTarget: HTMLElement }, start: () => void) => {
+    if (event.button !== 0 || heldTouch || !beginPress(event)) return;
+    if (!multiWeek() || !event.pointerType || event.pointerType === "mouse") {
+      start();
+      return;
+    }
+    const lookup = new Map(
+      _grid()
+        .weeks.flatMap((week) => week.days)
+        .map((day) => [day.id, day]),
+    );
+    heldTouch = holdDateDrag(
+      {
+        box: event.currentTarget,
+        pointerId: event.pointerId,
+        pointerType: event.pointerType,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      },
+      start,
+      (x, y) => {
+        const element = gridRef.current?.ownerDocument
+          .elementFromPoint(x, y)
+          ?.closest<HTMLElement>("[data-day]");
+        if (!element || !gridRef.current?.contains(element)) return;
+        const day = lookup.get(element.dataset.day ?? "");
+        if (day && !day.isDisabled) extendDrag(day.date, event.pointerId);
+      },
+      () => {
+        applyDrag(null);
+        movedRef.current = false;
+      },
+      () => {
+        heldTouch = null;
+      },
+    );
+  };
+  createEffect(
+    () => [
+      windowKey(),
+      props.onCreateEvent,
+      props.onDragEvent,
+      props.onSelectDrag,
+      props.onDragStart,
+      props.events,
+      props.eventStartEditable,
+      props.minDate,
+      props.maxDate,
+      props.isDateDisabled,
+    ],
+    () => () => {
+      heldTouch?.();
+    },
+  );
   const isDragging = createMemo(() => drag() !== null);
   // Whether any month drag is wired up at all, so the cells only take over touch
   // scrolling and pointer tracking when one of the handlers can actually fire.
@@ -805,6 +1008,8 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
           applyDrag(null);
           if (!movedRef.current) return;
           suppressClickRef.current = true;
+          // Multi-week rows drop a drag whose window was replaced before release.
+          if (multiWeek() && current.windowKey !== windowKey()) return;
           if (current.kind === "create") {
             const range = monthCreateRange(new Date(current.anchor), new Date(current.hover));
             props.onCreateEvent?.(range.start, range.end);
@@ -836,12 +1041,61 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
         };
       }),
   );
+  // Replacing the multi-week window cancels a drag and closes the overflow
+  // popover, so neither acts on days that are no longer shown.
+  let transientWindow = untrack(windowKey);
+  createEffect(windowKey, (key) =>
+    untrack(() => {
+      if (key === transientWindow) return;
+      transientWindow = key;
+      if (!multiWeek()) return;
+      applyDrag(null);
+      setMoreOpenFor(null);
+    }),
+  );
+  // Multi-week roving: the neighbouring focusable day, the same weekday in the
+  // nearest week that has it enabled, or the first/last focusable day.
+  const nextMultiWeekFocus = (key: string): Date | null => {
+    const days = focusableDays();
+    const keys = focusableKeys();
+    const period = _grid().period;
+    if (!days || !keys || !period) return null;
+    const index = days.findIndex((d) => format(d, "yyyy-MM-dd") === focusKey());
+    if (index === -1) return null;
+    if (key === "ArrowLeft") return days[index - 1] ?? null;
+    if (key === "ArrowRight") return days[index + 1] ?? null;
+    if (key === "Home") return days[0];
+    if (key === "End") return days[days.length - 1];
+    const step = key === "ArrowUp" ? -7 : 7;
+    for (
+      let cursor = addDays(days[index], step);
+      cursor >= period.start && cursor < period.endExclusive;
+      cursor = addDays(cursor, step)
+    ) {
+      if (keys.has(format(cursor, "yyyy-MM-dd"))) return cursor;
+    }
+    return null;
+  };
   const onKeyDown = (e: DomKeyboardEvent<HTMLDivElement>) => {
+    if (multiWeek()) {
+      if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) {
+        return;
+      }
+      e.preventDefault();
+      const target = nextMultiWeekFocus(e.key);
+      if (!target) return;
+      setFocusedDate(target);
+      const targetKey = format(target, "yyyy-MM-dd");
+      gridRef.current?.querySelector<HTMLElement>(`[data-day="${targetKey}"]`)?.focus();
+      return;
+    }
+    const focused = focusedDate();
+    if (!focused) return;
     let next: Date | null = null;
-    if (e.key === "ArrowLeft") next = addDays(focusedDate(), -1);
-    else if (e.key === "ArrowRight") next = addDays(focusedDate(), 1);
-    else if (e.key === "ArrowUp") next = addDays(focusedDate(), -7);
-    else if (e.key === "ArrowDown") next = addDays(focusedDate(), 7);
+    if (e.key === "ArrowLeft") next = addDays(focused, -1);
+    else if (e.key === "ArrowRight") next = addDays(focused, 1);
+    else if (e.key === "ArrowUp") next = addDays(focused, -7);
+    else if (e.key === "ArrowDown") next = addDays(focused, 7);
     else if (e.key === "Home") next = startOfMonth(props.source.date);
     else if (e.key === "End") next = endOfMonth(props.source.date);
     else return;
@@ -857,6 +1111,9 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       style={css({
         fontFamily: theme().fontFamily,
         color: theme().text,
+        // Multi-week rows keep their full height; when the view is given less
+        // room, the grid scrolls under the title and weekday header.
+        ...(multiWeek() ? { display: "flex", flexDirection: "column", minHeight: 0 } : null),
         ...props.style,
       })}
     >
@@ -870,15 +1127,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
             },
           })}
         >
-          {format(
-            props.source.date,
-            "MMMM yyyy",
-            props.locale
-              ? {
-                  locale: props.locale,
-                }
-              : undefined,
-          )}
+          {_grid().title}
         </div>
       ) : null}
       {props.showWeekdays ? (
@@ -886,7 +1135,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
           {...slot("weekdays", {
             base: {
               display: "grid",
-              gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+              gridTemplateColumns: `repeat(${_grid().weekdays.length}, minmax(0, 1fr))`,
             },
             themed: {
               borderBottom: `1px solid ${theme().gridLine}`,
@@ -917,19 +1166,15 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       <div
         ref={(el) => (gridRef.current = el)}
         role="grid"
-        aria-label={format(
-          props.source.date,
-          "MMMM yyyy",
-          props.locale
-            ? {
-                locale: props.locale,
-              }
-            : undefined,
-        )}
+        tabindex={multiWeek() ? -1 : undefined}
+        aria-label={_grid().title}
         // Arrow-key roving applies whenever the day cells are a tab stop: the
         // picker always, events mode only when keyboardDayNavigation is set.
         onKeyDown={dayRoving() ? onKeyDown : undefined}
-        {...slot("grid")}
+        {...slot(
+          "grid",
+          multiWeek() ? { base: { flex: "1 1 auto", minHeight: 0, overflowY: "auto" } } : undefined,
+        )}
       >
         {
           <For each={_grid().weeks} keyed={false}>
@@ -954,9 +1199,9 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
               const columns = createMemo(() => {
                 let first = 0;
                 let last = cols() - 1;
-                if (eventsMode() && !props.source.showAdjacentMonths) {
-                  const start = week().days.findIndex((d) => d.isCurrentMonth);
-                  const end = [...week().days].reverse().findIndex((d) => d.isCurrentMonth);
+                if (eventsMode() && !showAdjacentMonths()) {
+                  const start = week().days.findIndex((d) => !isOutsidePeriod(d));
+                  const end = [...week().days].reverse().findIndex((d) => !isOutsidePeriod(d));
                   if (start !== -1) {
                     first = start;
                     last = cols() - 1 - end;
@@ -996,7 +1241,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                         {...slot("week", {
                           base: {
                             display: "grid",
-                            gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                            gridTemplateColumns: `repeat(${cols()}, minmax(0, 1fr))`,
                           },
                         })}
                       >
@@ -1004,7 +1249,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                           <For each={week().days} keyed={false}>
                             {(day, dayCol) => {
                               const hidden = createMemo(
-                                () => !props.source.showAdjacentMonths && !day().isCurrentMonth,
+                                () => !showAdjacentMonths() && isOutsidePeriod(day()),
                               );
                               const cellHeight = createMemo(() =>
                                 eventsMode() ? eventRowHeight() : theme().cellHeight,
@@ -1078,7 +1323,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                         "data-selected": day().isSelected,
                                         "data-range": day().isInRange,
                                         "data-weekend": day().isWeekend,
-                                        "data-outside": !day().isCurrentMonth,
+                                        "data-outside": isOutsidePeriod(day()),
                                         "data-disabled": day().isDisabled,
                                         "data-creating": inCreate(),
                                         "data-drop": isDropTarget(),
@@ -1137,8 +1382,26 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                           role="gridcell"
                                           data-day={day().id}
                                           onFocusIn={(event) => {
-                                            if (event.target === event.currentTarget)
+                                            if (event.target === event.currentTarget) {
+                                              lastDayFocus.current = event.currentTarget;
                                               setFocusedDate(day().date);
+                                            }
+                                          }}
+                                          onFocusOut={(event) => {
+                                            if (event.target !== event.currentTarget) return;
+                                            const previous = event.currentTarget;
+                                            if (event.relatedTarget) lastDayFocus.current = null;
+                                            else {
+                                              // Removal blurs before detaching the node. Distinguish
+                                              // it from a manual blur after the DOM update finishes.
+                                              queueMicrotask(() => {
+                                                if (
+                                                  lastDayFocus.current === previous &&
+                                                  previous.isConnected
+                                                )
+                                                  lastDayFocus.current = null;
+                                              });
+                                            }
                                           }}
                                           {...dayData()}
                                           tabindex={
@@ -1171,7 +1434,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                             dragWired()
                                               ? {
                                                   ...dayCellProps().style,
-                                                  touchAction: "none",
+                                                  touchAction: multiWeek() ? "pan-y" : "none",
                                                   userSelect: "none",
                                                 }
                                               : dayCellProps().style,
@@ -1179,8 +1442,8 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                           onPointerDown={
                                             dragWired() && !day().isDisabled
                                               ? (e) => {
-                                                  if (e.button !== 0 || !beginPress(e)) return;
-                                                  beginCreate(day().date, e.pointerId);
+                                                  const date = day().date;
+                                                  pressRow(e, () => beginCreate(date, e.pointerId));
                                                 }
                                               : undefined
                                           }
@@ -1262,13 +1525,11 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                     onPointerDown={
                                                       canMove(b().seg.event)
                                                         ? (e) => {
-                                                            if (e.button !== 0 || !beginPress(e))
-                                                              return;
                                                             e.stopPropagation();
-                                                            beginMove(
-                                                              b().seg.event,
-                                                              day().date,
-                                                              e.pointerId,
+                                                            const event = b().seg.event;
+                                                            const date = day().date;
+                                                            pressRow(e, () =>
+                                                              beginMove(event, date, e.pointerId),
                                                             );
                                                           }
                                                         : undefined
@@ -1285,7 +1546,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                         ? props.eventAccessibilityLabel(
                                                             b().seg.event,
                                                             {
-                                                              mode: "month",
+                                                              mode: viewMode(),
                                                               isAllDay: isAllDayEvent(
                                                                 b().seg.event,
                                                               ),
@@ -1315,13 +1576,18 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                       cursor: canMove(b().seg.event)
                                                         ? "grab"
                                                         : undefined,
-                                                      touchAction: dragWired() ? "none" : undefined,
+                                                      touchAction: dragWired()
+                                                        ? multiWeek()
+                                                          ? "pan-y"
+                                                          : "none"
+                                                        : undefined,
                                                       zIndex: 2,
                                                     })}
                                                   >
                                                     {Chip() ? (
                                                       <Dynamic
                                                         component={Chip()}
+                                                        mode={viewMode()}
                                                         event={b().seg.event}
                                                         onPress={() =>
                                                           props.onPressEvent?.(b().seg.event)
@@ -1402,7 +1668,11 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                 }}
                                                 {...slot(
                                                   "more",
-                                                  moreButtonDefault(theme(), props.chipHeight),
+                                                  moreButtonDefault(
+                                                    theme(),
+                                                    props.chipHeight,
+                                                    multiWeek(),
+                                                  ),
                                                 )}
                                                 aria-label={`${labels().moreEvents(hiddenEvents().length)}, ${dayLabel()}`}
                                                 aria-expanded={
@@ -1514,6 +1784,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                           {Chip() ? (
                                                             <Dynamic
                                                               component={Chip()}
+                                                              mode={viewMode()}
                                                               event={event()}
                                                               onPress={() =>
                                                                 props.onPressEvent?.(event())
@@ -1549,8 +1820,10 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                         role="gridcell"
                                         data-day={day().id}
                                         onFocusIn={(event) => {
-                                          if (event.target === event.currentTarget)
+                                          if (event.target === event.currentTarget) {
+                                            lastDayFocus.current = event.currentTarget;
                                             setFocusedDate(day().date);
+                                          }
                                         }}
                                         {...dayData()}
                                         tabindex={day().id === focusKey() ? 0 : -1}

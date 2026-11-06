@@ -18,6 +18,7 @@ export {
   DateRangePicker,
   MonthList,
   MonthView,
+  MultiWeekView,
   ResourceTimeline,
   TimeGrid,
   YearView,

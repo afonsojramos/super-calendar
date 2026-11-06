@@ -38,6 +38,7 @@ import type {
   WeekStartsOn,
 } from "../types";
 import {
+  buildMultiWeekGrid,
   type DateRange,
   type EventAccessibilityLabeler,
   eventsInTimeZone,
@@ -55,7 +56,7 @@ import { type SlotStyleProps } from "../utils/slots";
 import { YearView, type YearViewSlot } from "./YearView";
 import { Agenda, type AgendaSlot } from "./Agenda";
 import { DefaultEvent } from "./DefaultEvent";
-import { MonthPager } from "./MonthPager";
+import { DateRowsPager } from "./MonthPager";
 import type { MonthViewSlot } from "./MonthView";
 import {
   DEFAULT_HOUR_HEIGHT,
@@ -204,6 +205,8 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   weekdayFormat?: WeekdayFormat;
   /** Number of day columns when `mode="custom"`. Ignored by other modes. Default 1. */
   numberOfDays?: number;
+  /** Consecutive full week rows for `mode="multiweek"` (default 2). */
+  numberOfWeeks?: number;
   /**
    * Last weekday of a `custom` partial-week view (0–6). When set, `custom` shows
    * `weekStartsOn`…`weekEndsOn` of the visible week and pages by week, taking
@@ -389,7 +392,13 @@ function visibleRange(
   weekStartsOn: WeekStartsOn,
   numberOfDays: number,
   weekEndsOn?: WeekStartsOn,
+  numberOfWeeks = 2,
+  hiddenDays?: number[],
 ): [Date, Date] {
+  if (mode === "multiweek") {
+    const { visibleRange } = buildMultiWeekGrid(date, { numberOfWeeks, weekStartsOn, hiddenDays });
+    return [visibleRange.start, endOfDay(addDays(visibleRange.endExclusive, -1))];
+  }
   if (mode === "month") {
     return [
       startOfWeek(startOfMonth(date), { weekStartsOn }),
@@ -415,7 +424,17 @@ function expansionRange(
   weekStartsOn: WeekStartsOn,
   numberOfDays: number,
   weekEndsOn?: WeekStartsOn,
+  numberOfWeeks = 2,
 ): [Date, Date] {
+  if (mode === "multiweek") {
+    const { period } = buildMultiWeekGrid(date, { numberOfWeeks, weekStartsOn });
+    const previous = addWeeks(period.start, -numberOfWeeks);
+    const following = addWeeks(period.endExclusive, numberOfWeeks);
+    return [
+      Number.isFinite(previous.getTime()) ? previous : period.start,
+      endOfDay(addDays(Number.isFinite(following.getTime()) ? following : period.endExclusive, -1)),
+    ];
+  }
   if (mode === "month") {
     return [
       startOfWeek(startOfMonth(addMonths(date, -1)), { weekStartsOn }),
@@ -513,6 +532,7 @@ function CalendarInner<T>(
     now,
     weekdayFormat,
     numberOfDays,
+    numberOfWeeks = 2,
     weekEndsOn,
     renderEvent = DefaultEvent,
     eventAccessibilityLabel,
@@ -589,7 +609,14 @@ function CalendarInner<T>(
   const displayEvents = useMemo(() => {
     let out = events;
     if (out.some((e) => e.recurrence)) {
-      let [start, end] = expansionRange(mode, date, weekStartsOn, numberOfDays ?? 1, weekEndsOn);
+      let [start, end] = expansionRange(
+        mode,
+        date,
+        weekStartsOn,
+        numberOfDays ?? 1,
+        weekEndsOn,
+        numberOfWeeks,
+      );
       // A display zone shifts each occurrence's wall-clock by up to ~a day, which
       // can move an edge occurrence into a visible column; widen so it's generated.
       if (timeZone) {
@@ -601,7 +628,16 @@ function CalendarInner<T>(
     if (timeZone) out = eventsInTimeZone(out, timeZone);
     return out;
     // `date.getTime()`: recompute on the instant, not a re-created Date identity.
-  }, [events, mode, date.getTime(), weekStartsOn, numberOfDays, weekEndsOn, timeZone]);
+  }, [
+    events,
+    mode,
+    date.getTime(),
+    weekStartsOn,
+    numberOfDays,
+    weekEndsOn,
+    timeZone,
+    numberOfWeeks,
+  ]);
 
   // Swallow presses on disabled events once, so every view inherits the guard.
   const handlePressEvent = useCallback(
@@ -624,9 +660,28 @@ function CalendarInner<T>(
   const handleChangeDate = useCallback(
     (next: Date) => {
       onChangeDate(next);
-      onChangeDateRange?.(visibleRange(mode, next, weekStartsOn, numberOfDays ?? 1, weekEndsOn));
+      onChangeDateRange?.(
+        visibleRange(
+          mode,
+          next,
+          weekStartsOn,
+          numberOfDays ?? 1,
+          weekEndsOn,
+          numberOfWeeks,
+          hiddenDays,
+        ),
+      );
     },
-    [onChangeDate, onChangeDateRange, mode, weekStartsOn, numberOfDays, weekEndsOn],
+    [
+      onChangeDate,
+      onChangeDateRange,
+      mode,
+      weekStartsOn,
+      numberOfDays,
+      weekEndsOn,
+      numberOfWeeks,
+      hiddenDays,
+    ],
   );
 
   // Inject `eventCellStyle`, `ampm`, `showTime`, `ellipsizeTitle` and
@@ -677,13 +732,25 @@ function CalendarInner<T>(
     eventAccessibilityLabel,
   ]);
 
+  const rowSpec = useMemo(
+    () =>
+      mode === "multiweek"
+        ? { kind: "multiweek" as const, numberOfWeeks }
+        : {
+            kind: "month" as const,
+            showAdjacentMonths: showAdjacentMonths ?? true,
+            showSixWeeks: showSixWeeks ?? false,
+          },
+    [mode, numberOfWeeks, showAdjacentMonths, showSixWeeks],
+  );
   const resolvedLabels = useMemo(() => resolveCalendarLabels(labels), [labels]);
 
   return (
     <CalendarThemeProvider value={mergedTheme}>
       <CalendarLabelsContext.Provider value={resolvedLabels}>
-        {mode === "month" ? (
-          <MonthPager
+        {mode === "month" || mode === "multiweek" ? (
+          <DateRowsPager
+            spec={rowSpec}
             date={date}
             events={displayEvents}
             maxVisibleEventCount={maxVisibleEventCount}
@@ -696,11 +763,9 @@ function CalendarInner<T>(
             labels={labels}
             sortedMonthView={sortedMonthView}
             moreLabel={moreLabel}
-            showAdjacentMonths={showAdjacentMonths}
             highlightWeekends={highlightWeekends}
             disableMonthEventCellPress={disableMonthEventCellPress}
             isRTL={isRTL}
-            showSixWeeks={showSixWeeks}
             showTitle={showTitle}
             activeDate={activeDate}
             renderHeaderForMonthView={renderHeaderForMonthView}

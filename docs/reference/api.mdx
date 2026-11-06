@@ -20,15 +20,16 @@ your editor lists the full set with inline docs.
 
 ## Data
 
-| Prop            | Type                      | Notes                                             |
-| --------------- | ------------------------- | ------------------------------------------------- |
-| `events`        | `CalendarEvent<T>[]`      | Your events. The generic `T` is your own data.    |
-| `date`          | `Date`                    | The controlled anchor date, read in local time.   |
-| `mode`          | `CalendarMode`            | `month` `week` `day` `3days` `custom` `schedule`. |
-| `numberOfDays`  | `number`                  | Column count for `custom`.                        |
-| `weekStartsOn`  | `0–6`                     | 0 = Sunday, 1 = Monday.                           |
-| `weekdayFormat` | `narrow \| short \| long` | Weekday header width (default `short`).           |
-| `timeZone`      | `string`                  | Display events in this IANA zone (DST-correct).   |
+| Prop            | Type                      | Notes                                                                |
+| --------------- | ------------------------- | -------------------------------------------------------------------- |
+| `events`        | `CalendarEvent<T>[]`      | Your events. The generic `T` is your own data.                       |
+| `date`          | `Date`                    | The controlled anchor date, read in local time.                      |
+| `mode`          | `CalendarMode`            | `month` `multiweek` `week` `day` `3days` `custom` `schedule` `year`. |
+| `numberOfWeeks` | `number`                  | Full rows for `multiweek`; positive safe integer, default `2`.       |
+| `numberOfDays`  | `number`                  | Column count for `custom`.                                           |
+| `weekStartsOn`  | `0–6`                     | 0 = Sunday, 1 = Monday.                                              |
+| `weekdayFormat` | `narrow \| short \| long` | Weekday header width (default `short`).                              |
+| `timeZone`      | `string`                  | Display events in this IANA zone (DST-correct).                      |
 
 Anchor dates are read in the device's local time zone: construct `date` as a
 local date (`new Date(2026, 7, 24)`), not a UTC instant. See
@@ -166,8 +167,8 @@ Changing either dimension updates already mounted list and pager months.
 
 <CardGroup cols={2}>
   <Card title="Components">
-    `Calendar`, `Agenda`, `MonthView`, `YearView`, `MonthPager`, `MonthList`, `TimeGrid`,
-    `ResourceTimeline`, `DefaultEvent`, `DefaultMonthEvent`
+    `Calendar`, `Agenda`, `MonthView`, `MultiWeekView`, `YearView`, `MonthPager`, `MonthList`,
+    `TimeGrid`, `ResourceTimeline`, `DefaultEvent`, `DefaultMonthEvent`
   </Card>
   <Card title="Hooks">
     `useDateRange`, `useMonthGrid`, `useCalendarTheme`, `useNow`, `useEventSource`
@@ -178,10 +179,11 @@ Changing either dimension updates already mounted list and pager months.
   <Card title="Helpers">
     `expandRecurringEvents`, `parseICalendar`, `toICalendar`, `eventsInTimeZone`, `toZonedTime`,
     `layoutDayEvents`, `layoutMonthWeek`, `isAllDayEvent`, `isBackgroundEvent`,
-    `backgroundBandsForDay`, `buildMonthGrid`, `buildMonthWeeks`, `nextDateRange`,
-    `isDateSelectable`, `isRangeEndpoint`, `isWithinDateRange`, `daySelectionState`, `getViewDays`,
-    `getWeekDays`, `getIsToday`, `isWeekend`, `isSameCalendarDay`, `minutesIntoDay`,
-    `weekdayFormatToken`, `defaultCalendarLabels`, `DEFAULT_HOUR_HEIGHT`
+    `backgroundBandsForDay`, `buildMonthGrid`, `buildMultiWeekGrid`, `buildMonthWeeks`,
+    `nextDateRange`, `isDateSelectable`, `isRangeEndpoint`, `isWithinDateRange`,
+    `daySelectionState`, `getViewDays`, `getWeekDays`, `getIsToday`, `isWeekend`,
+    `isSameCalendarDay`, `minutesIntoDay`, `weekdayFormatToken`, `defaultCalendarLabels`,
+    `DEFAULT_HOUR_HEIGHT`
   </Card>
   <Card title="Types">
     `CalendarEvent`, `CalendarMode`, `RenderEventArgs`, `RecurrenceRule`, `BusinessHours`,
@@ -191,12 +193,45 @@ Changing either dimension updates already mounted list and pager months.
   </Card>
 </CardGroup>
 
+## Multi-week views
+
+`Calendar` accepts `mode="multiweek"` and `numberOfWeeks` on native, React DOM,
+and Solid. `MultiWeekView<T>` and `MultiWeekViewProps<T>` expose a standalone
+window in each renderer. Its `date` belongs to the first displayed week;
+`weekStartsOn` defaults to Sunday. It shares month event bars, overflow,
+selection, drag interactions, and styling. `renderMonthEvent` on web `Calendar`,
+and native `renderHeaderForMonthView`/`renderCustomDateForMonth`, also apply here.
+Custom event callbacks receive `mode: "multiweek"`.
+
+Web `Calendar` uses `height` to constrain the rows; standalone web views accept
+`style`. Native fills its parent. Rows scroll rather than shrink below their
+content height. `MonthView` and `MonthPager` remain month-only components.
+React DOM and Solid multi-week views default `chipHeight` to `24` pixels for
+event and overflow-button targets. You can override it with `chipHeight`.
+See [multi-week grids](/guides/views#multi-week-grids) for navigation and count rules.
+
 ## Core-only helpers
 
 Import `@super-calendar/core/vanilla` to use pure core types and helpers without
 React. The root entry still exports those helpers plus the existing React hooks
 and selection provider. React is an optional package peer but is required when
 you import the root entry.
+
+`buildMultiWeekGrid(date, { numberOfWeeks?, weekStartsOn?, hiddenDays?, isRTL?,
+weekdayFormat?, locale?, selectedDates?, selectedRange?, minDate?, maxDate?,
+isDateDisabled? })` returns `MultiWeekGrid`: `weeks`, `weekdays`, `period`, and
+`visibleRange`. Both intervals contain `start` and `endExclusive` at local
+midnight. `period` covers every requested day; `visibleRange` is the chronological
+envelope after hiding weekdays. RTL reverses display order only. Each
+`MultiWeekGridDay` has the month builder's date/state fields without
+`isCurrentMonth`. `MultiWeekGridWeek.id` identifies the unfiltered week start.
+`MultiWeekGridOptions`, `MultiWeekGridInterval`, and these result types are exported
+from both core entries and all three renderers.
+
+The builder materializes O(7 × `numberOfWeeks`) days. It rejects invalid dates,
+nonpositive/fractional/unsafe counts, and unrepresentable spans with `RangeError`
+before allocating rows. `getViewDays` and `viewDayCount` reject `multiweek`;
+use this builder instead of the timed-column helpers.
 
 `loadEventSource({ source, format?, map?, signal? })` loads one JSON/iCalendar
 batch or calls an async event loader. It returns `Promise<CalendarEvent<T>[]>` and
@@ -279,7 +314,7 @@ uses the `latest` npm tag. It does not support Solid 1. The
 | Export                                                   | Contract                                                                                                                                                        |
 | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Calendar`                                               | Controlled `date`, `events`, and `mode`; recurring-event expansion and display-zone conversion.                                                                 |
-| `TimeGrid`, `MonthView`, `YearView`                      | Individual calendar views with the React DOM prop names.                                                                                                        |
+| `TimeGrid`, `MonthView`, `MultiWeekView`, `YearView`     | Individual calendar views with the React DOM prop names.                                                                                                        |
 | `MonthList`, `Agenda`                                    | Virtualized, measured rows.                                                                                                                                     |
 | `ResourceTimeline`                                       | Horizontal or vertical resource lanes.                                                                                                                          |
 | `DatePicker`, `DateRangePicker`                          | Controlled value and `onChange`, with a month-list popover.                                                                                                     |

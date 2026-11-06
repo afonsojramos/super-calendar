@@ -23,6 +23,7 @@
 export { Calendar, type CalendarProps, type CalendarSlot } from "./components/Calendar";
 export { Agenda, type AgendaProps, type AgendaSlot } from "./components/Agenda";
 export { MonthView, type MonthViewProps, type MonthViewSlot } from "./components/MonthView";
+export { MultiWeekView, type MultiWeekViewProps } from "./components/MultiWeekView";
 export { YearView, type YearViewProps, type YearViewSlot } from "./components/YearView";
 export { type ResolvedSlot, type SlotDefault, type SlotStyleProps } from "./utils/slots";
 export { MonthPager, type MonthPagerProps } from "./components/MonthPager";
@@ -89,6 +90,7 @@ export {
 } from "@super-calendar/core";
 export {
   buildMonthGrid,
+  buildMultiWeekGrid,
   layoutMonthWeek,
   type MonthEventSegment,
   type MonthGrid,
@@ -96,6 +98,11 @@ export {
   type MonthGridWeek,
   type MonthGridWeekday,
   type MonthWeekEvents,
+  type MultiWeekGrid,
+  type MultiWeekGridDay,
+  type MultiWeekGridInterval,
+  type MultiWeekGridOptions,
+  type MultiWeekGridWeek,
   type UseMonthGridOptions,
   useMonthGrid,
   weekdayFormatToken,

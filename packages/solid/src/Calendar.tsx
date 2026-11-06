@@ -1,6 +1,7 @@
 import { type JSX } from "@solidjs/web";
 import type { CalendarHandle, CalendarLabels } from "@super-calendar/core/vanilla";
 import {
+  buildMultiWeekGrid,
   type BusinessHours,
   type BusinessHoursBand,
   type CalendarEvent,
@@ -18,6 +19,7 @@ import {
 import {
   addDays,
   addMonths,
+  addWeeks,
   addYears,
   endOfDay,
   endOfMonth,
@@ -32,6 +34,7 @@ import {
 import { type Component, createMemo, onSettled } from "solid-js";
 import { Agenda, type AgendaSlot, type SolidAgendaEvent } from "./Agenda";
 import { MonthView, type MonthViewSlot, type SolidMonthEvent } from "./MonthView";
+import { MultiWeekView } from "./MultiWeekView";
 import { withDefaults } from "./props";
 import type { SlotStyleProps } from "./slots";
 import { css, type CSSProperties, type DomKeyboardEvent, type ElementRef } from "./styles";
@@ -83,6 +86,8 @@ export interface CalendarProps<T = unknown>
   now?: Date;
   /** Column count for `mode="custom"`. */
   numberOfDays?: number;
+  /** Consecutive full week rows for `mode="multiweek"` (default 2). */
+  numberOfWeeks?: number;
   /** date-fns locale for titles, headers, and time labels. */
   locale?: Locale;
   /**
@@ -276,7 +281,12 @@ function expansionRange(
   date: Date,
   weekStartsOn: WeekStartsOn,
   numberOfDays: number | undefined,
+  numberOfWeeks: number,
 ): [Date, Date] {
+  if (mode === "multiweek") {
+    const { period } = buildMultiWeekGrid(date, { weekStartsOn, numberOfWeeks });
+    return [period.start, endOfDay(addDays(period.endExclusive, -1))];
+  }
   if (mode === "month") {
     return [
       startOfWeek(startOfMonth(date), {
@@ -314,7 +324,9 @@ function pageStep(
   direction: number,
   weekStartsOn: WeekStartsOn,
   numberOfDays: number | undefined,
+  numberOfWeeks: number,
 ): Date {
+  if (mode === "multiweek") return addWeeks(date, direction * numberOfWeeks);
   if (mode === "year") return addYears(date, direction);
   if (mode === "month") return addMonths(date, direction);
   if (mode === "schedule") return addDays(date, direction * 7);
@@ -342,6 +354,7 @@ export function Calendar<T = unknown>(
     {
       mode: "week",
       weekStartsOn: 0,
+      numberOfWeeks: 2,
     } satisfies Partial<
       CalendarProps<T> & {
         ref?: (handle: CalendarHandle) => void;
@@ -368,6 +381,7 @@ export function Calendar<T = unknown>(
         props.date,
         props.weekStartsOn,
         props.numberOfDays,
+        props.numberOfWeeks,
       );
       // A display zone shifts each occurrence's wall-clock by up to ~a day, which
       // can move an edge occurrence into a visible column; widen so it's generated.
@@ -388,11 +402,25 @@ export function Calendar<T = unknown>(
     if (!props.onChangeDate) return;
     if (e.key === "PageDown")
       props.onChangeDate(
-        pageStep(props.mode, props.date, 1, props.weekStartsOn, props.numberOfDays),
+        pageStep(
+          props.mode,
+          props.date,
+          1,
+          props.weekStartsOn,
+          props.numberOfDays,
+          props.numberOfWeeks,
+        ),
       );
     else if (e.key === "PageUp")
       props.onChangeDate(
-        pageStep(props.mode, props.date, -1, props.weekStartsOn, props.numberOfDays),
+        pageStep(
+          props.mode,
+          props.date,
+          -1,
+          props.weekStartsOn,
+          props.numberOfDays,
+          props.numberOfWeeks,
+        ),
       );
     else return;
     e.preventDefault();
@@ -472,6 +500,49 @@ export function Calendar<T = unknown>(
           chipGap={props.chipGap}
           moreLabel={props.moreLabel}
           showAdjacentMonths={props.showAdjacentMonths}
+          showTitle={props.showTitle}
+          fillCellOnSelection={props.fillCellOnSelection}
+          selectedRange={props.selectedRange}
+          selectedDates={props.selectedDates}
+          minDate={props.minDate}
+          maxDate={props.maxDate}
+          isDateDisabled={props.isDateDisabled}
+          keyboardDayNavigation={props.keyboardDayNavigation}
+          onPressDay={props.onPressDay}
+          onPressCell={props.onPressCell}
+          onCreateEvent={props.onCreateEvent}
+          onSelectDrag={props.onSelectDrag}
+          onDragEvent={props.onDragEvent}
+          onDragStart={props.onDragStart}
+          eventStartEditable={props.eventStartEditable}
+          eventOverlap={props.eventOverlap}
+          onPressEvent={props.onPressEvent}
+          onPressMore={props.onPressMore}
+          renderEvent={props.renderMonthEvent}
+          eventAccessibilityLabel={props.eventAccessibilityLabel}
+        />
+      );
+    } else if (mode === "multiweek") {
+      return (
+        <MultiWeekView<T>
+          date={props.date}
+          numberOfWeeks={props.numberOfWeeks}
+          events={displayEvents()}
+          weekStartsOn={props.weekStartsOn}
+          hiddenDays={props.hiddenDays}
+          weekdayFormat={props.weekdayFormat}
+          highlightWeekends={props.highlightWeekends}
+          locale={props.locale}
+          labels={props.labels}
+          theme={props.theme}
+          className={props.className}
+          style={{ height: props.height, ...props.style }}
+          classNames={props.classNames}
+          styles={props.styles}
+          maxVisibleEventCount={props.maxVisibleEventCount}
+          chipHeight={props.chipHeight}
+          chipGap={props.chipGap}
+          moreLabel={props.moreLabel}
           showTitle={props.showTitle}
           fillCellOnSelection={props.fillCellOnSelection}
           selectedRange={props.selectedRange}

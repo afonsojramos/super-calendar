@@ -36,6 +36,9 @@ describe(rendererName, () => {
   );
   it.each([
     "months",
+    "multiweek",
+    "multiweek-eight",
+    "multiweek-dense",
     "week",
     "picker",
     "range",

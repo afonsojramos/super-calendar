@@ -38,23 +38,29 @@ describe("Solid server rendering", () => {
       timer.mockRestore();
     }
   });
-  it.each<CalendarMode>(["month", "week", "day", "3days", "custom", "schedule", "year"])(
-    "renders %s without a document or browser timers",
-    (mode) => {
-      expect(typeof document).toBe("undefined");
-      const timer = vi.spyOn(globalThis, "setInterval");
-      try {
-        const html = renderToString(() => (
-          <Calendar mode={mode} date={date} now={date} events={events} />
-        ));
-        expect(html.includes("NaN")).toBe(false);
-        expect(html).toContain(mode === "year" ? "July" : "Planning");
-        expect(timer).not.toHaveBeenCalled();
-      } finally {
-        timer.mockRestore();
-      }
-    },
-  );
+  it.each<CalendarMode>([
+    "month",
+    "multiweek",
+    "week",
+    "day",
+    "3days",
+    "custom",
+    "schedule",
+    "year",
+  ])("renders %s without a document or browser timers", (mode) => {
+    expect(typeof document).toBe("undefined");
+    const timer = vi.spyOn(globalThis, "setInterval");
+    try {
+      const html = renderToString(() => (
+        <Calendar mode={mode} date={date} now={date} events={events} />
+      ));
+      expect(html.includes("NaN")).toBe(false);
+      expect(html).toContain(mode === "year" ? "July" : "Planning");
+      expect(timer).not.toHaveBeenCalled();
+    } finally {
+      timer.mockRestore();
+    }
+  });
 
   it("renders a bounded virtual month list with deterministic hydration identifiers", () => {
     const render = () =>

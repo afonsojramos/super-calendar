@@ -167,7 +167,7 @@ export function Fixture() {
         ? clippedEvents
         : view === "edit-crowded"
           ? crowdedEvents
-          : view === "edit-many"
+          : view === "edit-many" || (view.startsWith("multiweek") && view.endsWith("dense"))
             ? manyEvents
             : view === "edit"
               ? editEvents
@@ -247,7 +247,25 @@ export function Fixture() {
           </button>
         ) : null}
       </nav>
-      {view === "months" ? (
+      {view.startsWith("multiweek") ? (
+        <Calendar
+          mode="multiweek"
+          date={date() ?? anchor}
+          numberOfWeeks={updated() ? 3 : view.includes("eight") ? 8 : 2}
+          weekStartsOn={1}
+          hiddenDays={restricted() ? [0, 6] : undefined}
+          maxDate={view === "multiweek-disabled-next" ? new Date(2026, 6, 26) : undefined}
+          isDateDisabled={disabled() ? (day) => day.getDate() === 16 : undefined}
+          height={view.includes("eight") ? 260 : 300}
+          events={events()}
+          keyboardDayNavigation
+          onChangeDate={setDate}
+          onCreateEvent={(start, end) => record(`${clock(start)}-${clock(end)}`)}
+          onDragEvent={(event, start, end) => {
+            record(`${event.title}@${clock(start)}-${clock(end)}`);
+          }}
+        />
+      ) : view === "months" ? (
         <MonthList
           date={anchor}
           pastMonths={0}

@@ -10,6 +10,7 @@ export * from "./utils/ical";
 export * from "./utils/labels";
 export * from "./utils/layout";
 export * from "./utils/monthGrid";
+export * from "./utils/multiWeekGrid";
 export * from "./utils/recurrence";
 export * from "./utils/timezone";
 export * from "./utils/eventSource";

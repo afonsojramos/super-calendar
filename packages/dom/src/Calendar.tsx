@@ -1,6 +1,7 @@
 import {
   addDays,
   addMonths,
+  addWeeks,
   endOfDay,
   endOfMonth,
   endOfWeek,
@@ -34,6 +35,7 @@ import {
   type DateRange,
   type DateSelectionConstraints,
   type EventAccessibilityLabeler,
+  buildMultiWeekGrid,
   eventsInTimeZone,
   expandRecurringEvents,
   getViewDays,
@@ -44,6 +46,7 @@ import type { CalendarHandle, CalendarLabels } from "@super-calendar/core";
 import { Agenda, type AgendaSlot, type DomAgendaEvent } from "./Agenda";
 import { YearView, type YearViewSlot } from "./YearView";
 import { type DomMonthEvent, MonthView, type MonthViewSlot } from "./MonthView";
+import { MultiWeekView } from "./MultiWeekView";
 import type { SlotStyleProps } from "./slots";
 import { type DomRenderEvent, TimeGrid, type TimeGridSlot } from "./TimeGrid";
 import type { DomCalendarTheme } from "./theme";
@@ -59,8 +62,9 @@ export type CalendarSlot = MonthViewSlot | TimeGridSlot | AgendaSlot | YearViewS
 export interface CalendarProps<T = unknown>
   extends DateSelectionConstraints, SlotStyleProps<CalendarSlot> {
   /**
-   * The view to render (default "week"). `month` renders a month grid, `schedule`
-   * a day-grouped agenda list, and the others a time grid.
+   * The view to render (default "week"). `month` renders a month grid,
+   * `multiweek` stacked week rows, `schedule` a day-grouped agenda list, `year`
+   * twelve mini months, and the others a time grid.
    */
   mode?: CalendarMode;
   /**
@@ -73,8 +77,9 @@ export interface CalendarProps<T = unknown>
   date: Date;
   /**
    * Fires with the next/previous period's date when the user pages the focused
-   * calendar with **PageDown** / **PageUp** (a month in `month`, a week in
-   * `schedule`, else the view's day span). It's controlled, so update `date` in
+   * calendar with **PageDown** / **PageUp** (a month in `month`,
+   * `numberOfWeeks` weeks in `multiweek`, a week in `schedule`, else the view's
+   * day span). It's controlled, so update `date` in
    * response. Omit it to leave paging to your own controls.
    */
   onChangeDate?: (date: Date) => void;
@@ -92,6 +97,11 @@ export interface CalendarProps<T = unknown>
   now?: Date;
   /** Column count for `mode="custom"`. */
   numberOfDays?: number;
+  /**
+   * Week rows for `mode="multiweek"`: a positive whole number, default 2. The
+   * rows start on the week containing `date`. Other values throw a `RangeError`.
+   */
+  numberOfWeeks?: number;
   /** date-fns locale for titles, headers, and time labels. */
   locale?: Locale;
   /**
@@ -220,7 +230,7 @@ export interface CalendarProps<T = unknown>
    */
   keyboardEventNavigation?: boolean;
 
-  // --- Month mode ---
+  // --- Month and multiweek modes ---
   /** Max chips per day before a "+N more" row. */
   maxVisibleEventCount?: number;
   /** Month chip height in pixels; omit to keep the renderer default. */
@@ -278,14 +288,20 @@ export interface CalendarProps<T = unknown>
 const EMPTY_EVENTS: CalendarEvent<never>[] = [];
 
 // Recurrence is expanded over the range a mode renders: the month grid for
-// `month`, the day columns for the time-grid modes, and a forward window for the
-// `schedule` agenda (which has no bounded viewport of its own).
+// `month`, the week rows for `multiweek`, the day columns for the time-grid
+// modes, and a forward window for the `schedule` agenda (which has no bounded
+// viewport of its own).
 function expansionRange(
   mode: CalendarMode,
   date: Date,
   weekStartsOn: WeekStartsOn,
   numberOfDays: number | undefined,
+  numberOfWeeks: number,
 ): [Date, Date] {
+  if (mode === "multiweek") {
+    const { period } = buildMultiWeekGrid(date, { weekStartsOn, numberOfWeeks });
+    return [period.start, endOfDay(addDays(period.endExclusive, -1))];
+  }
   if (mode === "month") {
     return [
       startOfWeek(startOfMonth(date), { weekStartsOn }),
@@ -308,16 +324,19 @@ function expansionRange(
 }
 
 // The date one page away in `direction` (+1 next, −1 previous): a year for
-// `year`, a month for `month`, a week for `schedule`, else the view's day span.
+// `year`, a month for `month`, the shown weeks for `multiweek`, a week for
+// `schedule`, else the view's day span.
 function pageStep(
   mode: CalendarMode,
   date: Date,
   direction: number,
   weekStartsOn: WeekStartsOn,
   numberOfDays: number | undefined,
+  numberOfWeeks: number,
 ): Date {
   if (mode === "year") return addYears(date, direction);
   if (mode === "month") return addMonths(date, direction);
+  if (mode === "multiweek") return addWeeks(date, direction * numberOfWeeks);
   if (mode === "schedule") return addDays(date, direction * 7);
   return addDays(date, direction * getViewDays(mode, date, weekStartsOn, numberOfDays ?? 1).length);
 }
@@ -347,6 +366,7 @@ function CalendarInner<T = unknown>(
     hiddenDays,
     now,
     numberOfDays,
+    numberOfWeeks = 2,
     locale,
     timeZone,
     theme,
@@ -433,7 +453,7 @@ function CalendarInner<T = unknown>(
   const displayEvents = useMemo(() => {
     let out: CalendarEvent<T>[] = events ?? EMPTY_EVENTS;
     if (out.some((e) => e.recurrence)) {
-      let [start, end] = expansionRange(mode, date, weekStartsOn, numberOfDays);
+      let [start, end] = expansionRange(mode, date, weekStartsOn, numberOfDays, numberOfWeeks);
       // A display zone shifts each occurrence's wall-clock by up to ~a day, which
       // can move an edge occurrence into a visible column; widen so it's generated.
       if (timeZone) {
@@ -445,15 +465,17 @@ function CalendarInner<T = unknown>(
     if (timeZone) out = eventsInTimeZone(out, timeZone);
     return out;
     // `date.getTime()`: recompute on the instant, not a re-created Date identity.
-  }, [events, mode, date.getTime(), weekStartsOn, numberOfDays, timeZone]);
+  }, [events, mode, date.getTime(), weekStartsOn, numberOfDays, numberOfWeeks, timeZone]);
 
   // PageDown / PageUp page the calendar when the consumer opts in with
   // `onChangeDate`; keydowns bubble up from the focused grid to this handler.
   const handlePageKeys = (e: ReactKeyboardEvent) => {
     if (!onChangeDate) return;
-    if (e.key === "PageDown") onChangeDate(pageStep(mode, date, 1, weekStartsOn, numberOfDays));
-    else if (e.key === "PageUp") onChangeDate(pageStep(mode, date, -1, weekStartsOn, numberOfDays));
-    else return;
+    if (e.key === "PageDown") {
+      onChangeDate(pageStep(mode, date, 1, weekStartsOn, numberOfDays, numberOfWeeks));
+    } else if (e.key === "PageUp") {
+      onChangeDate(pageStep(mode, date, -1, weekStartsOn, numberOfDays, numberOfWeeks));
+    } else return;
     e.preventDefault();
   };
 
@@ -523,6 +545,49 @@ function CalendarInner<T = unknown>(
         chipGap={chipGap}
         moreLabel={moreLabel}
         showAdjacentMonths={showAdjacentMonths}
+        showTitle={showTitle}
+        fillCellOnSelection={fillCellOnSelection}
+        selectedRange={selectedRange}
+        selectedDates={selectedDates}
+        minDate={minDate}
+        maxDate={maxDate}
+        isDateDisabled={isDateDisabled}
+        keyboardDayNavigation={keyboardDayNavigation}
+        onPressDay={onPressDay}
+        onPressCell={onPressCell}
+        onCreateEvent={onCreateEvent}
+        onSelectDrag={onSelectDrag}
+        onDragEvent={onDragEvent}
+        onDragStart={onDragStart}
+        eventStartEditable={eventStartEditable}
+        eventOverlap={eventOverlap}
+        onPressEvent={onPressEvent}
+        onPressMore={onPressMore}
+        renderEvent={renderMonthEvent}
+        eventAccessibilityLabel={eventAccessibilityLabel}
+      />
+    );
+  } else if (mode === "multiweek") {
+    view = (
+      <MultiWeekView<T>
+        date={date}
+        numberOfWeeks={numberOfWeeks}
+        events={displayEvents}
+        weekStartsOn={weekStartsOn}
+        hiddenDays={hiddenDays}
+        weekdayFormat={weekdayFormat}
+        highlightWeekends={highlightWeekends}
+        locale={locale}
+        labels={labels}
+        theme={theme}
+        className={className}
+        style={height != null ? { height, ...style } : style}
+        classNames={classNames}
+        styles={styles}
+        maxVisibleEventCount={maxVisibleEventCount}
+        chipHeight={chipHeight}
+        chipGap={chipGap}
+        moreLabel={moreLabel}
         showTitle={showTitle}
         fillCellOnSelection={fillCellOnSelection}
         selectedRange={selectedRange}
