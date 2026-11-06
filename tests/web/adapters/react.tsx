@@ -18,10 +18,13 @@ import {
   Calendar,
   MonthList,
   MonthView,
+  MultiWeekView,
   ResourceTimeline,
   YearView,
   type ResourceTimelineProps,
   type MonthListProps,
+  type MultiWeekViewProps,
+  type CalendarProps,
   type DomRenderEventArgs as RenderEventArgs,
 } from "../../../packages/dom/src";
 export {
@@ -31,6 +34,7 @@ export {
   DateRangePicker,
   MonthList,
   MonthView,
+  MultiWeekView,
   ResourceTimeline,
   TimeGrid,
   YearView,
@@ -63,6 +67,41 @@ export function ControlledTimeGrid(props: TimeGridProps) {
         setDate(next);
       }}
     />
+  );
+}
+
+export function ControlledMultiWeekView(props: MultiWeekViewProps) {
+  const [selectedRange, setSelectedRange] = useState(props.selectedRange);
+  return (
+    <MultiWeekView
+      {...props}
+      events={props.events ? [...props.events] : undefined}
+      selectedRange={selectedRange}
+      onSelectDrag={(start, end) => {
+        setSelectedRange({ start, end });
+        props.onSelectDrag?.(start, end);
+      }}
+      onCreateEvent={(start, end) => props.onCreateEvent?.(start, end)}
+    />
+  );
+}
+
+export function ControlledDragCalendar(
+  props: CalendarProps & { refreshEventsOnDragStart: boolean },
+) {
+  const [started, setStarted] = useState(false);
+  return (
+    <>
+      <output aria-label="Drag started">{String(started)}</output>
+      <Calendar
+        {...props}
+        events={props.refreshEventsOnDragStart && started ? props.events?.slice() : props.events}
+        onDragStart={(event) => {
+          setStarted(true);
+          props.onDragStart?.(event);
+        }}
+      />
+    </>
   );
 }
 

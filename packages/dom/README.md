@@ -69,6 +69,50 @@ Set `touchDragDelay` and `touchDragThreshold` on `TimeGrid` or `Calendar` to adj
 the hold. Mouse drag and resize retain their existing behavior. See the
 [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
 
+## Multi-week grids
+
+Use `mode="multiweek"` with `numberOfWeeks` (default `2`) for consecutive full
+week rows without hourly slots. The first week contains `date` and aligns to
+`weekStartsOn`. Navigation moves by the full number of weeks. `hiddenDays` only
+shortens rows; `custom` views remain hourly even above seven columns.
+
+```tsx
+import { useState } from "react";
+import { Calendar } from "@super-calendar/dom";
+
+export function MultiWeekCalendar() {
+  const [date, setDate] = useState(new Date(2026, 11, 28));
+  return (
+    <Calendar
+      mode="multiweek"
+      numberOfWeeks={3}
+      weekStartsOn={1}
+      date={date}
+      onChangeDate={setDate}
+      events={[]}
+      height={480}
+    />
+  );
+}
+```
+
+`MultiWeekView` exposes a standalone window with the month grid's event bars,
+overflow, selection, drag interactions, and styling. Pass expanded events to it;
+`Calendar` handles recurrence and time zones. Custom event renderers receive
+`mode: "multiweek"`. Rows scroll vertically when the container is too short.
+Event chips and overflow buttons default to 24 pixels high; use `chipHeight` to customize them.
+Counts must be positive safe integers whose date span is representable; invalid
+counts or dates throw `RangeError`. Rows are materialized, so larger counts need
+more space. `MonthView` retains its month-only behavior.
+
+In the multi-week web grid, a quick touch swipe scrolls. Hold a day or event for
+400 ms, then drag to create or move. Mouse input starts immediately. Cancelling
+the pointer or changing the displayed window cancels the hold or drag.
+
+Keep `events` stable during unrelated UI updates. With recurrence or `timeZone`,
+replacing the array rebuilds displayed events and cancels a held move. See
+[keep event data stable](https://super-calendar.afonsojramos.me/guides/events#keep-event-data-stable).
+
 ## Moving events
 
 Pass `onDragEvent` and update your event state with the returned `start` and `end`.

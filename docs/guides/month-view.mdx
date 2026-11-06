@@ -27,6 +27,12 @@ bar that runs past a week's edge is squared off and continues on the next row.
 />
 ```
 
+For a fixed count of consecutive full weeks, use `mode="multiweek"` or
+`MultiWeekView`. It shares the event bars, overflow, selection, drag interactions,
+and month styling described here. `numberOfWeeks` defaults to two, and
+`showAdjacentMonths`/`showSixWeeks` do not affect it. See
+[multi-week grids](/guides/views#multi-week-grids).
+
 ## Chip dimensions
 
 Set `chipHeight` and `chipGap` on `Calendar`, `MonthView`, or `MonthList` to size

@@ -20,8 +20,13 @@ afterAll(async () => {
   await server?.close();
 });
 
-async function checkPage(path: string, check: (page: Page) => Promise<void>, width = 1100) {
-  const page = await browser.newPage({ viewport: { width, height: 880 } });
+async function checkPage(
+  path: string,
+  check: (page: Page) => Promise<void>,
+  width = 1100,
+  hasTouch = false,
+) {
+  const page = await browser.newPage({ viewport: { width, height: 880 }, hasTouch });
   page.setDefaultTimeout(5_000);
   page.setDefaultNavigationTimeout(15_000);
   const errors: string[] = [];
@@ -42,7 +47,160 @@ async function checkPage(path: string, check: (page: Page) => Promise<void>, wid
   }
 }
 
+async function nativeMultiWeekGrid(page: Page) {
+  await page.getByText("multiweek", { exact: true }).click();
+  await page.getByRole("button", { name: "4 weeks", exact: true }).click();
+  const grids = page.getByTestId("multiweek-grid");
+  const currentIndex = () =>
+    grids.evaluateAll((nodes) =>
+      nodes.findIndex((node) => {
+        const rect = node.getBoundingClientRect();
+        return rect.left >= 0 && rect.right <= innerWidth;
+      }),
+    );
+  await expect.poll(currentIndex).toBeGreaterThanOrEqual(0);
+  const label = await grids.nth(await currentIndex()).getAttribute("aria-label");
+  if (!label) throw new Error("Missing multi-week range label");
+  const grid = grids.and(page.getByLabel(label, { exact: true }));
+  await grid.evaluate((element) => {
+    let viewport = element.parentElement;
+    while (viewport && getComputedStyle(viewport).overflowY !== "auto")
+      viewport = viewport.parentElement;
+    if (!viewport) throw new Error("Missing multi-week scroll viewport");
+    // Exercise the supported constrained-height consumer layout.
+    viewport.dataset.testScroll = "true";
+    viewport.style.height = "180px";
+    viewport.style.maxHeight = "180px";
+    viewport.style.flex = "0 0 180px";
+  });
+  const viewport = page.locator("[data-test-scroll]");
+  await viewport.scrollIntoViewIfNeeded();
+  await expect
+    .poll(() => viewport.evaluate((el) => el.scrollHeight - el.clientHeight))
+    .toBeGreaterThan(100);
+  return { grid, viewport };
+}
+
 describe("published demos", () => {
+  it("scrolls the native-web multi-week rows with a quick touch swipe", async () => {
+    await checkPage(
+      "/",
+      async (page) => {
+        const { viewport } = await nativeMultiWeekGrid(page);
+        const bounds = await viewport.boundingBox();
+        const contact = {
+          x: bounds!.x + bounds!.width / 2,
+          y: bounds!.y + bounds!.height - 20,
+          id: 1,
+        };
+        const cdp = await page.context().newCDPSession(page);
+        try {
+          await cdp.send("Input.dispatchTouchEvent", {
+            type: "touchStart",
+            touchPoints: [contact],
+          });
+          for (const offset of [20, 40, 70, 100, 120]) {
+            await cdp.send("Input.dispatchTouchEvent", {
+              type: "touchMove",
+              touchPoints: [{ ...contact, y: contact.y - offset }],
+            });
+            await page.waitForTimeout(20);
+          }
+          await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+          await expect.poll(() => viewport.evaluate((el) => el.scrollTop)).toBeGreaterThan(40);
+          expect(await page.getByText("✨ New event", { exact: true }).count()).toBe(0);
+        } finally {
+          await cdp.detach();
+        }
+      },
+      390,
+      true,
+    );
+  });
+
+  it.each(["day", "event"])(
+    "creates and moves a held native-web event, then accepts a quick %s tap",
+    async (target) => {
+      await checkPage(
+        "/",
+        async (page) => {
+          const { grid, viewport } = await nativeMultiWeekGrid(page);
+          await viewport.evaluate((el) => {
+            el.scrollTop = 180;
+          });
+          const bounds = await grid.boundingBox();
+          const rowHeight = bounds!.height / 4;
+          const contact = {
+            x: bounds!.x + (bounds!.width * 1.5) / 7,
+            y: bounds!.y + rowHeight * 2 + 10,
+            id: 1,
+          };
+          const destination = {
+            ...contact,
+            x: bounds!.x + (bounds!.width * 3.5) / 7,
+            y: bounds!.y + rowHeight * 3 + 10,
+          };
+          const cdp = await page.context().newCDPSession(page);
+          try {
+            await cdp.send("Input.dispatchTouchEvent", {
+              type: "touchStart",
+              touchPoints: [contact],
+            });
+            await page.waitForTimeout(450);
+            await cdp.send("Input.dispatchTouchEvent", { type: "touchCancel", touchPoints: [] });
+            expect(await grid.getByText("✨ New event", { exact: true }).count()).toBe(0);
+            await cdp.send("Input.dispatchTouchEvent", {
+              type: "touchStart",
+              touchPoints: [contact],
+            });
+            await page.waitForTimeout(450);
+            await cdp.send("Input.dispatchTouchEvent", {
+              type: "touchMove",
+              touchPoints: [{ ...contact, x: destination.x }],
+            });
+            await cdp.send("Input.dispatchTouchEvent", {
+              type: "touchMove",
+              touchPoints: [destination],
+            });
+            await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+            const bars = grid.getByRole("button", { name: /^✨ New event,/ });
+            await expect.poll(() => bars.count()).toBe(2);
+            const bar = await bars.first().boundingBox();
+            const grab = { x: bar!.x + 10, y: bar!.y + bar!.height / 2, id: 1 };
+            await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [grab] });
+            await page.waitForTimeout(450);
+            await cdp.send("Input.dispatchTouchEvent", {
+              type: "touchMove",
+              touchPoints: [{ ...destination, x: bounds!.x + (bounds!.width * 5.5) / 7 }],
+            });
+            await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+            await expect.poll(() => bars.count()).toBe(1);
+            const moved = await bars.first().boundingBox();
+            expect(moved!.y - bar!.y).toBeCloseTo(rowHeight, 0);
+            expect(moved!.x - bar!.x).toBeCloseTo((bounds!.width * 4) / 7, 0);
+            expect(await viewport.evaluate((el) => el.scrollTop)).toBe(180);
+            if (target === "day") {
+              await page.touchscreen.tap(bounds!.x + (bounds!.width * 0.5) / 7, destination.y);
+              await page.getByTestId("time-grid-pager").first().waitFor();
+            } else {
+              const pressed = page.waitForEvent("console", {
+                predicate: (message) =>
+                  message.text().includes("press event:") &&
+                  message.text().includes("✨ New event"),
+              });
+              await page.touchscreen.tap(moved!.x + 10, moved!.y + moved!.height / 2);
+              await pressed;
+            }
+          } finally {
+            await cdp.detach();
+          }
+        },
+        390,
+        true,
+      );
+    },
+  );
+
   it.each(["event actions", "date range picker"])(
     "keeps React demo shortcuts outside the %s dialog",
     async (kind) => {
@@ -97,6 +255,42 @@ describe("published demos", () => {
       await expect.poll(() => page.locator(month).count()).toBe(0);
     });
   });
+
+  it.each(["/", "/dom/", "/solid/"])(
+    "renders and navigates selectable multi-week ranges in %s",
+    async (path) => {
+      await checkPage(path, async (page) => {
+        if (path === "/solid/")
+          await page.getByLabel("View", { exact: true }).selectOption("multiweek");
+        else await page.getByText("multiweek", { exact: true }).click();
+        const grid = page.locator(
+          path === "/" ? '[data-testid="multiweek-grid"]' : '[role="grid"]',
+        );
+        await grid.first().waitFor();
+        expect(
+          await page.locator('[data-slot="dayColumn"], [data-testid="time-grid-pager"]').count(),
+        ).toBe(0);
+        const title = page.getByTestId("visible-period");
+        const initial = await title.textContent();
+        if (path === "/") await page.getByRole("button", { name: "4 weeks", exact: true }).click();
+        else await page.getByLabel("Weeks", { exact: true }).selectOption("4");
+        await expect.poll(() => title.textContent()).not.toBe(initial);
+        const fourWeeks = await title.textContent();
+        if (path !== "/") expect(await grid.locator("[data-day]").count()).toBe(28);
+        await page
+          .getByRole("button", { name: path === "/solid/" ? "Next period" : "Next", exact: true })
+          .click();
+        await expect.poll(() => title.textContent()).not.toBe(fourWeeks);
+        await page
+          .getByRole("button", {
+            name: path === "/solid/" ? "Previous period" : "Previous",
+            exact: true,
+          })
+          .click();
+        await expect.poll(() => title.textContent()).toBe(fourWeeks);
+      });
+    },
+  );
 
   it("loads and refreshes the Solid feed from the published subpath", async () => {
     await checkPage("/solid/?view=feed", async (page) => {

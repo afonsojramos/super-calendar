@@ -29,6 +29,7 @@ export * from "./utils/useNow";
 export * from "./utils/useEventSource";
 export * from "./utils/layout";
 export * from "./utils/monthGrid";
+export * from "./utils/multiWeekGrid";
 export * from "./utils/recurrence";
 export * from "./utils/timezone";
 export * from "./utils/useDateRange";

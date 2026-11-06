@@ -40,6 +40,22 @@ const events: CalendarEvent<Meta>[] = [
 - Multi-day events draw as one continuous bar across the days they span in the
   month view, and as a per-day clipped segment on the week/day time grid.
 
+## Keep event data stable
+
+Keep the `events` array and its event objects stable while only UI state changes,
+such as a drag indicator set by `onDragStart`. Pass stored data as `events={events}`.
+If you filter or map it, memoize the result with React's `useMemo` or Solid's
+`createMemo`, using the source data as a dependency. Update event data immutably
+when it changes.
+
+With `Calendar` recurrence or `timeZone`, a new array rebuilds the displayed
+occurrences, even if the array contains the same source objects. In the
+multi-week web grid, replacing the held event cancels the move. Keep unrelated
+state updates from rebuilding `events`, including inline copies such as
+`events={[...events]}`. A data refresh can still cancel an active move safely.
+The native `keyExtractor` controls rendering keys; it does not reconnect a held gesture
+to a replacement event.
+
 ## Render your own event
 
 For Solid, use the [custom event example](/guides/solid#render-custom-events).

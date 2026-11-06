@@ -2,6 +2,7 @@ import { addDays, addMonths, addWeeks, addYears, endOfMonth, format, startOfMont
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import {
   Calendar,
+  buildMultiWeekGrid,
   type CalendarEvent,
   type CalendarSlot,
   type CreateGhostArgs,
@@ -24,7 +25,7 @@ import { EventContextMenu } from "./EventContextMenu";
 
 // The grid views step by a fixed period (toolbar + letter keys). "schedule" is the
 // agenda list, and picker/list are scrolling MonthLists, so they sit outside it.
-const MODES = ["year", "month", "week", "3days", "day"] as const;
+const MODES = ["year", "month", "multiweek", "week", "3days", "day"] as const;
 type CalendarTab = (typeof MODES)[number];
 type DemoTab =
   | CalendarTab
@@ -91,7 +92,8 @@ const TAILWIND_SLOTS: Partial<Record<CalendarSlot, string>> = {
 
 // The dom Calendar is fully controlled by `date`, so the example owns navigation.
 // Step the anchor by the period the current mode shows.
-function stepDate(date: Date, mode: CalendarTab, dir: 1 | -1): Date {
+function stepDate(date: Date, mode: CalendarTab, dir: 1 | -1, numberOfWeeks = 2): Date {
+  if (mode === "multiweek") return addWeeks(date, dir * numberOfWeeks);
   if (mode === "year") return addYears(date, dir);
   if (mode === "month") return addMonths(date, dir);
   if (mode === "week") return addWeeks(date, dir);
@@ -100,7 +102,11 @@ function stepDate(date: Date, mode: CalendarTab, dir: 1 | -1): Date {
 }
 
 // Label for the visible period, matching exactly what the grid renders.
-function periodLabel(date: Date, mode: CalendarTab): string {
+function periodLabel(date: Date, mode: CalendarTab, numberOfWeeks = 2): string {
+  if (mode === "multiweek") {
+    const { visibleRange } = buildMultiWeekGrid(date, { numberOfWeeks, weekStartsOn: 1 });
+    return `${format(visibleRange.start, "PP")} - ${format(addDays(visibleRange.endExclusive, -1), "PP")}`;
+  }
   if (mode === "year") return format(date, "yyyy");
   if (mode === "month") return format(date, "MMMM yyyy");
   if (mode === "day") return format(date, "EEE, d MMM yyyy");
@@ -165,6 +171,7 @@ const DraftPreview = ({ start, end }: CreateGhostArgs) => (
 
 export function App() {
   const [mode, setMode] = useState<DemoTab>("week");
+  const [numberOfWeeks, setNumberOfWeeks] = useState(2);
   const [date, setDate] = useState(() => new Date());
   const [events, setEvents] = useState<CalendarEvent<EventMeta>[]>(buildEvents);
   const pickerMinDate = useMemo(() => new Date(), []);
@@ -262,11 +269,11 @@ export function App() {
       switch (e.key.toLowerCase()) {
         case "n":
         case "j":
-          if (isCalendarTab(mode)) setDate((d) => stepDate(d, mode, 1));
+          if (isCalendarTab(mode)) setDate((d) => stepDate(d, mode, 1, numberOfWeeks));
           break;
         case "p":
         case "k":
-          if (isCalendarTab(mode)) setDate((d) => stepDate(d, mode, -1));
+          if (isCalendarTab(mode)) setDate((d) => stepDate(d, mode, -1, numberOfWeeks));
           break;
         case "t":
           setDate(new Date());
@@ -292,7 +299,7 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode]);
+  }, [mode, numberOfWeeks]);
 
   return (
     <EventMenuProvider value={menuActions}>
@@ -324,7 +331,7 @@ export function App() {
                 type="button"
                 style={styles.navButton}
                 aria-label="Previous"
-                onClick={() => setDate((d) => stepDate(d, mode, -1))}
+                onClick={() => setDate((d) => stepDate(d, mode, -1, numberOfWeeks))}
               >
                 ‹
               </button>
@@ -335,12 +342,30 @@ export function App() {
                 type="button"
                 style={styles.navButton}
                 aria-label="Next"
-                onClick={() => setDate((d) => stepDate(d, mode, 1))}
+                onClick={() => setDate((d) => stepDate(d, mode, 1, numberOfWeeks))}
               >
                 ›
               </button>
             </div>
-            <span style={styles.periodLabel}>{periodLabel(date, mode)}</span>
+            {mode === "multiweek" ? (
+              <label>
+                Weeks{" "}
+                <select
+                  aria-label="Weeks"
+                  value={numberOfWeeks}
+                  onChange={(event) => setNumberOfWeeks(Number(event.currentTarget.value))}
+                >
+                  {[2, 3, 4].map((count) => (
+                    <option key={count} value={count}>
+                      {count}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <span data-testid="visible-period" style={styles.periodLabel}>
+              {periodLabel(date, mode, numberOfWeeks)}
+            </span>
             <span style={styles.hint}>keys: n / p move · t today · d w m x a views</span>
           </div>
         ) : null}
@@ -537,6 +562,7 @@ export function App() {
           <div style={styles.card}>
             <Calendar
               mode={mode}
+              numberOfWeeks={numberOfWeeks}
               renderBackgroundEvent={FocusBand}
               date={date}
               events={events}

@@ -14,11 +14,12 @@ description: Every surface the calendar can render, and the mode prop that picks
 <Calendar mode="week" date={date} events={events} onChangeDate={setDate} />
 ```
 
-| View                           | `mode`                           | What it is                                        |
-| ------------------------------ | -------------------------------- | ------------------------------------------------- |
-| [Month](/guides/month-view)    | `month`                          | The classic month grid with event chips.          |
-| [Time grid](/guides/time-grid) | `week`, `day`, `3days`, `custom` | Hour-by-hour columns with positioned event boxes. |
-| [Schedule](/guides/schedule)   | `schedule`                       | A vertical, day-grouped agenda list.              |
+| View                           | `mode`                           | What it is                                           |
+| ------------------------------ | -------------------------------- | ---------------------------------------------------- |
+| Multi-week                     | `multiweek`                      | A chosen number of full weeks as stacked event rows. |
+| [Month](/guides/month-view)    | `month`                          | The classic month grid with event chips.             |
+| [Time grid](/guides/time-grid) | `week`, `day`, `3days`, `custom` | Hour-by-hour columns with positioned event boxes.    |
+| [Schedule](/guides/schedule)   | `schedule`                       | A vertical, day-grouped agenda list.                 |
 
 Three more surfaces ship as standalone components rather than modes:
 
@@ -37,6 +38,69 @@ work-week), or set `weekEndsOn` to show a fixed slice of the week
 ```tsx
 <Calendar mode="custom" numberOfDays={5} date={date} events={events} onChangeDate={setDate} />
 ```
+
+## Multi-week grids
+
+Use `mode="multiweek"` to show full weeks as stacked rows without hourly slots.
+`numberOfWeeks` defaults to `2`. The first row is the week containing `date`,
+aligned backward to `weekStartsOn` (Sunday by default).
+
+```tsx
+import { useState } from "react";
+import { Calendar } from "@super-calendar/native";
+
+export function MultiWeekCalendar() {
+  const [date, setDate] = useState(new Date(2026, 11, 28));
+  return (
+    <Calendar
+      mode="multiweek"
+      numberOfWeeks={3}
+      weekStartsOn={1}
+      date={date}
+      events={[]}
+      onChangeDate={setDate}
+      onPressEvent={(event) => console.log(event.title)}
+    />
+  );
+}
+```
+
+React DOM and Solid use the same mode and prop names. `custom` continues to show
+hourly columns, including when `numberOfDays` exceeds seven.
+
+- Previous and next move by `numberOfWeeks` calendar weeks, including across DST,
+  month, and year boundaries. Hidden weekdays shorten each row without changing
+  the page step. Hiding all seven weekdays restores all days.
+- Every displayed date belongs to the requested period. `showAdjacentMonths` and
+  native `showSixWeeks` do not affect this mode. Titles include both date endpoints.
+- Event bars, overflow, selection, all-day creation, and event moves work as in the
+  month view. Existing month styling slots and render overrides apply. Custom event
+  renderers and accessibility callbacks receive `mode: "multiweek"`.
+- Web day cells support `keyboardDayNavigation`. Arrows skip hidden or disabled
+  days, and Home/End stay within the displayed range. PageUp/PageDown change the
+  window when `onChangeDate` is provided. Native supports swipe paging, and
+  react-native-web uses left/right keys.
+- Rows keep space for their content and scroll vertically when the view is too
+  short. Set `height` on web `Calendar`, or a constrained `style` on web
+  `MultiWeekView`. Native views fill their parent. Larger counts need more space;
+  the rows inside a page are materialized, not an infinite virtualized list.
+
+`numberOfWeeks` must be a positive safe integer. Invalid counts, invalid dates,
+and spans outside JavaScript's representable date range throw `RangeError`.
+
+For a single window without a pager, use the exported `MultiWeekView` from any
+renderer. It accepts the corresponding `MonthView` event, selection, interaction,
+and styling props, plus `numberOfWeeks`, but no month-membership options. Supply
+already-expanded events to standalone views; `Calendar` handles recurrence and
+display time zones.
+
+In the multi-week web grid, a quick touch swipe scrolls. Hold a day or event for
+400 ms, then drag to create or move. Mouse input starts immediately. Cancelling
+the pointer or changing the displayed window cancels the hold or drag.
+
+Keep `events` stable during unrelated UI updates. With recurrence or `timeZone`,
+replacing the array rebuilds displayed events and cancels a held move. See
+[keep event data stable](/guides/events#keep-event-data-stable).
 
 ## Paging
 

@@ -62,11 +62,11 @@ export type EventAccessibilityLabeler<T = unknown> = (
 ) => string;
 
 /**
- * Month cells and the all-day lane show a single clipped line; timed-grid titles
- * (`undefined`) wrap to fill the box.
+ * Month and multi-week cells and the all-day lane show a single clipped line;
+ * timed-grid titles (`undefined`) wrap to fill the box.
  */
 export function titleNumberOfLines(mode: CalendarMode, isAllDay: boolean): number | undefined {
-  return mode === "month" || isAllDay ? 1 : undefined;
+  return mode === "month" || mode === "multiweek" || isAllDay ? 1 : undefined;
 }
 
 /**
@@ -74,7 +74,7 @@ export function titleNumberOfLines(mode: CalendarMode, isAllDay: boolean): numbe
  * none should show. Timed events get their `start - end` range. An all-day event
  * gets the literal "All day" in the schedule (which has no all-day lane to
  * signal it positionally) and nothing on the day/week grid (the lane already
- * does). Month cells and `showTime={false}` always return `null`.
+ * does). Month and multi-week cells and `showTime={false}` always return `null`.
  */
 export function eventTimeLabel(args: {
   mode: CalendarMode;
@@ -86,7 +86,7 @@ export function eventTimeLabel(args: {
   /** Text for an all-day event in the schedule. Default "All day". */
   allDayLabel?: string;
 }): string | null {
-  if (!args.showTime || args.mode === "month") return null;
+  if (!args.showTime || args.mode === "month" || args.mode === "multiweek") return null;
   if (args.isAllDay) return args.mode === "schedule" ? (args.allDayLabel ?? "All day") : null;
   const timeFormat = args.ampm ? "h:mm a" : "HH:mm";
   return `${format(args.start, timeFormat)} - ${format(args.end, timeFormat)}`;

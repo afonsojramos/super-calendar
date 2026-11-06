@@ -207,6 +207,7 @@ try {
   for (const route of ["/", "/ssr"]) {
     for (const view of [
       "month",
+      "multiweek",
       "week",
       "day",
       "3days",

@@ -83,7 +83,7 @@ try {
         return '';
       });
       assert.equal(fetches, 0, 'SSR does not fetch an event source');
-      for (const mode of ['month', 'week', 'day', '3days', 'custom', 'schedule', 'year']) {
+      for (const mode of ['month', 'multiweek', 'week', 'day', '3days', 'custom', 'schedule', 'year']) {
         const html = renderToString(() => calendar.Calendar({ date, now: date, events, mode }));
         assert(html.length > 1000, mode);
         assert(!html.includes('NaN'), mode);

@@ -63,7 +63,7 @@ export function Schedule() {
 }
 ```
 
-`Calendar` supports month, week, day, 3-day, custom, schedule, and year modes.
+`Calendar` supports month, multiweek, week, day, 3-day, custom, schedule, and year modes.
 Use `MonthList` for a virtualized scrolling picker and `ResourceTimeline` for
 horizontal or vertical resource lanes. `DatePicker` and `DateRangePicker` wrap
 the month list in a popover. See the [Solid API reference](/reference/api#solid-exports).
@@ -83,6 +83,14 @@ reordered. Removing or replacing that event cancels its drag. Events with
 `draggable: false` remain clickable and keyboard accessible in both orientations.
 Removing a resource cancels creation in its lane. Losing pointer capture cancels
 the active interaction.
+
+## Multi-week rows
+
+`Calendar` accepts `mode="multiweek" numberOfWeeks={3}` to show three full weeks
+as stacked event rows. The default is two weeks. `MultiWeekView` exposes the
+standalone view with the same props and slots as React DOM. Reactive changes to
+`date`, `numberOfWeeks`, and `hiddenDays` update the rows. See
+[multi-week grids](/guides/views#multi-week-grids) for paging, selection, and sizing.
 
 ## Add range selection
 

@@ -31,13 +31,14 @@ they resolve to the single copy your app already uses.
 
 ## What it renders
 
-| Export      | Renders                                                                   |
-| ----------- | ------------------------------------------------------------------------- |
-| `Calendar`  | Batteries-included: picks the view from `mode` (month, schedule, grid).   |
-| `TimeGrid`  | A day/week/N-day time grid with an all-day lane and a now line.           |
-| `Agenda`    | A day-grouped, scrolling list of events: the schedule view.               |
-| `MonthList` | A scrolling, virtualized month: a date picker, or a calendar with events. |
-| `MonthView` | A single month grid: compact picker, or a calendar with event chips.      |
+| Export          | Renders                                                                   |
+| --------------- | ------------------------------------------------------------------------- |
+| `Calendar`      | Batteries-included: picks the view from `mode` (month, schedule, grid).   |
+| `TimeGrid`      | A day/week/N-day time grid with an all-day lane and a now line.           |
+| `Agenda`        | A day-grouped, scrolling list of events: the schedule view.               |
+| `MonthList`     | A scrolling, virtualized month: a date picker, or a calendar with events. |
+| `MultiWeekView` | Consecutive full weeks with event bars and no hourly slots.               |
+| `MonthView`     | A single month grid: compact picker, or a calendar with event chips.      |
 
 `Calendar` mirrors the React Native component's API across every view, including
 `mode="schedule"` (the `Agenda` list). You can also drop down to the
@@ -98,6 +99,14 @@ day-grouped agenda list, or `"day"` / `"3days"` / `"custom"` (with `numberOfDays
 for the time grid. Custom rendering splits by view: `renderTimeEvent` for the time
 grid, `renderMonthEvent` for month chips, and `renderScheduleEvent` for agenda
 rows.
+
+## Multi-week rows
+
+Use `mode="multiweek" numberOfWeeks={3}` on `Calendar`, or render `MultiWeekView`
+for one window. The default is two weeks, starting with the week containing
+`date`. Month slots and `renderMonthEvent` also style this mode. PageUp/PageDown
+advance by the chosen week count. Set `height` on `Calendar` to scroll the rows
+inside that viewport. See [multi-week grids](/guides/views#multi-week-grids).
 
 ## Schedule (agenda)
 

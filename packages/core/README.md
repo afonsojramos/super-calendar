@@ -85,6 +85,31 @@ move and resize dialog. `eventChangeRejected` supplies the web dialog's rejectio
 message (default "This change is not allowed."). `resolveCalendarLabels` fills omitted labels with English
 defaults from `defaultCalendarLabels`.
 
+## Multi-week grids
+
+`buildMultiWeekGrid` is available from both core entries. It builds consecutive
+full weeks without month padding or hourly slots.
+
+```ts
+import { buildMultiWeekGrid } from "@super-calendar/core/vanilla";
+
+const grid = buildMultiWeekGrid(new Date(2026, 11, 28), {
+  numberOfWeeks: 3,
+  weekStartsOn: 1,
+  hiddenDays: [0, 6],
+});
+console.log(grid.weeks, grid.period, grid.visibleRange);
+```
+
+`numberOfWeeks` defaults to `2` and must be a positive safe integer. Invalid
+dates, invalid counts, and spans outside JavaScript's date range throw
+`RangeError` before allocating rows. The builder materializes O(7 × N) days.
+`period` covers full weeks; `visibleRange` gives the chronological visible
+endpoints after hidden weekdays. Both use `{ start, endExclusive }`. RTL reverses
+row display only. `MultiWeekGridDay` has the month builder's day state without
+`isCurrentMonth`; `MultiWeekGridWeek.id` uses the unfiltered week start.
+`getViewDays` and `viewDayCount` reject `multiweek`, so use this builder for it.
+
 ## Recurrence limits
 
 Recurring-event expansion stops at JavaScript's date limits and omits occurrences

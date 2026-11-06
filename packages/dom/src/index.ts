@@ -42,6 +42,7 @@ export {
   type MonthViewSlot,
 } from "./MonthView";
 export { MonthList, type MonthListProps, type MonthListSlot } from "./MonthList";
+export { MultiWeekView, type MultiWeekViewProps } from "./MultiWeekView";
 export { YearView, type YearViewProps, type YearViewSlot } from "./YearView";
 export {
   type Resource,
@@ -101,6 +102,7 @@ export {
   useNow,
   useMonthGrid,
   buildMonthGrid,
+  buildMultiWeekGrid,
   layoutMonthWeek,
   weekdayFormatToken,
   type MonthEventSegment,
@@ -109,6 +111,11 @@ export {
   type MonthGridWeek,
   type MonthGridWeekday,
   type MonthWeekEvents,
+  type MultiWeekGrid,
+  type MultiWeekGridDay,
+  type MultiWeekGridInterval,
+  type MultiWeekGridOptions,
+  type MultiWeekGridWeek,
   type UseMonthGridOptions,
   type WeekdayFormat,
 } from "@super-calendar/core";
