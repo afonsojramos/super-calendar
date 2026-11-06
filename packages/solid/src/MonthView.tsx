@@ -937,17 +937,30 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
     }
   };
   let heldTouch: (() => void) | null = null;
-  const pressRow = (event: PointerEvent & { currentTarget: HTMLElement }, start: () => void) => {
+  let heldOrigin: { day: Date; event?: CalendarEvent<T> } | null = null;
+  const dayLookup = createMemo(
+    () =>
+      new Map(
+        _grid()
+          .weeks.flatMap((week) => week.days)
+          .map((day) => [day.id, day]),
+      ),
+  );
+  const pressRow = (
+    event: PointerEvent & { currentTarget: HTMLElement },
+    day: Date,
+    moving?: CalendarEvent<T>,
+  ) => {
     if (event.button !== 0 || heldTouch || !beginPress(event)) return;
+    const start = () => {
+      if (moving) beginMove(moving, day, event.pointerId);
+      else beginCreate(day, event.pointerId);
+    };
     if (!multiWeek() || !event.pointerType || event.pointerType === "mouse") {
       start();
       return;
     }
-    const lookup = new Map(
-      _grid()
-        .weeks.flatMap((week) => week.days)
-        .map((day) => [day.id, day]),
-    );
+    heldOrigin = { day, event: moving };
     heldTouch = holdDateDrag(
       {
         box: event.currentTarget,
@@ -962,7 +975,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
           .elementFromPoint(x, y)
           ?.closest<HTMLElement>("[data-day]");
         if (!element || !gridRef.current?.contains(element)) return;
-        const day = lookup.get(element.dataset.day ?? "");
+        const day = dayLookup().get(element.dataset.day ?? "");
         if (day && !day.isDisabled) extendDrag(day.date, event.pointerId);
       },
       () => {
@@ -971,24 +984,48 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       },
       () => {
         heldTouch = null;
+        heldOrigin = null;
       },
     );
   };
   createEffect(
-    () => [
-      windowKey(),
-      props.onCreateEvent,
-      props.onDragEvent,
-      props.onSelectDrag,
-      props.onDragStart,
-      props.events,
-      props.eventStartEditable,
-      props.minDate,
-      props.maxDate,
-      props.isDateDisabled,
-    ],
+    () => windowKey(),
     () => () => {
       heldTouch?.();
+    },
+  );
+  createEffect(
+    () => ({
+      days: dayLookup(),
+      events: props.events,
+      canCreate: !!(props.onCreateEvent || props.onSelectDrag),
+      canMove: !!props.onDragEvent,
+      eventStartEditable: props.eventStartEditable,
+    }),
+    (state) => {
+      const origin = heldOrigin;
+      if (!origin) return;
+      const current = dragRef.current;
+      const destination = current
+        ? new Date(current.kind === "create" ? current.hover : current.to)
+        : origin.day;
+      const enabled = (day: Date) => {
+        const cell = state.days.get(format(day, "yyyy-MM-dd"));
+        return cell != null && !cell.isDisabled;
+      };
+      if (
+        !enabled(origin.day) ||
+        !enabled(destination) ||
+        (origin.event
+          ? !state.canMove ||
+            !state.events?.includes(origin.event) ||
+            origin.event.disabled ||
+            origin.event.draggable === false ||
+            !(origin.event.startEditable ?? state.eventStartEditable)
+          : !state.canCreate)
+      ) {
+        heldTouch?.();
+      }
     },
   );
   const isDragging = createMemo(() => drag() !== null);
@@ -1443,7 +1480,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                             dragWired() && !day().isDisabled
                                               ? (e) => {
                                                   const date = day().date;
-                                                  pressRow(e, () => beginCreate(date, e.pointerId));
+                                                  pressRow(e, date);
                                                 }
                                               : undefined
                                           }
@@ -1528,9 +1565,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                             e.stopPropagation();
                                                             const event = b().seg.event;
                                                             const date = day().date;
-                                                            pressRow(e, () =>
-                                                              beginMove(event, date, e.pointerId),
-                                                            );
+                                                            pressRow(e, date, event);
                                                           }
                                                         : undefined
                                                     }

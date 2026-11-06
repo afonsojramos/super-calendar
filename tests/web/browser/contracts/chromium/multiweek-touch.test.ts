@@ -4,6 +4,31 @@ import { box, open, page, rendererName } from "../../session";
 const calls = () => page.getByLabel("Calls").textContent();
 
 describe(rendererName, () => {
+  it("commits the full touch span while live selection rerenders inline callbacks", async () => {
+    await open("multiweek-selection");
+    const from = await box('[data-day="2026-07-17"]');
+    const contact = { x: from.x + from.width / 2, y: from.y + 10, id: 1 };
+    const cdp = await page.context().newCDPSession(page);
+    try {
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [contact] });
+      await page.waitForTimeout(450);
+      for (const day of [20, 22]) {
+        const to = await box(`[data-day="2026-07-${day}"]`);
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ ...contact, x: to.x + to.width / 2, y: to.y + 10 }],
+        });
+        await expect
+          .poll(() => page.getByLabel("Selection").textContent())
+          .toBe(`17:0:0-${day}:0:0`);
+      }
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await expect.poll(calls).toBe('["17:0:0-23:0:0"]');
+    } finally {
+      await cdp.detach();
+    }
+  });
+
   it("scrolls a short multiweek grid by touch with creation and moving enabled", async () => {
     await open("multiweek-eight");
     const grid = page.getByRole("grid");

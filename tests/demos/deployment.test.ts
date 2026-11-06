@@ -156,6 +156,10 @@ describe("published demos", () => {
             await page.waitForTimeout(450);
             await cdp.send("Input.dispatchTouchEvent", {
               type: "touchMove",
+              touchPoints: [{ ...contact, x: destination.x }],
+            });
+            await cdp.send("Input.dispatchTouchEvent", {
+              type: "touchMove",
               touchPoints: [destination],
             });
             await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });

@@ -488,6 +488,7 @@ function DateRowsInner<T>({
   const dragEnabled = onCreateEvent != null || onSelectDrag != null || onDragEvent != null;
   const gridRef = useRef<ComponentRef<typeof View>>(null);
   const heldTouch = useRef<(() => void) | null>(null);
+  const heldOrigin = useRef<{ day: Date; event: CalendarEvent<T> | null } | null>(null);
   // The live drag drives the preview; the ref is what the gesture and the web
   // pointer listeners read, so neither has to be rebuilt as the hover day moves
   // (rebuilding the gesture mid-drag would cancel it).
@@ -526,18 +527,7 @@ function DateRowsInner<T>({
     () => () => {
       heldTouch.current?.();
     },
-    [
-      windowKey,
-      onCreateEvent,
-      onSelectDrag,
-      onDragEvent,
-      onDragStart,
-      events,
-      eventStartEditable,
-      minDate,
-      maxDate,
-      isDateDisabled,
-    ],
+    [windowKey],
   );
 
   // True when this press is the click trailing a just-committed web drag, which
@@ -555,6 +545,28 @@ function DateRowsInner<T>({
       !event.disabled && event.draggable !== false && (event.startEditable ?? eventStartEditable),
     [eventStartEditable],
   );
+  // Live selection can rerender its parent during a held web gesture. Callback
+  // identity changes do not invalidate a still-selectable day or movable event.
+  useEffect(() => {
+    const origin = heldOrigin.current;
+    if (!origin) return;
+    const current = dragRef.current;
+    const destination = current
+      ? current.kind === "create"
+        ? current.hover
+        : current.to
+      : origin.day;
+    const constraints = { minDate, maxDate, isDateDisabled };
+    if (
+      !isDateSelectable(origin.day, constraints) ||
+      !isDateSelectable(destination, constraints) ||
+      (origin.event
+        ? !onDragEvent || !events.includes(origin.event) || !canMoveEvent(origin.event)
+        : !onCreateEvent && !onSelectDrag)
+    ) {
+      heldTouch.current?.();
+    }
+  });
 
   // The day under a grid-relative point, plus the event bar drawn there (if any).
   // Returns null for a point on a blanked adjacent-month cell or an unselectable
@@ -597,13 +609,19 @@ function DateRowsInner<T>({
   );
 
   const beginDrag = useCallback(
-    (x: number, y: number) => {
+    (x: number, y: number, origin?: { day: Date; event: CalendarEvent<T> | null }) => {
       if (!mounted.current || (multiWeek && interactionWindow.current !== windowKey)) return;
+      if (
+        origin &&
+        (!isDateSelectable(origin.day, { minDate, maxDate, isDateDisabled }) ||
+          (origin.event && !events.includes(origin.event)))
+      )
+        return;
       // A fresh press starts a new interaction, so any guard left over from the
       // previous one (a drag whose trailing click never reached a cell) is stale.
       suppressPressRef.current = false;
       movedRef.current = false;
-      const hit = hitTest(x, y);
+      const hit = origin ?? hitTest(x, y);
       if (!hit) return;
       if (hit.event) {
         if (!onDragEvent || !canMoveEvent(hit.event)) return;
@@ -625,6 +643,10 @@ function DateRowsInner<T>({
       applyDrag,
       multiWeek,
       windowKey,
+      minDate,
+      maxDate,
+      isDateDisabled,
+      events,
     ],
   );
 
@@ -727,6 +749,8 @@ function DateRowsInner<T>({
     return () => target.removeEventListener?.("pointerup", up);
   }, [dragEnabled, endDrag, multiWeek]);
 
+  const webDragHandlers = useRef({ beginDrag, extendDrag });
+  webDragHandlers.current = { beginDrag, extendDrag };
   const pressWebGrid = (event: RNPointerEvent) => {
     const pointer = event.nativeEvent;
     if (multiWeek && (pointer.button !== 0 || pointer.isPrimary === false || heldTouch.current))
@@ -734,7 +758,7 @@ function DateRowsInner<T>({
     if (multiWeek) suppressPressRef.current = false;
     const start = () => {
       const point = gridPoint(pointer.clientX, pointer.clientY);
-      if (point) beginDrag(point.x, point.y);
+      if (point) webDragHandlers.current.beginDrag(point.x, point.y);
     };
     if (!multiWeek || !pointer.pointerType || pointer.pointerType === "mouse") {
       start();
@@ -743,13 +767,23 @@ function DateRowsInner<T>({
     // A native View ref is the host HTMLElement only on react-native-web.
     const node = gridRef.current as unknown as HTMLElement | null;
     if (!node) return;
+    const point = gridPoint(pointer.clientX, pointer.clientY);
+    if (!point) return;
+    const origin = hitTest(point.x, point.y);
+    if (!origin) return;
+    heldOrigin.current = origin;
     heldTouch.current = holdWebDateDrag(
       node,
       pointer,
-      start,
+      () => {
+        // Lane layout can change during the delay without removing the pressed
+        // event. Keep the original day/event instead of hit-testing again.
+        if (interactionWindow.current === windowKey)
+          webDragHandlers.current.beginDrag(point.x, point.y, origin);
+      },
       (x, y) => {
         const point = gridPoint(x, y);
-        if (point) extendDrag(point.x, point.y);
+        if (point) webDragHandlers.current.extendDrag(point.x, point.y);
       },
       () => {
         applyDrag(null);
@@ -757,6 +791,7 @@ function DateRowsInner<T>({
       },
       () => {
         heldTouch.current = null;
+        heldOrigin.current = null;
       },
     );
   };

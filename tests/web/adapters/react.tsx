@@ -23,6 +23,7 @@ import {
   YearView,
   type ResourceTimelineProps,
   type MonthListProps,
+  type MultiWeekViewProps,
   type DomRenderEventArgs as RenderEventArgs,
 } from "../../../packages/dom/src";
 export {
@@ -64,6 +65,22 @@ export function ControlledTimeGrid(props: TimeGridProps) {
         props.onChangeDate?.(next);
         setDate(next);
       }}
+    />
+  );
+}
+
+export function ControlledMultiWeekView(props: MultiWeekViewProps) {
+  const [selectedRange, setSelectedRange] = useState(props.selectedRange);
+  return (
+    <MultiWeekView
+      {...props}
+      events={props.events ? [...props.events] : undefined}
+      selectedRange={selectedRange}
+      onSelectDrag={(start, end) => {
+        setSelectedRange({ start, end });
+        props.onSelectDrag?.(start, end);
+      }}
+      onCreateEvent={(start, end) => props.onCreateEvent?.(start, end)}
     />
   );
 }

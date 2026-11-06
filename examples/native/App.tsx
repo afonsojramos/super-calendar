@@ -172,6 +172,7 @@ const FocusBand = ({ event, onPress }: RenderEventArgs<EventMeta>) => (
 export default function App() {
   const [mode, setMode] = useState<DemoTab>("week");
   const [numberOfWeeks, setNumberOfWeeks] = useState(2);
+  const [gridSelection, setGridSelection] = useState<DateRange | null>(null);
   const [date, setDate] = useState(() => new Date());
   const [events, setEvents] = useState<CalendarEvent<EventMeta>[]>(buildEvents);
   // Pull-to-refresh on the schedule list and the time grid: rebuild the demo
@@ -576,6 +577,14 @@ export default function App() {
                   <Calendar
                     mode={activeMode}
                     numberOfWeeks={numberOfWeeks}
+                    selectedRange={
+                      activeMode === "multiweek" ? (gridSelection ?? undefined) : undefined
+                    }
+                    onSelectDrag={
+                      activeMode === "multiweek"
+                        ? (start, end) => setGridSelection({ start, end })
+                        : undefined
+                    }
                     date={date}
                     events={events}
                     refreshControl={

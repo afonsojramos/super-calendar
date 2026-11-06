@@ -1,6 +1,12 @@
 import { createSignal, untrack } from "solid-js";
 import type { EventSource, EventSourceOptions } from "@super-calendar/core/vanilla";
-import { createEventSource, createNow, type NowOptions } from "../../../packages/solid/src";
+import {
+  createEventSource,
+  createNow,
+  MultiWeekView,
+  type MultiWeekViewProps,
+  type NowOptions,
+} from "../../../packages/solid/src";
 import { TimeGrid, type TimeGridProps } from "../../../packages/solid/src/TimeGrid";
 import { renderState } from "../../support/solid-render";
 import {
@@ -40,6 +46,22 @@ export function ControlledTimeGrid(props: TimeGridProps) {
         props.onChangeDate?.(next);
         setDate(next);
       }}
+    />
+  );
+}
+
+export function ControlledMultiWeekView(props: MultiWeekViewProps) {
+  const [selectedRange, setSelectedRange] = createSignal(untrack(() => props.selectedRange));
+  return (
+    <MultiWeekView
+      {...props}
+      events={props.events ? [...props.events] : undefined}
+      selectedRange={selectedRange()}
+      onSelectDrag={(start, end) => {
+        setSelectedRange({ start, end });
+        props.onSelectDrag?.(start, end);
+      }}
+      onCreateEvent={(start, end) => props.onCreateEvent?.(start, end)}
     />
   );
 }

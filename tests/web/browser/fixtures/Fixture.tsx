@@ -258,6 +258,10 @@ export function Fixture() {
           isDateDisabled={disabled() ? (day) => day.getDate() === 16 : undefined}
           height={view.includes("eight") ? 260 : 300}
           events={events()}
+          selectedRange={view === "multiweek-selection" ? (range() ?? undefined) : undefined}
+          onSelectDrag={
+            view === "multiweek-selection" ? (start, end) => setRange({ start, end }) : undefined
+          }
           keyboardDayNavigation
           onChangeDate={setDate}
           onCreateEvent={(start, end) => record(`${clock(start)}-${clock(end)}`)}
@@ -439,6 +443,11 @@ export function Fixture() {
         />
       )}
       <output aria-label="Calls">{JSON.stringify(calls())}</output>
+      {view === "multiweek-selection" ? (
+        <output aria-label="Selection">
+          {range()?.end ? `${clock(range()!.start)}-${clock(range()!.end!)}` : ""}
+        </output>
+      ) : null}
       <output aria-label="Drag starts">{dragStarts()}</output>
       <output aria-label="Revision">{revision()}</output>
     </main>

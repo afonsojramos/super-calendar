@@ -4,6 +4,7 @@ import type { CalendarEvent, WeekStartsOn } from "@super-calendar/core/vanilla";
 import {
   act,
   Calendar,
+  ControlledMultiWeekView,
   MultiWeekView,
   MonthView,
   fireEvent,
@@ -171,35 +172,79 @@ describe(rendererName, () => {
       beforeEach(() => vi.useFakeTimers());
       afterEach(() => vi.useRealTimers());
 
-      it.each(
-        [0, 400].flatMap((delay) =>
-          [
-            "selection callback",
-            "event removed",
-            "event locked",
-            "start callback",
-            "minDate",
-            "maxDate",
-            "predicate",
-          ].map((change) => ({ delay, change })),
-        ),
-      )("cancels a $delay ms hold when $change changes", async ({ delay, change }) => {
+      it("keeps a live selection when inline callbacks update parent state", async () => {
         const onSelectDrag = vi.fn();
-        const replacement = vi.fn();
         const onCreateEvent = vi.fn();
-        const onDragEvent = vi.fn();
-        const onDragStart = vi.fn();
-        const props = {
+        const view = render(ControlledMultiWeekView, {
           ...base,
           events: [meeting],
           onSelectDrag,
           onCreateEvent,
-          onDragEvent,
+        });
+        const point = { pointerId: 1, pointerType: "touch", clientX: 10, clientY: 10 };
+        let target = cell(view.container, "2031-01-01");
+        const original = Object.getOwnPropertyDescriptor(document, "elementFromPoint");
+        Object.defineProperty(document, "elementFromPoint", {
+          configurable: true,
+          value: () => target,
+        });
+        try {
+          fireEvent.pointerDown(cell(view.container, "2030-12-30"), point);
+          await act(() => vi.advanceTimersByTime(400));
+          fireEvent.pointerMove(document, { ...point, clientY: 100 });
+          target = cell(view.container, "2031-01-02");
+          fireEvent.pointerMove(document, { ...point, clientY: 150 });
+          fireEvent.pointerUp(document, { ...point, clientY: 150 });
+          expect(onSelectDrag).toHaveBeenNthCalledWith(
+            2,
+            new Date(2030, 11, 30),
+            new Date(2031, 0, 2),
+          );
+          expect(onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+            new Date(2030, 11, 30),
+            new Date(2031, 0, 3),
+          );
+        } finally {
+          if (original) Object.defineProperty(document, "elementFromPoint", original);
+          else delete (document as { elementFromPoint?: unknown }).elementFromPoint;
+          view.unmount();
+        }
+      });
+
+      it.each(
+        [0, 400].flatMap((delay) =>
+          [
+            "event removed",
+            "event locked",
+            "event handlers removed",
+            "creation handlers removed",
+            "minDate",
+            "maxDate",
+            "predicate",
+          ].map((change) => ({
+            delay,
+            change,
+          })),
+        ),
+      )("rejects a $delay ms held drag after $change invalidates it", async ({ delay, change }) => {
+        const onSelectDrag = vi.fn();
+        const onCreateEvent = vi.fn();
+        const onDragEvent = vi.fn();
+        const onDragStart = vi.fn();
+        const callbacks = (enabled: boolean) => ({
+          onSelectDrag: enabled ? onSelectDrag : undefined,
+          onCreateEvent: enabled ? onCreateEvent : undefined,
+          onDragEvent: enabled ? onDragEvent : undefined,
           onDragStart,
+        });
+        const props = {
+          ...base,
+          events: [meeting],
+          ...callbacks(true),
           eventStartEditable: true,
         };
         const view = render(MultiWeekView, props);
-        const moving = change.startsWith("event") || change === "start callback";
+        const moving = change.startsWith("event");
         const origin = moving ? view.getByTitle("Meeting") : cell(view.container, "2030-12-30");
         const point = { pointerId: 1, pointerType: "touch", clientX: 10, clientY: 10 };
         fireEvent.pointerDown(origin, point);
@@ -207,10 +252,9 @@ describe(rendererName, () => {
         onDragStart.mockClear();
         view.rerender({
           ...props,
-          ...(change === "selection callback" ? { onSelectDrag: replacement } : {}),
+          ...(change.endsWith("handlers removed") ? callbacks(false) : {}),
           ...(change === "event removed" ? { events: [] } : {}),
           ...(change === "event locked" ? { eventStartEditable: false } : {}),
-          ...(change === "start callback" ? { onDragStart: replacement } : {}),
           ...(change === "minDate" ? { minDate: new Date(2031, 0, 4) } : {}),
           ...(change === "maxDate" ? { maxDate: new Date(2030, 11, 31) } : {}),
           ...(change === "predicate" ? { isDateDisabled: () => true } : {}),
@@ -225,7 +269,6 @@ describe(rendererName, () => {
           fireEvent.pointerMove(document, { ...point, clientY: 150 });
           fireEvent.pointerUp(document, { ...point, clientY: 150 });
           expect(onSelectDrag).not.toHaveBeenCalled();
-          expect(replacement).not.toHaveBeenCalled();
           expect(onCreateEvent).not.toHaveBeenCalled();
           expect(onDragEvent).not.toHaveBeenCalled();
           expect(onDragStart).not.toHaveBeenCalled();
@@ -235,6 +278,98 @@ describe(rendererName, () => {
           view.unmount();
         }
       });
+
+      it.each(
+        [0, 400].flatMap((delay) =>
+          [false, true].flatMap((moving) =>
+            ["callbacks", "event list", "equivalent constraints"].map((change) => ({
+              delay,
+              moving,
+              change,
+            })),
+          ),
+        ),
+      )(
+        "keeps a $delay ms hold with moving=$moving after $change updates",
+        async ({ delay, moving, change }) => {
+          const onCreateEvent = vi.fn();
+          const onDragEvent = vi.fn();
+          const onDragStart = vi.fn();
+          const onSelectDrag = vi.fn();
+          const latest = {
+            onCreateEvent: vi.fn(),
+            onDragEvent: vi.fn(),
+            onDragStart: vi.fn(),
+            onSelectDrag: vi.fn(),
+          };
+          const props = {
+            ...base,
+            events: [meeting],
+            onCreateEvent,
+            onDragEvent,
+            onDragStart,
+            onSelectDrag,
+            minDate: new Date(2030, 11, 23),
+            maxDate: new Date(2031, 0, 5),
+            isDateDisabled: (_day: Date) => false,
+          };
+          const view = render(MultiWeekView, props);
+          const point = { pointerId: 1, pointerType: "touch", clientX: 10, clientY: 10 };
+          const origin = moving ? view.getByTitle("Meeting") : cell(view.container, "2030-12-30");
+          const original = Object.getOwnPropertyDescriptor(document, "elementFromPoint");
+          Object.defineProperty(document, "elementFromPoint", {
+            configurable: true,
+            value: () => cell(view.container, "2031-01-02"),
+          });
+          try {
+            fireEvent.pointerDown(origin, point);
+            await act(() => vi.advanceTimersByTime(delay));
+            view.rerender({
+              ...props,
+              ...(change === "callbacks" ? latest : {}),
+              ...(change === "event list" ? { events: [...props.events] } : {}),
+              ...(change === "equivalent constraints"
+                ? {
+                    minDate: new Date(props.minDate),
+                    maxDate: new Date(props.maxDate),
+                    isDateDisabled: () => false,
+                  }
+                : {}),
+            });
+            await act(() => vi.advanceTimersByTime(400));
+            fireEvent.pointerMove(document, { ...point, clientY: 150 });
+            fireEvent.pointerUp(document, { ...point, clientY: 150 });
+            const expected = change === "callbacks" ? latest : props;
+            if (moving) {
+              expect(expected.onDragEvent).toHaveBeenCalledExactlyOnceWith(
+                meeting,
+                new Date(2031, 0, 2, 9),
+                new Date(2031, 0, 2, 10),
+              );
+              if (delay === 0)
+                expect(expected.onDragStart).toHaveBeenCalledExactlyOnceWith(meeting);
+            } else {
+              expect(expected.onSelectDrag).toHaveBeenCalledExactlyOnceWith(
+                new Date(2030, 11, 30),
+                new Date(2031, 0, 2),
+              );
+              expect(expected.onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+                new Date(2030, 11, 30),
+                new Date(2031, 0, 3),
+              );
+            }
+            if (change === "callbacks") {
+              expect(onCreateEvent).not.toHaveBeenCalled();
+              expect(onDragEvent).not.toHaveBeenCalled();
+              expect(onSelectDrag).not.toHaveBeenCalled();
+            }
+          } finally {
+            if (original) Object.defineProperty(document, "elementFromPoint", original);
+            else delete (document as { elementFromPoint?: unknown }).elementFromPoint;
+            view.unmount();
+          }
+        },
+      );
     });
 
     it.each(["month", "multiweek"] as const)(

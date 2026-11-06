@@ -886,14 +886,29 @@ export function DateRows<T = unknown>({
     }
   };
   const heldTouch = useRef<(() => void) | null>(null);
-  const pressRow = (event: ReactPointerEvent<HTMLElement>, start: () => void) => {
+  const heldOrigin = useRef<{ day: Date; event?: CalendarEvent<T> } | null>(null);
+  const dayLookup = useMemo(
+    () => new Map(weeks.flatMap((week) => week.days).map((day) => [day.id, day])),
+    [weeks],
+  );
+  const touchHandlers = useRef({ beginCreate, beginMove, extendDrag, dayLookup });
+  touchHandlers.current = { beginCreate, beginMove, extendDrag, dayLookup };
+  const pressRow = (
+    event: ReactPointerEvent<HTMLElement>,
+    day: Date,
+    moving?: CalendarEvent<T>,
+  ) => {
     if (event.button !== 0 || event.isPrimary === false || heldTouch.current) return;
     beginPress();
+    const start = () => {
+      if (moving) touchHandlers.current.beginMove(moving, day);
+      else touchHandlers.current.beginCreate(day);
+    };
     if (!multiWeek || !event.pointerType || event.pointerType === "mouse") {
       start();
       return;
     }
-    const lookup = new Map(weeks.flatMap((week) => week.days).map((day) => [day.id, day]));
+    heldOrigin.current = { day, event: moving };
     heldTouch.current = holdDateDrag(
       {
         box: event.currentTarget,
@@ -908,8 +923,8 @@ export function DateRows<T = unknown>({
           .elementFromPoint(x, y)
           ?.closest<HTMLElement>("[data-day]");
         if (!element || !gridRef.current?.contains(element)) return;
-        const day = lookup.get(element.dataset.day ?? "");
-        if (day && !day.isDisabled) extendDrag(day.date);
+        const day = touchHandlers.current.dayLookup.get(element.dataset.day ?? "");
+        if (day && !day.isDisabled) touchHandlers.current.extendDrag(day.date);
       },
       () => {
         dragRef.current = null;
@@ -918,6 +933,7 @@ export function DateRows<T = unknown>({
       },
       () => {
         heldTouch.current = null;
+        heldOrigin.current = null;
       },
     );
   };
@@ -925,19 +941,31 @@ export function DateRows<T = unknown>({
     () => () => {
       heldTouch.current?.();
     },
-    [
-      windowKey,
-      onCreateEvent,
-      onDragEvent,
-      onSelectDrag,
-      onDragStart,
-      events,
-      eventStartEditable,
-      minDate,
-      maxDate,
-      isDateDisabled,
-    ],
+    [windowKey],
   );
+  // Parent selection updates can replace callbacks and equivalent props during
+  // a hold. Cancel only when its origin or current destination becomes invalid.
+  useEffect(() => {
+    const origin = heldOrigin.current;
+    if (!origin) return;
+    const current = dragRef.current;
+    const destination = current
+      ? new Date(current.kind === "create" ? current.hover : current.to)
+      : origin.day;
+    const enabled = (day: Date) => {
+      const cell = dayLookup.get(format(day, "yyyy-MM-dd"));
+      return cell != null && !cell.isDisabled;
+    };
+    if (
+      !enabled(origin.day) ||
+      !enabled(destination) ||
+      (origin.event
+        ? !events?.includes(origin.event) || !canMove(origin.event)
+        : !onCreateEvent && !onSelectDrag)
+    ) {
+      heldTouch.current?.();
+    }
+  });
   const isDragging = drag !== null;
   // Whether any month drag is wired up at all, so the cells only take over touch
   // scrolling and pointer tracking when one of the handlers can actually fire.
@@ -1242,7 +1270,7 @@ export function DateRows<T = unknown>({
                       onPointerDown={
                         dragWired && !day.isDisabled
                           ? (e) => {
-                              pressRow(e, () => beginCreate(day.date));
+                              pressRow(e, day.date);
                             }
                           : undefined
                       }
@@ -1298,7 +1326,7 @@ export function DateRows<T = unknown>({
                                   ? (e) => {
                                       if (e.button !== 0) return;
                                       e.stopPropagation();
-                                      pressRow(e, () => beginMove(b.seg.event, day.date));
+                                      pressRow(e, day.date, b.seg.event);
                                     }
                                   : undefined
                               }
