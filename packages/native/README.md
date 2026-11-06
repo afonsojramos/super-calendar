@@ -98,6 +98,10 @@ Counts must be positive safe integers whose date span is representable; invalid
 counts or dates throw `RangeError`. Rows are materialized, so larger counts need
 more space. `MonthView` and `MonthPager` retain their month-only behavior.
 
+Keep `events` stable during unrelated UI updates. With recurrence or `timeZone`,
+replacing the array rebuilds displayed events and cancels a held move on web. See
+[keep event data stable](https://super-calendar.afonsojramos.me/guides/events#keep-event-data-stable).
+
 ## Moving events
 
 Pass `onDragEvent` and update your event state with the returned `start` and `end`.

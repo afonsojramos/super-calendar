@@ -4,6 +4,7 @@ import type { CalendarEvent, WeekStartsOn } from "@super-calendar/core/vanilla";
 import {
   act,
   Calendar,
+  ControlledDragCalendar,
   ControlledMultiWeekView,
   MultiWeekView,
   MonthView,
@@ -490,6 +491,68 @@ describe(rendererName, () => {
   });
 
   describe("multiweek Calendar", () => {
+    it.each(
+      ["time zone", "recurrence", "both"].flatMap((processing) =>
+        [false, true].map((refresh) => ({
+          processing,
+          refresh,
+          outcome: refresh ? "cancels" : "commits",
+        })),
+      ),
+    )(
+      "$outcome a held move with $processing after onDragStart updates parent state",
+      async ({ processing, refresh }) => {
+        vi.useFakeTimers();
+        const event: CalendarEvent = {
+          ...meeting,
+          ...(processing !== "time zone" ? { recurrence: { freq: "daily", count: 1 } } : {}),
+        };
+        const onDragEvent = vi.fn();
+        const onDragStart = vi.fn();
+        const props = {
+          ...base,
+          mode: "multiweek" as const,
+          events: [event],
+          ...(processing !== "recurrence" ? { timeZone: "Europe/Lisbon" } : {}),
+          onDragStart,
+          onDragEvent,
+        };
+        const view = render(ControlledDragCalendar, {
+          ...props,
+          refreshEventsOnDragStart: refresh,
+        });
+        const point = { pointerId: 1, pointerType: "touch", clientX: 10, clientY: 10 };
+        const original = Object.getOwnPropertyDescriptor(document, "elementFromPoint");
+        Object.defineProperty(document, "elementFromPoint", {
+          configurable: true,
+          value: () => cell(view.container, "2031-01-02"),
+        });
+        try {
+          fireEvent.pointerDown(view.getByTitle("Meeting"), point);
+          await act(() => vi.advanceTimersByTime(400));
+          expect(onDragStart).toHaveBeenCalledOnce();
+          expect(view.getByLabelText("Drag started").textContent).toBe("true");
+          fireEvent.pointerMove(document, { ...point, clientY: 150 });
+          fireEvent.pointerUp(document, { ...point, clientY: 150 });
+          if (refresh) expect(onDragEvent).not.toHaveBeenCalled();
+          else {
+            const dragged: CalendarEvent = onDragStart.mock.calls[0][0];
+            expect(onDragEvent).toHaveBeenCalledExactlyOnceWith(
+              dragged,
+              addDays(dragged.start, 3),
+              addDays(dragged.end, 3),
+            );
+            expect(onDragEvent.mock.calls[0][0]).toBe(dragged);
+          }
+        } finally {
+          if (original) Object.defineProperty(document, "elementFromPoint", original);
+          else delete (document as { elementFromPoint?: unknown }).elementFromPoint;
+          view.unmount();
+          vi.useRealTimers();
+        }
+      },
+    );
+
     it.each([2, 3, 4, 8])("pages %i weeks in either direction", (numberOfWeeks) => {
       const onChangeDate = vi.fn();
       const view = render(Calendar, { ...base, mode: "multiweek", numberOfWeeks, onChangeDate });

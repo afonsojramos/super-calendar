@@ -15,6 +15,9 @@ type FixtureEvent = CalendarEvent<{ id: number }>;
 const initialEvents: FixtureEvent[] = [
   { id: 0, title: "Planning", start: new Date(2026, 6, 15, 9), end: new Date(2026, 6, 15, 10) },
 ];
+const recurringEvents: FixtureEvent[] = [
+  { ...initialEvents[0], recurrence: { freq: "daily", count: 1 } },
+];
 const denseEvents: FixtureEvent[] = Array.from({ length: 1000 }, (_, index) => {
   const start = new Date(
     2026,
@@ -161,17 +164,19 @@ export function Fixture() {
     end: new Date(2026, 6, 16),
   });
   const [events, setEvents] = useFixtureState(
-    view === "dense"
-      ? denseEvents
-      : view === "edit-clipped"
-        ? clippedEvents
-        : view === "edit-crowded"
-          ? crowdedEvents
-          : view === "edit-many" || (view.startsWith("multiweek") && view.endsWith("dense"))
-            ? manyEvents
-            : view === "edit"
-              ? editEvents
-              : initialEvents,
+    view === "multiweek-transformed"
+      ? recurringEvents
+      : view === "dense"
+        ? denseEvents
+        : view === "edit-clipped"
+          ? clippedEvents
+          : view === "edit-crowded"
+            ? crowdedEvents
+            : view === "edit-many" || (view.startsWith("multiweek") && view.endsWith("dense"))
+              ? manyEvents
+              : view === "edit"
+                ? editEvents
+                : initialEvents,
   );
   const [boardEvents, setBoardEvents] = useFixtureState(
     view.endsWith("crowded")
@@ -258,6 +263,10 @@ export function Fixture() {
           isDateDisabled={disabled() ? (day) => day.getDate() === 16 : undefined}
           height={view.includes("eight") ? 260 : 300}
           events={events()}
+          timeZone={view === "multiweek-transformed" ? "Europe/Lisbon" : undefined}
+          onDragStart={
+            view === "multiweek-transformed" ? () => setDragStarts((count) => count + 1) : undefined
+          }
           selectedRange={view === "multiweek-selection" ? (range() ?? undefined) : undefined}
           onSelectDrag={
             view === "multiweek-selection" ? (start, end) => setRange({ start, end }) : undefined

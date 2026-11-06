@@ -652,6 +652,10 @@ In the multi-week web grid, a quick touch swipe scrolls. Hold a day or event for
 400 ms, then drag to create or move. Mouse input starts immediately. Cancelling
 the pointer or changing the displayed window cancels the hold or drag.
 
+Keep `events` stable during unrelated UI updates. With recurrence or `timeZone`,
+replacing the array rebuilds displayed events and cancels a held web move. See
+[keep event data stable](https://super-calendar.afonsojramos.me/guides/events#keep-event-data-stable).
+
 ### Month view
 
 A single-day event shows as a chip in its day; a multi-day event draws as one

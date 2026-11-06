@@ -52,25 +52,36 @@ describe(rendererName, () => {
     }
   });
 
-  it("holds an event to move it across rows", async () => {
-    await open("multiweek");
-    const from = await box('[title="Planning"]');
-    const to = await box('[data-day="2026-07-22"]');
-    const contact = { x: from.x + from.width / 2, y: from.y + from.height / 2, id: 1 };
-    const cdp = await page.context().newCDPSession(page);
-    try {
-      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [contact] });
-      await page.waitForTimeout(450);
-      await cdp.send("Input.dispatchTouchEvent", {
-        type: "touchMove",
-        touchPoints: [{ ...contact, x: to.x + to.width / 2, y: to.y + 10 }],
-      });
-      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-      await expect.poll(calls).toBe('["Planning@22:9:0-22:10:0"]');
-    } finally {
-      await cdp.detach();
-    }
-  });
+  it.each(["multiweek", "multiweek-transformed"])(
+    "holds an event across rows in %s",
+    async (view) => {
+      await open(view);
+      const from = await box('[title="Planning"]');
+      const to = await box('[data-day="2026-07-22"]');
+      const contact = { x: from.x + from.width / 2, y: from.y + from.height / 2, id: 1 };
+      const cdp = await page.context().newCDPSession(page);
+      try {
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [contact] });
+        await page.waitForTimeout(450);
+        if (view === "multiweek-transformed")
+          await expect.poll(() => page.getByLabel("Drag starts").textContent()).toBe("1");
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ ...contact, x: to.x + to.width / 2, y: to.y + 10 }],
+        });
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await expect
+          .poll(calls)
+          .toBe(
+            view === "multiweek-transformed"
+              ? '["Planning@22:8:0-22:9:0"]'
+              : '["Planning@22:9:0-22:10:0"]',
+          );
+      } finally {
+        await cdp.detach();
+      }
+    },
+  );
 
   it.each([0, 450])("cancels a %ims hold when the window changes", async (delay) => {
     await open("multiweek");

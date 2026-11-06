@@ -203,6 +203,11 @@ selection, drag interactions, and styling. `renderMonthEvent` on web `Calendar`,
 and native `renderHeaderForMonthView`/`renderCustomDateForMonth`, also apply here.
 Custom event callbacks receive `mode: "multiweek"`.
 
+Held web moves track event object identity. With `Calendar` recurrence or
+`timeZone`, replacing the `events` array rebuilds displayed events and cancels
+the move. The native `keyExtractor` does not preserve gesture identity across replacements.
+See [keep event data stable](/guides/events#keep-event-data-stable).
+
 Web `Calendar` uses `height` to constrain the rows; standalone web views accept
 `style`. Native fills its parent. Rows scroll rather than shrink below their
 content height. `MonthView` and `MonthPager` remain month-only components.

@@ -4,6 +4,8 @@ import {
   createEventSource,
   createNow,
   MultiWeekView,
+  Calendar,
+  type CalendarProps,
   type MultiWeekViewProps,
   type NowOptions,
 } from "../../../packages/solid/src";
@@ -63,6 +65,25 @@ export function ControlledMultiWeekView(props: MultiWeekViewProps) {
       }}
       onCreateEvent={(start, end) => props.onCreateEvent?.(start, end)}
     />
+  );
+}
+
+export function ControlledDragCalendar(
+  props: CalendarProps & { refreshEventsOnDragStart: boolean },
+) {
+  const [started, setStarted] = createSignal(false);
+  return (
+    <>
+      <output aria-label="Drag started">{String(started())}</output>
+      <Calendar
+        {...props}
+        events={props.refreshEventsOnDragStart && started() ? props.events?.slice() : props.events}
+        onDragStart={(event) => {
+          setStarted(true);
+          props.onDragStart?.(event);
+        }}
+      />
+    </>
   );
 }
 
