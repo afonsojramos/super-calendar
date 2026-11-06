@@ -495,6 +495,25 @@ function collectRowEvents<T>(
 }
 
 /**
+ * Which rows a {@link DateRows} grid shows. Internal to the package: the public
+ * views adapt their own props to it.
+ */
+export type DateRowsSource = {
+  kind: "month";
+  /** Any day within the month to render. */
+  date: Date;
+  showAdjacentMonths: boolean;
+};
+
+/** Props for the private {@link DateRows} grid shared by the public row views. */
+export interface DateRowsProps<T = unknown> extends Omit<
+  MonthViewInternalProps<T>,
+  "date" | "showAdjacentMonths"
+> {
+  source: DateRowsSource;
+}
+
+/**
  * A single static month grid, rendered with plain DOM elements.
  *
  * @example
@@ -502,7 +521,28 @@ function collectRowEvents<T>(
  * <MonthView date={new Date()} events={events} onPressDay={(d) => setDate(d)} />
  * ```
  */
-export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX.Element {
+export function MonthView<T = unknown>(props: MonthViewInternalProps<T>): JSX.Element {
+  return (
+    <DateRows<T>
+      {...props}
+      source={{
+        kind: "month",
+        get date() {
+          return props.date;
+        },
+        get showAdjacentMonths() {
+          return props.showAdjacentMonths ?? true;
+        },
+      }}
+    />
+  );
+}
+
+/**
+ * The day-row grid behind the public row views: week rows of day cells with
+ * spanning event bars, overflow, selection, drag, and keyboard handling.
+ */
+export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
   const props = withDefaults(
     {
       weekStartsOn: 0,
@@ -511,7 +551,6 @@ export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX
       chipHeight: CHIP_HEIGHT,
       chipGap: CHIP_GAP,
       moreLabel: "{moreCount} More",
-      showAdjacentMonths: true,
       highlightWeekends: true,
       fillCellOnSelection: false,
       showTitle: true,
@@ -519,7 +558,7 @@ export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX
       eventStartEditable: true,
       eventOverlap: true,
       keyboardDayNavigation: false,
-    } satisfies Partial<MonthViewInternalProps<T>>,
+    } satisfies Partial<DateRowsProps<T>>,
     incoming,
   );
   const theme = createMemo(() => mergeSolidTheme(props.theme));
@@ -600,7 +639,7 @@ export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX
     () => CELL_PAD * 2 + DATE_ROW + props.maxVisibleEventCount * (props.chipHeight + props.chipGap),
   );
   const _grid = createMemo(() =>
-    buildMonthGrid(props.date, {
+    buildMonthGrid(props.source.date, {
       weekStartsOn: props.weekStartsOn,
       hiddenDays: props.hiddenDays,
       weekdayFormat: props.weekdayFormat,
@@ -629,12 +668,14 @@ export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX
   // Roving tabindex: only one day is in the tab order; arrow keys move focus
   // within the month, so the grid is a single, sensible tab stop.
   const initialFocus = createMemo(() => {
-    const inMonth = (d?: Date | null) => !!d && isSameMonth(d, props.date);
+    const inMonth = (d?: Date | null) => !!d && isSameMonth(d, props.source.date);
     if (inMonth(props.selectedRange?.start)) return startOfDay(props.selectedRange!.start);
     const picked = props.selectedDates?.find(inMonth);
     if (picked) return startOfDay(picked);
     const today = new Date();
-    return isSameMonth(today, props.date) ? startOfDay(today) : startOfMonth(props.date);
+    return isSameMonth(today, props.source.date)
+      ? startOfDay(today)
+      : startOfMonth(props.source.date);
   });
   const [focusedDate, setFocusedDate] = createSignal(untrack(() => initialFocus()));
   const initialFocusRef = {
@@ -646,7 +687,7 @@ export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX
       initialFocusRef.current = value;
     },
   );
-  const monthKey = createMemo(() => format(props.date, "yyyy-MM"));
+  const monthKey = createMemo(() => format(props.source.date, "yyyy-MM"));
   let focusedMonth = untrack(monthKey);
   createEffect(monthKey, (month) =>
     untrack(() => {
@@ -801,11 +842,11 @@ export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX
     else if (e.key === "ArrowRight") next = addDays(focusedDate(), 1);
     else if (e.key === "ArrowUp") next = addDays(focusedDate(), -7);
     else if (e.key === "ArrowDown") next = addDays(focusedDate(), 7);
-    else if (e.key === "Home") next = startOfMonth(props.date);
-    else if (e.key === "End") next = endOfMonth(props.date);
+    else if (e.key === "Home") next = startOfMonth(props.source.date);
+    else if (e.key === "End") next = endOfMonth(props.source.date);
     else return;
     e.preventDefault();
-    if (!isSameMonth(next, props.date)) return;
+    if (!isSameMonth(next, props.source.date)) return;
     setFocusedDate(next);
     const key = format(next, "yyyy-MM-dd");
     gridRef.current?.querySelector<HTMLElement>(`[data-day="${key}"]`)?.focus();
@@ -830,7 +871,7 @@ export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX
           })}
         >
           {format(
-            props.date,
+            props.source.date,
             "MMMM yyyy",
             props.locale
               ? {
@@ -877,7 +918,7 @@ export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX
         ref={(el) => (gridRef.current = el)}
         role="grid"
         aria-label={format(
-          props.date,
+          props.source.date,
           "MMMM yyyy",
           props.locale
             ? {
@@ -913,7 +954,7 @@ export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX
               const columns = createMemo(() => {
                 let first = 0;
                 let last = cols() - 1;
-                if (eventsMode() && !props.showAdjacentMonths) {
+                if (eventsMode() && !props.source.showAdjacentMonths) {
                   const start = week().days.findIndex((d) => d.isCurrentMonth);
                   const end = [...week().days].reverse().findIndex((d) => d.isCurrentMonth);
                   if (start !== -1) {
@@ -963,7 +1004,7 @@ export function MonthView<T = unknown>(incoming: MonthViewInternalProps<T>): JSX
                           <For each={week().days} keyed={false}>
                             {(day, dayCol) => {
                               const hidden = createMemo(
-                                () => !props.showAdjacentMonths && !day().isCurrentMonth,
+                                () => !props.source.showAdjacentMonths && !day().isCurrentMonth,
                               );
                               const cellHeight = createMemo(() =>
                                 eventsMode() ? eventRowHeight() : theme().cellHeight,

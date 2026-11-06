@@ -475,6 +475,25 @@ function collectRowEvents<T>(
 }
 
 /**
+ * Which rows a {@link DateRows} grid shows. Internal to the package: the public
+ * views adapt their own props to it.
+ */
+export type DateRowsSource = {
+  kind: "month";
+  /** Any day within the month to render. */
+  date: Date;
+  showAdjacentMonths: boolean;
+};
+
+/** Props for the private {@link DateRows} grid shared by the public row views. */
+export interface DateRowsProps<T = unknown> extends Omit<
+  MonthViewInternalProps<T>,
+  "date" | "showAdjacentMonths"
+> {
+  source: DateRowsSource;
+}
+
+/**
  * A single static month grid, rendered with plain DOM elements.
  *
  * @example
@@ -484,6 +503,18 @@ function collectRowEvents<T>(
  */
 export function MonthView<T = unknown>({
   date,
+  showAdjacentMonths = true,
+  ...rest
+}: MonthViewInternalProps<T>): ReactElement {
+  return <DateRows<T> {...rest} source={{ kind: "month", date, showAdjacentMonths }} />;
+}
+
+/**
+ * The day-row grid behind the public row views: week rows of day cells with
+ * spanning event bars, overflow, selection, drag, and keyboard handling.
+ */
+export function DateRows<T = unknown>({
+  source,
   weekStartsOn = 0,
   hiddenDays,
   weekdayFormat = "short",
@@ -500,7 +531,6 @@ export function MonthView<T = unknown>({
   onPressMore,
   selectedRange,
   selectedDates,
-  showAdjacentMonths = true,
   highlightWeekends = true,
   fillCellOnSelection = false,
   showTitle = true,
@@ -523,7 +553,8 @@ export function MonthView<T = unknown>({
   style,
   classNames,
   styles,
-}: MonthViewInternalProps<T>): ReactElement {
+}: DateRowsProps<T>): ReactElement {
+  const { date, showAdjacentMonths } = source;
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
   const labels = useMemo(() => resolveCalendarLabels(labelsProp), [labelsProp]);
   const slot = createSlots<MonthViewSlot>({ classNames, styles });

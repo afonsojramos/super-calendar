@@ -46,7 +46,7 @@ import {
 import type { CalendarLabels } from "@super-calendar/core";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
-import { MonthView, type MonthViewSlot } from "./MonthView";
+import { DateRows, type DateRowsSource, type MonthViewSlot } from "./MonthView";
 
 // Horizontal swipe paging doesn't translate to web; there we disable it and page
 // with the arrow keys instead.
@@ -130,7 +130,38 @@ export type MonthPagerProps<T> = {
   renderCustomDateForMonth?: (date: Date) => React.ReactNode;
 } & SlotStyleProps<MonthViewSlot>;
 
+/**
+ * Which pages a {@link DateRowsPager} swipes through. Internal to the package:
+ * the public pagers and `Calendar` adapt their own props to it.
+ */
+export type DateRowsPagerSpec = {
+  kind: "month";
+  showAdjacentMonths: boolean;
+  showSixWeeks: boolean;
+};
+
+/** Props for the private {@link DateRowsPager}. */
+export type DateRowsPagerProps<T> = Omit<
+  MonthPagerProps<T>,
+  "showAdjacentMonths" | "showSixWeeks"
+> & {
+  spec: DateRowsPagerSpec;
+};
+
 function MonthPagerInner<T>({
+  showAdjacentMonths = true,
+  showSixWeeks = false,
+  ...rest
+}: MonthPagerProps<T>): ReactElement {
+  const spec = useMemo<DateRowsPagerSpec>(
+    () => ({ kind: "month", showAdjacentMonths, showSixWeeks }),
+    [showAdjacentMonths, showSixWeeks],
+  );
+  return <DateRowsPager<T> {...rest} spec={spec} />;
+}
+
+function DateRowsPagerInner<T>({
+  spec,
   date,
   events,
   maxVisibleEventCount,
@@ -143,7 +174,6 @@ function MonthPagerInner<T>({
   sortedMonthView,
   moreLabel,
   labels,
-  showAdjacentMonths,
   highlightWeekends,
   disableMonthEventCellPress,
   isRTL,
@@ -171,14 +201,13 @@ function MonthPagerInner<T>({
   onChangeDate,
   freeSwipe = false,
   swipeEnabled = true,
-  showSixWeeks = false,
   showTitle = true,
   activeDate,
   renderHeaderForMonthView,
   renderCustomDateForMonth,
   classNames,
   styles: styleOverrides,
-}: MonthPagerProps<T>): ReactElement {
+}: DateRowsPagerProps<T>): ReactElement {
   const theme = useCalendarTheme();
   // Stable across renders (it feeds the memoized renderItem below).
   const slot = useMemo(
@@ -325,14 +354,33 @@ function MonthPagerInner<T>({
     [selectedDates, selectedRange, minDate, maxDate, isDateDisabled],
   );
 
+  // One source object per page date, so a memoized page skips re-rendering when
+  // the list calls `renderItem` again with unchanged inputs.
+  const sourceFor = useMemo(() => {
+    const cache = new WeakMap<Date, DateRowsSource>();
+    return (item: Date): DateRowsSource => {
+      let source = cache.get(item);
+      if (!source) {
+        source = {
+          kind: "month",
+          date: item,
+          showAdjacentMonths: spec.showAdjacentMonths,
+          showSixWeeks: spec.showSixWeeks,
+        };
+        cache.set(item, source);
+      }
+      return source;
+    };
+  }, [spec]);
+
   const snapToIndices = useMemo(() => monthDates.map((_, index) => index), [monthDates]);
   const keyExtractorList = useCallback((item: Date) => item.toISOString(), []);
   const getFixedItemSize = useCallback(() => containerWidth, [containerWidth]);
   const renderItem = useCallback(
     ({ item }: LegendListRenderItemProps<Date>) => (
       <View style={{ width: containerWidth, height: pageHeight }}>
-        <MonthView
-          date={item}
+        <DateRows
+          source={sourceFor(item)}
           events={events}
           // The pager shows one shared weekday header and the month title above it
           // (see below), so each page's grid omits its own title and weekday row.
@@ -347,11 +395,9 @@ function MonthPagerInner<T>({
           sortedMonthView={sortedMonthView}
           moreLabel={moreLabel}
           labels={labels}
-          showAdjacentMonths={showAdjacentMonths}
           highlightWeekends={highlightWeekends}
           disableMonthEventCellPress={disableMonthEventCellPress}
           isRTL={isRTL}
-          showSixWeeks={showSixWeeks}
           activeDate={activeDate}
           calendarCellStyle={calendarCellStyle}
           renderEvent={renderEvent}
@@ -388,11 +434,10 @@ function MonthPagerInner<T>({
       sortedMonthView,
       moreLabel,
       labels,
-      showAdjacentMonths,
+      sourceFor,
       highlightWeekends,
       disableMonthEventCellPress,
       isRTL,
-      showSixWeeks,
       activeDate,
       calendarCellStyle,
       renderEvent,
@@ -505,6 +550,9 @@ function MonthPagerInner<T>({
  * ```
  */
 export const MonthPager = memo(MonthPagerInner) as typeof MonthPagerInner;
+
+/** The swipeable pager behind `MonthPager` and `Calendar`'s row modes. */
+export const DateRowsPager = memo(DateRowsPagerInner) as typeof DateRowsPagerInner;
 
 type MonthWeekdayHeaderProps = {
   weekDays: Date[];

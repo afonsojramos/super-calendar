@@ -279,8 +279,39 @@ export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
   renderCustomDateForMonth?: (date: Date) => React.ReactNode;
 };
 
+/**
+ * Which rows a {@link DateRows} grid shows. Internal to the package: the public
+ * views and pagers adapt their own props to it.
+ */
+export type DateRowsSource = {
+  kind: "month";
+  /** Any day within the month to render. */
+  date: Date;
+  showAdjacentMonths: boolean;
+  showSixWeeks: boolean;
+};
+
+/** Props for the private {@link DateRows} grid shared by the public row views. */
+export type DateRowsProps<T> = Omit<
+  MonthViewProps<T>,
+  "date" | "showAdjacentMonths" | "showSixWeeks"
+> & { source: DateRowsSource };
+
 function MonthViewInner<T>({
   date,
+  showAdjacentMonths = true,
+  showSixWeeks = false,
+  ...rest
+}: MonthViewProps<T>): ReactElement {
+  const source = useMemo<DateRowsSource>(
+    () => ({ kind: "month", date, showAdjacentMonths, showSixWeeks }),
+    [date, showAdjacentMonths, showSixWeeks],
+  );
+  return <DateRows<T> {...rest} source={source} />;
+}
+
+function DateRowsInner<T>({
+  source,
   events,
   maxVisibleEventCount,
   chipHeight,
@@ -292,11 +323,9 @@ function MonthViewInner<T>({
   sortedMonthView = true,
   moreLabel = "{moreCount} More",
   labels: labelsProp,
-  showAdjacentMonths = true,
   highlightWeekends = true,
   disableMonthEventCellPress = false,
   isRTL = false,
-  showSixWeeks = false,
   showTitle = true,
   showWeekdays = true,
   activeDate,
@@ -327,7 +356,8 @@ function MonthViewInner<T>({
   onDayPointerEnter,
   classNames,
   styles: styleOverrides,
-}: MonthViewProps<T>): ReactElement {
+}: DateRowsProps<T>): ReactElement {
+  const { date, showAdjacentMonths, showSixWeeks } = source;
   const theme = useCalendarTheme();
   const badgeArea = DAY_CELL_PADDING_TOP + DATE_BADGE_HEIGHT + chipGap;
   const slot = createSlots<MonthViewSlot>({ classNames, styles: styleOverrides });
@@ -1122,6 +1152,12 @@ function MonthGridSurface({
  * ```
  */
 export const MonthView = memo(MonthViewInner) as typeof MonthViewInner;
+
+/**
+ * The day-row grid behind the public row views: week rows of day cells with
+ * spanning event bars, overflow, selection, and drag handling.
+ */
+export const DateRows = memo(DateRowsInner) as typeof DateRowsInner;
 
 const styles = StyleSheet.create({
   root: {
