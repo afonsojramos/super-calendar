@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
 import { StyleSheet } from "react-native";
 import * as gestureHandlerMock from "react-native-gesture-handler";
-import { addDays, addWeeks, differenceInCalendarDays } from "date-fns";
+import { addDays, addWeeks, differenceInCalendarDays, format, startOfMonth } from "date-fns";
 import { vi } from "vitest";
 import type { CalendarEvent } from "../../types";
 import { DefaultEvent } from "../DefaultEvent";
@@ -16,10 +16,12 @@ vi.mock("@legendapp/list/react-native", () => ({
     if (props.ref) props.ref.current = { scrollToIndex: list.scroll };
     return useMemo(
       () =>
-        props.renderItem({
-          item: props.data[props.initialScrollIndex],
-          index: props.initialScrollIndex,
-        }),
+        props.data[props.initialScrollIndex]
+          ? props.renderItem({
+              item: props.data[props.initialScrollIndex],
+              index: props.initialScrollIndex,
+            })
+          : null,
       [props.data, props.extraData],
     );
   },
@@ -154,6 +156,20 @@ describe("native MultiWeekView", () => {
 });
 
 describe("native multiweek pager", () => {
+  it("anchors month mode at the current date after a distant aligned multiweek jump", async () => {
+    const anchor = new Date(2026, 0, 5);
+    const target = addWeeks(anchor, 8 * 46);
+    const view = await render(<Calendar {...calendar} date={anchor} numberOfWeeks={8} />);
+    const series = list.props.data;
+    await view.rerender(<Calendar {...calendar} date={target} numberOfWeeks={8} />);
+    expect(list.props.data).toBe(series);
+    await view.rerender(<Calendar {...calendar} mode="month" date={target} numberOfWeeks={8} />);
+    expect(list.props.initialScrollIndex).toBeGreaterThanOrEqual(0);
+    expect(list.props.initialScrollIndex).toBeLessThan(list.props.data.length);
+    expect(list.props.data[list.props.initialScrollIndex]).toEqual(startOfMonth(target));
+    expect(view.getByText(format(target, "MMMM yyyy"))).toBeTruthy();
+  });
+
   it.each([2, 3, 4, 8])(
     "uses 121 pages at a stride of %i calendar weeks",
     async (numberOfWeeks) => {

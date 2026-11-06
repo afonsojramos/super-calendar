@@ -653,7 +653,7 @@ function DateRowsPagerRoot<T>(props: DateRowsPagerProps<T>): ReactElement {
     <DateRowsPagerInner
       {...props}
       key={key}
-      initialAnchor={current.anchor}
+      initialAnchor={count === undefined ? undefined : current.anchor}
       onChangeDate={onChangeDate}
     />
   );
