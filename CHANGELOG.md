@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.17.0](https://github.com/afonsojramos/super-calendar/compare/v2.16.0...v2.17.0) (2026-11-08)
+
+
+### Features
+
+* add multi-week calendar grids ([#114](https://github.com/afonsojramos/super-calendar/issues/114)) ([f7994f9](https://github.com/afonsojramos/super-calendar/commit/f7994f9ff6a01f537fe48646e1a4d658ad8dbcac))
+
+
+### Bug Fixes
+
+* recognize unified release pull requests ([#112](https://github.com/afonsojramos/super-calendar/issues/112)) ([a8646f1](https://github.com/afonsojramos/super-calendar/commit/a8646f1e108c233ba262d3ddec623771e9ad2b19))
+
 ## [2.16.0](https://github.com/afonsojramos/super-calendar/compare/v2.15.0...v2.16.0) (2026-11-05)
 
 
