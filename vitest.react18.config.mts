@@ -9,7 +9,10 @@ export default defineConfig({
         maxWorkers: 1,
         environment: "node",
         pool: "forks",
-        include: ["tests/web/browser/contracts/create-content.test.ts"],
+        include: [
+          "tests/web/browser/contracts/create-content.test.ts",
+          "tests/web/browser/contracts/multiweek.test.ts",
+        ],
         testTimeout: 15_000,
         hookTimeout: 30_000,
         provide: {

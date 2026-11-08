@@ -41,6 +41,11 @@ An additional contact on an event or resize grip cannot start a replacement hold
 or take over an active drag.
 These options apply to event gestures, not empty-slot or month interactions.
 
+In the multi-week web grid, keep the `events` input stable when `onDragStart`
+updates unrelated UI state. With recurrence or `timeZone`, a new array rebuilds
+the displayed events and cancels a held move. See
+[keep event data stable](/guides/events#keep-event-data-stable).
+
 ### Move an event past midnight
 
 A move keeps its duration, so dragging an event **down past the end of the day**

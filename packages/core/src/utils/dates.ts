@@ -19,7 +19,11 @@ export const getWeekDays = (date: Date, weekStartsOn: WeekStartsOn): Date[] => {
   return Array.from({ length: 7 }, (_, index) => addDays(start, index));
 };
 
-/** How many day columns a time-grid mode shows. `custom` uses `numberOfDays`. */
+/**
+ * How many day columns a time-grid mode shows. `custom` uses `numberOfDays`.
+ * Throws a `RangeError` for `multiweek`, which has week rows instead of day
+ * columns; use `buildMultiWeekGrid` for it.
+ */
 export const viewDayCount = (mode: CalendarMode, numberOfDays = 1): number => {
   switch (mode) {
     case "week":
@@ -28,6 +32,10 @@ export const viewDayCount = (mode: CalendarMode, numberOfDays = 1): number => {
       return 3;
     case "custom":
       return Math.max(1, Math.floor(numberOfDays));
+    case "multiweek":
+      throw new RangeError(
+        "The multiweek mode has week rows, not day columns. Use buildMultiWeekGrid for its days.",
+      );
     default:
       return 1; // 'day'
   }
@@ -57,6 +65,7 @@ export const weekDaysCount = (weekStartsOn: WeekStartsOn, weekEndsOn: WeekStarts
  * (honouring `weekStartsOn`). `custom` with a `weekEndsOn` spans the partial week
  * from `weekStartsOn` to `weekEndsOn` (anchored to `date`'s week, paging by week);
  * otherwise every mode shows `viewDayCount` consecutive days starting at `date`.
+ * Throws a `RangeError` for `multiweek` (see `viewDayCount`).
  */
 export const getViewDays = (
   mode: CalendarMode,

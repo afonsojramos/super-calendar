@@ -1,8 +1,9 @@
 import { createSignal, For, Show, untrack } from "solid-js";
-import { addDays, addMonths, addYears, format } from "date-fns";
+import { addDays, addMonths, addWeeks, addYears, format } from "date-fns";
 import { FeedExample } from "./FeedExample";
 import {
   Calendar,
+  buildMultiWeekGrid,
   DatePicker,
   DateRangePicker,
   MonthList,
@@ -23,7 +24,16 @@ const initialEvents: CalendarEvent<{ room: string }>[] = [
   { title: "Team day", start: at(4), end: at(5), room: "b" },
   { title: "Unavailable", start: at(2, 12), end: at(2, 13), display: "background", room: "a" },
 ];
-const modes: CalendarMode[] = ["month", "week", "day", "3days", "custom", "schedule", "year"];
+const modes: CalendarMode[] = [
+  "month",
+  "multiweek",
+  "week",
+  "day",
+  "3days",
+  "custom",
+  "schedule",
+  "year",
+];
 const views = [...modes, "months", "resources", "feed"];
 const pickerStyles = {
   popover: {
@@ -52,6 +62,7 @@ export function viewFromSearch(search: string) {
 
 export function App(props: { initialView?: string }) {
   const [date, setDate] = createSignal(anchor);
+  const [numberOfWeeks, setNumberOfWeeks] = createSignal(2);
   const [view, setView] = createSignal(untrack(() => props.initialView ?? "week"));
   const [events, setEvents] = createSignal(initialEvents);
   const [dark, setDark] = createSignal(false);
@@ -74,12 +85,23 @@ export function App(props: { initialView?: string }) {
   };
   const page = (direction: number) =>
     setDate((current) =>
-      mode() === "year"
-        ? addYears(current, direction)
-        : mode() === "month"
-          ? addMonths(current, direction)
-          : addDays(current, direction * (mode() === "day" ? 1 : 7)),
+      mode() === "multiweek"
+        ? addWeeks(current, direction * numberOfWeeks())
+        : mode() === "year"
+          ? addYears(current, direction)
+          : mode() === "month"
+            ? addMonths(current, direction)
+            : addDays(current, direction * (mode() === "day" ? 1 : 7)),
     );
+
+  const periodLabel = () => {
+    if (mode() !== "multiweek") return format(date(), "MMMM yyyy");
+    const { visibleRange } = buildMultiWeekGrid(date(), {
+      numberOfWeeks: numberOfWeeks(),
+      weekStartsOn: 1,
+    });
+    return `${format(visibleRange.start, "PP")} - ${format(addDays(visibleRange.endExclusive, -1), "PP")}`;
+  };
 
   return (
     <main data-theme={dark() ? "dark" : "light"}>
@@ -96,17 +118,33 @@ export function App(props: { initialView?: string }) {
           <button aria-label="Previous period" onClick={() => page(-1)}>
             ←
           </button>
-          <strong>{format(date(), "MMMM yyyy")}</strong>
+          <strong data-testid="visible-period">{periodLabel()}</strong>
           <button aria-label="Next period" onClick={() => page(1)}>
             →
           </button>
         </div>
         <label>
           View{" "}
-          <select value={view()} onChange={(event) => setView(event.currentTarget.value)}>
+          <select
+            aria-label="View"
+            value={view()}
+            onChange={(event) => setView(event.currentTarget.value)}
+          >
             <For each={views}>{(value) => <option value={value}>{value}</option>}</For>
           </select>
         </label>
+        <Show when={mode() === "multiweek"}>
+          <label>
+            Weeks{" "}
+            <select
+              aria-label="Weeks"
+              value={numberOfWeeks()}
+              onChange={(event) => setNumberOfWeeks(Number(event.currentTarget.value))}
+            >
+              <For each={[2, 3, 4]}>{(count) => <option value={count}>{count}</option>}</For>
+            </select>
+          </label>
+        </Show>
       </nav>
       <section class="calendar" aria-label="Interactive calendar">
         <Show
@@ -131,6 +169,7 @@ export function App(props: { initialView?: string }) {
                       hourHeight={56}
                       weekStartsOn={1}
                       numberOfDays={5}
+                      numberOfWeeks={numberOfWeeks()}
                       showAllDayLabel
                       keyboardDayNavigation
                       keyboardEventNavigation

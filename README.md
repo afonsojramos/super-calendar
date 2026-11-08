@@ -621,11 +621,40 @@ const scheme = useColorScheme();
 
 ### Modes
 
-`mode` is one of `month`, `week`, `day`, `3days`, `custom`, or `schedule`. For
+`mode` is one of `month`, `multiweek`, `week`, `day`, `3days`, `custom`, `year`, or `schedule`. For
 `custom`, set `numberOfDays` (e.g. `mode="custom" numberOfDays={5}` for a
 work-week). Day/3-day/custom views page by their column count; `week` pages by
 the calendar week. `schedule` is a vertical, day-grouped agenda list of the
 events you pass (no time grid).
+
+### Multi-week view
+
+Set `mode="multiweek" numberOfWeeks={3}` on `Calendar` in React DOM, Solid, or
+native to show three stacked full weeks without hour slots. The first week
+contains `date` and starts on `weekStartsOn` (Sunday by default). The default is
+two weeks. Previous/next moves by that many calendar weeks; hidden weekdays
+shorten the rows without changing the step. Existing `custom` views stay hourly.
+
+Use `MultiWeekView` for one standalone window, with the month view's event bars,
+overflow, selection, drag interactions, and styling. Custom event renderers
+receive `mode: "multiweek"`. `Calendar` expands recurrence; standalone views take
+expanded events. Rows scroll vertically in a short container. Large counts
+materialize more rows, so this is not an infinite calendar. Invalid counts or
+dates throw `RangeError`; `numberOfWeeks` must be a positive safe integer whose
+span fits JavaScript's date range.
+
+The pure `buildMultiWeekGrid` in `@super-calendar/core/vanilla` returns rows,
+weekday headers, the full `period`, and the chronological `visibleRange` after
+hidden weekdays, with exclusive end dates. It preserves month-grid day state
+without a month-membership flag.
+
+In the multi-week web grid, a quick touch swipe scrolls. Hold a day or event for
+400 ms, then drag to create or move. Mouse input starts immediately. Cancelling
+the pointer or changing the displayed window cancels the hold or drag.
+
+Keep `events` stable during unrelated UI updates. With recurrence or `timeZone`,
+replacing the array rebuilds displayed events and cancels a held web move. See
+[keep event data stable](https://super-calendar.afonsojramos.me/guides/events#keep-event-data-stable).
 
 ### Month view
 
@@ -772,17 +801,18 @@ this; the example's context menu portals into `#root` for exactly this reason.
 `<Calendar>` is the batteries-included entry point. The building blocks it wraps
 are also exported for advanced layouts:
 
-| Export             | Description                                                |
-| ------------------ | ---------------------------------------------------------- |
-| `Calendar`         | Top-level component; switches between month/week/day.      |
-| `MonthView`        | A single month grid.                                       |
-| `MonthPager`       | Horizontally-paged, virtualized months.                    |
-| `MonthList`        | Vertically-scrolling, continuous list of months.           |
-| `TimeGrid`         | Paged, pinch-zoomable week/day time-grid.                  |
-| `DefaultEvent`     | The built-in event renderer.                               |
-| `useDateRange`     | Range-selection state machine for the month view.          |
-| `useMonthGrid`     | Headless grid data (weeks + per-day state) for custom UIs. |
-| `useCalendarTheme` | Read the active theme inside a custom renderer.            |
+| Export             | Description                                                     |
+| ------------------ | --------------------------------------------------------------- |
+| `Calendar`         | Top-level component; switches between month/week/day.           |
+| `MultiWeekView`    | Consecutive full week rows with event bars and no hourly slots. |
+| `MonthView`        | A single month grid.                                            |
+| `MonthPager`       | Horizontally-paged, virtualized months.                         |
+| `MonthList`        | Vertically-scrolling, continuous list of months.                |
+| `TimeGrid`         | Paged, pinch-zoomable week/day time-grid.                       |
+| `DefaultEvent`     | The built-in event renderer.                                    |
+| `useDateRange`     | Range-selection state machine for the month view.               |
+| `useMonthGrid`     | Headless grid data (weeks + per-day state) for custom UIs.      |
+| `useCalendarTheme` | Read the active theme inside a custom renderer.                 |
 
 ## Notes & limitations
 

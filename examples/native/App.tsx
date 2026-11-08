@@ -21,6 +21,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   Calendar,
+  buildMultiWeekGrid,
   type CalendarEvent,
   type RenderEventArgs,
   type CalendarMode,
@@ -38,7 +39,7 @@ import { EventMenuProvider, type EventMenuActions } from "@super-calendar/exampl
 import { buildEvents, type EventMeta } from "@super-calendar/example-shared/events";
 import { EventContextMenu } from "./components/EventContextMenu";
 
-const MODES: CalendarMode[] = ["year", "month", "week", "3days", "day", "schedule"];
+const MODES: CalendarMode[] = ["year", "month", "multiweek", "week", "3days", "day", "schedule"];
 
 // The mode tabs plus the extra demo surfaces, matching the dom example where
 // the native package supports them: "picker" (range selection via useDateRange),
@@ -86,14 +87,15 @@ END:VEVENT
 END:VCALENDAR`;
 
 // The grid views that step by a fixed period; schedule/picker/list scroll instead.
-const GRID_MODES: CalendarMode[] = ["year", "month", "week", "3days", "day"];
+const GRID_MODES: CalendarMode[] = ["year", "month", "multiweek", "week", "3days", "day"];
 function isGridMode(tab: DemoTab): tab is CalendarMode {
   return (GRID_MODES as string[]).includes(tab);
 }
 
 // Step the anchor by the period the current grid view shows. Matches the dom
 // example so both demos navigate identically.
-function stepDate(date: Date, mode: CalendarMode, dir: 1 | -1): Date {
+function stepDate(date: Date, mode: CalendarMode, dir: 1 | -1, numberOfWeeks = 2): Date {
+  if (mode === "multiweek") return addWeeks(date, dir * numberOfWeeks);
   if (mode === "year") return addYears(date, dir);
   if (mode === "month") return addMonths(date, dir);
   if (mode === "week") return addWeeks(date, dir);
@@ -103,7 +105,11 @@ function stepDate(date: Date, mode: CalendarMode, dir: 1 | -1): Date {
 
 // Label for the visible period, matching exactly what the grid renders. Mirrors
 // the dom example so both demos show the same toolbar title.
-function periodLabel(date: Date, mode: CalendarMode): string {
+function periodLabel(date: Date, mode: CalendarMode, numberOfWeeks = 2): string {
+  if (mode === "multiweek") {
+    const { visibleRange } = buildMultiWeekGrid(date, { numberOfWeeks, weekStartsOn: 1 });
+    return `${format(visibleRange.start, "PP")} - ${format(addDays(visibleRange.endExclusive, -1), "PP")}`;
+  }
   if (mode === "year") return format(date, "yyyy");
   if (mode === "month") return format(date, "MMMM yyyy");
   if (mode === "day") return format(date, "EEE, d MMM yyyy");
@@ -165,6 +171,8 @@ const FocusBand = ({ event, onPress }: RenderEventArgs<EventMeta>) => (
 
 export default function App() {
   const [mode, setMode] = useState<DemoTab>("week");
+  const [numberOfWeeks, setNumberOfWeeks] = useState(2);
+  const [gridSelection, setGridSelection] = useState<DateRange | null>(null);
   const [date, setDate] = useState(() => new Date());
   const [events, setEvents] = useState<CalendarEvent<EventMeta>[]>(buildEvents);
   // Pull-to-refresh on the schedule list and the time grid: rebuild the demo
@@ -271,11 +279,11 @@ export default function App() {
       switch (e.key.toLowerCase()) {
         case "n":
         case "j":
-          if (isGridMode(mode)) setDate((d) => stepDate(d, mode, 1));
+          if (isGridMode(mode)) setDate((d) => stepDate(d, mode, 1, numberOfWeeks));
           break;
         case "p":
         case "k":
-          if (isGridMode(mode)) setDate((d) => stepDate(d, mode, -1));
+          if (isGridMode(mode)) setDate((d) => stepDate(d, mode, -1, numberOfWeeks));
           break;
         case "t":
           setDate(new Date());
@@ -301,7 +309,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode]);
+  }, [mode, numberOfWeeks]);
 
   return (
     <GestureHandlerRootView style={styles.root}>
@@ -333,13 +341,13 @@ export default function App() {
               ))}
             </View>
             {DEMO_MODE == null && isGridMode(activeMode) ? (
-              <View style={styles.navRow}>
+              <View style={[styles.navRow, activeMode === "multiweek" && { flexWrap: "wrap" }]}>
                 <View style={styles.navButtons}>
                   <Pressable
                     style={styles.navButton}
                     accessibilityRole="button"
                     accessibilityLabel="Previous"
-                    onPress={() => setDate((d) => stepDate(d, activeMode, -1))}
+                    onPress={() => setDate((d) => stepDate(d, activeMode, -1, numberOfWeeks))}
                   >
                     <Text style={styles.navButtonText}>‹</Text>
                   </Pressable>
@@ -350,12 +358,40 @@ export default function App() {
                     style={styles.navButton}
                     accessibilityRole="button"
                     accessibilityLabel="Next"
-                    onPress={() => setDate((d) => stepDate(d, activeMode, 1))}
+                    onPress={() => setDate((d) => stepDate(d, activeMode, 1, numberOfWeeks))}
                   >
                     <Text style={styles.navButtonText}>›</Text>
                   </Pressable>
                 </View>
-                <Text style={styles.periodLabel}>{periodLabel(date, activeMode)}</Text>
+                {activeMode === "multiweek" ? (
+                  <View style={styles.navButtons}>
+                    {[2, 3, 4].map((count) => (
+                      <Pressable
+                        key={count}
+                        style={[
+                          styles.todayButton,
+                          { minHeight: 44 },
+                          numberOfWeeks === count && {
+                            backgroundColor: "#eef0f3",
+                            borderColor: "#1F6FEB",
+                          },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${count} weeks`}
+                        accessibilityState={{ selected: numberOfWeeks === count }}
+                        onPress={() => setNumberOfWeeks(count)}
+                      >
+                        <Text style={styles.todayText}>{count} weeks</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+                <Text
+                  testID="visible-period"
+                  style={[styles.periodLabel, activeMode === "multiweek" && { flexBasis: "100%" }]}
+                >
+                  {periodLabel(date, activeMode, numberOfWeeks)}
+                </Text>
                 {Platform.OS === "web" ? (
                   <Text style={styles.hint}>
                     keys: ← / → or n / p move · t today · d w m x a views
@@ -540,6 +576,15 @@ export default function App() {
                 <EventMenuProvider value={menuActions}>
                   <Calendar
                     mode={activeMode}
+                    numberOfWeeks={numberOfWeeks}
+                    selectedRange={
+                      activeMode === "multiweek" ? (gridSelection ?? undefined) : undefined
+                    }
+                    onSelectDrag={
+                      activeMode === "multiweek"
+                        ? (start, end) => setGridSelection({ start, end })
+                        : undefined
+                    }
                     date={date}
                     events={events}
                     refreshControl={

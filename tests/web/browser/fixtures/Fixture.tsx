@@ -15,6 +15,9 @@ type FixtureEvent = CalendarEvent<{ id: number }>;
 const initialEvents: FixtureEvent[] = [
   { id: 0, title: "Planning", start: new Date(2026, 6, 15, 9), end: new Date(2026, 6, 15, 10) },
 ];
+const recurringEvents: FixtureEvent[] = [
+  { ...initialEvents[0], recurrence: { freq: "daily", count: 1 } },
+];
 const denseEvents: FixtureEvent[] = Array.from({ length: 1000 }, (_, index) => {
   const start = new Date(
     2026,
@@ -161,17 +164,19 @@ export function Fixture() {
     end: new Date(2026, 6, 16),
   });
   const [events, setEvents] = useFixtureState(
-    view === "dense"
-      ? denseEvents
-      : view === "edit-clipped"
-        ? clippedEvents
-        : view === "edit-crowded"
-          ? crowdedEvents
-          : view === "edit-many"
-            ? manyEvents
-            : view === "edit"
-              ? editEvents
-              : initialEvents,
+    view === "multiweek-transformed"
+      ? recurringEvents
+      : view === "dense"
+        ? denseEvents
+        : view === "edit-clipped"
+          ? clippedEvents
+          : view === "edit-crowded"
+            ? crowdedEvents
+            : view === "edit-many" || (view.startsWith("multiweek") && view.endsWith("dense"))
+              ? manyEvents
+              : view === "edit"
+                ? editEvents
+                : initialEvents,
   );
   const [boardEvents, setBoardEvents] = useFixtureState(
     view.endsWith("crowded")
@@ -247,7 +252,33 @@ export function Fixture() {
           </button>
         ) : null}
       </nav>
-      {view === "months" ? (
+      {view.startsWith("multiweek") ? (
+        <Calendar
+          mode="multiweek"
+          date={date() ?? anchor}
+          numberOfWeeks={updated() ? 3 : view.includes("eight") ? 8 : 2}
+          weekStartsOn={1}
+          hiddenDays={restricted() ? [0, 6] : undefined}
+          maxDate={view === "multiweek-disabled-next" ? new Date(2026, 6, 26) : undefined}
+          isDateDisabled={disabled() ? (day) => day.getDate() === 16 : undefined}
+          height={view.includes("eight") ? 260 : 300}
+          events={events()}
+          timeZone={view === "multiweek-transformed" ? "Europe/Lisbon" : undefined}
+          onDragStart={
+            view === "multiweek-transformed" ? () => setDragStarts((count) => count + 1) : undefined
+          }
+          selectedRange={view === "multiweek-selection" ? (range() ?? undefined) : undefined}
+          onSelectDrag={
+            view === "multiweek-selection" ? (start, end) => setRange({ start, end }) : undefined
+          }
+          keyboardDayNavigation
+          onChangeDate={setDate}
+          onCreateEvent={(start, end) => record(`${clock(start)}-${clock(end)}`)}
+          onDragEvent={(event, start, end) => {
+            record(`${event.title}@${clock(start)}-${clock(end)}`);
+          }}
+        />
+      ) : view === "months" ? (
         <MonthList
           date={anchor}
           pastMonths={0}
@@ -421,6 +452,11 @@ export function Fixture() {
         />
       )}
       <output aria-label="Calls">{JSON.stringify(calls())}</output>
+      {view === "multiweek-selection" ? (
+        <output aria-label="Selection">
+          {range()?.end ? `${clock(range()!.start)}-${clock(range()!.end!)}` : ""}
+        </output>
+      ) : null}
       <output aria-label="Drag starts">{dragStarts()}</output>
       <output aria-label="Revision">{revision()}</output>
     </main>

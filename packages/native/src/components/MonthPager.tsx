@@ -4,7 +4,17 @@ import {
   type LegendListRenderItemProps,
   type OnViewableItemsChangedInfo,
 } from "@legendapp/list/react-native";
-import { addMonths, differenceInCalendarMonths, format, type Locale, startOfMonth } from "date-fns";
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  differenceInCalendarMonths,
+  differenceInCalendarWeeks,
+  format,
+  type Locale,
+  startOfMonth,
+  startOfWeek,
+} from "date-fns";
 import {
   type ComponentRef,
   memo,
@@ -37,6 +47,7 @@ import type {
 import {
   type CalendarSelection,
   CalendarSelectionProvider,
+  buildMultiWeekGrid,
   type DateRange,
   type WeekdayFormat,
   filterHiddenDays,
@@ -46,7 +57,7 @@ import {
 import type { CalendarLabels } from "@super-calendar/core";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
-import { MonthView, type MonthViewSlot } from "./MonthView";
+import { DateRows, type DateRowsSource, type MonthViewSlot } from "./MonthView";
 
 // Horizontal swipe paging doesn't translate to web; there we disable it and page
 // with the arrow keys instead.
@@ -130,7 +141,41 @@ export type MonthPagerProps<T> = {
   renderCustomDateForMonth?: (date: Date) => React.ReactNode;
 } & SlotStyleProps<MonthViewSlot>;
 
+/**
+ * Which pages a {@link DateRowsPager} swipes through. Internal to the package:
+ * the public pagers and `Calendar` adapt their own props to it.
+ */
+export type DateRowsPagerSpec =
+  | {
+      kind: "month";
+      showAdjacentMonths: boolean;
+      showSixWeeks: boolean;
+    }
+  | { kind: "multiweek"; numberOfWeeks: number };
+
+/** Props for the private {@link DateRowsPager}. */
+export type DateRowsPagerProps<T> = Omit<
+  MonthPagerProps<T>,
+  "showAdjacentMonths" | "showSixWeeks"
+> & {
+  spec: DateRowsPagerSpec;
+};
+
 function MonthPagerInner<T>({
+  showAdjacentMonths = true,
+  showSixWeeks = false,
+  ...rest
+}: MonthPagerProps<T>): ReactElement {
+  const spec = useMemo<DateRowsPagerSpec>(
+    () => ({ kind: "month", showAdjacentMonths, showSixWeeks }),
+    [showAdjacentMonths, showSixWeeks],
+  );
+  return <DateRowsPager<T> {...rest} spec={spec} />;
+}
+
+function DateRowsPagerInner<T>({
+  spec,
+  initialAnchor,
   date,
   events,
   maxVisibleEventCount,
@@ -143,7 +188,6 @@ function MonthPagerInner<T>({
   sortedMonthView,
   moreLabel,
   labels,
-  showAdjacentMonths,
   highlightWeekends,
   disableMonthEventCellPress,
   isRTL,
@@ -171,14 +215,13 @@ function MonthPagerInner<T>({
   onChangeDate,
   freeSwipe = false,
   swipeEnabled = true,
-  showSixWeeks = false,
   showTitle = true,
   activeDate,
   renderHeaderForMonthView,
   renderCustomDateForMonth,
   classNames,
   styles: styleOverrides,
-}: MonthPagerProps<T>): ReactElement {
+}: DateRowsPagerProps<T> & { initialAnchor?: Date }): ReactElement {
   const theme = useCalendarTheme();
   // Stable across renders (it feeds the memoized renderItem below).
   const slot = useMemo(
@@ -221,15 +264,37 @@ function MonthPagerInner<T>({
   // A fixed window of months, anchored once and aligned to the month start. The
   // array never shifts as the date changes, so paging never re-renders a page's
   // content — LegendList virtualises and keys by month.
-  const [anchorDate] = useState(date);
-  const anchor = useMemo(() => startOfMonth(anchorDate), [anchorDate]);
-  const monthDates = useMemo(
-    () => Array.from({ length: PAGE_WINDOW * 2 + 1 }, (_, i) => addMonths(anchor, i - PAGE_WINDOW)),
-    [anchor],
+  const [anchorDate] = useState(initialAnchor ?? date);
+  const numberOfWeeks = spec.kind === "multiweek" ? spec.numberOfWeeks : undefined;
+  const anchor = useMemo(
+    () =>
+      numberOfWeeks === undefined
+        ? startOfMonth(anchorDate)
+        : startOfWeek(anchorDate, { weekStartsOn }),
+    [anchorDate, numberOfWeeks, weekStartsOn],
   );
+  const monthDates = useMemo(() => {
+    const dates = Array.from({ length: PAGE_WINDOW * 2 + 1 }, (_, i) =>
+      numberOfWeeks === undefined
+        ? addMonths(anchor, i - PAGE_WINDOW)
+        : addWeeks(anchor, (i - PAGE_WINDOW) * numberOfWeeks),
+    );
+    // The requested window is valid, but preloaded neighbours can run past
+    // Date's endpoints. Keep only complete representable multi-week pages.
+    return numberOfWeeks === undefined
+      ? dates
+      : dates.filter(
+          (page) =>
+            Number.isFinite(page.getTime()) &&
+            Number.isFinite(addWeeks(page, numberOfWeeks).getTime()),
+        );
+  }, [anchor, numberOfWeeks]);
   const indexOfMonth = useCallback(
-    (target: Date) => differenceInCalendarMonths(startOfMonth(target), anchor) + PAGE_WINDOW,
-    [anchor],
+    (target: Date) =>
+      numberOfWeeks === undefined
+        ? differenceInCalendarMonths(startOfMonth(target), anchor) + PAGE_WINDOW
+        : differenceInCalendarWeeks(target, monthDates[0], { weekStartsOn }) / numberOfWeeks,
+    [anchor, monthDates, numberOfWeeks, weekStartsOn],
   );
 
   // The committed month's page is the centred/active one. Derived (not stored)
@@ -305,7 +370,7 @@ function MonthPagerInner<T>({
   // `fillCellOnSelection` and `onSelectDrag` ride along because they reach the
   // grids as renderItem props, not through the selection context below: toggling
   // a "pick dates" mode on must reach the pages already rendered.
-  const listExtraData = useMemo(
+  const monthExtraData = useMemo(
     () => ({
       events,
       activeDate,
@@ -325,14 +390,28 @@ function MonthPagerInner<T>({
     [selectedDates, selectedRange, minDate, maxDate, isDateDisabled],
   );
 
+  // One source object per page date, so a memoized page skips re-rendering when
+  // the list calls `renderItem` again with unchanged inputs.
+  const sourceFor = useMemo(() => {
+    const cache = new WeakMap<Date, DateRowsSource>();
+    return (item: Date): DateRowsSource => {
+      let source = cache.get(item);
+      if (!source) {
+        source = { ...spec, date: item };
+        cache.set(item, source);
+      }
+      return source;
+    };
+  }, [spec]);
+
   const snapToIndices = useMemo(() => monthDates.map((_, index) => index), [monthDates]);
   const keyExtractorList = useCallback((item: Date) => item.toISOString(), []);
   const getFixedItemSize = useCallback(() => containerWidth, [containerWidth]);
   const renderItem = useCallback(
     ({ item }: LegendListRenderItemProps<Date>) => (
       <View style={{ width: containerWidth, height: pageHeight }}>
-        <MonthView
-          date={item}
+        <DateRows
+          source={sourceFor(item)}
           events={events}
           // The pager shows one shared weekday header and the month title above it
           // (see below), so each page's grid omits its own title and weekday row.
@@ -347,11 +426,9 @@ function MonthPagerInner<T>({
           sortedMonthView={sortedMonthView}
           moreLabel={moreLabel}
           labels={labels}
-          showAdjacentMonths={showAdjacentMonths}
           highlightWeekends={highlightWeekends}
           disableMonthEventCellPress={disableMonthEventCellPress}
           isRTL={isRTL}
-          showSixWeeks={showSixWeeks}
           activeDate={activeDate}
           calendarCellStyle={calendarCellStyle}
           renderEvent={renderEvent}
@@ -388,11 +465,10 @@ function MonthPagerInner<T>({
       sortedMonthView,
       moreLabel,
       labels,
-      showAdjacentMonths,
+      sourceFor,
       highlightWeekends,
       disableMonthEventCellPress,
       isRTL,
-      showSixWeeks,
       activeDate,
       calendarCellStyle,
       renderEvent,
@@ -416,6 +492,24 @@ function MonthPagerInner<T>({
     ],
   );
 
+  // The multi-week view invalidates cached pages for every input that reaches
+  // renderItem, including callbacks and layout. LegendList does not track a new
+  // renderItem identity on its own.
+  const listExtraData = useMemo(
+    () => (numberOfWeeks === undefined ? monthExtraData : { renderItem }),
+    [numberOfWeeks, monthExtraData, renderItem],
+  );
+  const visible = useMemo(
+    () =>
+      numberOfWeeks === undefined
+        ? null
+        : buildMultiWeekGrid(date, { numberOfWeeks, weekStartsOn, hiddenDays }).visibleRange,
+    [date, numberOfWeeks, weekStartsOn, hiddenDays],
+  );
+  const title = visible
+    ? `${format(visible.start, "PP", { locale })} – ${format(addDays(visible.endExclusive, -1), "PP", { locale })}`
+    : format(date, "MMMM yyyy", { locale });
+
   return (
     <CalendarSelectionProvider value={selection}>
       <View ref={containerRef} style={[styles.container, theme.containers.monthContainer]}>
@@ -429,7 +523,7 @@ function MonthPagerInner<T>({
             })}
             allowFontScaling={false}
           >
-            {format(date, "MMMM yyyy", locale ? { locale } : undefined)}
+            {title}
           </Text>
         ) : null}
         {renderHeaderForMonthView ? (
@@ -505,6 +599,67 @@ function MonthPagerInner<T>({
  * ```
  */
 export const MonthPager = memo(MonthPagerInner) as typeof MonthPagerInner;
+
+/** The swipeable pager behind `MonthPager` and `Calendar`'s row modes. */
+function DateRowsPagerRoot<T>(props: DateRowsPagerProps<T>): ReactElement {
+  const count = props.spec.kind === "multiweek" ? props.spec.numberOfWeeks : undefined;
+  const target = useMemo(
+    () =>
+      count === undefined
+        ? props.date
+        : buildMultiWeekGrid(props.date, { numberOfWeeks: count, weekStartsOn: props.weekStartsOn })
+            .period.start,
+    [props.date, count, props.weekStartsOn],
+  );
+  const [series, setSeries] = useState(() => ({
+    anchor: target,
+    count,
+    weekStartsOn: props.weekStartsOn,
+  }));
+  let current = series;
+  if (count !== undefined) {
+    const offset =
+      differenceInCalendarWeeks(target, series.anchor, { weekStartsOn: props.weekStartsOn }) /
+      count;
+    if (
+      series.count !== count ||
+      series.weekStartsOn !== props.weekStartsOn ||
+      !Number.isInteger(offset) ||
+      Math.abs(offset) > PAGE_WINDOW
+    ) {
+      current = { anchor: target, count, weekStartsOn: props.weekStartsOn };
+      setSeries(current);
+    }
+  }
+  const key =
+    count === undefined ? "month" : `${current.anchor.getTime()}:${count}:${props.weekStartsOn}`;
+  const generation = useRef(key);
+  generation.current = key;
+  useEffect(() => {
+    generation.current = key;
+    return () => {
+      generation.current = "unmounted";
+    };
+  }, [key]);
+  const onChangeDate = useCallback(
+    (date: Date) => {
+      // A remounted series can still receive a queued viewability callback from
+      // the old list. Never let it change the controlled date.
+      if (generation.current === key) props.onChangeDate(date);
+    },
+    [key, props.onChangeDate],
+  );
+  return (
+    <DateRowsPagerInner
+      {...props}
+      key={key}
+      initialAnchor={count === undefined ? undefined : current.anchor}
+      onChangeDate={onChangeDate}
+    />
+  );
+}
+
+export const DateRowsPager = memo(DateRowsPagerRoot) as typeof DateRowsPagerRoot;
 
 type MonthWeekdayHeaderProps = {
   weekDays: Date[];

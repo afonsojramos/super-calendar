@@ -17,7 +17,13 @@ const DOM_INDEX = path.join(REPO_ROOT, "packages", "dom", "src", "index.ts");
 const NATIVE_INDEX = path.join(REPO_ROOT, "packages", "native", "src", "index.tsx");
 
 // The shared components, by their exported `*Props` type.
-const SHARED_COMPONENTS = ["MonthView", "MonthList", "TimeGrid", "YearView"] as const;
+const SHARED_COMPONENTS = [
+  "MonthView",
+  "MultiWeekView",
+  "MonthList",
+  "TimeGrid",
+  "YearView",
+] as const;
 
 // Props that exist only on the dom renderer because they are web-platform
 // concerns with no native equivalent. Anything here is exempt from the
@@ -46,6 +52,7 @@ const DOM_PLATFORM_PROPS: Record<string, Set<string>> = {
   // showTitle/showWeekdays toggle dom-only chrome; theme/className/style as above.
   // keyboardDayNavigation is a web keyboard-focus concern (roving tabindex); native
   // is touch/swipe with arrow-key paging, so it has no equivalent.
+  MultiWeekView: new Set(["className", "style", "theme", "keyboardDayNavigation"]),
   MonthView: new Set([
     "className",
     "style",
@@ -96,6 +103,7 @@ describe("React DOM and Solid renderer API parity", () => {
   it.each([
     "Calendar",
     "MonthView",
+    "MultiWeekView",
     "MonthList",
     "TimeGrid",
     "YearView",

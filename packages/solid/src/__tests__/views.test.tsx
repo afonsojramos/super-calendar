@@ -23,14 +23,20 @@ const event: CalendarEvent = {
 const events = [event];
 
 describe("Solid views", () => {
-  it.each<CalendarMode>(["month", "week", "day", "3days", "custom", "schedule", "year"])(
-    "renders calendar mode %s",
-    (mode) => {
-      const view = mount(() => <Calendar date={date} mode={mode} events={events} now={date} />);
-      expect(view.container.textContent).not.toBe("");
-      if (mode !== "year") expect(view.getAllByText("Planning").length).toBeGreaterThan(0);
-    },
-  );
+  it.each<CalendarMode>([
+    "month",
+    "multiweek",
+    "week",
+    "day",
+    "3days",
+    "custom",
+    "schedule",
+    "year",
+  ])("renders calendar mode %s", (mode) => {
+    const view = mount(() => <Calendar date={date} mode={mode} events={events} now={date} />);
+    expect(view.container.textContent).not.toBe("");
+    if (mode !== "year") expect(view.getAllByText("Planning").length).toBeGreaterThan(0);
+  });
 
   it("updates mounted month cells without losing keyboard focus", () => {
     const onPressDay = vi.fn();

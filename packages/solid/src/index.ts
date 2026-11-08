@@ -1,6 +1,7 @@
 export {
   backgroundBandsForDay,
   buildMonthGrid,
+  buildMultiWeekGrid,
   daySelectionState,
   defaultCalendarLabels,
   expandRecurringEvents,
@@ -39,6 +40,11 @@ export {
   type MonthGridWeek,
   type MonthGridWeekday,
   type MonthWeekEvents,
+  type MultiWeekGrid,
+  type MultiWeekGridDay,
+  type MultiWeekGridInterval,
+  type MultiWeekGridOptions,
+  type MultiWeekGridWeek,
   type PositionedEvent,
   type RecurrenceFrequency,
   type RecurrenceRule,
@@ -67,6 +73,7 @@ export {
   type DateRangePickerProps,
 } from "./DateRangePicker";
 export { MonthList, type MonthListProps, type MonthListSlot } from "./MonthList";
+export { MultiWeekView, type MultiWeekViewProps } from "./MultiWeekView";
 export {
   MonthView,
   type MonthViewProps,

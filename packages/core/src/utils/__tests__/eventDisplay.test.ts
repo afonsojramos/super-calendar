@@ -80,8 +80,9 @@ describe("eventAccessibilityLabel", () => {
 });
 
 describe("titleNumberOfLines", () => {
-  it("clamps month cells to one line", () => {
+  it("clamps month and multi-week cells to one line", () => {
     expect(titleNumberOfLines("month", false)).toBe(1);
+    expect(titleNumberOfLines("multiweek", false)).toBe(1);
   });
 
   it("clamps all-day events to one line in any mode", () => {
@@ -102,8 +103,9 @@ describe("eventTimeLabel", () => {
   const end = new Date(2026, 0, 1, 10, 30, 0);
   const base = { start, end, ampm: false, showTime: true };
 
-  it("never labels month cells", () => {
+  it("never labels month or multi-week cells", () => {
     expect(eventTimeLabel({ ...base, mode: "month", isAllDay: false })).toBeNull();
+    expect(eventTimeLabel({ ...base, mode: "multiweek", isAllDay: false })).toBeNull();
   });
 
   it("honours showTime=false", () => {
