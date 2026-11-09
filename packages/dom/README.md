@@ -175,6 +175,10 @@ drag-to-create behavior. See the [DOM guide](https://super-calendar.afonsojramos
 The drag-to-create preview stays within the visible hours of the pressed column,
 with its border inside the column.
 
+`TimeGrid` completes creation on pointer release even if capture is lost just
+before it. Capture loss while the button is held and pointer cancellation
+cancel the sweep.
+
 Pass `renderCreateGhost` to `TimeGrid`, `Calendar`, or `ResourceTimeline` to draw
 a draft inside that preview. Define the component once, outside render:
 

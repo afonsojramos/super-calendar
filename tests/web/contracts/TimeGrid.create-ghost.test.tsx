@@ -3,6 +3,7 @@ import type { CreateGhostArgs } from "@super-calendar/core/vanilla";
 import {
   rendererName,
   Calendar,
+  act,
   fireEvent,
   render,
   TimeGrid,
@@ -219,18 +220,132 @@ describe(rendererName, () => {
       );
     });
 
-    it("clears the content when the sweep loses pointer capture", () => {
+    it("clears the content when the sweep loses pointer capture while still pressed", () => {
       const view = setup();
       view.down(96);
       view.move(300);
-      fireEvent.lostPointerCapture(view.column, { pointerId: 2 });
+      fireEvent.lostPointerCapture(view.column, { pointerId: 2, buttons: 1 });
       expect(view.content()).toBe("New event 26 02:00-26 06:15");
-      fireEvent.lostPointerCapture(view.column, { pointerId: 1 });
+      fireEvent.lostPointerCapture(view.column, { pointerId: 1, buttons: 1 });
       expect(view.ghost()).toBeNull();
       view.move(400);
       view.up(400);
       expect(view.onCreateEvent).not.toHaveBeenCalled();
       expect(view.ghost()).toBeNull();
+    });
+
+    it.each(["column", "document"])(
+      "commits once when release-time capture loss precedes pointerup on the %s",
+      (target) => {
+        const view = setup();
+        view.down(96);
+        view.move(150);
+        fireEvent.lostPointerCapture(view.column, { pointerId: 1, buttons: 0 });
+        expect(view.onCreateEvent).not.toHaveBeenCalled();
+        fireEvent.pointerUp(target === "column" ? view.column : document, {
+          pointerId: 1,
+          clientY: 150,
+          buttons: 0,
+        });
+        expect(view.onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+          new Date(2026, 5, 26, 2),
+          new Date(2026, 5, 26, 3, 15),
+        );
+        view.up(200);
+        expect(view.onCreateEvent).toHaveBeenCalledTimes(1);
+        expect(view.ghost()).toBeNull();
+      },
+    );
+
+    it("ignores unrelated pointer releases and cancellations", () => {
+      const view = setup();
+      view.down(96);
+      view.move(150);
+      fireEvent.pointerUp(document, { pointerId: 2, clientY: 300 });
+      fireEvent.pointerCancel(document, { pointerId: 2 });
+      expect(view.content()).toBe("New event 26 02:00-26 03:15");
+      fireEvent.pointerUp(document, { pointerId: 1, clientY: 150 });
+      expect(view.onCreateEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not let a second pointer replace or move the active sweep", () => {
+      const view = setup();
+      view.down(96);
+      view.move(150);
+      fireEvent.pointerDown(view.column, { pointerId: 2, isPrimary: false, clientY: 300 });
+      view.move(400, 2);
+      fireEvent.pointerCancel(view.column, { pointerId: 2 });
+      view.up(400, 2);
+      expect(view.content()).toBe("New event 26 02:00-26 03:15");
+      view.up(150);
+      expect(view.onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+        new Date(2026, 5, 26, 2),
+        new Date(2026, 5, 26, 3, 15),
+      );
+    });
+
+    it("completes a sweep when pointer capture is unavailable", () => {
+      const view = setup();
+      vi.spyOn(view.column, "setPointerCapture").mockImplementation(() => {
+        throw new Error("Capture unavailable");
+      });
+      view.down(96);
+      view.move(150);
+      fireEvent.pointerUp(document, { pointerId: 1, clientY: 150 });
+      expect(view.onCreateEvent).toHaveBeenCalledTimes(1);
+      expect(view.ghost()).toBeNull();
+    });
+
+    it("uses the latest callback when a document release completes the sweep", () => {
+      const view = setup();
+      view.down(96);
+      view.move(150);
+      const next = vi.fn();
+      view.update({ onCreateEvent: next });
+      fireEvent.pointerUp(document, { pointerId: 1, clientY: 150 });
+      expect(view.onCreateEvent).not.toHaveBeenCalled();
+      expect(next).toHaveBeenCalledExactlyOnceWith(
+        new Date(2026, 5, 26, 2),
+        new Date(2026, 5, 26, 3, 15),
+      );
+    });
+
+    it.each(["cancel", "Escape", "unmount", "date", "disable"])(
+      "does not commit a pending release after %s",
+      (reason) => {
+        const view = setup();
+        view.down(96);
+        view.move(150);
+        fireEvent.lostPointerCapture(view.column, { pointerId: 1, buttons: 0 });
+        if (reason === "cancel") fireEvent.pointerCancel(document, { pointerId: 1 });
+        else if (reason === "Escape") fireEvent.keyDown(document, { key: "Escape" });
+        else if (reason === "unmount") view.unmount();
+        else if (reason === "date") view.update({ date: new Date(2026, 5, 27) });
+        else view.update({ onCreateEvent: undefined });
+        fireEvent.pointerUp(document, { pointerId: 1, clientY: 150 });
+        expect(view.onCreateEvent).not.toHaveBeenCalled();
+        expect(view.ghost()).toBeNull();
+      },
+    );
+
+    it("cancels zero-button capture loss when no release follows in the event task", async () => {
+      const view = setup();
+      view.down(96);
+      view.move(150);
+      fireEvent.lostPointerCapture(view.column, { pointerId: 1, buttons: 0 });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+      expect(view.ghost()).toBeNull();
+      view.up(150);
+      expect(view.onCreateEvent).not.toHaveBeenCalled();
+      view.down(480);
+      view.move(528);
+      view.up(528);
+      expect(view.onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+        new Date(2026, 5, 26, 10),
+        new Date(2026, 5, 26, 11),
+      );
     });
 
     it("re-renders the held sweep with replaced props", () => {

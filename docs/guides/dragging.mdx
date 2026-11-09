@@ -245,6 +245,11 @@ range). On native it supersedes `onLongPressCell`; on web, dragging empty space
 creates instead of scrolling (use the wheel to scroll), and **Escape** cancels an
 in-progress sweep before it commits.
 
+React DOM and Solid `TimeGrid` complete creation on pointer release, including
+when pointer capture is lost immediately before release. Losing capture while
+the button is still pressed or cancelling the pointer
+cancels the sweep without creating an event.
+
 ```tsx
 <Calendar
   /* ... */
