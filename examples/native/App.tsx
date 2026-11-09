@@ -371,62 +371,64 @@ export default function App() {
               ))}
             </View>
             {DEMO_MODE == null && isGridMode(activeMode) ? (
-              <View style={[styles.navRow, activeMode === "multiweek" && { flexWrap: "wrap" }]}>
-                <View style={styles.navButtons}>
-                  <Pressable
-                    style={styles.navButton}
-                    accessibilityRole="button"
-                    accessibilityLabel="Previous"
-                    onPress={() => setDate((d) => stepDate(d, activeMode, -1, numberOfWeeks))}
-                  >
-                    <Text style={styles.navButtonText}>‹</Text>
-                  </Pressable>
-                  <Pressable style={styles.todayButton} onPress={() => setDate(new Date())}>
-                    <Text style={styles.todayText}>Today</Text>
-                  </Pressable>
-                  <Pressable
-                    style={styles.navButton}
-                    accessibilityRole="button"
-                    accessibilityLabel="Next"
-                    onPress={() => setDate((d) => stepDate(d, activeMode, 1, numberOfWeeks))}
-                  >
-                    <Text style={styles.navButtonText}>›</Text>
-                  </Pressable>
-                </View>
-                {activeMode === "multiweek" ? (
-                  <View style={styles.navButtons}>
-                    {[2, 3, 4].map((count) => (
-                      <Pressable
-                        key={count}
-                        style={[
-                          styles.todayButton,
-                          { minHeight: 44 },
-                          numberOfWeeks === count && {
-                            backgroundColor: "#eef0f3",
-                            borderColor: "#1F6FEB",
-                          },
-                        ]}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${count} weeks`}
-                        accessibilityState={{ selected: numberOfWeeks === count }}
-                        onPress={() => setNumberOfWeeks(count)}
-                      >
-                        <Text style={styles.todayText}>{count} weeks</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : null}
-                <Text
-                  testID="visible-period"
-                  style={[styles.periodLabel, activeMode === "multiweek" && { flexBasis: "100%" }]}
-                >
+              <View style={styles.navigation}>
+                <Text testID="visible-period" accessibilityRole="header" style={styles.periodLabel}>
                   {periodLabel(date, activeMode, numberOfWeeks)}
                 </Text>
-                {Platform.OS === "web" ? (
-                  <Text style={styles.hint}>
-                    keys: ← / → or n / p move · t today · d w m x a views
-                  </Text>
-                ) : null}
+                <View style={styles.navRow}>
+                  <View style={styles.navButtons}>
+                    <Pressable
+                      style={styles.navButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Previous"
+                      onPress={() => setDate((d) => stepDate(d, activeMode, -1, numberOfWeeks))}
+                    >
+                      <Text style={styles.navButtonText}>‹</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.todayButton}
+                      accessibilityRole="button"
+                      onPress={() => setDate(new Date())}
+                    >
+                      <Text style={styles.todayText}>Today</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.navButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Next"
+                      onPress={() => setDate((d) => stepDate(d, activeMode, 1, numberOfWeeks))}
+                    >
+                      <Text style={styles.navButtonText}>›</Text>
+                    </Pressable>
+                  </View>
+                  {activeMode === "multiweek" ? (
+                    <View style={styles.weekSelector}>
+                      <Text style={styles.weekLabel}>Weeks</Text>
+                      <View style={styles.navButtons}>
+                        {[2, 3, 4].map((count) => (
+                          <Pressable
+                            key={count}
+                            style={[
+                              styles.navButton,
+                              numberOfWeeks === count && styles.weekSelected,
+                            ]}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${count} weeks`}
+                            accessibilityState={{ selected: numberOfWeeks === count }}
+                            onPress={() => setNumberOfWeeks(count)}
+                          >
+                            <Text style={styles.todayText}>{count}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  ) : null}
+                  {Platform.OS === "web" ? (
+                    <Text style={styles.hint}>
+                      keys: ← / → or n / p move · t today · d w m x a views
+                    </Text>
+                  ) : null}
+                </View>
               </View>
             ) : null}
             {activeMode === "picker" ? (
@@ -606,6 +608,7 @@ export default function App() {
                 <EventMenuProvider value={menuActions}>
                   <Calendar
                     mode={activeMode}
+                    showTitle={DEMO_MODE != null}
                     numberOfWeeks={numberOfWeeks}
                     selectedRange={
                       activeMode === "multiweek" ? (gridSelection ?? undefined) : undefined
@@ -725,8 +728,12 @@ const styles = StyleSheet.create({
   tabText: { fontWeight: "600", color: "#1A1B1E", textTransform: "capitalize" },
   tabTextActive: { color: "#fff" },
   // Prev / Today / next navigation, mirroring the dom example's toolbar.
-  navRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingBottom: 12 },
-  navButtons: { flexDirection: "row", gap: 6 },
+  navigation: { gap: 8, paddingBottom: 12 },
+  navRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12 },
+  navButtons: { flexDirection: "row", gap: 4 },
+  weekSelector: { flexDirection: "row", alignItems: "center", gap: 8 },
+  weekLabel: { fontSize: 14, color: "#6B7280" },
+  weekSelected: { backgroundColor: "#eef0f3", borderColor: "#1F6FEB" },
   roomPager: {
     flexDirection: "row",
     alignItems: "center",
@@ -736,8 +743,10 @@ const styles = StyleSheet.create({
   },
   roomPagerText: { fontSize: 13, color: "#6B7280" },
   navButton: {
-    width: 34,
-    height: 34,
+    minWidth: 44,
+    minHeight: 44,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     borderRadius: 8,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "#E2E4E9",
@@ -747,8 +756,9 @@ const styles = StyleSheet.create({
   },
   navButtonText: { fontSize: 18, lineHeight: 18, color: "#1A1B1E" },
   todayButton: {
-    height: 34,
-    paddingHorizontal: 14,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderRadius: 8,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "#E2E4E9",
@@ -757,7 +767,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   todayText: { fontWeight: "600", fontSize: 14, color: "#1A1B1E" },
-  periodLabel: { fontWeight: "600", fontSize: 16, color: "#1A1B1E" },
+  periodLabel: { fontWeight: "600", fontSize: 18, color: "#1A1B1E" },
   hint: { marginLeft: "auto", color: "#9AA1AC", fontSize: 12 },
   // Keep the picker from sprawling: a centered card capped in width and height.
   pickerScreen: { flex: 1, alignItems: "center", paddingBottom: 16 },

@@ -155,6 +155,83 @@ describe("published demos", () => {
     },
   );
 
+  it.each([320, 411, 900])("keeps the native date navigation readable at %ipx", async (width) => {
+    await checkPage(
+      "/",
+      async (page) => {
+        await page.getByText("multiweek", { exact: true }).click();
+        const fourWeeks = page.getByRole("button", { name: "4 weeks", exact: true });
+        await fourWeeks.click();
+        const firstDay = page.getByLabel(/^Monday, 21 December 2026,/);
+        await expect
+          .poll(
+            () =>
+              firstDay.evaluate((cell) => {
+                const bounds = cell.getBoundingClientRect();
+                return cell.contains(
+                  document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + 20),
+                );
+              }),
+            { timeout: 5_000 },
+          )
+          .toBe(true);
+        const title = page.getByTestId("visible-period");
+        await expect.poll(() => title.textContent()).toBe("Dec 21, 2026 - Jan 17, 2027");
+        expect(await page.getByText(/Dec 21, 2026\s*[-–]\s*Jan 17, 2027/).count()).toBe(1);
+
+        const titleBounds = await title.boundingBox();
+        if (!titleBounds) throw new Error("Missing visible period heading");
+        expect(titleBounds.width).toBeGreaterThanOrEqual(Math.min(width, 900) - 34);
+        const controls = [
+          page.getByRole("button", { name: "Previous", exact: true }),
+          page.getByRole("button", { name: "Today", exact: true }),
+          page.getByRole("button", { name: "Next", exact: true }),
+          ...[2, 3, 4].map((count) =>
+            page.getByRole("button", { name: `${count} weeks`, exact: true }),
+          ),
+        ];
+        const boxes = [];
+        for (const control of controls) {
+          const box = await control.boundingBox();
+          if (!box) throw new Error("Missing date navigation control");
+          expect(box.width).toBeGreaterThanOrEqual(44);
+          expect(box.height).toBeGreaterThanOrEqual(44);
+          expect(box.x).toBeGreaterThanOrEqual(16);
+          expect(box.x + box.width).toBeLessThanOrEqual(width - 16);
+          expect(box.y).toBeGreaterThanOrEqual(titleBounds.y + titleBounds.height);
+          boxes.push(box);
+        }
+        for (let index = 0; index < boxes.length; index++) {
+          for (const other of boxes.slice(index + 1)) {
+            const box = boxes[index];
+            const overlapX =
+              Math.min(box.x + box.width, other.x + other.width) - Math.max(box.x, other.x);
+            const overlapY =
+              Math.min(box.y + box.height, other.y + other.height) - Math.max(box.y, other.y);
+            expect(overlapX <= 0 || overlapY <= 0).toBe(true);
+          }
+        }
+        if (width >= 411) expect(new Set(boxes.map((box) => Math.round(box.y))).size).toBe(1);
+        await controls[2].click();
+        await expect.poll(() => title.textContent()).toBe("Jan 18, 2027 - Feb 14, 2027");
+        await controls[1].click();
+        await expect.poll(() => title.textContent()).toBe("Dec 21, 2026 - Jan 17, 2027");
+        await controls[2].click();
+        await expect.poll(() => title.textContent()).toBe("Jan 18, 2027 - Feb 14, 2027");
+        await controls[0].click();
+        await expect.poll(() => title.textContent()).toBe("Dec 21, 2026 - Jan 17, 2027");
+
+        await page.getByText("month", { exact: true }).click();
+        await expect.poll(() => title.textContent()).toBe("December 2026");
+        expect(await page.getByText("December 2026", { exact: true }).count()).toBe(1);
+      },
+      width,
+      true,
+      new Date("2026-12-21T12:00:00Z"),
+      "Europe/Madrid",
+    );
+  });
+
   it.each(
     (["month", "multiweek"] as const).flatMap((mode) => [
       {
