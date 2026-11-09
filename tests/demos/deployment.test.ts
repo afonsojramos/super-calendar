@@ -86,6 +86,39 @@ async function nativeMultiWeekGrid(page: Page) {
 
 describe("published demos", () => {
   it.each(["/dom/", "/solid/"])(
+    "labels a one-day draft before a skipped date on %s",
+    async (path) => {
+      await checkPage(
+        path,
+        async (page) => {
+          if (path === "/solid/") {
+            await page.getByLabel("View", { exact: true }).selectOption("year");
+            for (let year = 0; year < 15; year++)
+              await page.getByRole("button", { name: "Previous period" }).click();
+            await page.getByLabel("View", { exact: true }).selectOption("month");
+            await page.getByRole("button", { name: "Next period" }).click();
+          } else await page.getByRole("button", { name: /^month$/i }).click();
+          expect(await page.evaluate(() => new Date(2011, 11, 30).getDate())).toBe(31);
+          const day = page.locator('[data-day="2011-12-29"]');
+          await day.scrollIntoViewIfNeeded();
+          const bounds = await day.boundingBox();
+          if (!bounds) throw new Error("Missing day before skipped date");
+          await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + 10);
+          await page.mouse.down();
+          await expect
+            .poll(() => page.locator('[data-slot="createGhost"]').allTextContents())
+            .toEqual(["Draft: Dec 29"]);
+          await page.mouse.up();
+        },
+        1100,
+        false,
+        new Date("2011-12-26T12:00:00Z"),
+        "Pacific/Apia",
+      );
+    },
+  );
+
+  it.each(["/dom/", "/solid/"])(
     "labels a one-day draft before a midnight clock change on %s",
     async (path) => {
       await checkPage(

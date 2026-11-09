@@ -179,7 +179,8 @@ const DraftPreview = ({ start, end }: CreateGhostArgs) => (
 );
 
 const MonthDraft = ({ start, end }: CreateGhostArgs) => {
-  const last = addDays(end, -1);
+  // The previous instant also works when the time zone skips an entire date.
+  const last = new Date(end.getTime() - 1);
   const range = isSameDay(start, last)
     ? format(start, "MMM d")
     : `${format(start, "MMM d")} to ${format(last, "MMM d")}`;
