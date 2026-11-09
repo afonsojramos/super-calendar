@@ -33,16 +33,85 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - uses: jdx/mise-action@v4
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - name: Build the PR base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/calendar-performance-base" "$BASE_SHA"
+          pnpm --dir "$RUNNER_TEMP/calendar-performance-base" install --frozen-lockfile
+          pnpm --dir "$RUNNER_TEMP/calendar-performance-base" build
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm bench:web
+      - name: Measure the PR base with the current fixture
+        if: github.event_name == 'pull_request'
+        env:
+          CALENDAR_PERFORMANCE_PACKAGE_ROOT: ${{ runner.temp }}/calendar-performance-base
+          CALENDAR_PERFORMANCE_OUTPUT: dist/performance/base
+        run: pnpm bench:web
+      - name: Measure the candidate
+        env:
+          CALENDAR_PERFORMANCE_OUTPUT: dist/performance/candidate
+        run: pnpm bench:web
+      - name: Generate the interaction table
+        env:
+          COMPARE_BASE: ${{ github.event_name == 'pull_request' }}
+        run: |
+          args=()
+          if [[ "$COMPARE_BASE" == "true" ]]; then args+=(--baseline dist/performance/base); fi
+          pnpm bench:report "${args[@]}"
       - uses: actions/upload-artifact@v4
         with:
           name: renderer-performance
-          path: dist/performance/*.json
+          path: dist/performance/
+          retention-days: 90
           if-no-files-found: error
+
+  performance-comment:
+    needs: performance
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      pull-requests: write
+    concurrency:
+      group: performance-comment-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: renderer-performance
+          path: performance
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('node:fs/promises');
+            const marker = '<!-- super-calendar-interaction-performance -->';
+            const metadata = JSON.parse(await fs.readFile('performance/report.json', 'utf8'));
+            const report = await fs.readFile('performance/report.md', 'utf8');
+            const number = context.payload.pull_request.number;
+            const expectedHead = context.payload.pull_request.head.sha;
+            const expectedBase = context.payload.pull_request.base.sha;
+            if (metadata.head !== expectedHead || metadata.base !== expectedBase || report.length > 60000 || !report.startsWith('## UI interaction timings\n')) {
+              throw new Error('Performance report does not match this pull request run');
+            }
+            const { data: current } = await github.rest.pulls.get({ ...context.repo, pull_number: number });
+            if (current.state !== 'open' || current.head.sha !== expectedHead || current.base.sha !== expectedBase) {
+              core.info('A newer PR revision superseded this report');
+              return;
+            }
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `${marker}\n${report}\n[Raw samples and environment metadata](${run}) are retained in the renderer-performance artifact.\n`;
+            const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: number, per_page: 100 });
+            const previous = comments.find(comment => comment.user?.login === 'github-actions[bot]' && comment.body?.startsWith(marker));
+            if (previous) await github.rest.issues.updateComment({ ...context.repo, comment_id: previous.id, body });
+            else await github.rest.issues.createComment({ ...context.repo, issue_number: number, body });
 
   package-health:
     runs-on: ubuntu-latest

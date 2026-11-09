@@ -5,7 +5,12 @@ import { fixtureConfig } from "../tests/web/browser/fixture-config.ts";
 const [renderer, directory] = process.argv.slice(2);
 assert(process.argv.length === 4 && (renderer === "react" || renderer === "solid") && directory);
 assert.equal(process.env.NODE_ENV, "production", "Benchmark builds require NODE_ENV=production");
-const { config } = fixtureConfig(renderer, "dist");
+const { config } = fixtureConfig(
+  renderer,
+  "dist",
+  19,
+  process.env.CALENDAR_PERFORMANCE_PACKAGE_ROOT,
+);
 await build({
   ...config,
   mode: "production",

@@ -1,15 +1,23 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { arch, cpus, platform, tmpdir } from "node:os";
+import { arch, cpus, hostname, platform, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 import type { Browser } from "playwright";
 import { afterAll, beforeAll, expect, inject, it } from "vitest";
 import { launchBrowser } from "../support/browser";
 import { serveDirectory } from "../support/static-server";
+import { clickTiming, measureEditing } from "./browser-interactions";
+import { defaultPerformanceOutput, interactions, type InteractionId } from "./interactions";
+import { parseReport, type InteractionReport } from "./report";
 
 const renderer = inject("browserRenderer");
 const root = resolve(import.meta.dirname, "../..");
+const packageRoot = resolve(process.env.CALENDAR_PERFORMANCE_PACKAGE_ROOT ?? root);
+const interactionSamples = Object.fromEntries(
+  interactions.map(({ id }) => [id, { samplesMs: [] as number[] }]),
+) as Record<InteractionId, { samplesMs: number[]; scriptMs?: number[]; taskMs?: number[] }>;
 const samples: {
   loadToPaintMs: number;
   updateToPaintMs: number;
@@ -111,6 +119,11 @@ it(`${renderer} records production rendering, scrolling, and bundle baselines`, 
           title.includes("!"),
         ),
       ).toBe(true);
+      const chooserToPaintMs = await clickTiming(
+        page,
+        page.getByRole("button", { name: "Edit events", exact: true }),
+        [{ selector: '[data-slot="eventAction"]', count: 1000 }],
+      );
 
       await page.goto(`${server.url}/?view=months`);
       const days = page.locator("[data-day]");
@@ -138,8 +151,9 @@ it(`${renderer} records production rendering, scrolling, and bundle baselines`, 
         });
       });
       expect(await days.count()).toBeLessThan(400);
+      const editing = await measureEditing(page, server.url);
       expect(errors).toEqual([]);
-      if (sample > 0)
+      if (sample > 0) {
         samples.push({
           loadToPaintMs,
           updateToPaintMs,
@@ -148,6 +162,22 @@ it(`${renderer} records production rendering, scrolling, and bundle baselines`, 
           scrollToPaintMs,
           nodes,
         });
+        const timings = {
+          ...editing,
+          "dense.mount": loadToPaintMs,
+          "dense.update": updateToPaintMs,
+          "dense.chooser": chooserToPaintMs,
+          "months.scroll": scrollToPaintMs,
+        };
+        for (const { id } of interactions) {
+          const duration = timings[id];
+          if (duration === undefined || !Number.isFinite(duration) || duration <= 0)
+            throw new Error(`Missing timing for ${id}`);
+          interactionSamples[id].samplesMs.push(duration);
+        }
+        (interactionSamples["dense.update"].scriptMs ??= []).push(updateScriptMs);
+        (interactionSamples["dense.update"].taskMs ??= []).push(updateTaskMs);
+      }
     } finally {
       await context.close();
     }
@@ -183,25 +213,78 @@ it(`${renderer} records production rendering, scrolling, and bundle baselines`, 
       ];
     }),
   );
-  const output = join(root, "dist/performance");
+  const output = resolve(
+    process.env.CALENDAR_PERFORMANCE_OUTPUT ?? join(root, defaultPerformanceOutput),
+  );
+  const commit = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: packageRoot,
+    encoding: "utf8",
+  }).trim();
+  const dirty =
+    execFileSync("git", ["status", "--porcelain"], { cwd: packageRoot, encoding: "utf8" }).trim()
+      .length > 0;
+  const collectedAt = new Date().toISOString();
+  const environment = {
+    platform: platform(),
+    arch: arch(),
+    cpu: cpus()[0]?.model ?? "unknown",
+    host: hostname(),
+    node: process.version,
+    browser: browser.version(),
+    viewport: "1100x850",
+    timezone: "Europe/Madrid",
+  };
+  const harnessFiles = [
+    "tests/performance/renderers.test.ts",
+    "tests/performance/browser-interactions.ts",
+    "tests/performance/interactions.ts",
+    "tests/web/browser/fixtures/Fixture.tsx",
+    "tests/web/browser/fixtures/PerformanceFixture.tsx",
+    "tests/web/browser/fixtures/main.tsx",
+    "tests/web/browser/fixtures/react.ts",
+    "tests/web/browser/fixtures/solid.ts",
+    "tests/web/browser/fixtures/index.html",
+    "tests/web/browser/fixture-config.ts",
+    "tests/support/browser.ts",
+    "tests/support/solid-plugin.mts",
+    "tests/support/static-server.ts",
+    "scripts/build-performance-fixture.mjs",
+    "vitest.performance.config.mts",
+    "pnpm-lock.yaml",
+  ];
+  const hash = createHash("sha256");
+  for (const file of harnessFiles)
+    hash
+      .update(file)
+      .update("\0")
+      .update(await readFile(join(root, file)))
+      .update("\0");
+  const report: InteractionReport = {
+    schemaVersion: 1,
+    renderer,
+    commit,
+    dirty,
+    collectedAt,
+    environment,
+    harnessHash: hash.digest("hex"),
+    warmupRuns: 1,
+    measurements: interactionSamples,
+  };
+  parseReport(report);
   await mkdir(output, { recursive: true });
+  await writeFile(
+    join(output, `${renderer}-interactions.json`),
+    `${JSON.stringify(report, null, 2)}\n`,
+  );
   await writeFile(
     join(output, `${renderer}.json`),
     `${JSON.stringify(
       {
         renderer,
-        commit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
-        dirty:
-          execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).trim()
-            .length > 0,
-        collectedAt: new Date().toISOString(),
-        environment: {
-          platform: platform(),
-          arch: arch(),
-          cpu: cpus()[0]?.model,
-          node: process.version,
-          browser: browser.version(),
-        },
+        commit,
+        dirty,
+        collectedAt,
+        environment,
         fixture: {
           eventCount: 1000,
           monthCount: 121,
