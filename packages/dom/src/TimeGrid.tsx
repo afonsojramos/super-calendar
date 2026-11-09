@@ -840,6 +840,16 @@ function TimeGridInner<T = unknown>(
     [days, events],
   );
   const hasAllDay = allDayLayout.segments.length > 0;
+  const allDayKeys = useRef(new WeakMap<CalendarEvent<T>, number>());
+  const nextAllDayKey = useRef(0);
+  const allDayKey = (event: CalendarEvent<T>) => {
+    let key = allDayKeys.current.get(event);
+    if (key === undefined) {
+      key = nextAllDayKey.current++;
+      allDayKeys.current.set(event, key);
+    }
+    return key;
+  };
 
   useEffect(() => {
     // On mount / when the offset prop changes, not on every zoom (hence the ref).
@@ -1895,7 +1905,7 @@ function TimeGridInner<T = unknown>(
               };
               return (
                 <div
-                  key={`${event.start.toISOString()}:${event.title}:${lane}`}
+                  key={allDayKey(event)}
                   {...slot("allDayColumn", {
                     base: {
                       gridColumn: `${startCol + 1} / span ${endCol - startCol + 1}`,

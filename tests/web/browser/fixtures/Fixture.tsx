@@ -198,7 +198,9 @@ export function Fixture() {
   });
   const [events, setEvents] = useFixtureState(
     view.startsWith("all-day")
-      ? allDayEvents
+      ? view.startsWith("all-day-repack")
+        ? [allDayEvents[0]]
+        : allDayEvents
       : view === "multiweek-transformed"
         ? recurringEvents
         : view === "dense"
@@ -236,6 +238,24 @@ export function Fixture() {
         <button onClick={() => setRejecting((value) => !value)}>Toggle rejection</button>
         <button onClick={() => setOverlapping((value) => !value)}>Toggle overlap</button>
         <button onClick={() => setEditing((value) => !value)}>Toggle editing</button>
+        {view.startsWith("all-day-repack") ? (
+          <button
+            onClick={() =>
+              setEvents((current) => [
+                ...current,
+                {
+                  id: 6,
+                  title: "Earlier",
+                  start: new Date(2026, 6, 13),
+                  end: new Date(2026, 6, view.endsWith("overlap") ? 17 : 14),
+                  allDay: true,
+                },
+              ])
+            }
+          >
+            Insert earlier event
+          </button>
+        ) : null}
         <button
           onClick={() => {
             setEvents((current) => [...current].reverse());

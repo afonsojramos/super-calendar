@@ -2101,7 +2101,7 @@ export function TimeGrid<T = unknown>(
               padding: "2px 0",
             })}
           >
-            <For each={allDayLayout().segments} keyed={false}>
+            <For each={allDayLayout().segments} keyed={(segment) => segment.event}>
               {(segment) => {
                 const args = createMemo<SolidRenderEventArgs<T>>(() => ({
                   event: segment().event,

@@ -15,6 +15,35 @@ async function expectSpan(title: string, first: number, last: number) {
 }
 
 describe(rendererName, () => {
+  it.each(["single", "overlap"])(
+    "keeps focus and activation on the same event after %s insertion repacks the bars",
+    async (variant) => {
+      await open(`all-day-repack-${variant}`);
+      const trip = page.locator('[data-slot="allDayEvent"]').filter({ hasText: "Trip" });
+      await trip.focus();
+      await page
+        .getByRole("button", { name: "Insert earlier event", exact: true })
+        .evaluate((element) => {
+          if (!(element instanceof HTMLButtonElement)) throw new Error("Missing insert control");
+          element.click();
+        });
+      await expect.poll(() => page.locator('[data-slot="allDayEvent"]').count()).toBe(2);
+      expect(await trip.evaluate((element) => element === document.activeElement)).toBe(true);
+      await page.keyboard.press("Enter");
+      expect(await page.getByLabel("Calls").textContent()).toBe('["press:Trip"]');
+      await page
+        .getByRole("button", { name: "Reverse events", exact: true })
+        .evaluate((element) => {
+          if (!(element instanceof HTMLButtonElement)) throw new Error("Missing reorder control");
+          element.click();
+        });
+      expect(await trip.evaluate((element) => element === document.activeElement)).toBe(true);
+      await page.keyboard.press("Enter");
+      expect(await page.getByLabel("Calls").textContent()).toBe('["press:Trip","press:Trip"]');
+      await expectSpan("Trip", 1, 3);
+    },
+  );
+
   it.each([320, 1100])(
     "draws one bar per all-day event at %i px and stacks overlapping spans",
     async (width) => {

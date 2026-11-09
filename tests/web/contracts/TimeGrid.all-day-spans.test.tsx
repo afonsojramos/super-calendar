@@ -37,6 +37,38 @@ describe(rendererName, () => {
     expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(trip);
   });
 
+  it.each([14, 17])(
+    "preserves focus and event identity when an earlier event ending on day %i repacks the bars",
+    (end) => {
+      const onPressEvent = vi.fn();
+      const earlier = {
+        ...trip,
+        title: "Earlier",
+        start: new Date(2026, 6, 13),
+        end: new Date(2026, 6, end),
+      };
+      const props = {
+        date,
+        mode: "week" as const,
+        weekStartsOn: 1 as const,
+        events: [trip],
+        onPressEvent,
+      };
+      const view = render(TimeGrid, props);
+      const button = view.getByText("Trip").closest("button");
+      if (!button) throw new Error("Missing Trip button");
+      button.focus();
+
+      for (const events of [[trip, earlier], [earlier, trip], [trip]]) {
+        view.rerender({ ...props, events });
+        expect(view.getByText("Trip").closest("button")).toBe(button);
+        expect(document.activeElement).toBe(button);
+      }
+      fireEvent.click(button);
+      expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(trip);
+    },
+  );
+
   it.each([
     { title: "Inside", start: 14, end: 17, before: false, after: false },
     { title: "Starts before", start: 11, end: 15, before: true, after: false },
