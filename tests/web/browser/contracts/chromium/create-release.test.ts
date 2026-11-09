@@ -67,6 +67,7 @@ describe(rendererName, () => {
         JSON.stringify([`${day}:9:0-${day}:11:0`]),
       );
       expect(await page.locator('[data-slot="createGhost"]').count()).toBe(0);
+      expect(await page.evaluate(() => getSelection()?.toString())).toBe("");
       // The completed sweep must detach its release listener.
       const nextBounds = (await column.boundingBox())!;
       const nextX = nextBounds.x + nextBounds.width / 2;
@@ -92,6 +93,10 @@ describe(rendererName, () => {
       await expect
         .poll(() => page.getByLabel("Calls").textContent())
         .toBe(JSON.stringify([`${day}:9:0-${day}:11:0`, `${day}:12:0-${day}:13:0`]));
+      await page.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+      expect(await page.getByLabel("Calls").textContent()).toBe(
+        JSON.stringify([`${day}:9:0-${day}:11:0`, `${day}:12:0-${day}:13:0`]),
+      );
     },
   );
 

@@ -1533,15 +1533,29 @@ export function TimeGrid<T = unknown>(
     const cancel = (event: PointerEvent) => {
       if (createOrigin.current?.pointerId === event.pointerId) clearCreate();
     };
+    const restart = (event: PointerEvent) => {
+      if (
+        (event.isPrimary && event.pointerType !== "touch") ||
+        createOrigin.current?.pointerId === event.pointerId
+      )
+        clearCreate();
+    };
+    // Text selected during a sweep can turn the next sweep into a native drag,
+    // which cancels pointer input before the calendar receives its release.
+    const preventSelection = (event: Event) => event.preventDefault();
     // If capture failed and release happened outside the window, the next press
     // belongs to a new gesture and must not complete the old one.
     document.addEventListener("pointerup", endCreate, true);
     document.addEventListener("pointercancel", cancel, true);
-    document.addEventListener("pointerdown", cancel, true);
+    document.addEventListener("pointerdown", restart, true);
+    document.addEventListener("selectstart", preventSelection, true);
+    document.addEventListener("dragstart", preventSelection, true);
     detachCreateListeners.current = () => {
       document.removeEventListener("pointerup", endCreate, true);
       document.removeEventListener("pointercancel", cancel, true);
-      document.removeEventListener("pointerdown", cancel, true);
+      document.removeEventListener("pointerdown", restart, true);
+      document.removeEventListener("selectstart", preventSelection, true);
+      document.removeEventListener("dragstart", preventSelection, true);
     };
   };
   const moveCreate = (e: DomPointerEvent) => {
