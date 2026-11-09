@@ -344,7 +344,7 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
    * Return `false` to reject the drop (the event snaps back).
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
-  /** Stable, unique event identity for the web editing dialog across data refreshes. */
+  /** Stable, unique identity for the editing dialog and all-day bars across data refreshes. */
   getEventId?: (event: CalendarEvent<T>) => string | number;
   /**
    * Page the grid to a new anchor date. Supplying it alongside `onDragEvent`
@@ -968,6 +968,25 @@ export function TimeGrid<T = unknown>(
     ),
   );
   const hasAllDay = createMemo(() => allDayLayout().segments.length > 0);
+  const allDaySpans = createMemo(() => {
+    const keys = new Map<CalendarEvent<T>, string>();
+    const seen = new Map<string, CalendarEvent<T>>();
+    for (const { event } of allDayLayout().segments) {
+      const id = props.getEventId?.(event);
+      if (typeof id !== "string" && typeof id !== "number") continue;
+      const key = `${typeof id}:${id}`;
+      const previous = seen.get(key);
+      if (previous) keys.delete(previous);
+      else {
+        seen.set(key, event);
+        keys.set(event, key);
+      }
+    }
+    return allDayLayout().segments.map((segment) => ({
+      ...segment,
+      key: keys.get(segment.event) ?? segment.event,
+    }));
+  });
 
   createEffect(
     () => [props.scrollOffsetMinutes, windowStart()],
@@ -2101,7 +2120,7 @@ export function TimeGrid<T = unknown>(
               padding: "2px 0",
             })}
           >
-            <For each={allDayLayout().segments} keyed={(segment) => segment.event}>
+            <For each={allDaySpans()} keyed={(segment) => segment.key}>
               {(segment) => {
                 const args = createMemo<SolidRenderEventArgs<T>>(() => ({
                   event: segment().event,

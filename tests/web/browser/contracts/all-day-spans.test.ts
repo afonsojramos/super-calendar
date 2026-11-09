@@ -15,6 +15,22 @@ async function expectSpan(title: string, first: number, last: number) {
 }
 
 describe(rendererName, () => {
+  it("preserves focus across an all-day refresh with a stable ID and activates the new object", async () => {
+    await open("all-day-repack-stable");
+    await page.locator('[data-slot="allDayEvent"]').filter({ hasText: "Trip" }).focus();
+    await page.getByRole("button", { name: "Refresh events", exact: true }).evaluate((element) => {
+      if (!(element instanceof HTMLButtonElement)) throw new Error("Missing refresh control");
+      element.click();
+    });
+    const refreshed = page
+      .locator('[data-slot="allDayEvent"]')
+      .filter({ hasText: "Trip refreshed" });
+    await expect.poll(() => refreshed.count()).toBe(1);
+    expect(await refreshed.evaluate((element) => element === document.activeElement)).toBe(true);
+    await page.keyboard.press("Enter");
+    expect(await page.getByLabel("Calls").textContent()).toBe('["press:Trip refreshed"]');
+  });
+
   it.each(["single", "overlap"])(
     "keeps focus and activation on the same event after %s insertion repacks the bars",
     async (variant) => {

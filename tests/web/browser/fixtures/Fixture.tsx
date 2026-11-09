@@ -327,7 +327,7 @@ export function Fixture() {
           }}
         />
       ) : view.startsWith("all-day") ? (
-        <TimeGrid
+        <TimeGrid<{ id: number }>
           date={updated() ? new Date(2026, 6, 22) : anchor}
           mode="week"
           weekStartsOn={1}
@@ -343,6 +343,7 @@ export function Fixture() {
               : events()
           }
           showAllDayLabel
+          getEventId={view.endsWith("stable") ? (event) => event.id : undefined}
           hideHours={view.endsWith("no-hours")}
           classNames={
             view.endsWith("classed")

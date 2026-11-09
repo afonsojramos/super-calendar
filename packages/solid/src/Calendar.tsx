@@ -203,7 +203,7 @@ export interface CalendarProps<T = unknown>
    * days dragged so the time of day and duration are kept.
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
-  /** Stable, unique event identity for the web editing dialog across data refreshes. */
+  /** Stable, unique identity for the editing dialog and time-grid all-day bars across data refreshes. */
   getEventId?: (event: CalendarEvent<T>) => string | number;
   /** Tap a day's column header. */
   onPressDateHeader?: (day: Date) => void;

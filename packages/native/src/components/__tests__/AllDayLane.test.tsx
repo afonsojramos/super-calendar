@@ -30,6 +30,46 @@ const props = {
 };
 
 describe("AllDayLane spans", () => {
+  it.each(
+    [230, 340, 361.42857142857144].flatMap((width) => [
+      {
+        width,
+        columns: [
+          [0, 0],
+          [2, 6],
+        ],
+      },
+      { width, columns: Array.from({ length: 7 }, (_, day) => [day, day]) },
+    ]),
+  )("keeps a full lane inside $width dp with $columns", async ({ width, columns }) => {
+    const events = columns.map(([first, last], index) => ({
+      ...trip,
+      title: `Event ${index}`,
+      start: new Date(2026, 6, 13 + first),
+      end: new Date(2026, 6, 14 + last),
+    }));
+    const view = await render(
+      <SlotStylesProvider classNames={{ allDayColumn: "span" }}>
+        <AllDayLane {...props} events={events} dayWidth={width / 7} />
+      </SlotStylesProvider>,
+    );
+    const cells = view.container.queryAll((node) => node.props.className === "span");
+    expect(cells).toHaveLength(events.length);
+    let consumed = 0;
+    for (const cell of cells) {
+      const style = StyleSheet.flatten(cell.props.style);
+      // Yoga tests wrapping with float32 values before it rounds to pixels.
+      const basis = Math.fround(style.width);
+      const margins = Math.fround(
+        Math.fround(style.marginLeft) + Math.fround(style.marginRight ?? 0),
+      );
+      expect(Math.fround(Math.fround(consumed + basis) + margins)).toBeLessThanOrEqual(
+        Math.fround(width),
+      );
+      consumed = Math.fround(consumed + Math.fround(basis + margins));
+    }
+  });
+
   it("preserves custom renderer state when an unchanged event moves to another lane", async () => {
     const StatefulSpan = ({ event }: RenderEventArgs) => {
       const [expanded, setExpanded] = useState(false);

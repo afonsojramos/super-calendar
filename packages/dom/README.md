@@ -155,6 +155,10 @@ refreshes close it. See
 Active gestures retain the original event through live insertions and reordering;
 removing the event or lane, losing capture, or unmounting cancels the gesture.
 
+In time grids, `getEventId` also preserves all-day focus and renderer state when
+a refresh replaces event objects. Bars without a valid, unique ID use object
+identity and remount when that object changes.
+
 ## Month chip dimensions
 
 `chipHeight` and `chipGap` configure month lanes and overflow rows on `Calendar`,

@@ -77,7 +77,11 @@ export function AllDayLane<T>({
         const { event, startCol, endCol, lane, continuesBefore, continuesAfter } = segment;
         const previous = spans[index - 1];
         const previousEnd = previous?.lane === lane ? previous.endCol : -1;
-        const remaining = spans[index + 1]?.lane === lane ? 0 : days.length - endCol - 1;
+        const lastInLane = spans[index + 1]?.lane !== lane;
+        const remaining = lastInLane ? days.length - endCol - 1 : 0;
+        // Yoga wraps before pixel rounding. Leave subpixel slack at the row end
+        // so float32 accumulation cannot push a bar onto the following line.
+        const wrapSlack = lastInLane ? Math.min(0.5, dayWidth / 4) : 0;
         return (
           <View
             key={keyExtractor(event, index)}
@@ -87,7 +91,7 @@ export function AllDayLane<T>({
                 {
                   width: dayWidth * (endCol - startCol + 1),
                   marginLeft: dayWidth * (startCol - previousEnd - 1),
-                  marginRight: dayWidth * remaining,
+                  marginRight: dayWidth * remaining - wrapSlack,
                 },
               ],
               themed: theme.containers.allDayColumn,

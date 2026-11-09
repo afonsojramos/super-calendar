@@ -22,6 +22,54 @@ const Span = (props: RenderEventArgs) => (
 );
 
 describe(rendererName, () => {
+  it("keeps duplicate-ID events separate when their input order changes", () => {
+    const other = { ...trip, title: "Other" };
+    const onPressEvent = vi.fn();
+    const props = {
+      date,
+      mode: "week" as const,
+      weekStartsOn: 1 as const,
+      events: [trip, other],
+      getEventId: () => "duplicate",
+      onPressEvent,
+    };
+    const view = render(TimeGrid, props);
+    const button = view.getByText("Trip").closest("button");
+    if (!button) throw new Error("Missing Trip button");
+    button.focus();
+    view.rerender({ ...props, events: [other, trip] });
+    expect(view.getByText("Trip").closest("button")).toBe(button);
+    expect(document.activeElement).toBe(button);
+    fireEvent.click(button);
+    expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(trip);
+  });
+
+  it("preserves distinct numeric and string event IDs through refreshed objects", () => {
+    const numeric = { ...trip, id: 0, title: "Numeric" };
+    const string = { ...trip, id: "0", title: "String" };
+    const onPressEvent = vi.fn();
+    const props = {
+      date,
+      mode: "week" as const,
+      weekStartsOn: 1 as const,
+      events: [numeric, string],
+      onPressEvent,
+      getEventId: (event: CalendarEvent<{ id: string | number }>) => event.id,
+    };
+    const view = render(TimeGrid<{ id: string | number }>, props);
+    const numericButton = view.getByText("Numeric").closest("button");
+    const stringButton = view.getByText("String").closest("button");
+    if (!numericButton || !stringButton) throw new Error("Missing all-day buttons");
+    numericButton.focus();
+    const refreshed = { ...numeric, title: "Numeric refreshed" };
+    view.rerender({ ...props, events: [{ ...string }, refreshed] });
+    expect(view.getByText("Numeric refreshed").closest("button")).toBe(numericButton);
+    expect(view.getByText("String").closest("button")).toBe(stringButton);
+    expect(document.activeElement).toBe(numericButton);
+    fireEvent.click(numericButton);
+    expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(refreshed);
+  });
+
   it("renders a multi-day all-day event as one spanning item in week view", () => {
     const onPressEvent = vi.fn();
     const view = render(TimeGrid, {

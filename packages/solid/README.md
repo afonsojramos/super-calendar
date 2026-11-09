@@ -102,6 +102,11 @@ to keep editing across full data refreshes. Return a stable, unique string or
 number per event or recurring occurrence. Missing, invalid, or duplicate IDs
 close the dialog. Without this prop, full refreshes close it. See
 [Move and resize actions](https://super-calendar.afonsojramos.me/guides/accessibility#move-and-resize-actions-web).
+
+In time grids, `getEventId` also preserves all-day focus and renderer state when
+a refresh replaces event objects. Bars without a valid, unique ID use object
+identity and remount when that object changes.
+
 Removing a resource cancels creation in its lane. `TimeGrid` completes creation
 on pointer release even if capture is lost just before it. Capture loss without
 a matching release and pointer cancellation cancel its creation sweep. A new

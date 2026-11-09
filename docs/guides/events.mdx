@@ -67,6 +67,11 @@ state updates from rebuilding `events`, including inline copies such as
 The native `keyExtractor` controls rendering keys; it does not reconnect a held gesture
 to a replacement event.
 
+In React DOM and Solid time grids, pass `getEventId` to preserve all-day focus
+and renderer state across refreshed objects. IDs must be stable, unique strings
+or numbers. Without a valid, unique ID, bars use object identity. Native uses
+`keyExtractor` for this purpose.
+
 ## Render your own event
 
 For Solid, use the [custom event example](/guides/solid#render-custom-events).

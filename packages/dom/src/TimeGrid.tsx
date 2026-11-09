@@ -342,7 +342,7 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
    * Return `false` to reject the drop (the event snaps back).
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
-  /** Stable, unique event identity for the web editing dialog across data refreshes. */
+  /** Stable, unique identity for the editing dialog and all-day bars across data refreshes. */
   getEventId?: (event: CalendarEvent<T>) => string | number;
   /**
    * Page the grid to a new anchor date. Supplying it alongside `onDragEvent`
@@ -840,15 +840,33 @@ function TimeGridInner<T = unknown>(
     [days, events],
   );
   const hasAllDay = allDayLayout.segments.length > 0;
+  const allDayIds = useMemo(() => {
+    const keys = new Map<CalendarEvent<T>, string>();
+    const seen = new Map<string, CalendarEvent<T>>();
+    for (const { event } of allDayLayout.segments) {
+      const id = getEventId?.(event);
+      if (typeof id !== "string" && typeof id !== "number") continue;
+      const key = `${typeof id}:${id}`;
+      const previous = seen.get(key);
+      if (previous) keys.delete(previous);
+      else {
+        seen.set(key, event);
+        keys.set(event, key);
+      }
+    }
+    return keys;
+  }, [allDayLayout, getEventId]);
   const allDayKeys = useRef(new WeakMap<CalendarEvent<T>, number>());
   const nextAllDayKey = useRef(0);
   const allDayKey = (event: CalendarEvent<T>) => {
+    const id = allDayIds.get(event);
+    if (id !== undefined) return id;
     let key = allDayKeys.current.get(event);
     if (key === undefined) {
       key = nextAllDayKey.current++;
       allDayKeys.current.set(event, key);
     }
-    return key;
+    return `object:${key}`;
   };
 
   useEffect(() => {
