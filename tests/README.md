@@ -9,7 +9,7 @@ verifies:
 | `web/adapters/`                | Framework wiring for shared contracts.                                                     |
 | `web/browser/contracts/`       | Real-browser behavior shared by React DOM and Solid, against source and built packages.    |
 | `web/browser/fixtures/`        | Shared browser UI and its framework adapters.                                              |
-| `demos/`                       | Smoke tests against the assembled static Pages artifact.                                   |
+| `demos/`                       | Browser checks for the static Pages artifact and isolated Expo exports.                    |
 | `performance/`                 | Production renderer and bundle measurements, reported without timing thresholds.           |
 | `architecture/`                | Package boundaries, public API parity, documentation consistency, and worklet compilation. |
 | `tooling/`                     | Test tooling, including the shared web parity gate.                                        |
@@ -51,6 +51,11 @@ and input. See the [browser test guide](web/README.md#browser-contracts) for set
 Solid hydration and package verification commands live in `scripts/` and are documented
 in the [Solid package README](../packages/solid/README.md#run-the-example). Device
 gesture checks use the [native example workflow](../AGENTS.md#running-the-native-example-on-a-device-or-emulator).
+
+The native month preview fixture in `demos/fixtures/native-month` is exported
+with the example's Expo toolchain into a temporary project. Its browser test
+checks real React Native Web accessibility and focus behavior. It does not
+replace physical-device gesture validation.
 
 ## Performance baselines
 

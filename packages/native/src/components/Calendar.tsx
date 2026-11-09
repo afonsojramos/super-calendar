@@ -143,8 +143,9 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
    */
   onCreateEvent?: (start: Date, end: Date) => void;
   /**
-   * A component that draws content inside the time-grid drag-to-create preview;
-   * see `TimeGrid`'s prop of the same name. Applies to the week/day grid only.
+   * Content inside the drag-to-create preview in time grids, month, and multiweek.
+   * Month grids receive an all-day range with an exclusive end, repeated for
+   * each row the span covers. Requires `onCreateEvent`.
    */
   renderCreateGhost?: ComponentType<CreateGhostArgs>;
   /**
@@ -780,6 +781,7 @@ function CalendarInner<T>(
             onLongPressEvent={handleLongPressEvent}
             onPressMore={onPressMore}
             onCreateEvent={onCreateEvent}
+            renderCreateGhost={renderCreateGhost}
             onSelectDrag={onSelectDrag}
             onDragEvent={onDragEvent}
             onDragStart={onDragStart}
