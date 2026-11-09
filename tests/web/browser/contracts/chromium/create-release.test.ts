@@ -7,23 +7,38 @@ describe(rendererName, () => {
       [false, true].map((outside) => ({ view, outside })),
     ),
   )(
-    "completes $view after early capture loss, outside column: $outside",
+    "completes $view with release-time capture loss, outside column: $outside",
     async ({ view, outside }) => {
       await page.setViewportSize({ width: 1100, height: 1000 });
       await open(view);
       const column = page.locator('[data-slot="dayColumn"]').first();
       const bounds = (await column.boundingBox())!;
-      await column.evaluate((element) => {
-        element.addEventListener("gotpointercapture", (event) => {
-          if (event instanceof PointerEvent)
-            element.setAttribute("data-pointer", String(event.pointerId));
-        });
+      await column.evaluate((element, outside) => {
+        // A release between automation commands can arrive before mouse-up, with
+        // buttons=1. Inject the reported zero-button order in the real release
+        // task instead. Outside releases also exercise the document listener
+        // without relying on the browser to retain pointer capture.
+        if (outside) element.setPointerCapture = () => {};
+        window.addEventListener(
+          "pointerup",
+          (event) => {
+            element.releasePointerCapture(event.pointerId);
+            element.dispatchEvent(
+              new PointerEvent("lostpointercapture", {
+                bubbles: true,
+                pointerId: event.pointerId,
+                buttons: event.buttons,
+              }),
+            );
+          },
+          { capture: true, once: true },
+        );
         document.addEventListener(
           "lostpointercapture",
           (event) => {
             document.body.setAttribute("data-release-order", `lost:${event.buttons}`);
           },
-          true,
+          { capture: true, once: true },
         );
         document.addEventListener(
           "pointerup",
@@ -35,14 +50,11 @@ describe(rendererName, () => {
           },
           true,
         );
-      });
+      }, outside);
       const x = bounds.x + bounds.width / 2;
       await page.mouse.move(x, bounds.y + 9 * 24 + 2);
       await page.mouse.down();
       await page.mouse.move(outside ? bounds.x - 20 : x, bounds.y + 11 * 24 + 2);
-      await column.evaluate((element) => {
-        element.releasePointerCapture(Number(element.getAttribute("data-pointer")));
-      });
       await page.mouse.up();
       expect(await page.locator("body").getAttribute("data-release-order")).toBe("lost:0,up");
       const day = view === "create-week" ? 13 : 15;
