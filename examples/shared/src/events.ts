@@ -65,7 +65,7 @@ export function buildEvents(): CalendarEvent<EventMeta>[] {
       end: at(1, 0),
       allDay: true,
     },
-    // Two all-day events tomorrow, so the all-day lane stacks more than one.
+    // Overlapping all-day events, including a three-day span in the week lane.
     {
       id: "13",
       kind: "travel",
@@ -79,7 +79,7 @@ export function buildEvents(): CalendarEvent<EventMeta>[] {
       kind: "work",
       title: "🎉 Company offsite",
       start: at(1, 0),
-      end: at(2, 0),
+      end: at(4, 0),
       allDay: true,
     },
     // One all-day event a week earlier, so swiping back reaches a one-row lane

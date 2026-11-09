@@ -23,6 +23,7 @@ import {
   isSameCalendarDay,
   isWeekend,
   layoutDayEvents,
+  layoutMonthWeek,
   movedClockSpan,
   overlapsOtherEvents,
   pageStepDays,
@@ -183,9 +184,9 @@ export interface SolidRenderEventArgs<T = unknown> {
   isAllDay: boolean;
   /** Pixel height of the event box (timed events only). */
   boxHeight?: number;
-  /** The event started before the visible day and continues into it. */
+  /** Starts before the visible day (timed) or visible date range (all-day). */
   continuesBefore?: boolean;
-  /** The event continues past the visible day. */
+  /** Ends after the visible day (timed) or visible date range (all-day). */
   continuesAfter?: boolean;
   /** Show the time range in 12-hour AM/PM. */
   ampm?: boolean;
@@ -953,19 +954,21 @@ export function TimeGrid<T = unknown>(
     },
     () => props.getEventId,
   );
-  const allDayByDay = createMemo(
-    // A multi-day all-day event shows in every column it overlaps (matching the
-    // native AllDayLane), not just its start day.
-    () =>
-      days().map((day) => {
-        const dayStart = startOfDay(day);
-        const dayEnd = addDays(dayStart, 1);
-        return props.events.filter(
-          (e) => isAllDayEvent(e) && !isBackgroundEvent(e) && e.start < dayEnd && e.end > dayStart,
-        );
-      }),
+  const allDayLayout = createMemo(() =>
+    layoutMonthWeek(
+      days(),
+      props.events.filter(
+        (event) =>
+          isAllDayEvent(event) &&
+          !isBackgroundEvent(event) &&
+          days().some(
+            (day) => event.start < addDays(startOfDay(day), 1) && event.end > startOfDay(day),
+          ),
+      ),
+    ),
   );
-  const hasAllDay = createMemo(() => allDayByDay().some((list) => list.length > 0));
+  const hasAllDay = createMemo(() => allDayLayout().segments.length > 0);
+
   createEffect(
     () => [props.scrollOffsetMinutes, windowStart()],
     () =>
@@ -2074,6 +2077,7 @@ export function TimeGrid<T = unknown>(
               base: {
                 width: gutterWidth(),
                 flex: "none",
+                boxSizing: "border-box",
                 minWidth: 0,
                 overflow: "hidden",
                 textAlign: "right",
@@ -2081,98 +2085,89 @@ export function TimeGrid<T = unknown>(
               themed: {
                 fontSize: 10,
                 color: theme().textMuted,
-                padding: "4px 6px 0 0",
+                padding: props.hideHours ? 0 : "4px 6px 0 0",
               },
             })}
           >
             {props.showAllDayLabel ? labels().allDay : null}
           </div>
-          {
-            <For each={allDayByDay()} keyed={false}>
-              {(list, i) => {
-                const dayStart = createMemo(() => startOfDay(days()[i]));
-                const dayEnd = createMemo(() => addDays(dayStart(), 1));
+          <div
+            style={css({
+              flex: 1,
+              minWidth: 0,
+              display: "grid",
+              gridTemplateColumns: `repeat(${days().length}, minmax(0, 1fr))`,
+              gap: "2px 0",
+              padding: "2px 0",
+            })}
+          >
+            <For each={allDayLayout().segments} keyed={false}>
+              {(segment) => {
+                const args = createMemo<SolidRenderEventArgs<T>>(() => ({
+                  event: segment().event,
+                  mode: props.mode,
+                  isAllDay: true,
+                  continuesBefore: segment().continuesBefore,
+                  continuesAfter: segment().continuesAfter,
+                  ampm: props.ampm,
+                  onPress: () => props.onPressEvent?.(segment().event),
+                }));
                 return (
                   <div
                     {...slot("allDayColumn", {
                       base: {
-                        flex: 1,
+                        gridColumn: `${segment().startCol + 1} / span ${segment().endCol - segment().startCol + 1}`,
+                        gridRow: segment().lane + 1,
                         minWidth: 0,
-                        // Mirror the day column's geometry so the all-day chip lines up
-                        // exactly with the timed events below it: a 1px left border (the
-                        // grid line, transparent here) plus a 1px horizontal inset.
+                        // Match the timed columns' grid line and horizontal inset.
                         borderLeft: "1px solid transparent",
-                        padding: "2px 1px",
+                        padding: "0 1px",
                         display: "flex",
                         flexDirection: "column",
-                        gap: 2,
                       },
                     })}
                   >
-                    {
-                      <For each={list()} keyed={false}>
-                        {(event) => {
-                          const args = createMemo<SolidRenderEventArgs<T>>(() => ({
-                            event: event(),
-                            mode: props.mode,
-                            isAllDay: true,
-                            // Whether this all-day event continues into the previous/next
-                            // column, so custom renderers can draw continuation affordances.
-                            continuesBefore: event().start < dayStart(),
-                            continuesAfter: event().end > dayEnd(),
-                            ampm: props.ampm,
-                            onPress: () => props.onPressEvent?.(event()),
-                          }));
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => props.onPressEvent?.(event())}
-                              aria-label={
-                                props.eventAccessibilityLabel
-                                  ? props.eventAccessibilityLabel(event(), {
-                                      mode: props.mode,
-                                      isAllDay: true,
-                                      ampm: props.ampm,
-                                    })
-                                  : defaultEventAccessibilityLabel({
-                                      title: event().title,
-                                      isAllDay: true,
-                                      start: event().start,
-                                      end: event().end,
-                                      ampm: props.ampm,
-                                      labels: labels(),
-                                    })
-                              }
-                              {...slot("allDayEvent", {
-                                base: {
-                                  border: "none",
-                                  padding: 0,
-                                  background: "transparent",
-                                  cursor: "pointer",
-                                  textAlign: "left",
-                                  height: 22,
-                                },
-                              })}
-                            >
-                              {Renderer() ? (
-                                <Dynamic component={Renderer()} {...args()} />
-                              ) : (
-                                <DefaultDomEvent
-                                  {...args()}
-                                  theme={theme()}
-                                  boxProps={slot("eventBox")}
-                                />
-                              )}
-                            </button>
-                          );
-                        }}
-                      </For>
-                    }
+                    <button
+                      type="button"
+                      onClick={() => props.onPressEvent?.(segment().event)}
+                      aria-label={
+                        props.eventAccessibilityLabel
+                          ? props.eventAccessibilityLabel(segment().event, {
+                              mode: props.mode,
+                              isAllDay: true,
+                              ampm: props.ampm,
+                            })
+                          : defaultEventAccessibilityLabel({
+                              title: segment().event.title,
+                              isAllDay: true,
+                              start: segment().event.start,
+                              end: segment().event.end,
+                              ampm: props.ampm,
+                              labels: labels(),
+                            })
+                      }
+                      {...slot("allDayEvent", {
+                        base: {
+                          border: "none",
+                          padding: 0,
+                          background: "transparent",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          height: 22,
+                        },
+                      })}
+                    >
+                      {Renderer() ? (
+                        <Dynamic component={Renderer()} {...args()} />
+                      ) : (
+                        <DefaultDomEvent {...args()} theme={theme()} boxProps={slot("eventBox")} />
+                      )}
+                    </button>
                   </div>
                 );
               }}
             </For>
-          }
+          </div>
         </div>
       ) : null}
 

@@ -185,6 +185,14 @@ the [Date selection](/guides/selection) guide.
 | `classNames`           | `Partial<Record<CalendarSlot, string>>`    | Per-slot Tailwind classes (uniwind/NativeWind); see [Styling](/guides/styling). |
 | `styles`               | `Partial<Record<CalendarSlot, StyleProp>>` | Per-slot style overrides, merged last.                                          |
 
+Time-grid all-day events render once per visible date range as spanning bars
+across their covered columns. Overlapping events occupy separate rows. This
+applies to native, React DOM, and Solid. The end is exclusive; hidden days take
+no width. `renderEvent` receives the original event, and its `continuesBefore`
+and `continuesAfter` hints indicate clipping at the visible range edges for
+all-day bars. The `allDayColumn` slot styles each spanning cell. Native rows
+measure custom event content to determine the band height.
+
 Month `Calendar`, `MonthView`, and `MonthList` accept `chipHeight` and `chipGap`.
 Both are numbers in pixels. DOM height defaults to 18; native height follows the
 theme. The gap defaults to 2 on both renderers. Native `MonthPager` forwards them too.

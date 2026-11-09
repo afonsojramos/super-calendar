@@ -6,6 +6,15 @@ The react-dom renderer for [super-calendar](https://github.com/afonsojramos/supe
 
 It is built on the headless [`@super-calendar/core`](https://www.npmjs.com/package/@super-calendar/core) and Legend List's DOM renderer.
 
+## All-day spans
+
+In the time grid, an all-day event renders once as a bar across the visible
+dates it covers. Overlapping events stack on separate rows. The end is
+exclusive, and hidden days take no width. `renderEvent` and press callbacks
+receive the original event; `continuesBefore` and `continuesAfter` indicate
+clipping at the visible range edges. The `allDayColumn` slot styles one
+spanning cell. Timed events that cross midnight keep their per-day segments.
+
 ## Install
 
 ```sh
