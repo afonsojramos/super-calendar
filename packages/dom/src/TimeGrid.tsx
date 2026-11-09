@@ -1346,11 +1346,18 @@ function TimeGridInner<T = unknown>(
     const cancel = (event: PointerEvent) => {
       if (createOrigin.current?.pointerId === event.pointerId) clearCreate();
     };
+    // If capture failed and release happened outside the window, the next press
+    // belongs to a new gesture and must not complete the old one.
+    const restart = (event: PointerEvent) => {
+      if (event.button === 0 && event.isPrimary !== false) cancel(event);
+    };
     document.addEventListener("pointerup", release, true);
     document.addEventListener("pointercancel", cancel, true);
+    document.addEventListener("pointerdown", restart, true);
     detachCreateListeners.current = () => {
       document.removeEventListener("pointerup", release, true);
       document.removeEventListener("pointercancel", cancel, true);
+      document.removeEventListener("pointerdown", restart, true);
     };
   };
   const moveCreate = (e: ReactPointerEvent) => {
@@ -1431,16 +1438,11 @@ function TimeGridInner<T = unknown>(
     if (createOrigin.current?.pointerId !== e.pointerId) return;
     clearCreate();
   };
-  // A zero-button loss can precede pointerup in the same browser event task.
-  // WebKit also reports zero while held, so cancel after that task unless the
-  // release listener has completed the sweep. Known held losses cancel now.
+  // Capture loss can precede pointerup with either button state. Give release
+  // the rest of this event task to complete, then cancel any remaining sweep.
   const loseCreateCapture = (e: ReactPointerEvent) => {
     const origin = createOrigin.current;
     if (!origin || origin.pointerId !== e.pointerId) return;
-    if (e.buttons !== 0) {
-      clearCreate();
-      return;
-    }
     if (origin.captureLoss !== undefined) clearTimeout(origin.captureLoss);
     origin.captureLoss = setTimeout(() => {
       if (createOrigin.current === origin) clearCreate();

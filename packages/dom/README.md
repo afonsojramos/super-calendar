@@ -176,8 +176,9 @@ The drag-to-create preview stays within the visible hours of the pressed column,
 with its border inside the column.
 
 `TimeGrid` completes creation on pointer release even if capture is lost just
-before it. Capture loss while the button is held and pointer cancellation
-cancel the sweep.
+before it. Capture loss without a matching release and pointer cancellation
+cancel the sweep. If a release outside the window is missed, a new press cancels
+the stale sweep before starting another interaction.
 
 Pass `renderCreateGhost` to `TimeGrid`, `Calendar`, or `ResourceTimeline` to draw
 a draft inside that preview. Define the component once, outside render:
