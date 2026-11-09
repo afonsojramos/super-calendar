@@ -1,6 +1,7 @@
 import { addDays, format, type Locale, isSameMonth, startOfDay } from "date-fns";
 import {
   type ComponentRef,
+  type ComponentType,
   memo,
   type ReactElement,
   useCallback,
@@ -45,6 +46,7 @@ import { holdWebDateDrag } from "../utils/holdWebDateDrag";
 import { CalendarLabelsContext } from "../utils/labels";
 import {
   type CalendarLabels,
+  type CreateGhostArgs,
   type DateRange,
   type EventAccessibilityLabeler,
   dayAccessibilityLabel,
@@ -153,6 +155,7 @@ export type MonthViewSlot =
   | "dayBadge"
   | "dayBadgeText"
   | "rangeBand"
+  | "createGhost"
   | "more"
   | "morePopover";
 
@@ -249,6 +252,14 @@ export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
    * plain tap fires `onPressDay`/`onPressCell` instead.
    */
   onCreateEvent?: (start: Date, end: Date) => void;
+  /**
+   * Content inside the drag-to-create preview. Receives the full all-day range,
+   * with an exclusive end, that `onCreateEvent` would receive on release. A span
+   * crossing rows renders the component once per row with the same range.
+   * Requires `onCreateEvent`; content is clipped, noninteractive, and hidden
+   * from screen readers. Omit to keep the day highlight without preview content.
+   */
+  renderCreateGhost?: ComponentType<CreateGhostArgs>;
   /**
    * Reports the day span of a create sweep **as it happens**, as the ordered
    * inclusive `[start, end]` days (both at midnight), so a selection highlight can
@@ -350,6 +361,7 @@ function DateRowsInner<T>({
   onLongPressEvent,
   onPressMore,
   onCreateEvent,
+  renderCreateGhost: RenderCreateGhost,
   onSelectDrag,
   onDragEvent,
   onDragStart,
@@ -471,9 +483,10 @@ function DateRowsInner<T>({
     return map;
   }, [events, sortedMonthView]);
 
-  // Draw the day-cell grid only for an events calendar; the events-free date
-  // picker reads cleaner without it (matching the dom renderer).
-  const showGrid = multiWeek || events.length > 0;
+  // Custom drafts need event lanes before the first event exists. Keep the
+  // events-free picker layout when no creation content is requested.
+  const createContentEnabled = onCreateEvent != null && RenderCreateGhost != null;
+  const showGrid = multiWeek || events.length > 0 || createContentEnabled;
 
   // Lay out each week row's spanning bars once per data change, not per render.
   const weekLayouts = useMemo(
@@ -493,6 +506,13 @@ function DateRowsInner<T>({
   // pointer listeners read, so neither has to be rebuilt as the hover day moves
   // (rebuilding the gesture mid-drag would cancel it).
   const [drag, setDrag] = useState<MonthDrag<T> | null>(null);
+  const createRange = useMemo(
+    () =>
+      createContentEnabled && drag?.kind === "create"
+        ? monthCreateRange(drag.anchor, drag.hover)
+        : null,
+    [createContentEnabled, drag],
+  );
   const dragRef = useRef<MonthDrag<T> | null>(null);
   const interactionWindow = useRef(windowKey);
   interactionWindow.current = windowKey;
@@ -1204,6 +1224,24 @@ function DateRowsInner<T>({
                       cols - 1 - [...week].reverse().findIndex((d) => isSameMonth(d, date));
                   }
                 }
+                const draftColumns = createRange
+                  ? week.flatMap((day, index) =>
+                      (showAdjacentMonths || isSameMonth(day, date)) &&
+                      day >= createRange.start &&
+                      day < createRange.end
+                        ? [index]
+                        : [],
+                    )
+                  : [];
+                const draftStart = draftColumns[0];
+                const draftEnd = draftColumns.at(-1);
+                // Overlay a free lane when possible, without moving cells under the drag.
+                const draftLane = Math.min(visibleLanes, Math.max(0, capacity.full - 1));
+                const draftTop = badgeArea + draftLane * chipMetrics.chipRowHeight;
+                const draftHeight = Math.min(
+                  chipMetrics.chipHeight,
+                  Math.max(0, gridHeight / weeks.length - draftTop),
+                );
                 return (
                   <View
                     {...slot("week", { base: styles.weekRow, themed: theme.containers.weekRow })}
@@ -1270,6 +1308,39 @@ function DateRowsInner<T>({
                               </View>
                             );
                           })}
+                        {RenderCreateGhost &&
+                        createRange &&
+                        draftStart !== undefined &&
+                        draftEnd !== undefined &&
+                        draftHeight > 0 ? (
+                          <View
+                            testID="month-create-ghost"
+                            {...slot("createGhost", {
+                              base: {
+                                position: "absolute",
+                                left: pct((draftStart / cols) * 100),
+                                right: pct(((cols - 1 - draftEnd) / cols) * 100),
+                                top: draftTop,
+                                height: draftHeight,
+                                marginHorizontal: CHIP_INSET_H,
+                                overflow: "hidden",
+                                zIndex: 1,
+                              },
+                              themed: {
+                                backgroundColor: theme.colors.rangeBackground,
+                                borderColor: theme.colors.selectedBackground,
+                                borderWidth: 1,
+                                borderRadius: 4,
+                              },
+                            })}
+                            pointerEvents="none"
+                            accessible={false}
+                            accessibilityElementsHidden
+                            importantForAccessibility="no-hide-descendants"
+                          >
+                            <RenderCreateGhost start={createRange.start} end={createRange.end} />
+                          </View>
+                        ) : null}
                       </View>
                     ) : null}
                   </View>

@@ -141,6 +141,17 @@ passes the lane's `resource`. The preview geometry stays on the UI thread, and
 the content is clipped to it and hidden from screen readers.
 A cancelled gesture clears the preview without calling `onCreateEvent`.
 
+`MonthView`, `MultiWeekView`, `MonthPager`, and `Calendar` in `month` or
+`multiweek` mode also accept `renderCreateGhost`. These views pass the full
+all-day range, with an exclusive end, and render one copy per covered week row.
+Use date labels rather than times for this content. The preview updates when
+the sweep reaches another day, uses `chipHeight`, `chipGap`, and the
+`createGhost` slot, and overlays a visible event lane without changing the row
+height. Content is clipped, ignores pointer input, and is hidden from screen
+readers. Both the renderer and `onCreateEvent` are required; together they also
+show the event-grid layout in an empty month. Omitting the renderer preserves
+the existing day highlight.
+
 ## Styling with Tailwind
 
 Every styleable part is a named slot that accepts a class (resolved by a Tailwind runtime such as [uniwind](https://docs.uniwind.dev) or NativeWind) and/or a style override. A classed slot drops its built-in themed styles, so your classes own the look:

@@ -1,6 +1,9 @@
 import { useMemo } from "react";
 import { vi } from "vitest";
-import { render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
+import { Text } from "react-native";
+import * as gestureHandlerMock from "react-native-gesture-handler";
+import type { CreateGhostArgs } from "@super-calendar/core";
 import type { CalendarEvent } from "../../types";
 
 // Capture the props handed to the virtualized list, and render only the active
@@ -95,6 +98,59 @@ describe("MonthPager event updates", () => {
     await rerender(<Calendar {...props} chipHeight={44} chipGap={6} />);
     expect(getByLabelText(/6 January 2026, 2 events$/)).toHaveStyle({ gap: 6 });
   });
+});
+
+describe("MonthPager creation preview updates", () => {
+  it.each(["month", "multiweek"] as const)(
+    "updates the cached %s page renderer and creation callback",
+    async (mode) => {
+      const first = vi.fn();
+      const replacement = vi.fn();
+      const First = ({ start }: CreateGhostArgs) => <Text>{`First ${start.getDate()}`}</Text>;
+      const Second = ({ start }: CreateGhostArgs) => <Text>{`Second ${start.getDate()}`}</Text>;
+      const props = {
+        mode,
+        date: new Date(2026, 5, 15),
+        events: [] as CalendarEvent[],
+        weekStartsOn: 0 as const,
+        onChangeDate: noop,
+        onPressEvent: noop,
+      };
+      const view = await render(
+        <Calendar {...props} onCreateEvent={first} renderCreateGhost={First} />,
+      );
+      await fireEvent(
+        view.getByTestId(mode === "month" ? "month-grid" : "multiweek-grid"),
+        "layout",
+        {
+          nativeEvent: { layout: { x: 0, y: 0, width: 700, height: mode === "month" ? 600 : 240 } },
+        },
+      );
+      const gesture = () => {
+        const { __gestures } = gestureHandlerMock as unknown as {
+          __gestures: { handlers: Record<string, (...args: unknown[]) => void> }[];
+        };
+        return __gestures.at(-1)!.handlers;
+      };
+      await act(() => gesture().onStart({ x: 250, y: mode === "month" ? 248 : 8 }));
+      expect(view.getByText("First 16", { includeHiddenElements: true })).toBeTruthy();
+      await view.rerender(<Calendar {...props} onCreateEvent={first} renderCreateGhost={Second} />);
+      expect(view.getByText("Second 16", { includeHiddenElements: true })).toBeTruthy();
+      expect(view.queryByText("First 16", { includeHiddenElements: true })).toBeNull();
+      await view.rerender(
+        <Calendar {...props} onCreateEvent={replacement} renderCreateGhost={Second} />,
+      );
+      await act(() => gesture().onEnd({}, true));
+      expect(first).not.toHaveBeenCalled();
+      expect(replacement).toHaveBeenCalledExactlyOnceWith(
+        new Date(2026, 5, 16),
+        new Date(2026, 5, 17),
+      );
+      await act(() => gesture().onStart({ x: 250, y: mode === "month" ? 248 : 8 }));
+      await view.rerender(<Calendar {...props} renderCreateGhost={Second} />);
+      expect(view.queryByTestId("month-create-ghost", { includeHiddenElements: true })).toBeNull();
+    },
+  );
 });
 
 describe("MonthPager title", () => {

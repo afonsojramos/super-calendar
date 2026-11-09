@@ -355,7 +355,8 @@ A few rules apply:
 - In React, define the component once outside render, as with `renderEvent`. A
   new inline function on every render remounts the content and drops its state.
 - `Calendar` forwards it in the time-grid modes (`day`, `3days`, `week`,
-  `custom`). Month and year sweeps don't use it. `ResourceTimeline` accepts the
+  `custom`). Native also supports [month and multi-week previews](#show-a-native-month-draft).
+  Year sweeps don't use it. `ResourceTimeline` accepts the
   same prop and adds the lane's `resource` to the props, in both orientations.
 - The range can extend past a narrowed `minHour`/`maxHour` window. On the web
   the preview box stops at the visible edge, but `start` and `end` keep matching
@@ -405,6 +406,40 @@ click without dragging creates nothing and still fires `onPressDay`.
 `[start, end]` days, so a selection highlight can follow the drag rather than
 appearing only on release. Set it, `onCreateEvent`, or both; either enables the
 gesture. See [Date selection](/guides/selection) for wiring it to `useDateRange`.
+
+### Show a native month draft
+
+In `@super-calendar/native`, pass `renderCreateGhost` to `MonthView`,
+`MultiWeekView`, `MonthPager`, or `Calendar` in `month` or `multiweek` mode.
+It receives the full all-day `start` and exclusive `end` that `onCreateEvent`
+would receive on release. Each week row crossed by the sweep renders one copy
+with the same range, including when you drag backward.
+
+```tsx
+import { Calendar, type CreateGhostArgs } from "@super-calendar/native";
+import { format } from "date-fns";
+import { Text } from "react-native";
+
+function MonthDraft({ start, end }: CreateGhostArgs) {
+  return (
+    <Text
+      numberOfLines={1}
+    >{`New: ${format(start, "MMM d")} to ${format(end, "MMM d")} (exclusive)`}</Text>
+  );
+}
+
+<Calendar mode="month" /* ... */ onCreateEvent={createEvent} renderCreateGhost={MonthDraft} />;
+```
+
+The preview uses `chipHeight`, `chipGap`, and the `createGhost` styling slot.
+It occupies the next available visible lane, or overlays the last lane when
+the row is full, without moving existing events. Its content is clipped,
+ignores pointer input, and is hidden from screen readers. It updates as the
+sweep reaches another day and clears on release or cancellation.
+
+The renderer requires `onCreateEvent`. An empty month shows the event-grid
+layout when both are set, so you can preview the first event. Without the
+renderer, the existing day highlight and empty picker layout are unchanged.
 
 ### Drag to reschedule
 

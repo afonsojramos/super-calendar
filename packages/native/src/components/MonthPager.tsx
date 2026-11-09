@@ -17,6 +17,7 @@ import {
 } from "date-fns";
 import {
   type ComponentRef,
+  type ComponentType,
   memo,
   type ReactElement,
   useCallback,
@@ -46,6 +47,7 @@ import type {
 } from "../types";
 import {
   type CalendarSelection,
+  type CreateGhostArgs,
   CalendarSelectionProvider,
   buildMultiWeekGrid,
   type DateRange,
@@ -106,6 +108,8 @@ export type MonthPagerProps<T> = {
   onPressMore?: (events: CalendarEvent<T>[], date: Date) => void;
   /** Drag across empty day cells to sweep out an all-day span for a new event. */
   onCreateEvent?: (start: Date, end: Date) => void;
+  /** Content for each row of the live creation preview; requires `onCreateEvent`. */
+  renderCreateGhost?: ComponentType<CreateGhostArgs>;
   /** Drag-to-select: reports the swept `[start, end]` days live. */
   onSelectDrag?: (start: Date, end: Date) => void;
   /** Days drawn as selected (a filled badge). */
@@ -201,6 +205,7 @@ function DateRowsPagerInner<T>({
   onLongPressEvent,
   onPressMore,
   onCreateEvent,
+  renderCreateGhost,
   onSelectDrag,
   selectedDates,
   selectedRange,
@@ -378,8 +383,19 @@ function DateRowsPagerInner<T>({
       dragSelect: onSelectDrag != null,
       chipHeight,
       chipGap,
+      renderCreateGhost,
+      onCreateEvent,
     }),
-    [events, activeDate, fillCellOnSelection, onSelectDrag, chipHeight, chipGap],
+    [
+      events,
+      activeDate,
+      fillCellOnSelection,
+      onSelectDrag,
+      chipHeight,
+      chipGap,
+      renderCreateGhost,
+      onCreateEvent,
+    ],
   );
 
   // Selection reaches the grids through context, not `renderItem`, so a change
@@ -440,6 +456,7 @@ function DateRowsPagerInner<T>({
           onLongPressEvent={onLongPressEvent}
           onPressMore={onPressMore}
           onCreateEvent={onCreateEvent}
+          renderCreateGhost={renderCreateGhost}
           onSelectDrag={onSelectDrag}
           fillCellOnSelection={fillCellOnSelection}
           onDragEvent={onDragEvent}
@@ -480,6 +497,7 @@ function DateRowsPagerInner<T>({
       onLongPressEvent,
       onPressMore,
       onCreateEvent,
+      renderCreateGhost,
       onSelectDrag,
       fillCellOnSelection,
       onDragEvent,

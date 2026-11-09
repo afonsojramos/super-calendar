@@ -98,7 +98,7 @@ Differences from the web renderer:
 - **Event chips and cards are `renderEvent`'s job.** To restyle them with Tailwind,
   pass your own `renderEvent` (or `renderMonthEvent` etc.) built from classed
   components.
-- **Animated slots.** `businessHours`, `weekendShade`, `daySeparator`, `event`,
+- **Animated slots.** In time grids, `businessHours`, `weekendShade`, `daySeparator`, `event`,
   `nowIndicator`, and `createGhost` render as Reanimated
   views. Their `styles` overrides always apply; whether `className` resolves there
   depends on your runtime's support for Animated components.
@@ -151,7 +151,10 @@ shared header and forwards the rest to each month's `MonthView`.
 ### MonthView
 
 Native's `MonthView` supports `title`, `weekdays`, `weekday`, `grid`, `week`, `day`,
-`dayBadge`, `dayBadgeText`, `rangeBand`, `more`, and `morePopover`.
+`dayBadge`, `dayBadgeText`, `rangeBand`, `createGhost`, `more`, and `morePopover`.
+Native `createGhost` is the noninteractive draft bar shown with
+`renderCreateGhost` and `onCreateEvent`. It also applies to `MultiWeekView`
+and the month or multi-week `Calendar`.
 
 | Slot          | Element                                           |
 | ------------- | ------------------------------------------------- |
