@@ -68,13 +68,30 @@ describe(rendererName, () => {
       );
       expect(await page.locator('[data-slot="createGhost"]').count()).toBe(0);
       // The completed sweep must detach its release listener.
-      await page.mouse.move(x, bounds.y + 12 * 24 + 2);
+      const nextBounds = (await column.boundingBox())!;
+      const nextX = nextBounds.x + nextBounds.width / 2;
+      const nextY = nextBounds.y + 12 * 24 + 2;
+      await expect
+        .poll(
+          () =>
+            column.evaluate(
+              (element, point) => {
+                const target = document.elementFromPoint(point.x, point.y);
+                return target === element ? "column" : target?.outerHTML.slice(0, 500);
+              },
+              { x: nextX, y: nextY },
+            ),
+          { timeout: 5_000 },
+        )
+        .toBe("column");
+      await page.mouse.move(nextX, nextY);
       await page.mouse.down();
-      await page.mouse.move(x, bounds.y + 13 * 24 + 2);
+      await expect.poll(() => page.locator('[data-slot="createGhost"]').count()).toBe(1);
+      await page.mouse.move(nextX, nextBounds.y + 13 * 24 + 2);
       await page.mouse.up();
-      expect(await page.getByLabel("Calls").textContent()).toBe(
-        JSON.stringify([`${day}:9:0-${day}:11:0`, `${day}:12:0-${day}:13:0`]),
-      );
+      await expect
+        .poll(() => page.getByLabel("Calls").textContent())
+        .toBe(JSON.stringify([`${day}:9:0-${day}:11:0`, `${day}:12:0-${day}:13:0`]));
     },
   );
 
