@@ -143,7 +143,9 @@ also accept `renderCreateGhost` in all three renderers. Native `MonthPager`
 forwards it to its pages. It receives the full all-day
 range with an exclusive end, once per covered week row. These previews follow
 `chipHeight` and `chipGap` and use the `createGhost` slot. They require
-`onCreateEvent` and update when the swept day changes. See
+`onCreateEvent` and update when the swept day changes. In DOM and Solid, both
+props switch an empty month to the event-grid layout. Set `keyboardDayNavigation`
+to keep arrow-key day navigation in that layout. See
 [Show a month draft](/guides/dragging#show-a-month-draft).
 
 ## Selection

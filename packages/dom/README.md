@@ -193,6 +193,8 @@ end, once per covered row. Use date labels for this content. The preview follows
 `chipHeight` and `chipGap`, uses the `createGhost` slot, and requires
 `onCreateEvent`. It is clipped, noninteractive, and hidden from assistive
 technology. Empty months use the event-grid layout when both props are set.
+Set `keyboardDayNavigation` to keep arrow-key day navigation in that layout,
+including before the first event exists.
 
 Pass `renderCreateGhost` to `TimeGrid`, `Calendar`, or `ResourceTimeline` to draw
 a draft inside that preview. Define the component once, outside render:

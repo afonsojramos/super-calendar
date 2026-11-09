@@ -421,7 +421,18 @@ It receives the full all-day `start` and exclusive `end` that `onCreateEvent`
 would receive on release. Each week row crossed by the sweep renders one copy
 with the same range, including when you drag backward.
 
-```tsx
+<CodeGroup>
+
+```tsx React DOM
+import type { CreateGhostArgs } from "@super-calendar/dom";
+import { format } from "date-fns";
+
+function MonthDraft({ start, end }: CreateGhostArgs) {
+  return <span>{`New: ${format(start, "MMM d")} to ${format(end, "MMM d")} (exclusive)`}</span>;
+}
+```
+
+```tsx React Native
 import { Calendar, type CreateGhostArgs } from "@super-calendar/native";
 import { format } from "date-fns";
 import { Text } from "react-native";
@@ -437,15 +448,31 @@ function MonthDraft({ start, end }: CreateGhostArgs) {
 <Calendar mode="month" /* ... */ onCreateEvent={createEvent} renderCreateGhost={MonthDraft} />;
 ```
 
+```tsx Solid
+import type { CreateGhostArgs } from "@super-calendar/solid";
+import { format } from "date-fns";
+
+function MonthDraft(props: CreateGhostArgs) {
+  return (
+    <span>{`New: ${format(props.start, "MMM d")} to ${format(props.end, "MMM d")} (exclusive)`}</span>
+  );
+}
+```
+
+</CodeGroup>
+
 The preview uses `chipHeight`, `chipGap`, and the `createGhost` styling slot.
 It occupies the next available visible lane, or overlays the last lane when
 the row is full, without moving existing events. Its content is clipped,
 ignores pointer input, and is hidden from screen readers. On web, it also stays out of the tab order. It updates as the
-sweep reaches another day and clears on release.
+sweep reaches another day and clears on release or cancellation.
 
 The renderer requires `onCreateEvent`. An empty month shows the event-grid
 layout when both are set, so you can preview the first event. Without the
 renderer, the existing day highlight and empty picker layout are unchanged.
+In DOM and Solid, the event-grid layout disables arrow-key day navigation by
+default. Set `keyboardDayNavigation` to keep it enabled before and after creating
+the first event.
 
 ### Drag to reschedule
 
