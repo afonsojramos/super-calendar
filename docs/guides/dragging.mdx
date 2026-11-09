@@ -361,7 +361,7 @@ A few rules apply:
 - In React, define the component once outside render, as with `renderEvent`. A
   new inline function on every render remounts the content and drops its state.
 - `Calendar` forwards it in the time-grid modes (`day`, `3days`, `week`,
-  `custom`). Native also supports [month and multi-week previews](#show-a-native-month-draft).
+  `custom`). For month and multi-week modes, see [Show a month draft](#show-a-month-draft).
   Year sweeps don't use it. `ResourceTimeline` accepts the
   same prop and adds the lane's `resource` to the props, in both orientations.
 - The range can extend past a narrowed `minHour`/`maxHour` window. On the web
@@ -413,15 +413,26 @@ click without dragging creates nothing and still fires `onPressDay`.
 appearing only on release. Set it, `onCreateEvent`, or both; either enables the
 gesture. See [Date selection](/guides/selection) for wiring it to `useDateRange`.
 
-### Show a native month draft
+### Show a month draft
 
-In `@super-calendar/native`, pass `renderCreateGhost` to `MonthView`,
-`MultiWeekView`, `MonthPager`, or `Calendar` in `month` or `multiweek` mode.
+Pass `renderCreateGhost` to `MonthView`, `MultiWeekView`, or `Calendar` in
+`month` or `multiweek` mode in any renderer.
 It receives the full all-day `start` and exclusive `end` that `onCreateEvent`
 would receive on release. Each week row crossed by the sweep renders one copy
 with the same range, including when you drag backward.
 
-```tsx
+<CodeGroup>
+
+```tsx React DOM
+import type { CreateGhostArgs } from "@super-calendar/dom";
+import { format } from "date-fns";
+
+function MonthDraft({ start, end }: CreateGhostArgs) {
+  return <span>{`New: ${format(start, "MMM d")} to ${format(end, "MMM d")} (exclusive)`}</span>;
+}
+```
+
+```tsx React Native
 import { Calendar, type CreateGhostArgs } from "@super-calendar/native";
 import { format } from "date-fns";
 import { Text } from "react-native";
@@ -437,16 +448,31 @@ function MonthDraft({ start, end }: CreateGhostArgs) {
 <Calendar mode="month" /* ... */ onCreateEvent={createEvent} renderCreateGhost={MonthDraft} />;
 ```
 
+```tsx Solid
+import type { CreateGhostArgs } from "@super-calendar/solid";
+import { format } from "date-fns";
+
+function MonthDraft(props: CreateGhostArgs) {
+  return (
+    <span>{`New: ${format(props.start, "MMM d")} to ${format(props.end, "MMM d")} (exclusive)`}</span>
+  );
+}
+```
+
+</CodeGroup>
+
 The preview uses `chipHeight`, `chipGap`, and the `createGhost` styling slot.
 It occupies the next available visible lane, or overlays the last lane when
 the row is full, without moving existing events. Its content is clipped,
-ignores pointer input, and is hidden from screen readers. On React Native Web,
-it also stays out of the tab order. It updates as the
+ignores pointer input, and is hidden from screen readers. On web, it also stays out of the tab order. It updates as the
 sweep reaches another day and clears on release or cancellation.
 
 The renderer requires `onCreateEvent`. An empty month shows the event-grid
 layout when both are set, so you can preview the first event. Without the
 renderer, the existing day highlight and empty picker layout are unchanged.
+In DOM and Solid, the event-grid layout disables arrow-key day navigation by
+default. Set `keyboardDayNavigation` to keep it enabled before and after creating
+the first event.
 
 ### Drag to reschedule
 

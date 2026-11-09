@@ -187,6 +187,15 @@ cancel the sweep. If a release outside the window is missed, a new press cancels
 the stale sweep before starting another interaction. Text selection and native
 browser dragging are disabled only while a mouse or pen sweep is active.
 
+`MonthView`, `MultiWeekView`, and `Calendar` in month and multi-week modes also
+accept `renderCreateGhost`. It receives the full all-day range with an exclusive
+end, once per covered row. Use date labels for this content. The preview follows
+`chipHeight` and `chipGap`, uses the `createGhost` slot, and requires
+`onCreateEvent`. It is clipped, noninteractive, and hidden from assistive
+technology. Empty months use the event-grid layout when both props are set.
+Set `keyboardDayNavigation` to keep arrow-key day navigation in that layout,
+including before the first event exists.
+
 Pass `renderCreateGhost` to `TimeGrid`, `Calendar`, or `ResourceTimeline` to draw
 a draft inside that preview. Define the component once, outside render:
 

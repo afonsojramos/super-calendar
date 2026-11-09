@@ -107,6 +107,15 @@ hours of the pressed column, with its border inside the column.
 Short previews use `minEventHeight`, like committed events. Clipping to the
 visible hours takes priority at the column edges.
 
+`MonthView`, `MultiWeekView`, and `Calendar` in month and multi-week modes also
+accept `renderCreateGhost`. It receives the full all-day range with an exclusive
+end, once per covered row. Use date labels for this content. The preview follows
+`chipHeight` and `chipGap`, uses the `createGhost` slot, and requires
+`onCreateEvent`. It is clipped, noninteractive, and hidden from assistive
+technology. Empty months use the event-grid layout when both props are set.
+Set `keyboardDayNavigation` to keep arrow-key day navigation in that layout,
+including before the first event exists.
+
 Pass `renderCreateGhost` to `TimeGrid`, `Calendar`, or `ResourceTimeline` to draw
 a draft inside that preview. Read the props inside JSX so the text follows the
 sweep:

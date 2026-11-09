@@ -4,6 +4,7 @@ import {
   buildMonthGrid,
   buildMultiWeekGrid,
   type CalendarEvent,
+  type CreateGhostArgs,
   type CalendarLabels,
   compareDayEvents,
   type DateRange,
@@ -63,6 +64,7 @@ export type MonthViewSlot =
   | "dayBadge"
   | "rangeBand"
   | "events"
+  | "createGhost"
   | "chipButton"
   | "chip"
   | "more"
@@ -205,6 +207,12 @@ export interface MonthViewProps<T = unknown>
    * carry `data-creating` for styling.
    */
   onCreateEvent?: (start: Date, end: Date) => void;
+  /**
+   * Custom content for a drag-to-create preview, once per covered week row.
+   * Receives the full all-day range with an exclusive end. Requires onCreateEvent.
+   * Content is clipped, noninteractive, and hidden from assistive technology.
+   */
+  renderCreateGhost?: Component<CreateGhostArgs>;
   /**
    * Reports the day span of a create sweep **as it happens**, as the ordered
    * inclusive `[start, end]` days (both at midnight), so a selection highlight can
@@ -612,7 +620,12 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
   // Calendar layout (date in the corner + event chips) is on whenever `events`
   // is provided; otherwise the compact picker badge layout is used. Multi-week
   // rows always use the calendar layout.
-  const eventsMode = createMemo(() => props.events !== undefined || multiWeek());
+  const createContentEnabled = createMemo(
+    () => props.onCreateEvent != null && props.renderCreateGhost != null,
+  );
+  const eventsMode = createMemo(
+    () => props.events !== undefined || multiWeek() || createContentEnabled(),
+  );
   // The day cells form a roving tab stop (arrow keys + Enter) in the picker
   // always, and in events mode only when the consumer opts in. Otherwise events
   // mode tabs through the event chips alone.
@@ -852,6 +865,15 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
   // all-day span, or press an event chip and drop it on another day. Both are
   // released on a window pointerup, so letting go anywhere still commits.
   const [drag, setDrag] = createSignal<MonthDrag<T> | null>(null);
+  const createRange = createMemo(
+    () => {
+      const current = drag();
+      return createContentEnabled() && current?.kind === "create"
+        ? monthCreateRange(new Date(current.anchor), new Date(current.hover))
+        : null;
+    },
+    { equals: (a, b) => a === b || (!!a && !!b && +a.start === +b.start && +a.end === +b.end) },
+  );
   const dragRef: ElementRef<MonthDrag<T> | null> = { current: null };
   const applyDrag = (value: MonthDrag<T> | null) => {
     dragRef.current = value;
@@ -1260,6 +1282,29 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                   last,
                 };
               });
+              const draftColumns = createMemo(() => {
+                const range = createRange();
+                return range
+                  ? week().days.flatMap((day, index) =>
+                      (!showAdjacentMonths() && isOutsidePeriod(day)) ||
+                      day.date < range.start ||
+                      day.date >= range.end
+                        ? []
+                        : [index],
+                    )
+                  : [];
+              });
+              const draftTop = createMemo(
+                () =>
+                  CELL_PAD +
+                  DATE_ROW +
+                  props.chipGap +
+                  Math.min(visibleLanes(), Math.max(0, props.maxVisibleEventCount - 1)) *
+                    (props.chipHeight + props.chipGap),
+              );
+              const draftHeight = createMemo(() =>
+                Math.min(props.chipHeight, Math.max(0, eventRowHeight() - draftTop())),
+              );
               return (
                 <>
                   {(() => {
@@ -1551,6 +1596,45 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                            start day's gridcell and reads with that day. Made
                                            non-interactive mid drag so a sweep (or a move) reaches the
                                            cells beneath. */}
+                                          <Show
+                                            when={
+                                              props.renderCreateGhost &&
+                                              createRange() &&
+                                              draftColumns()[0] === dayCol &&
+                                              draftHeight() > 0
+                                            }
+                                          >
+                                            <div
+                                              {...slot("createGhost", {
+                                                base: {
+                                                  position: "absolute",
+                                                  left: 2,
+                                                  width: `calc(${(draftColumns().at(-1)! - dayCol + 1) * 100}% - 4px)`,
+                                                  top: draftTop(),
+                                                  height: draftHeight(),
+                                                  boxSizing: "border-box",
+                                                  pointerEvents: "none",
+                                                  overflow: "hidden",
+                                                  zIndex: 3,
+                                                },
+                                                themed: {
+                                                  background: theme().rangeBackground,
+                                                  border: `1px solid ${theme().selectedBackground}`,
+                                                  borderRadius: 4,
+                                                  fontSize: 12,
+                                                  color: theme().text,
+                                                },
+                                              })}
+                                              inert
+                                              aria-hidden="true"
+                                            >
+                                              <Dynamic
+                                                component={props.renderCreateGhost!}
+                                                start={createRange()!.start}
+                                                end={createRange()!.end}
+                                              />
+                                            </div>
+                                          </Show>
                                           {
                                             <For
                                               each={barSegs().filter((b) => b.startCol === dayCol)}

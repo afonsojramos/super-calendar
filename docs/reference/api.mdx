@@ -138,12 +138,15 @@ In React DOM and Solid `MonthView` and `MultiWeekView`, Escape and cancellation
 of the active pointer clear a create or move gesture without calling
 `onCreateEvent` or `onDragEvent`.
 
-Native `MonthView`, `MultiWeekView`, `MonthPager`, and `Calendar` in `month` or
-`multiweek` mode also accept `renderCreateGhost`. It receives the full all-day
+`MonthView`, `MultiWeekView`, and `Calendar` in `month` or `multiweek` mode
+also accept `renderCreateGhost` in all three renderers. Native `MonthPager`
+forwards it to its pages. It receives the full all-day
 range with an exclusive end, once per covered week row. These previews follow
 `chipHeight` and `chipGap` and use the `createGhost` slot. They require
-`onCreateEvent` and update when the swept day changes. See
-[Show a native month draft](/guides/dragging#show-a-native-month-draft).
+`onCreateEvent` and update when the swept day changes. In DOM and Solid, both
+props switch an empty month to the event-grid layout. Set `keyboardDayNavigation`
+to keep arrow-key day navigation in that layout. See
+[Show a month draft](/guides/dragging#show-a-month-draft).
 
 ## Selection
 

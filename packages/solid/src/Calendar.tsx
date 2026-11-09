@@ -190,8 +190,9 @@ export interface CalendarProps<T = unknown>
    */
   onCreateEvent?: (start: Date, end: Date) => void;
   /**
-   * A component that draws content inside the time-grid drag-to-create preview;
-   * see `TimeGrid`'s prop of the same name. Applies to the week/day grid only.
+   * A component that draws content inside a creation preview in time-grid, month
+   * and multi-week modes. Month rows receive the full all-day range with an
+   * exclusive end, once per covered row. Requires onCreateEvent.
    */
   renderCreateGhost?: Component<CreateGhostArgs>;
   /** Fires when an event drag begins. */
@@ -511,6 +512,7 @@ export function Calendar<T = unknown>(
           onPressDay={props.onPressDay}
           onPressCell={props.onPressCell}
           onCreateEvent={props.onCreateEvent}
+          renderCreateGhost={props.renderCreateGhost}
           onSelectDrag={props.onSelectDrag}
           onDragEvent={props.onDragEvent}
           onDragStart={props.onDragStart}
@@ -554,6 +556,7 @@ export function Calendar<T = unknown>(
           onPressDay={props.onPressDay}
           onPressCell={props.onPressCell}
           onCreateEvent={props.onCreateEvent}
+          renderCreateGhost={props.renderCreateGhost}
           onSelectDrag={props.onSelectDrag}
           onDragEvent={props.onDragEvent}
           onDragStart={props.onDragStart}
