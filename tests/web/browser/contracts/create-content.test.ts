@@ -132,7 +132,7 @@ describe(rendererName, () => {
     await page.mouse.up();
   });
 
-  it.each(["scroll", "ancestor scroll", "zoom in", "zoom out"])(
+  it.each(["scroll", "smooth scroll", "ancestor scroll", "zoom in", "zoom out"])(
     "commits the shown range after %s without another pointer move",
     async (change) => {
       const column = await openColumn("draft-day-scrolled");
@@ -159,10 +159,28 @@ describe(rendererName, () => {
           .poll(async () => (await bounds('[data-slot="dayColumn"]')).y)
           .toBeLessThan(column.y);
       } else {
-        await page.mouse.wheel(0, 96);
+        const targetScrollTop = await page.locator('[data-slot="dayColumn"]').evaluate((column) => {
+          let scroller = column.parentElement;
+          while (scroller && getComputedStyle(scroller).overflowY !== "auto")
+            scroller = scroller.parentElement;
+          if (!scroller) throw new Error("Missing time-grid scroll container");
+          scroller.dataset.scrollTarget = "true";
+          return Math.min(scroller.scrollTop + 96, scroller.scrollHeight - scroller.clientHeight);
+        });
+        if (change === "smooth scroll")
+          await page
+            .locator("[data-scroll-target]")
+            .evaluate((scroller) => scroller.scrollBy({ top: 96, behavior: "smooth" }));
+        else await page.mouse.wheel(0, 96);
         await expect
-          .poll(async () => (await bounds('[data-slot="dayColumn"]')).y)
+          .poll(async () => (await bounds('[data-slot="dayColumn"]')).y, { interval: 1 })
           .toBeLessThan(column.y);
+        // Wheel dispatch and the first moved pixel can precede the final scroll position.
+        await expect
+          .poll(() =>
+            page.locator("[data-scroll-target]").evaluate((scroller) => scroller.scrollTop),
+          )
+          .toBe(targetScrollTop);
       }
       await page.evaluate(
         () =>
