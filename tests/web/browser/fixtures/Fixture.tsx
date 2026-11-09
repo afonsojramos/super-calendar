@@ -252,9 +252,9 @@ export function Fixture() {
           </button>
         ) : null}
       </nav>
-      {view.startsWith("multiweek") ? (
+      {view.startsWith("multiweek") || view === "month-drag" ? (
         <Calendar
-          mode="multiweek"
+          mode={view === "month-drag" ? "month" : "multiweek"}
           date={date() ?? anchor}
           numberOfWeeks={updated() ? 3 : view.includes("eight") ? 8 : 2}
           weekStartsOn={1}

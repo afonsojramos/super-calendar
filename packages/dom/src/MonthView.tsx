@@ -110,6 +110,7 @@ type MonthDrag<T> = (
 ) & {
   // The rows the drag began in, so a drag never commits into a different window.
   windowKey: string;
+  pointerId: number;
 };
 
 /** Props for {@link MonthView}. */
@@ -860,20 +861,20 @@ export function DateRows<T = unknown>({
     suppressClickRef.current = false;
     movedRef.current = false;
   };
-  const beginCreate = (day: Date) => {
+  const beginCreate = (day: Date, pointerId: number) => {
     if (!onCreateEvent && !onSelectDrag) return;
     const t = startOfDay(day).getTime();
-    setDrag({ kind: "create", anchor: t, hover: t, windowKey });
+    setDrag({ kind: "create", anchor: t, hover: t, windowKey, pointerId });
   };
-  const beginMove = (event: CalendarEvent<T>, day: Date) => {
+  const beginMove = (event: CalendarEvent<T>, day: Date, pointerId: number) => {
     if (!canMove(event)) return;
     const t = startOfDay(day).getTime();
-    setDrag({ kind: "move", event, from: t, to: t, windowKey });
+    setDrag({ kind: "move", event, from: t, to: t, windowKey, pointerId });
     onDragStart?.(event);
   };
-  const extendDrag = (day: Date) => {
+  const extendDrag = (day: Date, pointerId: number) => {
     const current = dragRef.current;
-    if (!current) return;
+    if (!current || current.pointerId !== pointerId) return;
     const t = startOfDay(day).getTime();
     if (t === (current.kind === "create" ? current.hover : current.to)) return;
     movedRef.current = true;
@@ -901,8 +902,8 @@ export function DateRows<T = unknown>({
     if (event.button !== 0 || event.isPrimary === false || heldTouch.current) return;
     beginPress();
     const start = () => {
-      if (moving) touchHandlers.current.beginMove(moving, day);
-      else touchHandlers.current.beginCreate(day);
+      if (moving) touchHandlers.current.beginMove(moving, day, event.pointerId);
+      else touchHandlers.current.beginCreate(day, event.pointerId);
     };
     if (!multiWeek || !event.pointerType || event.pointerType === "mouse") {
       start();
@@ -924,7 +925,7 @@ export function DateRows<T = unknown>({
           ?.closest<HTMLElement>("[data-day]");
         if (!element || !gridRef.current?.contains(element)) return;
         const day = touchHandlers.current.dayLookup.get(element.dataset.day ?? "");
-        if (day && !day.isDisabled) touchHandlers.current.extendDrag(day.date);
+        if (day && !day.isDisabled) touchHandlers.current.extendDrag(day.date, event.pointerId);
       },
       () => {
         dragRef.current = null;
@@ -972,10 +973,12 @@ export function DateRows<T = unknown>({
   const dragWired = onCreateEvent != null || onSelectDrag != null || onDragEvent != null;
   useEffect(() => {
     if (!isDragging) return;
-    const finish = () => {
+    const finish = (event: PointerEvent) => {
       const current = dragRef.current;
+      if (!current || current.pointerId !== event.pointerId) return;
+      dragRef.current = null;
       setDrag(null);
-      if (!current || !movedRef.current) return;
+      if (!movedRef.current) return;
       // Multi-week rows drop a drag whose window was replaced before release.
       if (multiWeek && current.windowKey !== windowKeyRef.current) return;
       suppressClickRef.current = true;
@@ -996,8 +999,29 @@ export function DateRows<T = unknown>({
       }
       onDragEvent?.(current.event, next.start, next.end);
     };
+    const clear = () => {
+      heldTouch.current?.();
+      dragRef.current = null;
+      setDrag(null);
+      movedRef.current = false;
+      suppressClickRef.current = true;
+    };
+    const cancel = (event: PointerEvent) => {
+      if (dragRef.current?.pointerId === event.pointerId) clear();
+    };
+    const keyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      clear();
+    };
     window.addEventListener("pointerup", finish);
-    return () => window.removeEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("keydown", keyDown);
+    return () => {
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("keydown", keyDown);
+    };
   }, [isDragging, multiWeek, onCreateEvent, onDragEvent, eventOverlap, events]);
   // Replacing the multi-week window cancels a drag and closes the overflow
   // popover, so neither acts on days that are no longer shown.
@@ -1277,7 +1301,9 @@ export function DateRows<T = unknown>({
                       // A disabled day is out of every selection, drag included, so
                       // a sweep never extends onto it and no drop lands there.
                       onPointerEnter={
-                        dragWired && !day.isDisabled ? () => extendDrag(day.date) : undefined
+                        dragWired && !day.isDisabled
+                          ? (event) => extendDrag(day.date, event.pointerId)
+                          : undefined
                       }
                       onClick={
                         day.isDisabled

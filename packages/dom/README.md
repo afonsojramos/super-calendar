@@ -105,6 +105,10 @@ Counts must be positive safe integers whose date span is representable; invalid
 counts or dates throw `RangeError`. Rows are materialized, so larger counts need
 more space. `MonthView` retains its month-only behavior.
 
+In month and multi-week grids, Escape or cancellation of the active pointer
+ends a create or move gesture without committing. Other pointers cannot finish
+or cancel that gesture.
+
 In the multi-week web grid, a quick touch swipe scrolls. Hold a day or event for
 400 ms, then drag to create or move. Mouse input starts immediately. Cancelling
 the pointer or changing the displayed window cancels the hold or drag.

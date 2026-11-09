@@ -1064,17 +1064,27 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
           }
           props.onDragEvent?.(current.event, next.start, next.end);
         };
-        const cancel = (e: PointerEvent) => {
-          if (dragRef.current?.pointerId !== e.pointerId) return;
+        const clear = () => {
+          heldTouch?.();
           applyDrag(null);
           movedRef.current = false;
           suppressClickRef.current = true;
         };
+        const cancel = (event: PointerEvent) => {
+          if (dragRef.current?.pointerId === event.pointerId) clear();
+        };
+        const keyDown = (event: KeyboardEvent) => {
+          if (event.key !== "Escape") return;
+          event.preventDefault();
+          clear();
+        };
         window.addEventListener("pointerup", finish);
         window.addEventListener("pointercancel", cancel);
+        window.addEventListener("keydown", keyDown);
         return () => {
           window.removeEventListener("pointerup", finish);
           window.removeEventListener("pointercancel", cancel);
+          window.removeEventListener("keydown", keyDown);
         };
       }),
   );
