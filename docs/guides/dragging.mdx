@@ -376,8 +376,12 @@ A few rules apply:
 
 ## On the month grid
 
-The same two handlers work in `month` mode on both renderers. Nothing extra to
+The same two handlers work in `month` mode on all three renderers. Nothing extra to
 enable: pass `onCreateEvent`, `onDragEvent`, or both.
+
+In React DOM and Solid month and multi-week grids, **Escape** or cancellation
+of the active pointer ends a create or move gesture without calling its commit
+handler. Release and cancellation events from other pointers do not end the active gesture.
 
 ### Drag to create a day span
 

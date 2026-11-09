@@ -127,6 +127,10 @@ is held. Cancelled native gestures do not call `onCreateEvent`. The content is c
 hidden from assistive tech. On React Native it updates when the sweep crosses a
 snap step. See [Show a draft in the preview](/guides/dragging#show-a-draft-in-the-preview).
 
+In React DOM and Solid `MonthView` and `MultiWeekView`, Escape and cancellation
+of the active pointer clear a create or move gesture without calling
+`onCreateEvent` or `onDragEvent`.
+
 ## Selection
 
 | Prop                  | Type                   | Notes                                            |

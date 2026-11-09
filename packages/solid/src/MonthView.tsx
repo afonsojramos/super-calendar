@@ -868,8 +868,9 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
   const suppressClickRef = {
     current: false,
   };
-  const consumeSuppressedClick = () => {
-    if (!suppressClickRef.current) return false;
+  // Keyboard and assistive-technology clicks have detail 0 and never trail a drag.
+  const consumeSuppressedClick = (detail: number) => {
+    if (detail === 0 || !suppressClickRef.current) return false;
     suppressClickRef.current = false;
     return true;
   };
@@ -1064,17 +1065,27 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
           }
           props.onDragEvent?.(current.event, next.start, next.end);
         };
-        const cancel = (e: PointerEvent) => {
-          if (dragRef.current?.pointerId !== e.pointerId) return;
+        const clear = () => {
+          heldTouch?.();
           applyDrag(null);
           movedRef.current = false;
           suppressClickRef.current = true;
         };
+        const cancel = (event: PointerEvent) => {
+          if (dragRef.current?.pointerId === event.pointerId) clear();
+        };
+        const keyDown = (event: KeyboardEvent) => {
+          if (event.key !== "Escape") return;
+          event.preventDefault();
+          clear();
+        };
         window.addEventListener("pointerup", finish);
         window.addEventListener("pointercancel", cancel);
+        window.addEventListener("keydown", keyDown);
         return () => {
           window.removeEventListener("pointerup", finish);
           window.removeEventListener("pointercancel", cancel);
+          window.removeEventListener("keydown", keyDown);
         };
       }),
   );
@@ -1494,8 +1505,8 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                           onClick={
                                             day().isDisabled
                                               ? undefined
-                                              : () => {
-                                                  if (consumeSuppressedClick()) return;
+                                              : (e) => {
+                                                  if (consumeSuppressedClick(e.detail)) return;
                                                   props.onPressDay?.(day().date);
                                                   props.onPressCell?.(startOfDay(day().date));
                                                 }
@@ -1571,7 +1582,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                     }
                                                     onClick={(e) => {
                                                       e.stopPropagation();
-                                                      if (consumeSuppressedClick()) return;
+                                                      if (consumeSuppressedClick(e.detail)) return;
                                                       props.onPressEvent?.(b().seg.event);
                                                     }}
                                                     {...barChipButton()}
