@@ -153,6 +153,54 @@ describe("MonthPager creation preview updates", () => {
   );
 });
 
+describe("MonthPager creation preview styling", () => {
+  it.each(["month", "multiweek"] as const)(
+    "updates cached %s preview styles and classes",
+    async (mode) => {
+      const Draft = ({ start }: CreateGhostArgs) => <Text>{`Draft ${start.getDate()}`}</Text>;
+      const props = {
+        mode,
+        date: new Date(2026, 5, 15),
+        events: [] as CalendarEvent[],
+        weekStartsOn: 0 as const,
+        onChangeDate: noop,
+        onPressEvent: noop,
+        onCreateEvent: noop,
+        renderCreateGhost: Draft,
+      };
+      const firstStyle = { createGhost: { backgroundColor: "red" } };
+      const secondStyle = { createGhost: { backgroundColor: "blue" } };
+      const view = await render(
+        <Calendar {...props} styles={firstStyle} classNames={{ createGhost: "first" }} />,
+      );
+      await fireEvent(
+        view.getByTestId(mode === "month" ? "month-grid" : "multiweek-grid"),
+        "layout",
+        {
+          nativeEvent: { layout: { x: 0, y: 0, width: 700, height: mode === "month" ? 600 : 240 } },
+        },
+      );
+      const { __gestures } = gestureHandlerMock as unknown as {
+        __gestures: { handlers: Record<string, (...args: unknown[]) => void> }[];
+      };
+      await act(() =>
+        __gestures.at(-1)!.handlers.onStart({ x: 250, y: mode === "month" ? 248 : 8 }),
+      );
+      const ghost = () => view.getByTestId("month-create-ghost", { includeHiddenElements: true });
+      expect(ghost()).toHaveStyle({ backgroundColor: "red" });
+      expect(ghost().props.className).toBe("first");
+      await view.rerender(
+        <Calendar {...props} styles={secondStyle} classNames={{ createGhost: "first" }} />,
+      );
+      expect(ghost()).toHaveStyle({ backgroundColor: "blue" });
+      await view.rerender(
+        <Calendar {...props} styles={secondStyle} classNames={{ createGhost: "second" }} />,
+      );
+      expect(ghost().props.className).toBe("second");
+    },
+  );
+});
+
 describe("MonthPager title", () => {
   const date = new Date(2026, 0, 6);
 

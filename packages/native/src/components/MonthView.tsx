@@ -31,6 +31,8 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 // Web drag-to-select relays cell pointer events up to MonthList; native drag is
 // driven by a list-level pan there instead.
 const isWeb = Platform.OS === "web";
+// React 18 forwards the canonical string; React 19 treats it as a boolean attribute.
+const webPreviewProps = isWeb ? { "aria-hidden": true, inert: "inert" } : {};
 import { useCalendarTheme } from "../theme";
 import type {
   CalendarEvent,
@@ -1333,6 +1335,7 @@ function DateRowsInner<T>({
                                 borderRadius: 4,
                               },
                             })}
+                            {...webPreviewProps}
                             pointerEvents="none"
                             accessible={false}
                             accessibilityElementsHidden

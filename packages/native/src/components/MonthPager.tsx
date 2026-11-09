@@ -385,6 +385,8 @@ function DateRowsPagerInner<T>({
       chipGap,
       renderCreateGhost,
       onCreateEvent,
+      createGhostClassName: classNames?.createGhost,
+      createGhostStyle: styleOverrides?.createGhost,
     }),
     [
       events,
@@ -395,6 +397,8 @@ function DateRowsPagerInner<T>({
       chipGap,
       renderCreateGhost,
       onCreateEvent,
+      classNames?.createGhost,
+      styleOverrides?.createGhost,
     ],
   );
 

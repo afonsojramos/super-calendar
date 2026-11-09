@@ -434,7 +434,8 @@ function MonthDraft({ start, end }: CreateGhostArgs) {
 The preview uses `chipHeight`, `chipGap`, and the `createGhost` styling slot.
 It occupies the next available visible lane, or overlays the last lane when
 the row is full, without moving existing events. Its content is clipped,
-ignores pointer input, and is hidden from screen readers. It updates as the
+ignores pointer input, and is hidden from screen readers. On React Native Web,
+it also stays out of the tab order. It updates as the
 sweep reaches another day and clears on release or cancellation.
 
 The renderer requires `onCreateEvent`. An empty month shows the event-grid

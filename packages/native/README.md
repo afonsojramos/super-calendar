@@ -148,7 +148,7 @@ Use date labels rather than times for this content. The preview updates when
 the sweep reaches another day, uses `chipHeight`, `chipGap`, and the
 `createGhost` slot, and overlays a visible event lane without changing the row
 height. Content is clipped, ignores pointer input, and is hidden from screen
-readers. Both the renderer and `onCreateEvent` are required; together they also
+readers. On React Native Web, it also stays out of the tab order. Both the renderer and `onCreateEvent` are required; together they also
 show the event-grid layout in an empty month. Omitting the renderer preserves
 the existing day highlight.
 
