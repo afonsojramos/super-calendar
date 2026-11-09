@@ -78,9 +78,13 @@ describe(rendererName, () => {
     },
   );
 
-  it.each(["create-day", "create-week"])(
-    "discards a missed $view release before an unrelated click",
-    async (view) => {
+  it.each(
+    ["create-day", "create-week"].flatMap((view) =>
+      (["left", "middle", "right"] as const).map((button) => ({ view, button })),
+    ),
+  )(
+    "discards a missed $view release before an unrelated $button click",
+    async ({ view, button }) => {
       await page.setViewportSize({ width: 1100, height: 1000 });
       await open(view);
       const column = page.locator('[data-slot="dayColumn"]').first();
@@ -104,7 +108,7 @@ describe(rendererName, () => {
       await page.mouse.move(x, bounds.y + 11 * 24 + 2);
       await page.mouse.up();
       expect(await page.locator('[data-slot="createGhost"]').count()).toBe(1);
-      await page.getByRole("button", { name: "Unrelated action" }).click();
+      await page.getByRole("button", { name: "Unrelated action" }).click({ button });
       expect(await page.getByLabel("Calls").textContent()).toBe("[]");
       expect(await page.locator('[data-slot="createGhost"]').count()).toBe(0);
       await page.mouse.move(x, bounds.y + 12 * 24 + 2);

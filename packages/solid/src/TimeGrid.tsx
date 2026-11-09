@@ -1535,16 +1535,13 @@ export function TimeGrid<T = unknown>(
     };
     // If capture failed and release happened outside the window, the next press
     // belongs to a new gesture and must not complete the old one.
-    const restart = (event: PointerEvent) => {
-      if (event.button === 0 && event.isPrimary !== false) cancel(event);
-    };
     document.addEventListener("pointerup", endCreate, true);
     document.addEventListener("pointercancel", cancel, true);
-    document.addEventListener("pointerdown", restart, true);
+    document.addEventListener("pointerdown", cancel, true);
     detachCreateListeners.current = () => {
       document.removeEventListener("pointerup", endCreate, true);
       document.removeEventListener("pointercancel", cancel, true);
-      document.removeEventListener("pointerdown", restart, true);
+      document.removeEventListener("pointerdown", cancel, true);
     };
   };
   const moveCreate = (e: DomPointerEvent) => {

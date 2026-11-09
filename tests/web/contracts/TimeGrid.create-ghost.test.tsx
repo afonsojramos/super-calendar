@@ -301,24 +301,32 @@ describe(rendererName, () => {
       expect(view.ghost()).toBeNull();
     });
 
-    it("cancels a missed release before an unrelated click can commit stale creation", () => {
-      const view = setup();
-      vi.spyOn(view.column, "setPointerCapture").mockImplementation(() => {});
-      view.down(96);
-      view.move(150);
-      // The button was released outside the window, so no pointerup reached it.
-      fireEvent.pointerDown(document.body, { pointerId: 1, button: 0, buttons: 1, clientY: 300 });
-      fireEvent.pointerUp(document.body, { pointerId: 1, buttons: 0, clientY: 300 });
-      expect(view.onCreateEvent).not.toHaveBeenCalled();
-      expect(view.ghost()).toBeNull();
-      view.down(480);
-      view.move(528);
-      view.up(528);
-      expect(view.onCreateEvent).toHaveBeenCalledExactlyOnceWith(
-        new Date(2026, 5, 26, 10),
-        new Date(2026, 5, 26, 11),
-      );
-    });
+    it.each([0, 1, 2])(
+      "cancels a missed release before an unrelated button %s click can commit stale creation",
+      (button) => {
+        const view = setup();
+        vi.spyOn(view.column, "setPointerCapture").mockImplementation(() => {});
+        view.down(96);
+        view.move(150);
+        // The button was released outside the window, so no pointerup reached it.
+        fireEvent.pointerDown(document.body, {
+          pointerId: 1,
+          button,
+          buttons: button === 0 ? 1 : button === 1 ? 4 : 2,
+          clientY: 300,
+        });
+        fireEvent.pointerUp(document.body, { pointerId: 1, buttons: 0, clientY: 300 });
+        expect(view.onCreateEvent).not.toHaveBeenCalled();
+        expect(view.ghost()).toBeNull();
+        view.down(480);
+        view.move(528);
+        view.up(528);
+        expect(view.onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+          new Date(2026, 5, 26, 10),
+          new Date(2026, 5, 26, 11),
+        );
+      },
+    );
 
     it("starts from a fresh origin when the next press returns to a column after a missed release", () => {
       const view = setup();
