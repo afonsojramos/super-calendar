@@ -104,6 +104,8 @@ In `TimeGrid`, the drag-to-create preview snaps to the same range as
 `onCreateEvent`, starting with one slot on press. It stays within the visible
 hours of the pressed column, with its border inside the column.
 `dragStepMinutes` sets the snap interval.
+Short previews use `minEventHeight`, like committed events. Clipping to the
+visible hours takes priority at the column edges.
 
 Pass `renderCreateGhost` to `TimeGrid`, `Calendar`, or `ResourceTimeline` to draw
 a draft inside that preview. Read the props inside JSX so the text follows the

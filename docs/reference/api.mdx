@@ -118,6 +118,8 @@ React DOM and Solid `TimeGrid` snap creation-preview geometry to the same range
 as `onCreateEvent`, with or without custom content. An initial press previews one
 snap step. The box remains clipped to the visible hours, including when the
 committed range extends outside a narrowed `minHour`/`maxHour` window.
+Short previews use `minEventHeight` to match the event's minimum size. The
+visible-hour boundary takes priority over that minimum.
 
 `renderCreateGhost` is a component (`ComponentType` in React, `Component` in
 Solid) that receives `CreateGhostArgs`: `{ start: Date; end: Date }`. These are

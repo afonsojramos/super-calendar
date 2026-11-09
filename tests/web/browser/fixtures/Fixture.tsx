@@ -386,7 +386,8 @@ export function Fixture() {
           weekStartsOn={1}
           events={createdEvents()}
           height={700}
-          hourHeight={60}
+          hourHeight={view.includes("default") || view.includes("minimum") ? undefined : 60}
+          minEventHeight={view.includes("minimum") ? 28 : undefined}
           minHour={view.includes("dst") ? 0 : view.includes("fractional") ? 8.1 : 8}
           maxHour={view.includes("dst") ? 6 : 14}
           dragStepMinutes={view.includes("30") ? 30 : 15}

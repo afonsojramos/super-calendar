@@ -269,7 +269,9 @@ browser dragging are disabled so they cannot interrupt creation.
 
 On the web, the time-grid preview snaps both ends to the range that
 `onCreateEvent` receives, using `dragStepMinutes` or the default 15 minutes.
-The initial press shows one snapped slot. This also works without
+The initial press shows one snapped slot. Short previews use `minEventHeight`,
+like committed events, with clipping at the visible-hour boundary taking
+priority over that minimum. This also works without
 `renderCreateGhost`. The preview stays inside the visible hours. When a sweep
 passes the start or end of those hours (00:00 and 24:00 by default, or `minHour`
 and `maxHour`), the preview stops at that edge. Its border and minimum height stay

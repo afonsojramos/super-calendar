@@ -10,6 +10,8 @@ describe(rendererName, () => {
     { view: "snap-week-30", from: 77, to: 185, top: 90, end: 180 },
     { view: "snap-day-fractional", from: 58, to: 182, top: 54, end: 189 },
     { view: "snap-day-dst", from: 127, to: 248, top: 180, end: 255 },
+    { view: "snap-day-default", from: 50, to: 58, top: 48, end: 62 },
+    { view: "snap-day-minimum", from: 50, to: 58, top: 48, end: 76 },
   ])(
     "aligns the $view preview with its created event from $from to $to",
     async ({ view, from, to, top, end }) => {
@@ -43,4 +45,24 @@ describe(rendererName, () => {
     await page.mouse.up();
     expect(await page.getByLabel("Calls").textContent()).toBe("[]");
   });
+
+  it.each(["snap-day-default", "snap-day-minimum"])(
+    "clips the $view minimum height at the final visible hour",
+    async (view) => {
+      await open(view);
+      const column = (await page.locator('[data-slot="dayColumn"]').boundingBox())!;
+      const x = column.x + column.width / 2;
+      await page.mouse.move(x, column.y + 278);
+      await page.mouse.down();
+      await page.mouse.move(x, column.y + 286);
+      const ghost = (await page.locator('[data-slot="createGhost"]').boundingBox())!;
+      expect(ghost.y - column.y).toBe(276);
+      expect(ghost.height).toBe(12);
+      expect(ghost.y + ghost.height).toBe(column.y + column.height);
+      await page.mouse.up();
+      expect(await page.getByLabel("Calls").textContent()).toBe(
+        JSON.stringify(["15:13:45-15:14:0"]),
+      );
+    },
+  );
 });
