@@ -55,6 +55,28 @@ function DraftPreview(props: CreateGhostArgs) {
   );
 }
 
+function MonthDraft(props: CreateGhostArgs) {
+  const range = () => {
+    const last = addDays(props.end, -1);
+    return props.start.getTime() === last.getTime()
+      ? format(props.start, "MMM d")
+      : `${format(props.start, "MMM d")} to ${format(last, "MMM d")}`;
+  };
+  return (
+    <span
+      style={{
+        display: "block",
+        padding: "0 3px",
+        "font-size": "11px",
+        "font-weight": 600,
+        "white-space": "nowrap",
+        overflow: "hidden",
+        "text-overflow": "ellipsis",
+      }}
+    >{`Draft: ${range()}`}</span>
+  );
+}
+
 export function viewFromSearch(search: string) {
   const requested = new URLSearchParams(search).get("view");
   return views.find((value) => value === requested) ?? "week";
@@ -178,7 +200,9 @@ export function App(props: { initialView?: string }) {
                       onSelectDrag={selection.selectRange}
                       onDragEvent={move}
                       onCreateEvent={create}
-                      renderCreateGhost={DraftPreview}
+                      renderCreateGhost={
+                        mode() === "month" || mode() === "multiweek" ? MonthDraft : DraftPreview
+                      }
                       onPressEvent={(event) => setStatus(`Selected ${event.title}`)}
                     />
                   }

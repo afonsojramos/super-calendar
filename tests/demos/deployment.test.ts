@@ -208,6 +208,47 @@ describe("published demos", () => {
     },
   );
 
+  it.each(
+    ["/dom/", "/solid/"].flatMap((path) => ["month", "multiweek"].map((mode) => ({ path, mode }))),
+  )("shows live $mode date previews on $path", async ({ path, mode }) => {
+    await checkPage(
+      path,
+      async (page) => {
+        if (path === "/solid/") await page.getByLabel("View", { exact: true }).selectOption(mode);
+        else await page.getByRole("button", { name: new RegExp(`^${mode}$`, "i") }).click();
+        const first = page.locator('[data-day="2026-11-06"]');
+        const last = page.locator('[data-day="2026-11-11"]');
+        await first.scrollIntoViewIfNeeded();
+        const origin = await first.boundingBox();
+        const target = await last.boundingBox();
+        if (!origin || !target) throw new Error("Missing month day bounds");
+        await page.mouse.move(origin.x + origin.width / 2, origin.y + 10);
+        await page.mouse.down();
+        const ghost = page.locator('[data-slot="createGhost"]');
+        await expect.poll(() => ghost.allTextContents()).toEqual(["Draft: Nov 6"]);
+        await page.mouse.move(target.x + target.width / 2, target.y + 10, { steps: 8 });
+        await expect
+          .poll(() => ghost.allTextContents())
+          .toEqual(["Draft: Nov 6 to Nov 11", "Draft: Nov 6 to Nov 11"]);
+        expect(
+          await ghost.evaluateAll((elements) =>
+            elements.every(
+              (el) => el.hasAttribute("inert") && el.getAttribute("aria-hidden") === "true",
+            ),
+          ),
+        ).toBe(true);
+        await page.mouse.up();
+        await expect.poll(() => ghost.count()).toBe(0);
+        await expect
+          .poll(() => page.getByRole("button", { name: /^(✨ )?New event,/ }).count())
+          .toBe(2);
+      },
+      1100,
+      false,
+      new Date(2026, 10, 2, 12),
+    );
+  });
+
   it("scrolls the native-web multi-week rows with a quick touch swipe", async () => {
     await checkPage(
       "/",

@@ -169,6 +169,27 @@ const DraftPreview = ({ start, end }: CreateGhostArgs) => (
   </div>
 );
 
+const MonthDraft = ({ start, end }: CreateGhostArgs) => {
+  const last = addDays(end, -1);
+  const range =
+    start.getTime() === last.getTime()
+      ? format(start, "MMM d")
+      : `${format(start, "MMM d")} to ${format(last, "MMM d")}`;
+  return (
+    <span
+      style={{
+        display: "block",
+        padding: "0 3px",
+        fontSize: 11,
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }}
+    >{`Draft: ${range}`}</span>
+  );
+};
+
 export function App() {
   const [mode, setMode] = useState<DemoTab>("week");
   const [numberOfWeeks, setNumberOfWeeks] = useState(2);
@@ -593,7 +614,9 @@ export function App() {
                   return [...prev, { id: nextId, kind: "work", title: "✨ New event", start, end }];
                 })
               }
-              renderCreateGhost={DraftPreview}
+              renderCreateGhost={
+                mode === "month" || mode === "multiweek" ? MonthDraft : DraftPreview
+              }
               onPressEvent={(event) => console.log("press event:", event.title)}
               onPressDay={(day) => {
                 setDate(day);
