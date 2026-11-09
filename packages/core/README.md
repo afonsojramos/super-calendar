@@ -75,6 +75,10 @@ Use `resolveDraggedBounds` to commit a move or resize. Equal start and end delta
 move the event while preserving elapsed duration, including across daylight
 saving changes. For a resize, pass zero for the edge you want to keep fixed.
 
+`eventDayKeys` and `groupEventsByDay` index every occupied local calendar day by
+its start-of-day ISO value. Midnight clock changes do not shift later day keys.
+An event ending at the start of a day excludes that day.
+
 `CalendarEvent<T>` includes an optional `dragHandleColor: string` for the native
 renderer's time-grid and resource-timeline resize grips. When omitted, those
 grips use `theme.colors.eventText`. Core preserves the field without interpreting it.

@@ -255,6 +255,10 @@ nonpositive/fractional/unsafe counts, and unrepresentable spans with `RangeError
 before allocating rows. `getViewDays` and `viewDayCount` reject `multiweek`;
 use this builder instead of the timed-column helpers.
 
+`eventDayKeys` and `groupEventsByDay` use each local day's start-of-day ISO value.
+They include every occupied day across midnight clock changes. An event ending
+at the start of a day excludes that day.
+
 `loadEventSource({ source, format?, map?, signal? })` loads one JSON/iCalendar
 batch or calls an async event loader. It returns `Promise<CalendarEvent<T>[]>` and
 rejects HTTP, validation, and cancellation errors. `signal` applies to URL

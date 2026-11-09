@@ -189,7 +189,9 @@ export function eventDayKeys<T>(event: CalendarEvent<T>): string[] {
   const last = startOfDay(lastInstant);
 
   const keys: string[] = [];
-  for (let cursor = first; cursor <= last; cursor = addDays(cursor, 1)) {
+  // Midnight can normalize to 01:00 on a clock change. Reset each subsequent
+  // day so its index still matches startOfDay(date).
+  for (let cursor = first; cursor <= last; cursor = startOfDay(addDays(cursor, 1))) {
     keys.push(cursor.toISOString());
   }
   return keys;

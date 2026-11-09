@@ -40,6 +40,10 @@ const events: CalendarEvent<Meta>[] = [
 - Multi-day events draw as one continuous bar across the days they span in the
   month view, and as a per-day clipped segment on the week/day time grid.
 
+Multi-day events remain visible on each occupied day in month and multi-week
+grids, including when a local clock change skips midnight. An event ending at
+the start of a day does not occupy that day.
+
 ## Keep event data stable
 
 Keep the `events` array and its event objects stable while only UI state changes,
