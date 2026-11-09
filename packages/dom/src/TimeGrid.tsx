@@ -20,6 +20,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -110,6 +111,7 @@ const DEFAULT_MIN_EVENT_HEIGHT = 14;
 // via `eventGap`.
 const DEFAULT_EVENT_GAP = 1;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const useClientLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 // Floor for the create-by-drag preview, so a press shows a line before it moves.
 const CREATE_PREVIEW_MIN_HEIGHT = 2;
 // Vertical placement of the create preview inside a day column `gridHeight` px
@@ -622,6 +624,7 @@ function TimeGridInner<T = unknown>(
   } | null>(null);
   const createOrigin = useRef<{
     pointerId: number;
+    captureLoss?: ReturnType<typeof setTimeout>;
     clientY: number;
     el: HTMLElement;
     dayIndex: number;
@@ -630,6 +633,8 @@ function TimeGridInner<T = unknown>(
     startPx: number;
   } | null>(null);
   const createActive = createBox !== null;
+  const detachCreateListeners = useRef<(() => void) | null>(null);
+  const createRelease = useRef<((event: PointerEvent) => void) | null>(null);
   useEffect(() => {
     if (!createActive) return;
     // Scrolling a column or an ancestor moves it beneath the held pointer.
@@ -1292,6 +1297,11 @@ function TimeGridInner<T = unknown>(
       cancelHoldRef.current?.();
       detachDocListeners();
       clearEdgeTimer();
+      if (createOrigin.current?.captureLoss !== undefined)
+        clearTimeout(createOrigin.current.captureLoss);
+      createOrigin.current = null;
+      detachCreateListeners.current?.();
+      detachCreateListeners.current = null;
     },
     [],
   );
@@ -1302,6 +1312,7 @@ function TimeGridInner<T = unknown>(
 
   const pxFromTop = (el: HTMLElement, clientY: number) => clientY - el.getBoundingClientRect().top;
   const beginCreate = (e: ReactPointerEvent, dayIndex: number) => {
+    if (createOrigin.current || activeGrabRef.current || e.isPrimary === false) return;
     // Mouse / pen only: on touch the column must stay free to scroll the grid.
     // Only from the column background, primary button, never on an event.
     cellTouchRef.current =
@@ -1328,6 +1339,37 @@ function TimeGridInner<T = unknown>(
       startPx,
     };
     setCreateBox({ dayIndex, dayTime, startPx, curPx: startPx });
+    // Capture can be lost before pointerup. Observe release outside the column
+    // too, without depending on React having rendered the preview yet.
+    const document = el.ownerDocument;
+    const release = (event: PointerEvent) => createRelease.current?.(event);
+    const cancel = (event: PointerEvent) => {
+      if (createOrigin.current?.pointerId === event.pointerId) clearCreate();
+    };
+    const restart = (event: PointerEvent) => {
+      if (
+        (event.isPrimary && event.pointerType !== "touch") ||
+        createOrigin.current?.pointerId === event.pointerId
+      )
+        clearCreate();
+    };
+    // Text selected during a sweep can turn the next sweep into a native drag,
+    // which cancels pointer input before the calendar receives its release.
+    const preventSelection = (event: Event) => event.preventDefault();
+    // If capture failed and release happened outside the window, the next press
+    // belongs to a new gesture and must not complete the old one.
+    document.addEventListener("pointerup", release, true);
+    document.addEventListener("pointercancel", cancel, true);
+    document.addEventListener("pointerdown", restart, true);
+    document.addEventListener("selectstart", preventSelection, true);
+    document.addEventListener("dragstart", preventSelection, true);
+    detachCreateListeners.current = () => {
+      document.removeEventListener("pointerup", release, true);
+      document.removeEventListener("pointercancel", cancel, true);
+      document.removeEventListener("pointerdown", restart, true);
+      document.removeEventListener("selectstart", preventSelection, true);
+      document.removeEventListener("dragstart", preventSelection, true);
+    };
   };
   const moveCreate = (e: ReactPointerEvent) => {
     const touch = cellTouchRef.current;
@@ -1339,7 +1381,7 @@ function TimeGridInner<T = unknown>(
       cellTouchRef.current = null;
     }
     const o = createOrigin.current;
-    if (!o) return;
+    if (!o || o.pointerId !== e.pointerId) return;
     o.clientY = e.clientY;
     setCreateBox({
       dayIndex: o.dayIndex,
@@ -1348,14 +1390,17 @@ function TimeGridInner<T = unknown>(
       curPx: pxFromTop(o.el, e.clientY),
     });
   };
-  const endCreate = (e: ReactPointerEvent) => {
+  const endCreate = (e: Pick<PointerEvent, "pointerId" | "clientY">) => {
     const o = createOrigin.current;
-    if (!o) return;
-    try {
-      o.el.releasePointerCapture?.(e.pointerId);
-    } catch {
-      // Best-effort release.
-    }
+    if (!o || o.pointerId !== e.pointerId) return;
+    clearCreate();
+    if (
+      !o.el.isConnected ||
+      !cellEnabled ||
+      (o.creating && !onCreateEvent) ||
+      days[o.dayIndex]?.getTime() !== o.dayTime
+    )
+      return;
     const endPx = pxFromTop(o.el, e.clientY);
     const day = days[o.dayIndex];
     const moved = Math.abs(endPx - o.startPx) > 4;
@@ -1367,9 +1412,10 @@ function TimeGridInner<T = unknown>(
       const at = cellRangeFromDrag(day, o.startPx, o.startPx, h, windowStart, snapMinutes);
       if (at) onPressCell(at.start);
     }
-    createOrigin.current = null;
-    setCreateBox(null);
   };
+  useClientLayoutEffect(() => {
+    createRelease.current = endCreate;
+  });
   const tapCell = (e: ReactMouseEvent<HTMLDivElement>, dayIndex: number) => {
     const touch = cellTouchRef.current;
     cellTouchRef.current = null;
@@ -1388,6 +1434,9 @@ function TimeGridInner<T = unknown>(
   const clearCreate = useCallback(() => {
     const previous = createOrigin.current;
     createOrigin.current = null;
+    if (previous?.captureLoss !== undefined) clearTimeout(previous.captureLoss);
+    detachCreateListeners.current?.();
+    detachCreateListeners.current = null;
     setCreateBox(null);
     try {
       previous?.el.releasePointerCapture?.(previous.pointerId);
@@ -1395,15 +1444,20 @@ function TimeGridInner<T = unknown>(
       // The browser may have already released capture.
     }
   }, []);
-  const cancelCreate = () => {
-    cellTouchRef.current = null;
-    clearCreate();
-  };
-  // Without capture the column stops seeing the sweep's moves and release, so
-  // drop it. Leaves `cellTouchRef` alone: touch taps resolve on the later click.
-  const loseCreateCapture = (e: ReactPointerEvent) => {
+  const cancelCreate = (e: ReactPointerEvent) => {
+    if (cellTouchRef.current?.pointerId === e.pointerId) cellTouchRef.current = null;
     if (createOrigin.current?.pointerId !== e.pointerId) return;
     clearCreate();
+  };
+  // Capture loss can precede pointerup with either button state. Give release
+  // the rest of this event task to complete, then cancel any remaining sweep.
+  const loseCreateCapture = (e: ReactPointerEvent) => {
+    const origin = createOrigin.current;
+    if (!origin || origin.pointerId !== e.pointerId) return;
+    if (origin.captureLoss !== undefined) clearTimeout(origin.captureLoss);
+    origin.captureLoss = setTimeout(() => {
+      if (createOrigin.current === origin) clearCreate();
+    }, 0);
   };
   // Pointer capture does not move keyboard focus to the grid.
   useEffect(() => {

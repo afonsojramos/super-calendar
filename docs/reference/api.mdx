@@ -108,6 +108,12 @@ DOM `onPressCell` also handles touch taps on empty time-grid slots. The callback
 runs from the column's click, after pointer-up. Swipes and cancelled contacts
 do not call it. Mouse and pen retain their existing behavior.
 
+React DOM and Solid `TimeGrid` complete a creation sweep on pointer release,
+even if pointer capture is lost just before it. Capture loss without a matching
+release and pointer cancellation cancel creation. A new press discards any
+stale sweep left by a missed release outside the window. Active mouse and pen
+sweeps prevent text selection and native browser dragging.
+
 `renderCreateGhost` is a component (`ComponentType` in React, `Component` in
 Solid) that receives `CreateGhostArgs`: `{ start: Date; end: Date }`. These are
 the snapped, ordered range `onCreateEvent` would receive if the sweep ended at

@@ -93,8 +93,12 @@ to keep editing across full data refreshes. Return a stable, unique string or
 number per event or recurring occurrence. Missing, invalid, or duplicate IDs
 close the dialog. Without this prop, full refreshes close it. See
 [Move and resize actions](https://super-calendar.afonsojramos.me/guides/accessibility#move-and-resize-actions-web).
-Removing a resource cancels creation in its lane. Losing pointer capture cancels
-the active interaction.
+Removing a resource cancels creation in its lane. `TimeGrid` completes creation
+on pointer release even if capture is lost just before it. Capture loss without
+a matching release and pointer cancellation cancel its creation sweep. A new
+press discards a stale sweep left by a missed release outside the window.
+Text selection and native browser dragging are disabled only while a mouse or
+pen sweep is active.
 
 In `TimeGrid`, the drag-to-create preview stays within the visible hours of the
 pressed column, with its border inside the column.

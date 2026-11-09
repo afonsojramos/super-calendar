@@ -669,6 +669,7 @@ export function TimeGrid<T = unknown>(
   } | null>(null);
   const createOrigin: ElementRef<{
     pointerId: number;
+    captureLoss?: ReturnType<typeof setTimeout>;
     clientY: number;
     el: HTMLElement;
     dayIndex: number;
@@ -695,6 +696,7 @@ export function TimeGrid<T = unknown>(
       return () => window.removeEventListener("scroll", onScroll, true);
     },
   );
+  const detachCreateListeners: ElementRef<(() => void) | null> = { current: null };
   // Touch never sweeps, so a tap presses the cell from its click, which the
   // browser skips when the finger scrolled the grid instead.
   const cellTouchRef: ElementRef<{
@@ -1474,6 +1476,11 @@ export function TimeGrid<T = unknown>(
         cancelHoldRef.current?.();
         detachDocListeners();
         clearEdgeTimer();
+        if (createOrigin.current?.captureLoss !== undefined)
+          clearTimeout(createOrigin.current.captureLoss);
+        createOrigin.current = null;
+        detachCreateListeners.current?.();
+        detachCreateListeners.current = null;
       }),
   );
   createEffect(
@@ -1520,6 +1527,36 @@ export function TimeGrid<T = unknown>(
       startPx,
       curPx: startPx,
     });
+    // Capture can be lost before pointerup. Observe release outside the column
+    // too, without depending on the preview having rendered yet.
+    const document = el.ownerDocument;
+    const cancel = (event: PointerEvent) => {
+      if (createOrigin.current?.pointerId === event.pointerId) clearCreate();
+    };
+    const restart = (event: PointerEvent) => {
+      if (
+        (event.isPrimary && event.pointerType !== "touch") ||
+        createOrigin.current?.pointerId === event.pointerId
+      )
+        clearCreate();
+    };
+    // Text selected during a sweep can turn the next sweep into a native drag,
+    // which cancels pointer input before the calendar receives its release.
+    const preventSelection = (event: Event) => event.preventDefault();
+    // If capture failed and release happened outside the window, the next press
+    // belongs to a new gesture and must not complete the old one.
+    document.addEventListener("pointerup", endCreate, true);
+    document.addEventListener("pointercancel", cancel, true);
+    document.addEventListener("pointerdown", restart, true);
+    document.addEventListener("selectstart", preventSelection, true);
+    document.addEventListener("dragstart", preventSelection, true);
+    detachCreateListeners.current = () => {
+      document.removeEventListener("pointerup", endCreate, true);
+      document.removeEventListener("pointercancel", cancel, true);
+      document.removeEventListener("pointerdown", restart, true);
+      document.removeEventListener("selectstart", preventSelection, true);
+      document.removeEventListener("dragstart", preventSelection, true);
+    };
   };
   const moveCreate = (e: DomPointerEvent) => {
     const touch = cellTouchRef.current;
@@ -1540,14 +1577,17 @@ export function TimeGrid<T = unknown>(
       curPx: pxFromTop(o.el, e.clientY),
     });
   };
-  const endCreate = (e: DomPointerEvent) => {
+  const endCreate = (e: Pick<PointerEvent, "pointerId" | "clientY">) => {
     const o = createOrigin.current;
     if (!o || o.pointerId !== e.pointerId) return;
-    try {
-      o.el.releasePointerCapture?.(e.pointerId);
-    } catch {
-      // Best-effort release.
-    }
+    clearCreate();
+    if (
+      !o.el.isConnected ||
+      !cellEnabled() ||
+      (o.creating && !props.onCreateEvent) ||
+      days()[o.dayIndex]?.getTime() !== o.dayTime
+    )
+      return;
     const endPx = pxFromTop(o.el, e.clientY);
     const day = days()[o.dayIndex];
     const moved = Math.abs(endPx - o.startPx) > 4;
@@ -1559,8 +1599,6 @@ export function TimeGrid<T = unknown>(
       const at = cellRangeFromDrag(day, o.startPx, o.startPx, h, windowStart(), snapMinutes());
       if (at) props.onPressCell(at.start);
     }
-    createOrigin.current = null;
-    setCreateBox(null);
   };
   const tapCell = (e: DomMouseEvent<HTMLDivElement>, dayIndex: number) => {
     const touch = cellTouchRef.current;
@@ -1580,6 +1618,9 @@ export function TimeGrid<T = unknown>(
   const clearCreate = () => {
     const previous = createOrigin.current;
     createOrigin.current = null;
+    if (previous?.captureLoss !== undefined) clearTimeout(previous.captureLoss);
+    detachCreateListeners.current?.();
+    detachCreateListeners.current = null;
     setCreateBox(null);
     try {
       previous?.el.releasePointerCapture?.(previous.pointerId);
@@ -1605,11 +1646,15 @@ export function TimeGrid<T = unknown>(
     if (createOrigin.current?.pointerId !== e.pointerId) return;
     clearCreate();
   };
-  // Without capture the column stops seeing the sweep's moves and release, so
-  // drop it. Leaves `cellTouchRef` alone: touch taps resolve on the later click.
+  // Capture loss can precede pointerup with either button state. Give release
+  // the rest of this event task to complete, then cancel any remaining sweep.
   const loseCreateCapture = (e: DomPointerEvent) => {
-    if (createOrigin.current?.pointerId !== e.pointerId) return;
-    clearCreate();
+    const origin = createOrigin.current;
+    if (!origin || origin.pointerId !== e.pointerId) return;
+    if (origin.captureLoss !== undefined) clearTimeout(origin.captureLoss);
+    origin.captureLoss = setTimeout(() => {
+      if (createOrigin.current === origin) clearCreate();
+    }, 0);
   };
   // Pointer capture does not move keyboard focus to the grid.
   createEffect(

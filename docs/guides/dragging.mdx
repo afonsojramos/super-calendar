@@ -245,6 +245,13 @@ range). On native it supersedes `onLongPressCell`; on web, dragging empty space
 creates instead of scrolling (use the wheel to scroll), and **Escape** cancels an
 in-progress sweep before it commits.
 
+React DOM and Solid `TimeGrid` complete creation on pointer release, including
+when pointer capture is lost immediately before release. Capture loss without
+a matching release or cancelling the pointer cancels the sweep without creating
+an event. A new press discards a stale sweep left by a missed release outside
+the window. While a mouse or pen sweep is active, text selection and native
+browser dragging are disabled so they cannot interrupt creation.
+
 ```tsx
 <Calendar
   /* ... */
@@ -358,7 +365,8 @@ A few rules apply:
   preview range even if the pointer does not move again before release.
 - The content clears when the sweep ends or is cancelled, and each new sweep
   mounts it fresh. Changing the pressed column to another day cancels the sweep.
-  In React DOM and Solid, **Escape** or losing pointer capture cancels the sweep,
+  In React DOM and Solid, **Escape** cancels the sweep. Losing pointer capture
+  also cancels it unless a time-grid sweep is released immediately afterward,
   and a press without a drag shows the one-step range while held, then fires
   `onPressCell` instead of creating. On React Native, a stationary hold creates
   that one-step range. A cancelled native gesture clears the preview without
