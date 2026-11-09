@@ -10,6 +10,7 @@ import {
   endOfMonth,
   format,
   startOfMonth,
+  startOfDay,
 } from "date-fns";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useState } from "react";
@@ -53,7 +54,7 @@ import { EventContextMenu } from "./components/EventContextMenu";
 function MonthDraft({ start, end }: CreateGhostArgs) {
   const theme = useCalendarTheme();
   // The previous instant also works when the time zone skips an entire date.
-  const last = new Date(end.getTime() - 1);
+  const last = new Date(startOfDay(end).getTime() - 1);
   const range = isSameDay(start, last)
     ? format(start, "MMM d")
     : `${format(start, "MMM d")} to ${format(last, "MMM d")}`;

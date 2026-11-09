@@ -109,6 +109,16 @@ describe("published demos", () => {
       },
       {
         mode,
+        timezoneId: "America/Sao_Paulo",
+        now: new Date("2018-11-01T12:00:00Z"),
+        row: 0,
+        column: 6,
+        single: "Draft: Nov 4",
+        span: "",
+        singleOnly: true,
+      },
+      {
+        mode,
         timezoneId: "Pacific/Apia",
         now: new Date("2011-12-26T12:00:00Z"),
         row: mode === "month" ? 4 : 0,
@@ -119,7 +129,7 @@ describe("published demos", () => {
       },
     ]),
   )(
-    "shows live native-web $mode creation content in $timezoneId",
+    "shows live native-web $mode creation content in $timezoneId for $single",
     async ({ mode, timezoneId, now, row, column, single, span, singleOnly }) => {
       await checkPage(
         "/",
@@ -167,7 +177,9 @@ describe("published demos", () => {
           const draft = grid.getByTestId("month-draft-range");
           await expect.poll(() => draft.allTextContents()).toEqual([single]);
           if (singleOnly) {
-            expect(await page.evaluate(() => new Date(2011, 11, 30).getDate())).toBe(31);
+            if (timezoneId === "Pacific/Apia")
+              expect(await page.evaluate(() => new Date(2011, 11, 30).getDate())).toBe(31);
+            else expect(await page.evaluate(() => new Date(2018, 10, 4).getHours())).toBe(1);
             await page.mouse.up();
             return;
           }
