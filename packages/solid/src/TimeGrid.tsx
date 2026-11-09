@@ -114,7 +114,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 const sameRange = (a: CreateGhostArgs | null, b: CreateGhostArgs | null) =>
   a === b ||
   (!!a && !!b && a.start.getTime() === b.start.getTime() && a.end.getTime() === b.end.getTime());
-// Floor for the create-by-drag preview, so a press shows a line before it moves.
+// Keep an empty or fully clipped preview visible at the column edge.
 const CREATE_PREVIEW_MIN_HEIGHT = 2;
 // Vertical placement of the create preview inside a day column `gridHeight` px
 // tall. Both ends are clamped to the visible hours. The preview is anchored to
@@ -128,6 +128,25 @@ function createPreviewPlacement(topPx: number, heightPx: number, gridHeight: num
   return top + height / 2 > gridHeight / 2
     ? { bottom: gridHeight - top - height, height }
     : { top, height };
+}
+
+function createRangePlacement(
+  range: CreateGhostArgs,
+  day: Date,
+  hourHeight: number,
+  minHour: number,
+  gridHeight: number,
+) {
+  // Use wall-clock positions, including midnight on the following day. Elapsed
+  // milliseconds would shift the preview on daylight-saving transitions.
+  const at = (time: Date) =>
+    (differenceInCalendarDays(time, day) * 24 +
+      time.getHours() +
+      time.getMinutes() / 60 -
+      minHour) *
+    hourHeight;
+  const top = at(range.start);
+  return createPreviewPlacement(top, at(range.end) - top, gridHeight);
 }
 
 // Edge auto-advance: how close to the day-columns edge (px) counts as "at the
@@ -2241,10 +2260,10 @@ export function TimeGrid<T = unknown>(
                 });
                 // What `onCreateEvent` would receive if the sweep ended here. Kept
                 // while the range holds, so content updates only when it changes.
-                const ghostRange = createMemo(
+                const createRange = createMemo(
                   () => {
                     const currentGhost = ghost();
-                    return currentGhost && props.renderCreateGhost && props.onCreateEvent
+                    return currentGhost && props.onCreateEvent
                       ? cellRangeFromDrag(
                           day(),
                           currentGhost.startPx,
@@ -2257,6 +2276,28 @@ export function TimeGrid<T = unknown>(
                   },
                   { equals: sameRange },
                 );
+                const ghostRange = createMemo(() =>
+                  props.renderCreateGhost ? createRange() : null,
+                );
+                const previewPlacement = createMemo(() => {
+                  const range = createRange();
+                  if (range)
+                    return createRangePlacement(
+                      range,
+                      day(),
+                      hourHeight(),
+                      windowStart(),
+                      totalHeight(),
+                    );
+                  const current = ghost();
+                  return current
+                    ? createPreviewPlacement(
+                        Math.min(current.startPx, current.curPx),
+                        Math.abs(current.curPx - current.startPx),
+                        totalHeight(),
+                      )
+                    : {};
+                });
                 // The tail of a move that runs past midnight, previewed at the top of
                 // this column. The dragged event is looked up from its `drag.key`
                 // ("<originColumn>:<index>"), so no extra state has to track it.
@@ -2763,7 +2804,7 @@ export function TimeGrid<T = unknown>(
                     ) : null}
                     {
                       <Show when={ghost()}>
-                        {(ghost) => (
+                        {(_ghost) => (
                           <div
                             aria-hidden="true"
                             // Custom content stays out of the tab order and pointer input.
@@ -2773,11 +2814,7 @@ export function TimeGrid<T = unknown>(
                                 position: "absolute",
                                 left: props.eventGap,
                                 right: props.eventGap,
-                                ...createPreviewPlacement(
-                                  Math.min(ghost().startPx, ghost().curPx),
-                                  Math.abs(ghost().curPx - ghost().startPx),
-                                  totalHeight(),
-                                ),
+                                ...previewPlacement(),
                                 // Borders, including custom ones, stay inside the placed box.
                                 boxSizing: "border-box",
                                 ...(ghostRange() ? { overflow: "hidden" } : null),

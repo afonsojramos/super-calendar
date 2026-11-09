@@ -100,8 +100,10 @@ press discards a stale sweep left by a missed release outside the window.
 Text selection and native browser dragging are disabled only while a mouse or
 pen sweep is active.
 
-In `TimeGrid`, the drag-to-create preview stays within the visible hours of the
-pressed column, with its border inside the column.
+In `TimeGrid`, the drag-to-create preview snaps to the same range as
+`onCreateEvent`, starting with one slot on press. It stays within the visible
+hours of the pressed column, with its border inside the column.
+`dragStepMinutes` sets the snap interval.
 
 Pass `renderCreateGhost` to `TimeGrid`, `Calendar`, or `ResourceTimeline` to draw
 a draft inside that preview. Read the props inside JSX so the text follows the

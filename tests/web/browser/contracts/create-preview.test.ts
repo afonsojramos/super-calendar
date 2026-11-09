@@ -85,15 +85,19 @@ describe(rendererName, () => {
       (["up", "down"] as const).map((direction) => ({ view, direction })),
     ),
   )(
-    "spans the whole $view grid when sweeping $direction from edge to past the other edge",
+    "shows the clipped snapped $view range when sweeping $direction from edge to past the other edge",
     async ({ view, direction }) => {
       const column = await openColumn(view);
       const pressY = direction === "up" ? column.y + column.height - 1 : column.y + 1;
       const preview = await holdPreview(column, pressY, target(column, direction, 60));
       expectInside(preview, column);
       expectNear(preview.y, column.y);
-      expectNear(preview.height, column.height);
+      // The commit clamps an origin rounded to midnight to 23:45 before
+      // ordering an upward sweep. The preview must stop there too.
+      const lastSlot = direction === "up" && view !== "create-week-window" ? 6 : 0;
+      expectNear(preview.height, column.height - lastSlot);
       await page.mouse.up();
+      if (lastSlot) expect(await calls()).toBe(JSON.stringify(["13:0:0-13:23:45"]));
     },
   );
 

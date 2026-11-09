@@ -12,6 +12,7 @@ export default defineConfig({
         include: [
           "tests/web/browser/contracts/create-content.test.ts",
           "tests/web/browser/contracts/chromium/create-release.test.ts",
+          "tests/web/browser/contracts/create-snap.test.ts",
           "tests/web/browser/contracts/multiweek.test.ts",
         ],
         testTimeout: 15_000,
