@@ -112,7 +112,7 @@ const DEFAULT_MIN_EVENT_HEIGHT = 14;
 const DEFAULT_EVENT_GAP = 1;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const useClientLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
-// Floor for the create-by-drag preview, so a press shows a line before it moves.
+// Keep an empty or fully clipped preview visible at the column edge.
 const CREATE_PREVIEW_MIN_HEIGHT = 2;
 // Vertical placement of the create preview inside a day column `gridHeight` px
 // tall. Both ends are clamped to the visible hours. The preview is anchored to
@@ -126,6 +126,25 @@ function createPreviewPlacement(topPx: number, heightPx: number, gridHeight: num
   return top + height / 2 > gridHeight / 2
     ? { bottom: gridHeight - top - height, height }
     : { top, height };
+}
+
+function createRangePlacement(
+  range: CreateGhostArgs,
+  day: Date,
+  hourHeight: number,
+  minHour: number,
+  gridHeight: number,
+) {
+  // Use wall-clock positions, including midnight on the following day. Elapsed
+  // milliseconds would shift the preview on daylight-saving transitions.
+  const at = (time: Date) =>
+    (differenceInCalendarDays(time, day) * 24 +
+      time.getHours() +
+      time.getMinutes() / 60 -
+      minHour) *
+    hourHeight;
+  const top = at(range.start);
+  return createPreviewPlacement(top, at(range.end) - top, gridHeight);
 }
 
 // Edge auto-advance: how close to the day-columns edge (px) counts as "at the
@@ -1474,10 +1493,7 @@ function TimeGridInner<T = unknown>(
   // the same `Date`s while that range holds, so content effects keyed on them
   // re-run only when it changes.
   const liveRange =
-    createBox &&
-    RenderCreateGhost &&
-    onCreateEvent &&
-    days[createBox.dayIndex]?.getTime() === createBox.dayTime
+    createBox && onCreateEvent && days[createBox.dayIndex]?.getTime() === createBox.dayTime
       ? cellRangeFromDrag(
           days[createBox.dayIndex],
           createBox.startPx,
@@ -1977,7 +1993,7 @@ function TimeGridInner<T = unknown>(
               createBox?.dayIndex === dayIndex && createBox.dayTime === day.getTime()
                 ? createBox
                 : null;
-            const ghostRange = ghost ? createRange : null;
+            const ghostRange = ghost && RenderCreateGhost ? createRange : null;
             // The tail of a move that runs past midnight, previewed at the top of
             // this column. The dragged event is looked up from its `drag.key`
             // ("<originColumn>:<index>"), so no extra state has to track it.
@@ -2359,11 +2375,19 @@ function TimeGridInner<T = unknown>(
                         position: "absolute",
                         left: eventGap,
                         right: eventGap,
-                        ...createPreviewPlacement(
-                          Math.min(ghost.startPx, ghost.curPx),
-                          Math.abs(ghost.curPx - ghost.startPx),
-                          totalHeight,
-                        ),
+                        ...(createRange
+                          ? createRangePlacement(
+                              createRange,
+                              day,
+                              hourHeight,
+                              windowStart,
+                              totalHeight,
+                            )
+                          : createPreviewPlacement(
+                              Math.min(ghost.startPx, ghost.curPx),
+                              Math.abs(ghost.curPx - ghost.startPx),
+                              totalHeight,
+                            )),
                         // Borders, including custom ones, stay inside the placed box.
                         boxSizing: "border-box",
                         ...(ghostRange ? { overflow: "hidden" } : null),

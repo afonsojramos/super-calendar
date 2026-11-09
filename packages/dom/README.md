@@ -172,8 +172,9 @@ On the time grid, an empty-slot touch tap calls `onPressCell` from the column's
 click. Swipes and cancelled contacts do not press the slot. Mouse and pen retain
 drag-to-create behavior. See the [DOM guide](https://super-calendar.afonsojramos.me/guides/dom).
 
-The drag-to-create preview stays within the visible hours of the pressed column,
-with its border inside the column.
+The drag-to-create preview snaps to the same range as `onCreateEvent`, starting
+with one slot on press. It stays within the visible hours of the pressed column,
+with its border inside the column. `dragStepMinutes` sets the snap interval.
 
 `TimeGrid` completes creation on pointer release even if capture is lost just
 before it. Capture loss without a matching release and pointer cancellation

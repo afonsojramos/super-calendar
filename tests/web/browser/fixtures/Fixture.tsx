@@ -158,6 +158,7 @@ export function Fixture() {
   const [disabled, setDisabled] = useFixtureState(false);
   const [restricted, setRestricted] = useFixtureState(false);
   const [calls, setCalls] = useFixtureState<string[]>([]);
+  const [createdEvents, setCreatedEvents] = useFixtureState<FixtureEvent[]>([]);
   const [date, setDate] = useFixtureState<Date | null>(constrained ? new Date(2026, 6, 1) : anchor);
   const [range, setRange] = useFixtureState<DateRange | null>({
     start: constrained ? new Date(2026, 6, 1) : anchor,
@@ -376,6 +377,24 @@ export function Fixture() {
                 }
               : undefined
           }
+        />
+      ) : view.startsWith("snap-") ? (
+        <TimeGrid<{ id: number }>
+          date={view.includes("dst") ? new Date(2026, 2, 29) : anchor}
+          now={anchor}
+          mode={view.includes("week") ? "week" : "day"}
+          weekStartsOn={1}
+          events={createdEvents()}
+          height={700}
+          hourHeight={60}
+          minHour={view.includes("dst") ? 0 : view.includes("fractional") ? 8.1 : 8}
+          maxHour={view.includes("dst") ? 6 : 14}
+          dragStepMinutes={view.includes("30") ? 30 : 15}
+          renderCreateGhost={view.includes("content") ? Draft : undefined}
+          onCreateEvent={(start, end) => {
+            record(`${clock(start)}-${clock(end)}`);
+            setCreatedEvents([{ id: 1, title: "Created", start, end }]);
+          }}
         />
       ) : view.startsWith("create") ? (
         // Create-by-drag scenarios. The whole column fits in the viewport, so a

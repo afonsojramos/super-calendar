@@ -267,12 +267,16 @@ browser dragging are disabled so they cannot interrupt creation.
   "drag to create a range."
 </Note>
 
-On the web, the time-grid preview stays inside the visible hours. When a sweep
+On the web, the time-grid preview snaps both ends to the range that
+`onCreateEvent` receives, using `dragStepMinutes` or the default 15 minutes.
+The initial press shows one snapped slot. This also works without
+`renderCreateGhost`. The preview stays inside the visible hours. When a sweep
 passes the start or end of those hours (00:00 and 24:00 by default, or `minHour`
 and `maxHour`), the preview stops at that edge. Its border and minimum height stay
 inside the column, including borders from a `createGhost` class or style. The
-preview does not change `onCreateEvent`, which still receives the snapped range
-within the pressed day.
+preview uses the existing `onCreateEvent` range within the pressed day. For an
+upward sweep whose origin rounds to midnight, that range ends one snap step
+before midnight, and the preview ends there too.
 
 ### Show a draft in the preview
 
