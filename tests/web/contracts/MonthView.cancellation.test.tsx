@@ -134,6 +134,31 @@ describe(rendererName, () => {
       fireEvent.click(chip, { detail: 0 });
       expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(event);
     });
+    it.each(["event", "day"])(
+      "keeps the trailing %s click suppressed after keyboard activation",
+      (target) => {
+        const event = { title: "Existing", start: date, end: new Date(2026, 6, 16) };
+        const onPressEvent = vi.fn();
+        const onPressDay = vi.fn();
+        const view = render(mode === "month" ? MonthView : MultiWeekView, {
+          date,
+          events: [event],
+          onDragEvent: vi.fn(),
+          onPressEvent,
+          onPressDay,
+        });
+        const chip = view.getByRole("button", { name: /^Existing,/ });
+        press(chip);
+        move(day(view.container, 16));
+        fireEvent.keyDown(window, { key: "Escape" });
+        fireEvent.click(chip, { detail: 0 });
+        expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(event);
+        release();
+        fireEvent.click(target === "event" ? chip : day(view.container, 15), { detail: 1 });
+        expect(onPressEvent).toHaveBeenCalledTimes(1);
+        expect(onPressDay).not.toHaveBeenCalled();
+      },
+    );
     it("cancels an event move on Escape", () => {
       const event = {
         title: "Existing",

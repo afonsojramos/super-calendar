@@ -3,6 +3,28 @@ import { box, open, page, rendererName } from "../session";
 
 describe(rendererName, () => {
   it.each(["month-drag", "multiweek"])(
+    "keeps a cancelled %s release suppressed after Enter",
+    async (view) => {
+      await open(view);
+      const chip = page.getByRole("button", { name: /^Planning,/ });
+      const origin = (await chip.boundingBox())!;
+      const target = await box('[data-day="2026-07-22"]');
+      await page.mouse.move(origin.x + origin.width / 2, origin.y + origin.height / 2);
+      await page.mouse.down();
+      await chip.focus();
+      await page.mouse.move(target.x + target.width / 2, target.y + 10, { steps: 8 });
+      await page.keyboard.press("Escape");
+      await page.keyboard.press("Enter");
+      await expect.poll(() => page.getByLabel("Calls").textContent()).toBe('["press:Planning"]');
+      await page.mouse.move(origin.x + origin.width / 2, origin.y + origin.height / 2);
+      await page.mouse.up();
+      await page.evaluate(
+        () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+      );
+      expect(await page.getByLabel("Calls").textContent()).toBe('["press:Planning"]');
+    },
+  );
+  it.each(["month-drag", "multiweek"])(
     "keeps keyboard event activation after cancelling a %s move",
     async (view) => {
       await open(view);

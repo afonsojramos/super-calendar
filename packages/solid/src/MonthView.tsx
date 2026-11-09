@@ -870,9 +870,9 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
   };
   // Keyboard and assistive-technology clicks have detail 0 and never trail a drag.
   const consumeSuppressedClick = (detail: number) => {
-    if (!suppressClickRef.current) return false;
+    if (detail === 0 || !suppressClickRef.current) return false;
     suppressClickRef.current = false;
-    return detail !== 0;
+    return true;
   };
   // `disabled` and `draggable: false` lock an event outright; `startEditable`
   // (per event, falling back to the grid default) allows or blocks a move.
