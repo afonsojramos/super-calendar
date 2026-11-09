@@ -79,6 +79,10 @@ saving changes. For a resize, pass zero for the edge you want to keep fixed.
 its start-of-day ISO value. Midnight clock changes do not shift later day keys.
 An event ending at the start of a day excludes that day.
 
+`monthCreateRange(anchor, hover)` returns the ordered all-day creation range.
+Its exclusive end is the start of the day after the last selected date,
+including when a clock change skips midnight.
+
 `CalendarEvent<T>` includes an optional `dragHandleColor: string` for the native
 renderer's time-grid and resource-timeline resize grips. When omitted, those
 grips use `theme.colors.eventText`. Core preserves the field without interpreting it.

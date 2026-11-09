@@ -266,6 +266,10 @@ use this builder instead of the timed-column helpers.
 They include every occupied day across midnight clock changes. An event ending
 at the start of a day excludes that day.
 
+`monthCreateRange(anchor, hover)` returns the ordered all-day creation range.
+Its exclusive end is the start of the day after the last selected date,
+including when a clock change skips midnight.
+
 `loadEventSource({ source, format?, map?, signal? })` loads one JSON/iCalendar
 batch or calls an async event loader. It returns `Promise<CalendarEvent<T>[]>` and
 rejects HTTP, validation, and cancellation errors. `signal` applies to URL

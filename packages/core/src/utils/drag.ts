@@ -181,8 +181,8 @@ export function resolveDraggedBounds(
 
 /**
  * The all-day range swept out between two day cells of the month grid, ordered
- * whichever way the sweep ran: `start` is midnight of the first day and `end` is
- * midnight after the last, so a one-day sweep still yields a usable event. Shared
+ * whichever way the sweep ran: `start` is the first local day's start and `end` is
+ * the next day's start after the last, so a one-day sweep yields a usable event. Shared
  * by both renderers so a month drag-to-create means the same thing on each.
  */
 export function monthCreateRange(anchor: Date, hover: Date): { start: Date; end: Date } {
@@ -190,7 +190,7 @@ export function monthCreateRange(anchor: Date, hover: Date): { start: Date; end:
   const b = startOfDay(hover);
   const first = a.getTime() <= b.getTime() ? a : b;
   const last = a.getTime() <= b.getTime() ? b : a;
-  return { start: first, end: addDays(last, 1) };
+  return { start: first, end: startOfDay(addDays(last, 1)) };
 }
 
 /**
