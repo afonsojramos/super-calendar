@@ -341,6 +341,29 @@ describe(rendererName, () => {
       ]);
     });
 
+    it.each([
+      { mode: "custom" as const, numberOfDays: 4, label: "4 days", destination: 19 },
+      { mode: "week" as const, numberOfDays: 2, label: "week", destination: 22 },
+      { mode: "day" as const, numberOfDays: 2, label: "day", destination: 16 },
+    ])("updates page actions when the visible span becomes $label", (next) => {
+      const onDragEvent = vi.fn();
+      const props = grid({ mode: "custom", numberOfDays: 2, onDragEvent });
+      const view = render(TimeGrid, props);
+      fireEvent.click(trigger(view, "Planning"));
+      expect(actionNames(view.getByRole("dialog"))).toContain("Move to next 2 days");
+
+      view.rerender({ ...props, mode: next.mode, numberOfDays: next.numberOfDays });
+      const dialog = view.getByRole("dialog");
+      expect(actionNames(dialog)).toContain(`Move to next ${next.label}`);
+      expect(actionNames(dialog)).not.toContain("Move to next 2 days");
+      fireEvent.click(action(dialog, `Move to next ${next.label}`));
+      expect(onDragEvent).toHaveBeenCalledExactlyOnceWith(
+        planning,
+        at(next.destination, 9),
+        at(next.destination, 10),
+      );
+    });
+
     it("closes on Escape and returns focus to its button", () => {
       const view = render(TimeGrid, grid({ onDragEvent: vi.fn(), dragStepMinutes: 30 }));
       fireEvent.click(trigger(view, "Planning"));

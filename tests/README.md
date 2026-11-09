@@ -77,6 +77,17 @@ than package tarball sizes.
 Load timing includes local asset loading and rendering. Update and scroll timings
 run from the action until all updated titles or the new virtualized rows are in
 the DOM, then through two animation frames, including frame scheduling.
-Compare results on the same machine and browser. CI uploads a report for each
-commit; timing values are informational until repeated runs establish useful
-regression limits. Structural assertions remain blocking checks.
+The update also records Chromium's script and total main-thread task durations
+over that interval. Use these work measurements alongside paint latency: waiting
+for a frame can hide a reduction in JavaScript work. Total task time includes
+script time; the two values are not additive.
+Compare baseline and candidate with identical inputs on the same hardware,
+runtime, and browser. Run benchmarks without parallel builds or tests and retain
+raw samples. Claim improvements only when they exceed run-to-run variation.
+CI uploads a report for each commit; timing values are informational until
+repeated runs establish useful regression limits. Structural assertions remain
+blocking checks.
+
+Profile native interactions in a release build on a physical device. Browser
+measurements and the native recording gesture harness do not measure native
+frame pacing or input latency.

@@ -736,6 +736,11 @@ function TimeGridInner<T = unknown>(
       canResize: editable && (event.durationEditable ?? eventDurationEditable),
     };
   };
+  const hasEditActions = (event: CalendarEvent<T>) => {
+    if (isAllDayEvent(event) || isBackgroundEvent(event)) return false;
+    const { canMove, canResize } = editability(event);
+    return canMove || canResize;
+  };
   const eventLabel = (event: CalendarEvent<T>) =>
     eventAccessibilityLabel
       ? eventAccessibilityLabel(event, { mode, isAllDay: false, ampm })
@@ -772,7 +777,7 @@ function TimeGridInner<T = unknown>(
     }
   };
   const editActions = (event: CalendarEvent<T>): EventEditAction[] => {
-    if (isAllDayEvent(event) || isBackgroundEvent(event)) return [];
+    if (!hasEditActions(event)) return [];
     const { canMove, canResize } = editability(event);
     const action = (id: string, label: string): EventEditAction => {
       const [startDelta, endDelta] = actionDelta(id) ?? [0, 0];
@@ -1723,7 +1728,7 @@ function TimeGridInner<T = unknown>(
               )
               .map((pe) => pe.event),
           ),
-        ].filter((event) => editActions(event).length > 0)}
+        ].filter(hasEditActions)}
         label={labels.editEvents}
         labelFor={(event) => labels.eventActions(event.title ?? "")}
         descriptionFor={eventDescription}
