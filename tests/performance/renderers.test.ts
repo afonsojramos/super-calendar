@@ -13,6 +13,8 @@ const root = resolve(import.meta.dirname, "../..");
 const samples: {
   loadToPaintMs: number;
   updateToPaintMs: number;
+  updateScriptMs: number;
+  updateTaskMs: number;
   scrollToPaintMs: number;
   nodes: number;
 }[] = [];
@@ -63,29 +65,45 @@ it(`${renderer} records production rendering, scrolling, and bundle baselines`, 
           ),
       );
       const nodes = await page.locator("*").count();
-      const updateToPaintMs = await page
+      const updateButton = await page
         .getByRole("button", { name: "Update events" })
-        .evaluate((button) => {
-          if (!(button instanceof HTMLButtonElement)) throw new Error("Missing update button");
-          const start = performance.now();
-          button.click();
-          return new Promise<number>((done, reject) => {
-            const rendered = () => {
-              const events = [...document.querySelectorAll('[data-slot="event"]')];
-              if (
-                events.length === 1000 &&
-                events.every((event) => event.textContent?.includes("!"))
-              ) {
-                requestAnimationFrame(() =>
-                  requestAnimationFrame(() => done(performance.now() - start)),
-                );
-              } else if (performance.now() - start > 5_000) {
-                reject(new Error("The bulk event update did not render"));
-              } else requestAnimationFrame(rendered);
-            };
-            requestAnimationFrame(rendered);
-          });
+        .elementHandle();
+      if (!updateButton) throw new Error("Missing update button");
+      const profiler = await context.newCDPSession(page);
+      await profiler.send("Performance.enable");
+      const beforeUpdate = await profiler.send("Performance.getMetrics");
+      const updateToPaintMs = await updateButton.evaluate((button) => {
+        if (!(button instanceof HTMLButtonElement)) throw new Error("Missing update button");
+        const start = performance.now();
+        button.click();
+        return new Promise<number>((done, reject) => {
+          const rendered = () => {
+            const events = [...document.querySelectorAll('[data-slot="event"]')];
+            if (
+              events.length === 1000 &&
+              events.every((event) => event.textContent?.includes("!"))
+            ) {
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => done(performance.now() - start)),
+              );
+            } else if (performance.now() - start > 5_000) {
+              reject(new Error("The bulk event update did not render"));
+            } else requestAnimationFrame(rendered);
+          };
+          requestAnimationFrame(rendered);
         });
+      });
+      const afterUpdate = await profiler.send("Performance.getMetrics");
+      await profiler.detach();
+      const elapsedMetric = (name: string) => {
+        const before = beforeUpdate.metrics.find((metric) => metric.name === name)?.value;
+        const after = afterUpdate.metrics.find((metric) => metric.name === name)?.value;
+        if (before === undefined || after === undefined)
+          throw new Error(`Missing browser performance metric: ${name}`);
+        return (after - before) * 1000;
+      };
+      const updateScriptMs = elapsedMetric("ScriptDuration");
+      const updateTaskMs = elapsedMetric("TaskDuration");
       expect(await page.getByLabel("Revision").textContent()).toBe("1");
       expect(await page.locator('[data-slot="event"]').count()).toBe(1000);
       expect(
@@ -121,7 +139,15 @@ it(`${renderer} records production rendering, scrolling, and bundle baselines`, 
       });
       expect(await days.count()).toBeLessThan(400);
       expect(errors).toEqual([]);
-      if (sample > 0) samples.push({ loadToPaintMs, updateToPaintMs, scrollToPaintMs, nodes });
+      if (sample > 0)
+        samples.push({
+          loadToPaintMs,
+          updateToPaintMs,
+          updateScriptMs,
+          updateTaskMs,
+          scrollToPaintMs,
+          nodes,
+        });
     } finally {
       await context.close();
     }
@@ -136,7 +162,14 @@ it(`${renderer} records production rendering, scrolling, and bundle baselines`, 
       return { file, bytes: data.byteLength, gzipBytes: gzipSync(data).byteLength };
     }),
   );
-  const metrics = ["loadToPaintMs", "updateToPaintMs", "scrollToPaintMs", "nodes"] as const;
+  const metrics = [
+    "loadToPaintMs",
+    "updateToPaintMs",
+    "updateScriptMs",
+    "updateTaskMs",
+    "scrollToPaintMs",
+    "nodes",
+  ] as const;
   const summary = Object.fromEntries(
     metrics.map((metric) => {
       const values = samples.map((sample) => sample[metric]).sort((a, b) => a - b);

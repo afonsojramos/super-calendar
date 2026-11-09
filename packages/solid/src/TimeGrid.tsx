@@ -842,6 +842,11 @@ export function TimeGrid<T = unknown>(
       canResize: editable && (event.durationEditable ?? props.eventDurationEditable),
     };
   };
+  const hasEditActions = (event: CalendarEvent<T>) => {
+    if (isAllDayEvent(event) || isBackgroundEvent(event)) return false;
+    const { canMove, canResize } = editability(event);
+    return canMove || canResize;
+  };
   const eventLabel = (event: CalendarEvent<T>) =>
     props.eventAccessibilityLabel
       ? props.eventAccessibilityLabel(event, {
@@ -861,8 +866,9 @@ export function TimeGrid<T = unknown>(
     `${describeEventDates(event)}, ${eventLabel(event)}`;
   // The actions dialog's steps, matching the native screen-reader actions: one
   // snap step, or one page of days, through the same commit path as a drop.
-  const pageDays = () =>
-    pageStepDays(props.mode, props.date, props.weekStartsOn, props.numberOfDays);
+  const pageDays = createMemo(() =>
+    pageStepDays(props.mode, props.date, props.weekStartsOn, props.numberOfDays),
+  );
   const actionDelta = (id: string): [number, number] | null => {
     const step = snapMinutes();
     const page = pageDays() * HOURS_PER_DAY * 60;
@@ -884,7 +890,7 @@ export function TimeGrid<T = unknown>(
     }
   };
   const editActions = (event: CalendarEvent<T>): EventEditAction[] => {
-    if (isAllDayEvent(event) || isBackgroundEvent(event)) return [];
+    if (!hasEditActions(event)) return [];
     const { canMove, canResize } = editability(event);
     const step = snapMinutes();
     const words = labels();
@@ -1885,7 +1891,7 @@ export function TimeGrid<T = unknown>(
               )
               .map((pe) => pe.event),
           ),
-        ].filter((event) => editActions(event).length > 0)}
+        ].filter(hasEditActions)}
         label={labels().editEvents}
         labelFor={(event) => labels().eventActions(event.title ?? "")}
         descriptionFor={eventDescription}
