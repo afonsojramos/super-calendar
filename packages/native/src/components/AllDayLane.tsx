@@ -50,7 +50,7 @@ export function AllDayLane<T>({
   const slot = useSlots<AllDayLaneSlot>();
   const RenderEventComponent = renderEvent;
 
-  const rows = useMemo(() => {
+  const spans = useMemo(() => {
     const allDay = events.filter(
       (event) =>
         isAllDayEvent(event) &&
@@ -62,63 +62,62 @@ export function AllDayLane<T>({
     const { segments, laneCount } = layoutMonthWeek(days, allDay);
     const lanes: MonthEventSegment<T>[][] = Array.from({ length: laneCount }, () => []);
     for (const segment of segments) lanes[segment.lane].push(segment);
-    return lanes;
+    return lanes.flat();
   }, [days, events]);
 
   return (
     <View
       {...slot("allDayLane", {
-        base: [styles.lane, rows.length > 0 && { paddingVertical: 2 }],
+        base: [styles.lane, spans.length > 0 && { paddingVertical: 2 }],
         themed: theme.containers.allDayLane,
       })}
       onLayout={onLayout}
     >
-      {rows.map((segments, lane) => (
-        <View key={lane} style={styles.row}>
-          {segments.map((segment, index) => {
-            const { event, startCol, endCol, continuesBefore, continuesAfter } = segment;
-            const previousEnd = index === 0 ? -1 : segments[index - 1].endCol;
-            return (
-              <View
-                key={keyExtractor(event, index)}
-                {...slot("allDayColumn", {
-                  base: [
-                    styles.column,
-                    {
-                      width: dayWidth * (endCol - startCol + 1),
-                      marginLeft: dayWidth * (startCol - previousEnd - 1),
-                    },
-                  ],
-                  themed: theme.containers.allDayColumn,
-                })}
-              >
-                <View {...slot("allDayEvent", { base: styles.chip })}>
-                  <RenderEventComponent
-                    event={event}
-                    mode={mode}
-                    isAllDay
-                    continuesBefore={continuesBefore}
-                    continuesAfter={continuesAfter}
-                    onPress={() => onPressEvent(event)}
-                    onLongPress={onLongPressEvent ? () => onLongPressEvent(event) : undefined}
-                  />
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      ))}
+      {spans.map((segment, index) => {
+        const { event, startCol, endCol, lane, continuesBefore, continuesAfter } = segment;
+        const previous = spans[index - 1];
+        const previousEnd = previous?.lane === lane ? previous.endCol : -1;
+        const remaining = spans[index + 1]?.lane === lane ? 0 : days.length - endCol - 1;
+        return (
+          <View
+            key={keyExtractor(event, index)}
+            {...slot("allDayColumn", {
+              base: [
+                styles.column,
+                {
+                  width: dayWidth * (endCol - startCol + 1),
+                  marginLeft: dayWidth * (startCol - previousEnd - 1),
+                  marginRight: dayWidth * remaining,
+                },
+              ],
+              themed: theme.containers.allDayColumn,
+            })}
+          >
+            <View {...slot("allDayEvent", { base: styles.chip })}>
+              <RenderEventComponent
+                event={event}
+                mode={mode}
+                isAllDay
+                continuesBefore={continuesBefore}
+                continuesAfter={continuesAfter}
+                onPress={() => onPressEvent(event)}
+                onLongPress={onLongPressEvent ? () => onLongPressEvent(event) : undefined}
+              />
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   lane: {
-    gap: 2,
-  },
-  row: {
+    // Keep keyed events as siblings so changing lanes preserves renderer state.
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "flex-start",
+    rowGap: 2,
   },
   column: {
     paddingHorizontal: 1,

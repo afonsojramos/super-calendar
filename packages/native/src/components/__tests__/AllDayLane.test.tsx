@@ -1,4 +1,5 @@
 import { fireEvent, render } from "@testing-library/react-native";
+import { useState } from "react";
 import { Pressable, Text, StyleSheet } from "react-native";
 import { vi } from "vitest";
 import { AllDayLane } from "../AllDayLane";
@@ -29,6 +30,25 @@ const props = {
 };
 
 describe("AllDayLane spans", () => {
+  it("preserves custom renderer state when an unchanged event moves to another lane", async () => {
+    const StatefulSpan = ({ event }: RenderEventArgs) => {
+      const [expanded, setExpanded] = useState(false);
+      return (
+        <Pressable onPress={() => setExpanded((value) => !value)}>
+          <Text>{`${event.title}: ${expanded ? "expanded" : "collapsed"}`}</Text>
+        </Pressable>
+      );
+    };
+    const view = await render(<AllDayLane {...props} renderEvent={StatefulSpan} />);
+    await fireEvent.press(view.getByText("Trip: collapsed"));
+    expect(view.getByText("Trip: expanded")).toBeTruthy();
+    const earlier = { ...trip, title: "Earlier", start: days[0] };
+    for (const events of [[trip, earlier], [earlier, trip], [trip]]) {
+      await view.rerender(<AllDayLane {...props} events={events} renderEvent={StatefulSpan} />);
+      expect(view.getByText("Trip: expanded")).toBeTruthy();
+    }
+  });
+
   it("renders one full-width span with original press and long-press event identity", async () => {
     const onPressEvent = vi.fn();
     const onLongPressEvent = vi.fn();
