@@ -52,7 +52,8 @@ import { EventContextMenu } from "./components/EventContextMenu";
 
 function MonthDraft({ start, end }: CreateGhostArgs) {
   const theme = useCalendarTheme();
-  const last = addDays(end, -1);
+  // The previous instant also works when the time zone skips an entire date.
+  const last = new Date(end.getTime() - 1);
   const range = isSameDay(start, last)
     ? format(start, "MMM d")
     : `${format(start, "MMM d")} to ${format(last, "MMM d")}`;
