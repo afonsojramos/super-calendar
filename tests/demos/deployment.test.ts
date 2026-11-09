@@ -26,8 +26,9 @@ async function checkPage(
   width = 1100,
   hasTouch = false,
   now?: Date,
+  timezoneId?: string,
 ) {
-  const page = await browser.newPage({ viewport: { width, height: 880 }, hasTouch });
+  const page = await browser.newPage({ viewport: { width, height: 880 }, hasTouch, timezoneId });
   if (now) await page.clock.setFixedTime(now);
   page.setDefaultTimeout(5_000);
   page.setDefaultNavigationTimeout(15_000);
@@ -84,9 +85,30 @@ async function nativeMultiWeekGrid(page: Page) {
 }
 
 describe("published demos", () => {
-  it.each(["month", "multiweek"] as const)(
-    "shows live native-web %s creation content",
-    async (mode) => {
+  it.each(
+    (["month", "multiweek"] as const).flatMap((mode) => [
+      {
+        mode,
+        timezoneId: "Europe/Madrid",
+        now: new Date("2026-07-15T12:00:00Z"),
+        row: mode === "month" ? 2 : 0,
+        column: 4,
+        single: "Draft: Jul 17",
+        span: "Draft: Jul 17 to Jul 22",
+      },
+      {
+        mode,
+        timezoneId: "America/Sao_Paulo",
+        now: new Date("2018-11-01T12:00:00Z"),
+        row: 0,
+        column: 5,
+        single: "Draft: Nov 3",
+        span: "Draft: Nov 3 to Nov 7",
+      },
+    ]),
+  )(
+    "shows live native-web $mode creation content in $timezoneId",
+    async ({ mode, timezoneId, now, row, column, single, span }) => {
       await checkPage(
         "/",
         async (page) => {
@@ -120,9 +142,8 @@ describe("published demos", () => {
           const bounds = await grid.boundingBox();
           if (!bounds) throw new Error("Native calendar grid has no bounds");
           const rows = mode === "month" ? 5 : 2;
-          const row = mode === "month" ? 2 : 0;
           const origin = {
-            x: bounds.x + (bounds.width * 4.5) / 7,
+            x: bounds.x + (bounds.width * (column + 0.5)) / 7,
             y: bounds.y + (bounds.height * row) / rows + 10,
           };
           const target = {
@@ -132,11 +153,9 @@ describe("published demos", () => {
           await page.mouse.move(origin.x, origin.y);
           await page.mouse.down();
           const draft = grid.getByTestId("month-draft-range");
-          await expect.poll(() => draft.allTextContents()).toEqual(["Draft: Jul 17"]);
+          await expect.poll(() => draft.allTextContents()).toEqual([single]);
           await page.mouse.move(target.x, target.y, { steps: 8 });
-          await expect
-            .poll(() => draft.allTextContents())
-            .toEqual(["Draft: Jul 17 to Jul 22", "Draft: Jul 17 to Jul 22"]);
+          await expect.poll(() => draft.allTextContents()).toEqual([span, span]);
           expect(
             await grid
               .getByTestId("month-create-ghost")
@@ -154,7 +173,8 @@ describe("published demos", () => {
         },
         1100,
         false,
-        new Date(2026, 6, 15, 12),
+        now,
+        timezoneId,
       );
     },
   );

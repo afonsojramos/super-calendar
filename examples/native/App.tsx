@@ -1,7 +1,16 @@
 // Uniwind's CSS entry point: enables Tailwind classes on native components,
 // powering the "tailwind" demo tab.
 import "./global.css";
-import { addDays, addMonths, addWeeks, addYears, endOfMonth, format, startOfMonth } from "date-fns";
+import {
+  isSameDay,
+  addDays,
+  addMonths,
+  addWeeks,
+  addYears,
+  endOfMonth,
+  format,
+  startOfMonth,
+} from "date-fns";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -44,10 +53,9 @@ import { EventContextMenu } from "./components/EventContextMenu";
 function MonthDraft({ start, end }: CreateGhostArgs) {
   const theme = useCalendarTheme();
   const last = addDays(end, -1);
-  const range =
-    last.getTime() === start.getTime()
-      ? format(start, "MMM d")
-      : `${format(start, "MMM d")} to ${format(last, "MMM d")}`;
+  const range = isSameDay(start, last)
+    ? format(start, "MMM d")
+    : `${format(start, "MMM d")} to ${format(last, "MMM d")}`;
   return (
     <Text
       testID="month-draft-range"
