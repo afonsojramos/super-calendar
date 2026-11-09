@@ -1,5 +1,5 @@
 import { createSignal, For, Show, untrack } from "solid-js";
-import { isSameDay, addDays, addMonths, addWeeks, addYears, format } from "date-fns";
+import { isSameDay, addDays, addMonths, addWeeks, addYears, format, startOfDay } from "date-fns";
 import { FeedExample } from "./FeedExample";
 import {
   Calendar,
@@ -58,7 +58,7 @@ function DraftPreview(props: CreateGhostArgs) {
 function MonthDraft(props: CreateGhostArgs) {
   const range = () => {
     // The previous instant also works when the time zone skips an entire date.
-    const last = new Date(props.end.getTime() - 1);
+    const last = new Date(startOfDay(props.end).getTime() - 1);
     return isSameDay(props.start, last)
       ? format(props.start, "MMM d")
       : `${format(props.start, "MMM d")} to ${format(last, "MMM d")}`;

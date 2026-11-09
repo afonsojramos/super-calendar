@@ -118,9 +118,9 @@ describe("published demos", () => {
     },
   );
 
-  it.each(["/dom/", "/solid/"])(
-    "labels a one-day draft before a midnight clock change on %s",
-    async (path) => {
+  it.each(["/dom/", "/solid/"].flatMap((path) => [23, 24].map((day) => ({ path, day }))))(
+    "labels a one-day draft on April $day around a midnight clock change on $path",
+    async ({ path, day: dayNumber }) => {
       await checkPage(
         path,
         async (page) => {
@@ -131,7 +131,7 @@ describe("published demos", () => {
               await page.getByRole("button", { name: "Previous period" }).click();
           } else await page.getByRole("button", { name: /^month$/i }).click();
           expect(await page.evaluate(() => new Date(2026, 3, 24).getHours())).toBe(1);
-          const day = page.locator('[data-day="2026-04-23"]');
+          const day = page.locator(`[data-day="2026-04-${dayNumber}"]`);
           await day.scrollIntoViewIfNeeded();
           const bounds = await day.boundingBox();
           if (!bounds) throw new Error("Missing midnight-transition day");
@@ -139,7 +139,7 @@ describe("published demos", () => {
           await page.mouse.down();
           await expect
             .poll(() => page.locator('[data-slot="createGhost"]').allTextContents())
-            .toEqual(["Draft: Apr 23"]);
+            .toEqual([`Draft: Apr ${dayNumber}`]);
           await page.mouse.up();
         },
         1100,
