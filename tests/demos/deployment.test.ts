@@ -25,8 +25,10 @@ async function checkPage(
   check: (page: Page) => Promise<void>,
   width = 1100,
   hasTouch = false,
+  now?: Date,
 ) {
   const page = await browser.newPage({ viewport: { width, height: 880 }, hasTouch });
+  if (now) await page.clock.setFixedTime(now);
   page.setDefaultTimeout(5_000);
   page.setDefaultNavigationTimeout(15_000);
   const errors: string[] = [];
@@ -82,6 +84,81 @@ async function nativeMultiWeekGrid(page: Page) {
 }
 
 describe("published demos", () => {
+  it.each(["month", "multiweek"] as const)(
+    "shows live native-web %s creation content",
+    async (mode) => {
+      await checkPage(
+        "/",
+        async (page) => {
+          await page.getByText(mode, { exact: true }).click();
+          if (mode === "multiweek")
+            await page.getByRole("button", { name: "2 weeks", exact: true }).click();
+          const grids = page.getByTestId(mode === "month" ? "month-grid" : "multiweek-grid");
+          const visibleIndex = () =>
+            grids.evaluateAll((nodes) =>
+              nodes.findIndex((node) => {
+                const rect = node.getBoundingClientRect();
+                return rect.width > 0 && rect.left >= 0 && rect.right <= innerWidth;
+              }),
+            );
+          await expect.poll(visibleIndex, { timeout: 5_000 }).toBeGreaterThanOrEqual(0);
+          const grid = grids.nth(await visibleIndex());
+          await grid.scrollIntoViewIfNeeded();
+          // Legend List initially measures its pages with pointer input disabled.
+          await expect
+            .poll(
+              () =>
+                grid.evaluate((element) => {
+                  const rect = element.getBoundingClientRect();
+                  return element.contains(
+                    document.elementFromPoint(rect.x + rect.width / 2, rect.y + 10),
+                  );
+                }),
+              { timeout: 5_000 },
+            )
+            .toBe(true);
+          const bounds = await grid.boundingBox();
+          if (!bounds) throw new Error("Native calendar grid has no bounds");
+          const rows = mode === "month" ? 5 : 2;
+          const row = mode === "month" ? 2 : 0;
+          const origin = {
+            x: bounds.x + (bounds.width * 4.5) / 7,
+            y: bounds.y + (bounds.height * row) / rows + 10,
+          };
+          const target = {
+            x: bounds.x + (bounds.width * 2.5) / 7,
+            y: bounds.y + (bounds.height * (row + 1)) / rows + 10,
+          };
+          await page.mouse.move(origin.x, origin.y);
+          await page.mouse.down();
+          const draft = grid.getByTestId("month-draft-range");
+          await expect.poll(() => draft.allTextContents()).toEqual(["Draft: Jul 17"]);
+          await page.mouse.move(target.x, target.y, { steps: 8 });
+          await expect
+            .poll(() => draft.allTextContents())
+            .toEqual(["Draft: Jul 17 to Jul 22", "Draft: Jul 17 to Jul 22"]);
+          expect(
+            await grid
+              .getByTestId("month-create-ghost")
+              .evaluateAll((elements) =>
+                elements.every(
+                  (el) => el.getAttribute("aria-hidden") === "true" && el.hasAttribute("inert"),
+                ),
+              ),
+          ).toBe(true);
+          await page.mouse.up();
+          await expect.poll(() => draft.count()).toBe(0);
+          await expect
+            .poll(() => grid.getByRole("button", { name: /^✨ New event,/ }).count())
+            .toBe(2);
+        },
+        1100,
+        false,
+        new Date(2026, 6, 15, 12),
+      );
+    },
+  );
+
   it("scrolls the native-web multi-week rows with a quick touch swipe", async () => {
     await checkPage(
       "/",
