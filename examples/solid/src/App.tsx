@@ -1,5 +1,5 @@
 import { createSignal, For, Show, untrack } from "solid-js";
-import { addDays, addMonths, addWeeks, addYears, format } from "date-fns";
+import { isSameDay, addDays, addMonths, addWeeks, addYears, format, startOfDay } from "date-fns";
 import { FeedExample } from "./FeedExample";
 import {
   Calendar,
@@ -52,6 +52,29 @@ function DraftPreview(props: CreateGhostArgs) {
       <strong>New event</strong>
       <div>{`${format(props.start, "HH:mm")} - ${format(props.end, "HH:mm")}`}</div>
     </div>
+  );
+}
+
+function MonthDraft(props: CreateGhostArgs) {
+  const range = () => {
+    // The previous instant also works when the time zone skips an entire date.
+    const last = new Date(startOfDay(props.end).getTime() - 1);
+    return isSameDay(props.start, last)
+      ? format(props.start, "MMM d")
+      : `${format(props.start, "MMM d")} to ${format(last, "MMM d")}`;
+  };
+  return (
+    <span
+      style={{
+        display: "block",
+        padding: "0 3px",
+        "font-size": "11px",
+        "font-weight": 600,
+        "white-space": "nowrap",
+        overflow: "hidden",
+        "text-overflow": "ellipsis",
+      }}
+    >{`Draft: ${range()}`}</span>
   );
 }
 
@@ -178,7 +201,9 @@ export function App(props: { initialView?: string }) {
                       onSelectDrag={selection.selectRange}
                       onDragEvent={move}
                       onCreateEvent={create}
-                      renderCreateGhost={DraftPreview}
+                      renderCreateGhost={
+                        mode() === "month" || mode() === "multiweek" ? MonthDraft : DraftPreview
+                      }
                       onPressEvent={(event) => setStatus(`Selected ${event.title}`)}
                     />
                   }

@@ -1,4 +1,14 @@
-import { addDays, addMonths, addWeeks, addYears, endOfMonth, format, startOfMonth } from "date-fns";
+import {
+  isSameDay,
+  addDays,
+  addMonths,
+  addWeeks,
+  addYears,
+  endOfMonth,
+  format,
+  startOfMonth,
+  startOfDay,
+} from "date-fns";
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import {
   Calendar,
@@ -168,6 +178,27 @@ const DraftPreview = ({ start, end }: CreateGhostArgs) => (
     <div>{`${format(start, "HH:mm")} - ${format(end, "HH:mm")}`}</div>
   </div>
 );
+
+const MonthDraft = ({ start, end }: CreateGhostArgs) => {
+  // The previous instant also works when the time zone skips an entire date.
+  const last = new Date(startOfDay(end).getTime() - 1);
+  const range = isSameDay(start, last)
+    ? format(start, "MMM d")
+    : `${format(start, "MMM d")} to ${format(last, "MMM d")}`;
+  return (
+    <span
+      style={{
+        display: "block",
+        padding: "0 3px",
+        fontSize: 11,
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }}
+    >{`Draft: ${range}`}</span>
+  );
+};
 
 export function App() {
   const [mode, setMode] = useState<DemoTab>("week");
@@ -593,7 +624,9 @@ export function App() {
                   return [...prev, { id: nextId, kind: "work", title: "✨ New event", start, end }];
                 })
               }
-              renderCreateGhost={DraftPreview}
+              renderCreateGhost={
+                mode === "month" || mode === "multiweek" ? MonthDraft : DraftPreview
+              }
               onPressEvent={(event) => console.log("press event:", event.title)}
               onPressDay={(day) => {
                 setDate(day);

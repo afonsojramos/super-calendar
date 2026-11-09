@@ -85,6 +85,76 @@ async function nativeMultiWeekGrid(page: Page) {
 }
 
 describe("published demos", () => {
+  it.each(["/dom/", "/solid/"])(
+    "labels a one-day draft before a skipped date on %s",
+    async (path) => {
+      await checkPage(
+        path,
+        async (page) => {
+          if (path === "/solid/") {
+            await page.getByLabel("View", { exact: true }).selectOption("year");
+            for (let year = 0; year < 15; year++)
+              await page.getByRole("button", { name: "Previous period" }).click();
+            await page.getByLabel("View", { exact: true }).selectOption("month");
+            await page.getByRole("button", { name: "Next period" }).click();
+          } else await page.getByRole("button", { name: /^month$/i }).click();
+          expect(await page.evaluate(() => new Date(2011, 11, 30).getDate())).toBe(31);
+          const day = page.locator('[data-day="2011-12-29"]');
+          await day.scrollIntoViewIfNeeded();
+          const bounds = await day.boundingBox();
+          if (!bounds) throw new Error("Missing day before skipped date");
+          await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + 10);
+          await page.mouse.down();
+          await expect
+            .poll(() => page.locator('[data-slot="createGhost"]').allTextContents())
+            .toEqual(["Draft: Dec 29"]);
+          await page.mouse.up();
+        },
+        1100,
+        false,
+        new Date("2011-12-26T12:00:00Z"),
+        "Pacific/Apia",
+      );
+    },
+  );
+
+  it.each(["/dom/", "/solid/"].flatMap((path) => [23, 24].map((day) => ({ path, day }))))(
+    "labels a one-day draft on April $day around a midnight clock change on $path",
+    async ({ path, day: dayNumber }) => {
+      await checkPage(
+        path,
+        async (page) => {
+          if (path === "/solid/") {
+            await page.getByLabel("View", { exact: true }).selectOption("month");
+            // The Solid example starts in November 2026; navigate to April.
+            for (let month = 0; month < 7; month++)
+              await page.getByRole("button", { name: "Previous period" }).click();
+          } else await page.getByRole("button", { name: /^month$/i }).click();
+          expect(await page.evaluate(() => new Date(2026, 3, 24).getHours())).toBe(1);
+          const day = page.locator(`[data-day="2026-04-${dayNumber}"]`);
+          await day.scrollIntoViewIfNeeded();
+          const bounds = await day.boundingBox();
+          if (!bounds) throw new Error("Missing midnight-transition day");
+          await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + 10);
+          await page.mouse.down();
+          await expect
+            .poll(() => page.locator('[data-slot="createGhost"]').allTextContents())
+            .toEqual([`Draft: Apr ${dayNumber}`]);
+          const ghost = await page.locator('[data-slot="createGhost"]').boundingBox();
+          if (!ghost) throw new Error("Missing midnight-transition draft");
+          expect(ghost.x).toBeGreaterThanOrEqual(bounds.x - 1);
+          expect(ghost.x + ghost.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1);
+          expect(ghost.width).toBeGreaterThan(bounds.width / 2);
+          await page.mouse.up();
+        },
+        1100,
+        false,
+        new Date("2026-04-23T12:00:00Z"),
+        "Africa/Cairo",
+      );
+    },
+  );
+
   it.each(
     (["month", "multiweek"] as const).flatMap((mode) => [
       {
@@ -207,6 +277,47 @@ describe("published demos", () => {
       );
     },
   );
+
+  it.each(
+    ["/dom/", "/solid/"].flatMap((path) => ["month", "multiweek"].map((mode) => ({ path, mode }))),
+  )("shows live $mode date previews on $path", async ({ path, mode }) => {
+    await checkPage(
+      path,
+      async (page) => {
+        if (path === "/solid/") await page.getByLabel("View", { exact: true }).selectOption(mode);
+        else await page.getByRole("button", { name: new RegExp(`^${mode}$`, "i") }).click();
+        const first = page.locator('[data-day="2026-11-06"]');
+        const last = page.locator('[data-day="2026-11-11"]');
+        await first.scrollIntoViewIfNeeded();
+        const origin = await first.boundingBox();
+        const target = await last.boundingBox();
+        if (!origin || !target) throw new Error("Missing month day bounds");
+        await page.mouse.move(origin.x + origin.width / 2, origin.y + 10);
+        await page.mouse.down();
+        const ghost = page.locator('[data-slot="createGhost"]');
+        await expect.poll(() => ghost.allTextContents()).toEqual(["Draft: Nov 6"]);
+        await page.mouse.move(target.x + target.width / 2, target.y + 10, { steps: 8 });
+        await expect
+          .poll(() => ghost.allTextContents())
+          .toEqual(["Draft: Nov 6 to Nov 11", "Draft: Nov 6 to Nov 11"]);
+        expect(
+          await ghost.evaluateAll((elements) =>
+            elements.every(
+              (el) => el.hasAttribute("inert") && el.getAttribute("aria-hidden") === "true",
+            ),
+          ),
+        ).toBe(true);
+        await page.mouse.up();
+        await expect.poll(() => ghost.count()).toBe(0);
+        await expect
+          .poll(() => page.getByRole("button", { name: /^(✨ )?New event,/ }).count())
+          .toBe(2);
+      },
+      1100,
+      false,
+      new Date(2026, 10, 2, 12),
+    );
+  });
 
   it("scrolls the native-web multi-week rows with a quick touch swipe", async () => {
     await checkPage(
