@@ -178,6 +178,8 @@ drag-to-create behavior. See the [DOM guide](https://super-calendar.afonsojramos
 The drag-to-create preview snaps to the same range as `onCreateEvent`, starting
 with one slot on press. It stays within the visible hours of the pressed column,
 with its border inside the column. `dragStepMinutes` sets the snap interval.
+Short previews use `minEventHeight`, like committed events. Clipping to the
+visible hours takes priority at the column edges.
 
 `TimeGrid` completes creation on pointer release even if capture is lost just
 before it. Capture loss without a matching release and pointer cancellation

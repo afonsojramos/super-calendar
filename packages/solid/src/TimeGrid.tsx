@@ -136,6 +136,7 @@ function createRangePlacement(
   hourHeight: number,
   minHour: number,
   gridHeight: number,
+  minEventHeight: number,
 ) {
   // Use wall-clock positions, including midnight on the following day. Elapsed
   // milliseconds would shift the preview on daylight-saving transitions.
@@ -146,7 +147,7 @@ function createRangePlacement(
       minHour) *
     hourHeight;
   const top = at(range.start);
-  return createPreviewPlacement(top, at(range.end) - top, gridHeight);
+  return createPreviewPlacement(top, Math.max(minEventHeight, at(range.end) - top), gridHeight);
 }
 
 // Edge auto-advance: how close to the day-columns edge (px) counts as "at the
@@ -2294,6 +2295,7 @@ export function TimeGrid<T = unknown>(
                       hourHeight(),
                       windowStart(),
                       totalHeight(),
+                      props.minEventHeight ?? DEFAULT_MIN_EVENT_HEIGHT,
                     );
                   const current = ghost();
                   return current
