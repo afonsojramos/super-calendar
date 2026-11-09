@@ -399,6 +399,11 @@ inside the column.
 />
 ```
 
+`MonthView`, `MultiWeekView`, and `Calendar` in month and multi-week modes also
+support `renderCreateGhost` in every renderer. The content receives the full
+all-day range with an exclusive end, once per covered row. It uses the
+`createGhost` slot and chip dimensions, and requires `onCreateEvent`.
+
 To show a draft in the preview while it is swept, pass a `renderCreateGhost`
 component. It receives `start` and `end`, the range `onCreateEvent` would get if
 released now, and the calendar clips it to the preview. It needs

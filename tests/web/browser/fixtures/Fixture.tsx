@@ -253,7 +253,26 @@ export function Fixture() {
           </button>
         ) : null}
       </nav>
-      {view.startsWith("multiweek") || view === "month-drag" ? (
+      {view.startsWith("month-draft") || view.startsWith("multiweek-draft") ? (
+        <Calendar
+          mode={view.startsWith("month-draft") ? "month" : "multiweek"}
+          date={anchor}
+          events={events()}
+          weekStartsOn={1}
+          numberOfWeeks={2}
+          chipHeight={28}
+          maxVisibleEventCount={3}
+          renderCreateGhost={view.endsWith("focus") ? FocusingDraft : Draft}
+          classNames={view.endsWith("custom") ? { createGhost: "fixture-ghost" } : undefined}
+          onCreateEvent={(start, end) => {
+            record(`${clock(start)}-${clock(end)}`);
+            setEvents((current) => [
+              ...current,
+              { id: current.length, title: "Created", start, end, allDay: true },
+            ]);
+          }}
+        />
+      ) : view.startsWith("multiweek") || view === "month-drag" ? (
         <Calendar
           mode={view === "month-drag" ? "month" : "multiweek"}
           date={date() ?? anchor}

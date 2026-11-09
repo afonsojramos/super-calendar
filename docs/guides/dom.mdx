@@ -64,6 +64,11 @@ The drag-to-create preview stays within the visible hours of the pressed column,
 with its border inside the column. See
 [Drag to create](/guides/dragging#drag-to-create).
 
+`MonthView`, `MultiWeekView`, and `Calendar` in month and multi-week modes also
+support `renderCreateGhost` in every renderer. The content receives the full
+all-day range with an exclusive end, once per covered row. It uses the
+`createGhost` slot and chip dimensions, and requires `onCreateEvent`.
+
 Pass `renderCreateGhost` to `TimeGrid`, `Calendar`, or `ResourceTimeline` to draw
 a draft inside that preview. It receives the live `start` and `end` that
 `onCreateEvent` would get on release. See

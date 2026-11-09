@@ -24,6 +24,7 @@ import {
   buildMonthGrid,
   buildMultiWeekGrid,
   type CalendarEvent,
+  type CreateGhostArgs,
   compareDayEvents,
   dayBadgeKind,
   type DateRange,
@@ -48,6 +49,7 @@ import {
   resolveCalendarLabels,
 } from "@super-calendar/core";
 import { holdDateDrag } from "./touch";
+import { InertDiv } from "./InertDiv";
 import { createSlots, dataState, type SlotDefault, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
@@ -65,6 +67,7 @@ export type MonthViewSlot =
   | "dayBadge"
   | "rangeBand"
   | "events"
+  | "createGhost"
   | "chipButton"
   | "chip"
   | "more"
@@ -194,6 +197,12 @@ export interface MonthViewProps<T = unknown>
    * carry `data-creating` for styling.
    */
   onCreateEvent?: (start: Date, end: Date) => void;
+  /**
+   * Custom content for a drag-to-create preview, once per covered week row.
+   * Receives the full all-day range with an exclusive end. Requires onCreateEvent.
+   * Content is clipped, noninteractive, and hidden from assistive technology.
+   */
+  renderCreateGhost?: ComponentType<CreateGhostArgs>;
   /**
    * Reports the day span of a create sweep **as it happens**, as the ordered
    * inclusive `[start, end]` days (both at midnight), so a selection highlight can
@@ -580,6 +589,7 @@ export function DateRows<T = unknown>({
   onPressDay,
   onPressCell,
   onCreateEvent,
+  renderCreateGhost: RenderCreateGhost,
   onSelectDrag,
   onDragEvent,
   onDragStart,
@@ -605,7 +615,8 @@ export function DateRows<T = unknown>({
   // Calendar layout (date in the corner + event chips) is on whenever `events`
   // is provided; otherwise the compact picker badge layout is used. Multi-week
   // rows always use the calendar layout.
-  const eventsMode = events !== undefined || multiWeek;
+  const createContentEnabled = onCreateEvent != null && RenderCreateGhost != null;
+  const eventsMode = events !== undefined || multiWeek || createContentEnabled;
   // The day cells form a roving tab stop (arrow keys + Enter) in the picker
   // always, and in events mode only when the consumer opts in. Otherwise events
   // mode tabs through the event chips alone.
@@ -841,6 +852,15 @@ export function DateRows<T = unknown>({
     dragRef.current = next;
     setDrag(next);
   }, []);
+  const createStart = drag?.kind === "create" ? drag.anchor : null;
+  const createEnd = drag?.kind === "create" ? drag.hover : null;
+  const createRange = useMemo(
+    () =>
+      createContentEnabled && createStart !== null && createEnd !== null
+        ? monthCreateRange(new Date(createStart), new Date(createEnd))
+        : null,
+    [createContentEnabled, createStart, createEnd],
+  );
   const movedRef = useRef(false);
   // Set when a drag commits, so the click the browser fires next is swallowed (it
   // must not also open the day, or the event the drag landed on). A drag that ends
@@ -1186,6 +1206,23 @@ export function DateRows<T = unknown>({
               };
             })
             .filter((b) => b.startCol <= b.endCol);
+          const draftColumns = createRange
+            ? week.days.flatMap((day, index) =>
+                (!showAdjacentMonths && isOutsidePeriod(day)) ||
+                day.date < createRange.start ||
+                day.date >= createRange.end
+                  ? []
+                  : [index],
+              )
+            : [];
+          const draftStart = draftColumns[0];
+          const draftEnd = draftColumns.at(-1);
+          const draftTop =
+            CELL_PAD +
+            DATE_ROW +
+            chipGap +
+            Math.min(visibleLanes, Math.max(0, maxVisibleEventCount - 1)) * (chipHeight + chipGap);
+          const draftHeight = Math.min(chipHeight, Math.max(0, eventRowHeight - draftTop));
           const barChipButton = slot("chipButton", chipButtonDefault);
           const barChip = slot("chip", chipDefault(theme, chipHeight));
           return (
@@ -1420,6 +1457,38 @@ export function DateRows<T = unknown>({
                             </button>
                           );
                         })}
+                      {RenderCreateGhost &&
+                      createRange &&
+                      draftStart === dayCol &&
+                      draftEnd !== undefined &&
+                      draftHeight > 0 ? (
+                        <InertDiv
+                          {...slot("createGhost", {
+                            base: {
+                              position: "absolute",
+                              left: 2,
+                              width: `calc(${(draftEnd - draftStart + 1) * 100}% - 4px)`,
+                              top: draftTop,
+                              height: draftHeight,
+                              boxSizing: "border-box",
+                              pointerEvents: "none",
+                              overflow: "hidden",
+                              zIndex: 3,
+                            },
+                            themed: {
+                              background: theme.rangeBackground,
+                              border: `1px solid ${theme.selectedBackground}`,
+                              borderRadius: 4,
+                              fontSize: 12,
+                              color: theme.text,
+                            },
+                          })}
+                          inert
+                          aria-hidden="true"
+                        >
+                          <RenderCreateGhost start={createRange.start} end={createRange.end} />
+                        </InertDiv>
+                      ) : null}
                       <div
                         {...slot("events", {
                           base: { display: "flex", flexDirection: "column", gap: chipGap },
