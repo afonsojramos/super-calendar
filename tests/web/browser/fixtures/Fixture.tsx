@@ -273,6 +273,7 @@ export function Fixture() {
           }
           keyboardDayNavigation
           onChangeDate={setDate}
+          onPressEvent={(event) => record(`press:${event.title}`)}
           onCreateEvent={(start, end) => record(`${clock(start)}-${clock(end)}`)}
           onDragEvent={(event, start, end) => {
             record(`${event.title}@${clock(start)}-${clock(end)}`);

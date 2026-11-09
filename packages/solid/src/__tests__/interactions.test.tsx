@@ -260,7 +260,8 @@ describe("Solid month interactions", () => {
     day.dispatchEvent(new PointerEvent("pointerenter", { pointerId: 1 }));
     flush();
     pointer(window, "up");
-    click(chip);
+    chip.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+    flush();
     expect(onDragEvent).toHaveBeenCalledTimes(1);
     expect(onDragEvent.mock.calls[0][1].getDate()).toBe(16);
     expect(onPressEvent).not.toHaveBeenCalled();

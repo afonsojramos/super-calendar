@@ -868,10 +868,11 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
   const suppressClickRef = {
     current: false,
   };
-  const consumeSuppressedClick = () => {
+  // Keyboard and assistive-technology clicks have detail 0 and never trail a drag.
+  const consumeSuppressedClick = (detail: number) => {
     if (!suppressClickRef.current) return false;
     suppressClickRef.current = false;
-    return true;
+    return detail !== 0;
   };
   // `disabled` and `draggable: false` lock an event outright; `startEditable`
   // (per event, falling back to the grid default) allows or blocks a move.
@@ -1504,8 +1505,8 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                           onClick={
                                             day().isDisabled
                                               ? undefined
-                                              : () => {
-                                                  if (consumeSuppressedClick()) return;
+                                              : (e) => {
+                                                  if (consumeSuppressedClick(e.detail)) return;
                                                   props.onPressDay?.(day().date);
                                                   props.onPressCell?.(startOfDay(day().date));
                                                 }
@@ -1581,7 +1582,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                     }
                                                     onClick={(e) => {
                                                       e.stopPropagation();
-                                                      if (consumeSuppressedClick()) return;
+                                                      if (consumeSuppressedClick(e.detail)) return;
                                                       props.onPressEvent?.(b().seg.event);
                                                     }}
                                                     {...barChipButton()}

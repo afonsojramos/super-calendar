@@ -571,7 +571,7 @@ describe(rendererName, () => {
         fireEvent.pointerDown(chip, { button: 0 });
         fireEvent.pointerEnter(dayCell(container, "2026-07-09"));
         fireEvent.pointerUp(window);
-        fireEvent.click(chip);
+        fireEvent.click(chip, { detail: 1 });
         expect(onDragEvent).toHaveBeenCalledTimes(1);
         expect(onPressEvent).not.toHaveBeenCalled();
       });

@@ -1,5 +1,12 @@
 import { vi } from "vitest";
-import { MonthView, MultiWeekView, fireEvent, render, rendererName } from "@calendar-test/renderer";
+import {
+  MonthView,
+  MultiWeekView,
+  act,
+  fireEvent,
+  render,
+  rendererName,
+} from "@calendar-test/renderer";
 
 const date = new Date(2026, 6, 15);
 const day = (container: HTMLElement, number: number) =>
@@ -56,6 +63,76 @@ describe(rendererName, () => {
         new Date(2026, 6, 15),
         new Date(2026, 6, 17),
       );
+    });
+    it("commits the latest day when movement and release share a render batch", () => {
+      const onCreateEvent = vi.fn();
+      const view = render(mode === "month" ? MonthView : MultiWeekView, {
+        date,
+        events: [],
+        onCreateEvent,
+      });
+      press(day(view.container, 17));
+      act(() => {
+        move(day(view.container, 15));
+        move(day(view.container, 22));
+        release();
+      });
+      expect(onCreateEvent).toHaveBeenCalledExactlyOnceWith(
+        new Date(2026, 6, 17),
+        new Date(2026, 6, 23),
+      );
+    });
+    it.each(["Escape", "pointercancel"])(
+      "preserves keyboard activation after %s cancels a move",
+      (reason) => {
+        const event = {
+          title: "Existing",
+          start: new Date(2026, 6, 15),
+          end: new Date(2026, 6, 16),
+          allDay: true,
+        };
+        const onPressEvent = vi.fn();
+        const onDragEvent = vi.fn();
+        const view = render(mode === "month" ? MonthView : MultiWeekView, {
+          date,
+          events: [event],
+          onDragEvent,
+          onPressEvent,
+        });
+        const chip = view.getByRole("button", { name: /^Existing,/ });
+        press(chip);
+        move(day(view.container, 16));
+        if (reason === "Escape") fireEvent.keyDown(window, { key: "Escape" });
+        else fireEvent.pointerCancel(window, { pointerId: 7 });
+        release();
+        fireEvent.click(chip, { detail: 0 });
+        expect(onDragEvent).not.toHaveBeenCalled();
+        expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(event);
+      },
+    );
+    it("suppresses the pointer click trailing a cancelled move", () => {
+      const event = {
+        title: "Existing",
+        start: new Date(2026, 6, 15),
+        end: new Date(2026, 6, 16),
+        allDay: true,
+      };
+      const onPressEvent = vi.fn();
+      const view = render(mode === "month" ? MonthView : MultiWeekView, {
+        date,
+        events: [event],
+        onDragEvent: vi.fn(),
+        onPressEvent,
+      });
+      const chip = view.getByRole("button", { name: /^Existing,/ });
+      press(chip);
+      move(day(view.container, 16));
+      fireEvent.keyDown(window, { key: "Escape" });
+      release();
+      fireEvent.click(chip, { detail: 1 });
+      expect(onPressEvent).not.toHaveBeenCalled();
+      fireEvent.click(chip, { detail: 0 });
+      expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(event);
     });
     it("cancels an event move on Escape", () => {
       const event = {

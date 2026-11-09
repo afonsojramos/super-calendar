@@ -381,7 +381,7 @@ enable: pass `onCreateEvent`, `onDragEvent`, or both.
 
 In React DOM and Solid month and multi-week grids, **Escape** or cancellation
 of the active pointer ends a create or move gesture without calling its commit
-handler. Other pointers cannot finish or cancel the active gesture.
+handler. Release and cancellation events from other pointers do not end the active gesture.
 
 ### Drag to create a day span
 

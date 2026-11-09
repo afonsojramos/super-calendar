@@ -2,6 +2,28 @@ import { describe, expect, it } from "vitest";
 import { box, open, page, rendererName } from "../session";
 
 describe(rendererName, () => {
+  it.each(["month-drag", "multiweek"])(
+    "keeps keyboard event activation after cancelling a %s move",
+    async (view) => {
+      await open(view);
+      const chip = page.getByRole("button", { name: /^Planning,/ });
+      const origin = await chip.boundingBox();
+      if (!origin) throw new Error("Missing event chip bounds");
+      const target = await box('[data-day="2026-07-22"]');
+      await page.mouse.move(origin.x + origin.width / 2, origin.y + origin.height / 2);
+      await page.mouse.down();
+      // WebKit does not focus a button on pointerdown; establish the focused drag first.
+      await chip.focus();
+      await page.mouse.move(target.x + target.width / 2, target.y + 10, { steps: 8 });
+      await expect.poll(() => page.locator("[data-day][data-drop]").count()).toBe(1);
+      await page.keyboard.press("Escape");
+      await page.mouse.up();
+      expect(await page.getByLabel("Calls").textContent()).toBe("[]");
+      expect(await chip.evaluate((element) => document.activeElement === element)).toBe(true);
+      await page.keyboard.press("Enter");
+      await expect.poll(() => page.getByLabel("Calls").textContent()).toBe('["press:Planning"]');
+    },
+  );
   it.each(
     ["month-drag", "multiweek"].flatMap((view) =>
       ["Escape", "pointercancel", "other pointer"].map((reason) => ({ view, reason })),
