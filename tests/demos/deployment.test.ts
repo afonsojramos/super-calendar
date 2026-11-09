@@ -140,6 +140,11 @@ describe("published demos", () => {
           await expect
             .poll(() => page.locator('[data-slot="createGhost"]').allTextContents())
             .toEqual([`Draft: Apr ${dayNumber}`]);
+          const ghost = await page.locator('[data-slot="createGhost"]').boundingBox();
+          if (!ghost) throw new Error("Missing midnight-transition draft");
+          expect(ghost.x).toBeGreaterThanOrEqual(bounds.x - 1);
+          expect(ghost.x + ghost.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1);
+          expect(ghost.width).toBeGreaterThan(bounds.width / 2);
           await page.mouse.up();
         },
         1100,
