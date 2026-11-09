@@ -10,6 +10,7 @@ export default defineConfig({
         environment: "node",
         pool: "forks",
         include: [
+          "tests/web/browser/contracts/all-day-spans.test.ts",
           "tests/web/browser/contracts/create-content.test.ts",
           "tests/web/browser/contracts/chromium/create-release.test.ts",
           "tests/web/browser/contracts/create-snap.test.ts",

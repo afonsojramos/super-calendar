@@ -9,6 +9,15 @@ This package targets `solid-js@2.0.0-rc.20` and
 Its version follows the other calendar packages, and releases use the `latest`
 npm tag.
 
+## All-day spans
+
+In the time grid, an all-day event renders once as a bar across the visible
+dates it covers. Overlapping events stack on separate rows. The end is
+exclusive, and hidden days take no width. `renderEvent` and press callbacks
+receive the original event; `continuesBefore` and `continuesAfter` indicate
+clipping at the visible range edges. The `allDayColumn` slot styles one
+spanning cell. Timed events that cross midnight keep their per-day segments.
+
 ## Install
 
 ```sh
@@ -93,6 +102,11 @@ to keep editing across full data refreshes. Return a stable, unique string or
 number per event or recurring occurrence. Missing, invalid, or duplicate IDs
 close the dialog. Without this prop, full refreshes close it. See
 [Move and resize actions](https://super-calendar.afonsojramos.me/guides/accessibility#move-and-resize-actions-web).
+
+In time grids, `getEventId` also preserves all-day focus and renderer state when
+a refresh replaces event objects. Bars without a valid, unique ID use object
+identity and remount when that object changes.
+
 Removing a resource cancels creation in its lane. `TimeGrid` completes creation
 on pointer release even if capture is lost just before it. Capture loss without
 a matching release and pointer cancellation cancel its creation sweep. A new

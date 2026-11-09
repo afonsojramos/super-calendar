@@ -15,6 +15,38 @@ type FixtureEvent = CalendarEvent<{ id: number }>;
 const initialEvents: FixtureEvent[] = [
   { id: 0, title: "Planning", start: new Date(2026, 6, 15, 9), end: new Date(2026, 6, 15, 10) },
 ];
+const allDayEvents: FixtureEvent[] = [
+  { id: 0, title: "Trip", start: new Date(2026, 6, 14), end: new Date(2026, 6, 17), allDay: true },
+  {
+    id: 1,
+    title: "Overlap",
+    start: new Date(2026, 6, 15),
+    end: new Date(2026, 6, 18),
+    allDay: true,
+  },
+  {
+    id: 2,
+    title: "Single",
+    start: new Date(2026, 6, 13),
+    end: new Date(2026, 6, 14),
+    allDay: true,
+  },
+  {
+    id: 3,
+    title: "Before",
+    start: new Date(2026, 6, 11),
+    end: new Date(2026, 6, 14),
+    allDay: true,
+  },
+  { id: 4, title: "After", start: new Date(2026, 6, 18), end: new Date(2026, 6, 22), allDay: true },
+  {
+    id: 5,
+    title: "Overnight",
+    start: new Date(2026, 6, 14, 21),
+    end: new Date(2026, 6, 15, 10),
+    allDay: false,
+  },
+];
 const recurringEvents: FixtureEvent[] = [
   { ...initialEvents[0], recurrence: { freq: "daily", count: 1 } },
 ];
@@ -165,19 +197,23 @@ export function Fixture() {
     end: new Date(2026, 6, 16),
   });
   const [events, setEvents] = useFixtureState(
-    view === "multiweek-transformed"
-      ? recurringEvents
-      : view === "dense"
-        ? denseEvents
-        : view === "edit-clipped"
-          ? clippedEvents
-          : view === "edit-crowded"
-            ? crowdedEvents
-            : view === "edit-many" || (view.startsWith("multiweek") && view.endsWith("dense"))
-              ? manyEvents
-              : view === "edit"
-                ? editEvents
-                : initialEvents,
+    view.startsWith("all-day")
+      ? view.startsWith("all-day-repack")
+        ? [allDayEvents[0]]
+        : allDayEvents
+      : view === "multiweek-transformed"
+        ? recurringEvents
+        : view === "dense"
+          ? denseEvents
+          : view === "edit-clipped"
+            ? clippedEvents
+            : view === "edit-crowded"
+              ? crowdedEvents
+              : view === "edit-many" || (view.startsWith("multiweek") && view.endsWith("dense"))
+                ? manyEvents
+                : view === "edit"
+                  ? editEvents
+                  : initialEvents,
   );
   const [boardEvents, setBoardEvents] = useFixtureState(
     view.endsWith("crowded")
@@ -202,6 +238,24 @@ export function Fixture() {
         <button onClick={() => setRejecting((value) => !value)}>Toggle rejection</button>
         <button onClick={() => setOverlapping((value) => !value)}>Toggle overlap</button>
         <button onClick={() => setEditing((value) => !value)}>Toggle editing</button>
+        {view.startsWith("all-day-repack") ? (
+          <button
+            onClick={() =>
+              setEvents((current) => [
+                ...current,
+                {
+                  id: 6,
+                  title: "Earlier",
+                  start: new Date(2026, 6, 13),
+                  end: new Date(2026, 6, view.endsWith("overlap") ? 17 : 14),
+                  allDay: true,
+                },
+              ])
+            }
+          >
+            Insert earlier event
+          </button>
+        ) : null}
         <button
           onClick={() => {
             setEvents((current) => [...current].reverse());
@@ -271,6 +325,32 @@ export function Fixture() {
               { id: current.length, title: "Created", start, end, allDay: true },
             ]);
           }}
+        />
+      ) : view.startsWith("all-day") ? (
+        <TimeGrid<{ id: number }>
+          date={updated() ? new Date(2026, 6, 22) : anchor}
+          mode="week"
+          weekStartsOn={1}
+          height={260}
+          hiddenDays={view.endsWith("hidden") ? [0, 3, 6] : undefined}
+          events={
+            view.endsWith("long")
+              ? events().map((event) =>
+                  event.id === 0
+                    ? { ...event, title: `Trip${"QuarterlyCompanyOffsite".repeat(8)}` }
+                    : event,
+                )
+              : events()
+          }
+          showAllDayLabel
+          getEventId={view.endsWith("stable") ? (event) => event.id : undefined}
+          hideHours={view.endsWith("no-hours")}
+          classNames={
+            view.endsWith("classed")
+              ? { allDayColumn: "all-day-cell", allDayEvent: "all-day-event" }
+              : undefined
+          }
+          onPressEvent={(event) => record(`press:${event.title}`)}
         />
       ) : view.startsWith("multiweek") || view === "month-drag" ? (
         <Calendar

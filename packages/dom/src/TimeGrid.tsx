@@ -54,6 +54,7 @@ import {
   isSameCalendarDay,
   isWeekend,
   layoutDayEvents,
+  layoutMonthWeek,
   overlapsOtherEvents,
   type PositionedEvent,
   useNow,
@@ -181,9 +182,9 @@ export interface DomRenderEventArgs<T = unknown> {
   isAllDay: boolean;
   /** Pixel height of the event box (timed events only). */
   boxHeight?: number;
-  /** The event started before the visible day and continues into it. */
+  /** Starts before the visible day (timed) or visible date range (all-day). */
   continuesBefore?: boolean;
-  /** The event continues past the visible day. */
+  /** Ends after the visible day (timed) or visible date range (all-day). */
   continuesAfter?: boolean;
   /** Show the time range in 12-hour AM/PM. */
   ampm?: boolean;
@@ -341,7 +342,7 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
    * Return `false` to reject the drop (the event snaps back).
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
-  /** Stable, unique event identity for the web editing dialog across data refreshes. */
+  /** Stable, unique identity for the editing dialog and all-day bars across data refreshes. */
   getEventId?: (event: CalendarEvent<T>) => string | number;
   /**
    * Page the grid to a new anchor date. Supplying it alongside `onDragEvent`
@@ -823,20 +824,50 @@ function TimeGridInner<T = unknown>(
     getEventId,
   );
 
-  const allDayByDay = useMemo(
-    // A multi-day all-day event shows in every column it overlaps (matching the
-    // native AllDayLane), not just its start day.
+  const allDayLayout = useMemo(
     () =>
-      days.map((day) => {
-        const dayStart = startOfDay(day);
-        const dayEnd = addDays(dayStart, 1);
-        return events.filter(
-          (e) => isAllDayEvent(e) && !isBackgroundEvent(e) && e.start < dayEnd && e.end > dayStart,
-        );
-      }),
+      layoutMonthWeek(
+        days,
+        events.filter(
+          (event) =>
+            isAllDayEvent(event) &&
+            !isBackgroundEvent(event) &&
+            days.some(
+              (day) => event.start < addDays(startOfDay(day), 1) && event.end > startOfDay(day),
+            ),
+        ),
+      ),
     [days, events],
   );
-  const hasAllDay = allDayByDay.some((list) => list.length > 0);
+  const hasAllDay = allDayLayout.segments.length > 0;
+  const allDayIds = useMemo(() => {
+    const keys = new Map<CalendarEvent<T>, string>();
+    const seen = new Map<string, CalendarEvent<T>>();
+    for (const { event } of allDayLayout.segments) {
+      const id = getEventId?.(event);
+      if (typeof id !== "string" && typeof id !== "number") continue;
+      const key = `${typeof id}:${id}`;
+      const previous = seen.get(key);
+      if (previous) keys.delete(previous);
+      else {
+        seen.set(key, event);
+        keys.set(event, key);
+      }
+    }
+    return keys;
+  }, [allDayLayout, getEventId]);
+  const allDayKeys = useRef(new WeakMap<CalendarEvent<T>, number>());
+  const nextAllDayKey = useRef(0);
+  const allDayKey = (event: CalendarEvent<T>) => {
+    const id = allDayIds.get(event);
+    if (id !== undefined) return id;
+    let key = allDayKeys.current.get(event);
+    if (key === undefined) {
+      key = nextAllDayKey.current++;
+      allDayKeys.current.set(event, key);
+    }
+    return `object:${key}`;
+  };
 
   useEffect(() => {
     // On mount / when the offset prop changes, not on every zoom (hence the ref).
@@ -1855,87 +1886,93 @@ function TimeGridInner<T = unknown>(
               base: {
                 width: gutterWidth,
                 flex: "none",
+                boxSizing: "border-box",
                 minWidth: 0,
                 overflow: "hidden",
                 textAlign: "right",
               },
-              themed: { fontSize: 10, color: theme.textMuted, padding: "4px 6px 0 0" },
+              themed: {
+                fontSize: 10,
+                color: theme.textMuted,
+                padding: hideHours ? 0 : "4px 6px 0 0",
+              },
             })}
           >
             {showAllDayLabel ? labels.allDay : null}
           </div>
-          {allDayByDay.map((list, i) => {
-            const dayStart = startOfDay(days[i]);
-            const dayEnd = addDays(dayStart, 1);
-            return (
-              <div
-                key={days[i].toISOString()}
-                {...slot("allDayColumn", {
-                  base: {
-                    flex: 1,
-                    minWidth: 0,
-                    // Mirror the day column's geometry so the all-day chip lines up
-                    // exactly with the timed events below it: a 1px left border (the
-                    // grid line, transparent here) plus a 1px horizontal inset.
-                    borderLeft: "1px solid transparent",
-                    padding: "2px 1px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 2,
-                  },
-                })}
-              >
-                {list.map((event) => {
-                  const args: DomRenderEventArgs<T> = {
-                    event,
-                    mode,
-                    isAllDay: true,
-                    // Whether this all-day event continues into the previous/next
-                    // column, so custom renderers can draw continuation affordances.
-                    continuesBefore: event.start < dayStart,
-                    continuesAfter: event.end > dayEnd,
-                    ampm,
-                    onPress: () => onPressEvent?.(event),
-                  };
-                  return (
-                    <button
-                      key={`${event.start.toISOString()}:${event.title}`}
-                      type="button"
-                      onClick={() => onPressEvent?.(event)}
-                      aria-label={
-                        eventAccessibilityLabel
-                          ? eventAccessibilityLabel(event, { mode, isAllDay: true, ampm })
-                          : defaultEventAccessibilityLabel({
-                              title: event.title,
-                              isAllDay: true,
-                              start: event.start,
-                              end: event.end,
-                              ampm,
-                              labels,
-                            })
-                      }
-                      {...slot("allDayEvent", {
-                        base: {
-                          border: "none",
-                          padding: 0,
-                          background: "transparent",
-                          cursor: "pointer",
-                          textAlign: "left",
-                          height: 22,
-                        },
-                      })}
-                    >
-                      {Renderer ? (
-                        <Renderer {...args} />
-                      ) : (
-                        <DefaultDomEvent {...args} theme={theme} boxProps={slot("eventBox")} />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })}
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              display: "grid",
+              gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))`,
+              gap: "2px 0",
+              padding: "2px 0",
+            }}
+          >
+            {allDayLayout.segments.map((segment) => {
+              const { event, startCol, endCol, lane, continuesBefore, continuesAfter } = segment;
+              const args: DomRenderEventArgs<T> = {
+                event,
+                mode,
+                isAllDay: true,
+                continuesBefore,
+                continuesAfter,
+                ampm,
+                onPress: () => onPressEvent?.(event),
+              };
+              return (
+                <div
+                  key={allDayKey(event)}
+                  {...slot("allDayColumn", {
+                    base: {
+                      gridColumn: `${startCol + 1} / span ${endCol - startCol + 1}`,
+                      gridRow: lane + 1,
+                      minWidth: 0,
+                      // Match the timed columns' grid line and horizontal inset.
+                      borderLeft: "1px solid transparent",
+                      padding: "0 1px",
+                      display: "flex",
+                      flexDirection: "column",
+                    },
+                  })}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onPressEvent?.(event)}
+                    aria-label={
+                      eventAccessibilityLabel
+                        ? eventAccessibilityLabel(event, { mode, isAllDay: true, ampm })
+                        : defaultEventAccessibilityLabel({
+                            title: event.title,
+                            isAllDay: true,
+                            start: event.start,
+                            end: event.end,
+                            ampm,
+                            labels,
+                          })
+                    }
+                    {...slot("allDayEvent", {
+                      base: {
+                        border: "none",
+                        padding: 0,
+                        background: "transparent",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        height: 22,
+                      },
+                    })}
+                  >
+                    {Renderer ? (
+                      <Renderer {...args} />
+                    ) : (
+                      <DefaultDomEvent {...args} theme={theme} boxProps={slot("eventBox")} />
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : null}
 

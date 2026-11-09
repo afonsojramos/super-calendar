@@ -67,8 +67,8 @@ export type RenderEventArgs<T = unknown> = {
   boxHeight?: SharedValue<number>;
   /**
    * On the week/day grid, true when this is a clipped segment of a multi-day
-   * event that started on an earlier day / continues onto a later day. Lets a
-   * renderer draw "continues" affordances. `undefined` in month mode.
+   * timed event. For an all-day bar, these flags refer to the visible date
+   * range instead. Lets a renderer draw "continues" affordances.
    */
   continuesBefore?: boolean;
   continuesAfter?: boolean;

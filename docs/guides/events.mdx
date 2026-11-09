@@ -27,7 +27,10 @@ const events: CalendarEvent<Meta>[] = [
 ```
 
 - `allDay` lays the event out in the all-day lane above the grid instead of in
-  the columns. It's also inferred for midnight-to-midnight spans. Pass
+  the columns. Each event forms one bar across the visible dates it covers,
+  with overlapping events stacked on separate rows in all three renderers.
+  The end is exclusive, so a midnight end does not cover the next day.
+  It's also inferred for midnight-to-midnight spans. Pass
   `showAllDayEventCell={false}` to hide the lane entirely (its events won't show).
   In the `schedule` view (which has no lane) an all-day event reads "All day"
   instead of a time range; override the wording with `allDayLabel` (e.g. for a
@@ -37,8 +40,12 @@ const events: CalendarEvent<Meta>[] = [
   resize (see the [drag guide](/guides/dragging)).
 - `dragHandleColor` overrides the resize grip colour for an event in the native
   time grid and resource timeline. It defaults to `theme.colors.eventText`.
-- Multi-day events draw as one continuous bar across the days they span in the
-  month view, and as a per-day clipped segment on the week/day time grid.
+- Multi-day events draw as one continuous bar in month view. Timed events
+  spanning midnight keep a clipped segment in each day of the week/day grid.
+  All-day bars span the covered visible columns, including across hidden days.
+  Their `continuesBefore` and `continuesAfter` renderer hints describe clipping
+  at the visible range edges, rather than at each day. The renderer and press
+  callbacks receive the original event.
 
 Multi-day events remain visible on each occupied day in month and multi-week
 grids, including when a local clock change skips midnight. An event ending at
@@ -59,6 +66,11 @@ state updates from rebuilding `events`, including inline copies such as
 `events={[...events]}`. A data refresh can still cancel an active move safely.
 The native `keyExtractor` controls rendering keys; it does not reconnect a held gesture
 to a replacement event.
+
+In React DOM and Solid time grids, pass `getEventId` to preserve all-day focus
+and renderer state across refreshed objects. IDs must be stable, unique strings
+or numbers. Without a valid, unique ID, bars use object identity. Native uses
+`keyExtractor` for this purpose.
 
 ## Render your own event
 

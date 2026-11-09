@@ -731,22 +731,6 @@ describe(rendererName, () => {
       expect((onPressCell.mock.calls[0][0] as Date).getHours()).toBe(2);
     });
 
-    it("spreads a multi-day all-day event across every column it covers", () => {
-      const wed = new Date(2026, 6, 15); // week (Mon start) = Jul 13–19
-      const trip: CalendarEvent[] = [
-        { title: "Trip", start: new Date(2026, 6, 14), end: new Date(2026, 6, 17), allDay: true },
-      ];
-      const { getAllByText } = render(TimeGrid, {
-        date: wed,
-        mode: "week",
-        weekStartsOn: 1,
-        events: trip,
-        hourHeight: 48,
-      });
-      // Covers the 14th, 15th, 16th (end exclusive at midnight of the 17th).
-      expect(getAllByText("Trip")).toHaveLength(3);
-    });
-
     it("queries businessHours for each visible day", () => {
       const businessHours = vi.fn(() => ({ start: 9, end: 17 }));
       render(TimeGrid, { date: day, mode: "3days", weekStartsOn: 1, businessHours: businessHours });

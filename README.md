@@ -752,7 +752,8 @@ paging follows the system scroll direction — so enable React Native's
   handler covers every view; `onPressDay` still fires alongside it for drill-down.
 - **Long-press** mirrors every tap: `onLongPressEvent(event)`, `onLongPressCell(date)`
   (week/day), and `onLongPressDay(date)` (month). All optional.
-- **All-day events** render in a lane above the time grid (and as chips or
+- **All-day events** render as one bar across their covered visible dates in a
+  lane above the time grid, with overlapping bars on separate rows (and as chips or
   spanning bars in month cells), excluded from the timed columns. Mark an event `allDay: true`, or it's
   inferred when it spans whole days (midnight-to-midnight). `renderEvent` receives
   `isAllDay` so you can style the chip. The lane is hidden when there are none.
@@ -822,11 +823,12 @@ are also exported for advanced layouts:
 ## Notes & limitations
 
 - **Multi-day events** are supported: pass one event and it appears on every day
-  it spans. On the week/day grid each day shows the clipped segment (so a
+  it spans. On the week/day grid each timed event shows a clipped segment per day (so a
   23:00→01:00 event renders 23:00–24:00, then 00:00–01:00), and `renderEvent`
   receives `continuesBefore`/`continuesAfter` so you can draw continuation hints.
   All-day events (an explicit `allDay` flag or a midnight-to-midnight span) render
-  in a dedicated lane above the time grid.
+  once as a spanning bar in a dedicated lane above the time grid. Their
+  continuation hints describe clipping at the visible range edges.
 - **`weekStartsOn` defaults to `0` (Sunday).** Pass `1` for Monday-first.
 - **Controlled `date`.** The calendar is controlled: echo `onChangeDate` back
   into the `date` prop, or paging and the "today" realign won't track.

@@ -85,6 +85,44 @@ async function nativeMultiWeekGrid(page: Page) {
 }
 
 describe("published demos", () => {
+  it.each([320, 411, 900])(
+    "spans native all-day events across their dates at %ipx",
+    async (width) => {
+      await checkPage(
+        "/",
+        async (page) => {
+          await page.getByText("week", { exact: true }).click();
+          const trip = page.getByRole("button", { name: /Company offsite/ });
+          await expect.poll(() => trip.count()).toBe(1);
+          await trip.scrollIntoViewIfNeeded();
+          const bar = await trip.boundingBox();
+          const first = await page.getByLabel("Tuesday 10 November", { exact: true }).boundingBox();
+          const last = await page.getByLabel("Thursday 12 November", { exact: true }).boundingBox();
+          const overlap = await page.getByRole("button", { name: /Bank holiday/ }).boundingBox();
+          if (!bar || !first || !last || !overlap) throw new Error("Missing native all-day bounds");
+          expect(Math.abs(bar.x - first.x)).toBeLessThanOrEqual(2);
+          expect(Math.abs(bar.x + bar.width - (last.x + last.width))).toBeLessThanOrEqual(2);
+          expect(overlap.y).toBeGreaterThanOrEqual(bar.y + bar.height);
+          await page.getByRole("button", { name: "Next", exact: true }).click();
+          await expect
+            .poll(() =>
+              page.getByTestId("all-day-band").evaluateAll((bands) => {
+                const visible = bands
+                  .map((band) => band.getBoundingClientRect())
+                  .filter((bounds) => bounds.left >= 0 && bounds.right <= innerWidth);
+                return Math.max(0, ...visible.map((bounds) => bounds.height));
+              }),
+            )
+            .toBeLessThanOrEqual(1);
+        },
+        width,
+        false,
+        new Date("2026-11-09T12:00:00Z"),
+        "Europe/Madrid",
+      );
+    },
+  );
+
   it.each(["/dom/", "/solid/"])(
     "labels a one-day draft before a skipped date on %s",
     async (path) => {
