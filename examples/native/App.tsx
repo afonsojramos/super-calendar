@@ -1,7 +1,17 @@
 // Uniwind's CSS entry point: enables Tailwind classes on native components,
 // powering the "tailwind" demo tab.
 import "./global.css";
-import { addDays, addMonths, addWeeks, addYears, endOfMonth, format, startOfMonth } from "date-fns";
+import {
+  isSameDay,
+  addDays,
+  addMonths,
+  addWeeks,
+  addYears,
+  endOfMonth,
+  format,
+  startOfMonth,
+  startOfDay,
+} from "date-fns";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -23,6 +33,8 @@ import {
   Calendar,
   buildMultiWeekGrid,
   type CalendarEvent,
+  type CreateGhostArgs,
+  useCalendarTheme,
   type RenderEventArgs,
   type CalendarMode,
   type CalendarSlot,
@@ -38,6 +50,24 @@ import { type DateRange, MonthList, useDateRange } from "@super-calendar/native/
 import { EventMenuProvider, type EventMenuActions } from "@super-calendar/example-shared";
 import { buildEvents, type EventMeta } from "@super-calendar/example-shared/events";
 import { EventContextMenu } from "./components/EventContextMenu";
+
+function MonthDraft({ start, end }: CreateGhostArgs) {
+  const theme = useCalendarTheme();
+  // The previous instant also works when the time zone skips an entire date.
+  const last = new Date(startOfDay(end).getTime() - 1);
+  const range = isSameDay(start, last)
+    ? format(start, "MMM d")
+    : `${format(start, "MMM d")} to ${format(last, "MMM d")}`;
+  return (
+    <Text
+      testID="month-draft-range"
+      numberOfLines={1}
+      style={{ color: theme.colors.text, fontSize: 11, fontWeight: "600", paddingHorizontal: 3 }}
+    >
+      {`Draft: ${range}`}
+    </Text>
+  );
+}
 
 const MODES: CalendarMode[] = ["year", "month", "multiweek", "week", "3days", "day", "schedule"];
 
@@ -599,6 +629,9 @@ export default function App() {
                       return { start: 9, end: 17 };
                     }}
                     renderEvent={EventContextMenu}
+                    renderCreateGhost={
+                      activeMode === "month" || activeMode === "multiweek" ? MonthDraft : undefined
+                    }
                     onChangeDate={setDate}
                     onDragEvent={(event, start, end) => {
                       // The exam is pinned via `draggable: false` on the event, so it

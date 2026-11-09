@@ -25,8 +25,11 @@ async function checkPage(
   check: (page: Page) => Promise<void>,
   width = 1100,
   hasTouch = false,
+  now?: Date,
+  timezoneId?: string,
 ) {
-  const page = await browser.newPage({ viewport: { width, height: 880 }, hasTouch });
+  const page = await browser.newPage({ viewport: { width, height: 880 }, hasTouch, timezoneId });
+  if (now) await page.clock.setFixedTime(now);
   page.setDefaultTimeout(5_000);
   page.setDefaultNavigationTimeout(15_000);
   const errors: string[] = [];
@@ -82,6 +85,129 @@ async function nativeMultiWeekGrid(page: Page) {
 }
 
 describe("published demos", () => {
+  it.each(
+    (["month", "multiweek"] as const).flatMap((mode) => [
+      {
+        mode,
+        timezoneId: "Europe/Madrid",
+        now: new Date("2026-07-15T12:00:00Z"),
+        row: mode === "month" ? 2 : 0,
+        column: 4,
+        single: "Draft: Jul 17",
+        span: "Draft: Jul 17 to Jul 22",
+        singleOnly: false,
+      },
+      {
+        mode,
+        timezoneId: "America/Sao_Paulo",
+        now: new Date("2018-11-01T12:00:00Z"),
+        row: 0,
+        column: 5,
+        single: "Draft: Nov 3",
+        span: "Draft: Nov 3 to Nov 7",
+        singleOnly: false,
+      },
+      {
+        mode,
+        timezoneId: "America/Sao_Paulo",
+        now: new Date("2018-11-01T12:00:00Z"),
+        row: 0,
+        column: 6,
+        single: "Draft: Nov 4",
+        span: "",
+        singleOnly: true,
+      },
+      {
+        mode,
+        timezoneId: "Pacific/Apia",
+        now: new Date("2011-12-26T12:00:00Z"),
+        row: mode === "month" ? 4 : 0,
+        column: 3,
+        single: "Draft: Dec 29",
+        span: "",
+        singleOnly: true,
+      },
+    ]),
+  )(
+    "shows live native-web $mode creation content in $timezoneId for $single",
+    async ({ mode, timezoneId, now, row, column, single, span, singleOnly }) => {
+      await checkPage(
+        "/",
+        async (page) => {
+          await page.getByText(mode, { exact: true }).click();
+          if (mode === "multiweek")
+            await page.getByRole("button", { name: "2 weeks", exact: true }).click();
+          const grids = page.getByTestId(mode === "month" ? "month-grid" : "multiweek-grid");
+          const visibleIndex = () =>
+            grids.evaluateAll((nodes) =>
+              nodes.findIndex((node) => {
+                const rect = node.getBoundingClientRect();
+                return rect.width > 0 && rect.left >= 0 && rect.right <= innerWidth;
+              }),
+            );
+          await expect.poll(visibleIndex, { timeout: 5_000 }).toBeGreaterThanOrEqual(0);
+          const grid = grids.nth(await visibleIndex());
+          await grid.scrollIntoViewIfNeeded();
+          // Legend List initially measures its pages with pointer input disabled.
+          await expect
+            .poll(
+              () =>
+                grid.evaluate((element) => {
+                  const rect = element.getBoundingClientRect();
+                  return element.contains(
+                    document.elementFromPoint(rect.x + rect.width / 2, rect.y + 10),
+                  );
+                }),
+              { timeout: 5_000 },
+            )
+            .toBe(true);
+          const bounds = await grid.boundingBox();
+          if (!bounds) throw new Error("Native calendar grid has no bounds");
+          const rows = mode === "month" ? 5 : 2;
+          const origin = {
+            x: bounds.x + (bounds.width * (column + 0.5)) / 7,
+            y: bounds.y + (bounds.height * row) / rows + 10,
+          };
+          const target = {
+            x: bounds.x + (bounds.width * 2.5) / 7,
+            y: bounds.y + (bounds.height * (row + 1)) / rows + 10,
+          };
+          await page.mouse.move(origin.x, origin.y);
+          await page.mouse.down();
+          const draft = grid.getByTestId("month-draft-range");
+          await expect.poll(() => draft.allTextContents()).toEqual([single]);
+          if (singleOnly) {
+            if (timezoneId === "Pacific/Apia")
+              expect(await page.evaluate(() => new Date(2011, 11, 30).getDate())).toBe(31);
+            else expect(await page.evaluate(() => new Date(2018, 10, 4).getHours())).toBe(1);
+            await page.mouse.up();
+            return;
+          }
+          await page.mouse.move(target.x, target.y, { steps: 8 });
+          await expect.poll(() => draft.allTextContents()).toEqual([span, span]);
+          expect(
+            await grid
+              .getByTestId("month-create-ghost")
+              .evaluateAll((elements) =>
+                elements.every(
+                  (el) => el.getAttribute("aria-hidden") === "true" && el.hasAttribute("inert"),
+                ),
+              ),
+          ).toBe(true);
+          await page.mouse.up();
+          await expect.poll(() => draft.count()).toBe(0);
+          await expect
+            .poll(() => grid.getByRole("button", { name: /^✨ New event,/ }).count())
+            .toBe(2);
+        },
+        1100,
+        false,
+        now,
+        timezoneId,
+      );
+    },
+  );
+
   it("scrolls the native-web multi-week rows with a quick touch swipe", async () => {
     await checkPage(
       "/",
