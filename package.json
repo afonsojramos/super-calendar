@@ -26,6 +26,8 @@
     "test:solid:package": "node scripts/verify-solid-package.mjs",
     "bench": "pnpm --filter @super-calendar/core bench",
     "bench:web": "vitest run --config vitest.performance.config.mts",
+    "bench:report": "node scripts/report-performance.mjs",
+    "bench:map": "node scripts/report-performance.mjs --map",
     "parity:visual": "node scripts/visual-parity.mjs",
     "lint": "oxlint --type-aware packages tests",
     "lint:fix": "oxlint --fix --type-aware packages tests",

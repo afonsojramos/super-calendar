@@ -1,4 +1,7 @@
 import { mount } from "@calendar-browser/adapter";
 import { Fixture } from "./Fixture";
+import { PerformanceFixture } from "./PerformanceFixture";
 
-mount(Fixture);
+mount(
+  new URLSearchParams(location.search).get("view") === "performance" ? PerformanceFixture : Fixture,
+);
