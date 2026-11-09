@@ -85,6 +85,38 @@ async function nativeMultiWeekGrid(page: Page) {
 }
 
 describe("published demos", () => {
+  it.each(["/dom/", "/solid/"])(
+    "labels a one-day draft before a midnight clock change on %s",
+    async (path) => {
+      await checkPage(
+        path,
+        async (page) => {
+          if (path === "/solid/") {
+            await page.getByLabel("View", { exact: true }).selectOption("month");
+            // The Solid example starts in November 2026; navigate to April.
+            for (let month = 0; month < 7; month++)
+              await page.getByRole("button", { name: "Previous period" }).click();
+          } else await page.getByRole("button", { name: /^month$/i }).click();
+          expect(await page.evaluate(() => new Date(2026, 3, 24).getHours())).toBe(1);
+          const day = page.locator('[data-day="2026-04-23"]');
+          await day.scrollIntoViewIfNeeded();
+          const bounds = await day.boundingBox();
+          if (!bounds) throw new Error("Missing midnight-transition day");
+          await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + 10);
+          await page.mouse.down();
+          await expect
+            .poll(() => page.locator('[data-slot="createGhost"]').allTextContents())
+            .toEqual(["Draft: Apr 23"]);
+          await page.mouse.up();
+        },
+        1100,
+        false,
+        new Date("2026-04-23T12:00:00Z"),
+        "Africa/Cairo",
+      );
+    },
+  );
+
   it.each(
     (["month", "multiweek"] as const).flatMap((mode) => [
       {

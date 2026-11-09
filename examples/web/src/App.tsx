@@ -1,4 +1,13 @@
-import { addDays, addMonths, addWeeks, addYears, endOfMonth, format, startOfMonth } from "date-fns";
+import {
+  isSameDay,
+  addDays,
+  addMonths,
+  addWeeks,
+  addYears,
+  endOfMonth,
+  format,
+  startOfMonth,
+} from "date-fns";
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import {
   Calendar,
@@ -171,10 +180,9 @@ const DraftPreview = ({ start, end }: CreateGhostArgs) => (
 
 const MonthDraft = ({ start, end }: CreateGhostArgs) => {
   const last = addDays(end, -1);
-  const range =
-    start.getTime() === last.getTime()
-      ? format(start, "MMM d")
-      : `${format(start, "MMM d")} to ${format(last, "MMM d")}`;
+  const range = isSameDay(start, last)
+    ? format(start, "MMM d")
+    : `${format(start, "MMM d")} to ${format(last, "MMM d")}`;
   return (
     <span
       style={{
