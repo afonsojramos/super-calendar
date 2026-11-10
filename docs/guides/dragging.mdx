@@ -480,7 +480,9 @@ Pick an event bar up and drop it on another day. Both ends shift by the same
 number of calendar days, so the **time of day and the duration are preserved**
 (a multi-day event keeps its length). Grab it with a **long-press** on native and
 a **press-drag** on web. The carried bar fades and the target day is tinted while
-you drag.
+you drag. On web, a press becomes a drag only after the pointer travels a few
+pixels, so clicking a movable bar fires `onPressEvent` rather than the day's
+`onPressDay` or `onPressCell`.
 
 ```tsx
 <Calendar

@@ -83,6 +83,10 @@ const CHIP_GAP = 2;
 const CELL_PAD = 4;
 // Opacity of an event chip while it is being dragged to another day.
 const DRAGGED_CHIP_OPACITY = 0.4;
+// How far a press travels before it becomes a drag. Until then the chips stay
+// hit-testable, so a click still reaches the chip it pressed.
+const DRAG_SLOP_PX = 4;
+const TOUCH_DRAG_SLOP_PX = 8;
 
 // A day as the shared rows render it. Month days carry `isCurrentMonth`;
 // multi-week days omit it because every one of them is inside the period.
@@ -115,6 +119,10 @@ type MonthDrag<T> = (
   // The rows the drag began in, so a drag never commits into a different window.
   windowKey: string;
   pointerId: number;
+  // Set once the pointer travels past the drag slop (or a touch hold fires).
+  // Chips stop taking pointer input only then, so a plain click is not
+  // retargeted to the day cell beneath.
+  armed: boolean;
 };
 
 /** Props for {@link MonthView}. */
@@ -881,21 +889,23 @@ export function DateRows<T = unknown>({
     !event.disabled &&
     event.draggable !== false &&
     (event.startEditable ?? eventStartEditable);
+  // Where the current press began and how far it may travel before it drags.
+  const pressOrigin = useRef({ x: 0, y: 0, slop: DRAG_SLOP_PX });
   // A fresh press starts a new interaction, so any guard left over from the
   // previous one is stale.
   const beginPress = () => {
     suppressClickRef.current = false;
     movedRef.current = false;
   };
-  const beginCreate = (day: Date, pointerId: number) => {
+  const beginCreate = (day: Date, pointerId: number, armed: boolean) => {
     if (!onCreateEvent && !onSelectDrag) return;
     const t = startOfDay(day).getTime();
-    applyDrag({ kind: "create", anchor: t, hover: t, windowKey, pointerId });
+    applyDrag({ kind: "create", anchor: t, hover: t, windowKey, pointerId, armed });
   };
-  const beginMove = (event: CalendarEvent<T>, day: Date, pointerId: number) => {
+  const beginMove = (event: CalendarEvent<T>, day: Date, pointerId: number, armed: boolean) => {
     if (!canMove(event)) return;
     const t = startOfDay(day).getTime();
-    applyDrag({ kind: "move", event, from: t, to: t, windowKey, pointerId });
+    applyDrag({ kind: "move", event, from: t, to: t, windowKey, pointerId, armed });
     onDragStart?.(event);
   };
   const extendDrag = (day: Date, pointerId: number) => {
@@ -904,7 +914,11 @@ export function DateRows<T = unknown>({
     const t = startOfDay(day).getTime();
     if (t === (current.kind === "create" ? current.hover : current.to)) return;
     movedRef.current = true;
-    applyDrag(current.kind === "create" ? { ...current, hover: t } : { ...current, to: t });
+    applyDrag(
+      current.kind === "create"
+        ? { ...current, hover: t, armed: true }
+        : { ...current, to: t, armed: true },
+    );
     // A sweep reports its span live, so a selection can track the drag; a move
     // has nothing to report until it is dropped.
     if (current.kind === "create") {
@@ -927,12 +941,17 @@ export function DateRows<T = unknown>({
   ) => {
     if (event.button !== 0 || event.isPrimary === false || heldTouch.current) return;
     beginPress();
-    const start = () => {
-      if (moving) touchHandlers.current.beginMove(moving, day, event.pointerId);
-      else touchHandlers.current.beginCreate(day, event.pointerId);
+    pressOrigin.current = {
+      x: event.clientX,
+      y: event.clientY,
+      slop: event.pointerType === "touch" ? TOUCH_DRAG_SLOP_PX : DRAG_SLOP_PX,
+    };
+    const start = (armed: boolean) => {
+      if (moving) touchHandlers.current.beginMove(moving, day, event.pointerId, armed);
+      else touchHandlers.current.beginCreate(day, event.pointerId, armed);
     };
     if (!multiWeek || !event.pointerType || event.pointerType === "mouse") {
-      start();
+      start(false);
       return;
     }
     heldOrigin.current = { day, event: moving };
@@ -944,7 +963,8 @@ export function DateRows<T = unknown>({
         clientX: event.clientX,
         clientY: event.clientY,
       },
-      start,
+      // The hold itself is the deliberate gesture, so a held drag starts armed.
+      () => start(true),
       (x, y) => {
         const element = gridRef.current?.ownerDocument
           .elementFromPoint(x, y)
@@ -993,6 +1013,7 @@ export function DateRows<T = unknown>({
     }
   });
   const isDragging = drag !== null;
+  const dragArmed = drag?.armed === true;
   // Whether any month drag is wired up at all, so the cells only take over touch
   // scrolling and pointer tracking when one of the handlers can actually fire.
   const dragWired = onCreateEvent != null || onSelectDrag != null || onDragEvent != null;
@@ -1002,7 +1023,13 @@ export function DateRows<T = unknown>({
       const current = dragRef.current;
       if (!current || current.pointerId !== event.pointerId) return;
       applyDrag(null);
-      if (!movedRef.current) return;
+      if (!movedRef.current) {
+        // An armed move that returns to its day is released over the day cell,
+        // because the chip ignored pointer input mid drag. The click that
+        // follows belongs to the abandoned drag, not to the day.
+        if (current.kind === "move" && current.armed) suppressClickRef.current = true;
+        return;
+      }
       // Multi-week rows drop a drag whose window was replaced before release.
       if (multiWeek && current.windowKey !== windowKeyRef.current) return;
       suppressClickRef.current = true;
@@ -1032,15 +1059,24 @@ export function DateRows<T = unknown>({
     const cancel = (event: PointerEvent) => {
       if (dragRef.current?.pointerId === event.pointerId) clear();
     };
+    const arm = (event: PointerEvent) => {
+      const current = dragRef.current;
+      if (!current || current.armed || current.pointerId !== event.pointerId) return;
+      const origin = pressOrigin.current;
+      if (Math.hypot(event.clientX - origin.x, event.clientY - origin.y) <= origin.slop) return;
+      applyDrag({ ...current, armed: true });
+    };
     const keyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
       clear();
     };
+    window.addEventListener("pointermove", arm);
     window.addEventListener("pointerup", finish);
     window.addEventListener("pointercancel", cancel);
     window.addEventListener("keydown", keyDown);
     return () => {
+      window.removeEventListener("pointermove", arm);
       window.removeEventListener("pointerup", finish);
       window.removeEventListener("pointercancel", cancel);
       window.removeEventListener("keydown", keyDown);
@@ -1382,7 +1418,8 @@ export function DateRows<T = unknown>({
                         .filter((b) => b.startCol === dayCol)
                         .map((b) => {
                           const span = b.endCol - b.startCol + 1;
-                          const isDragged = drag?.kind === "move" && drag.event === b.seg.event;
+                          const isDragged =
+                            dragArmed && drag?.kind === "move" && drag.event === b.seg.event;
                           return (
                             <button
                               key={`bar-${b.seg.event.start.toISOString()}:${b.seg.event.title}:${b.seg.lane}`}
@@ -1423,7 +1460,7 @@ export function DateRows<T = unknown>({
                                   chipGap +
                                   b.seg.lane * (chipHeight + chipGap),
                                 height: chipHeight,
-                                pointerEvents: isDragging ? "none" : "auto",
+                                pointerEvents: dragArmed ? "none" : "auto",
                                 // Fade the bar being carried, so the tinted drop
                                 // target reads as where it is going.
                                 opacity: isDragged ? DRAGGED_CHIP_OPACITY : undefined,
