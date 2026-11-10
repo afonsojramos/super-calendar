@@ -92,6 +92,21 @@ const editEvents: FixtureEvent[] = [
     end: new Date(2026, 6, 18, 10),
   },
 ];
+// An overnight event whose next-day segment shares its column with Breakfast.
+const overnightEvents: FixtureEvent[] = [
+  {
+    id: 0,
+    title: "Overnight",
+    start: new Date(2026, 6, 15, 22),
+    end: new Date(2026, 6, 16, 10),
+  },
+  {
+    id: 1,
+    title: "Breakfast",
+    start: new Date(2026, 6, 16, 9),
+    end: new Date(2026, 6, 16, 10),
+  },
+];
 const resources = [
   { id: "a", title: "Room A" },
   { id: "b", title: "Room B" },
@@ -207,13 +222,15 @@ export function Fixture() {
           ? denseEvents
           : view === "edit-clipped"
             ? clippedEvents
-            : view === "edit-crowded"
-              ? crowdedEvents
-              : view === "edit-many" || (view.startsWith("multiweek") && view.endsWith("dense"))
-                ? manyEvents
-                : view === "edit"
-                  ? editEvents
-                  : initialEvents,
+            : view === "edit-overnight"
+              ? overnightEvents
+              : view === "edit-crowded"
+                ? crowdedEvents
+                : view === "edit-many" || (view.startsWith("multiweek") && view.endsWith("dense"))
+                  ? manyEvents
+                  : view === "edit"
+                    ? editEvents
+                    : initialEvents,
   );
   const [boardEvents, setBoardEvents] = useFixtureState(
     view.endsWith("crowded")

@@ -463,6 +463,66 @@ describe(rendererName, () => {
       expect(originals.every((original) => original.style.visibility !== "hidden")).toBe(true);
     });
 
+    it("keeps a pressed multi-day segment in its column until the pointer moves", () => {
+      const trip: CalendarEvent = {
+        title: "Trip",
+        start: new Date(2026, 5, 25, 15),
+        end: new Date(2026, 5, 26, 8),
+      };
+      const standup: CalendarEvent = {
+        title: "Standup",
+        start: new Date(2026, 5, 25, 15),
+        end: new Date(2026, 5, 25, 16),
+      };
+      const onDragEvent = vi.fn();
+      const onPressEvent = vi.fn();
+      const { container, getAllByText } = render(TimeGrid, {
+        date: day,
+        mode: "week",
+        events: [trip, standup],
+        hourHeight: 48,
+        onDragEvent,
+        onPressEvent,
+      });
+      const originals = getAllByText("Trip").map(wrapperOf);
+      const box = originals[0];
+      const resting = [box.style.left, box.style.width];
+      fireEvent.pointerDown(box, { clientX: 150, clientY: 300, pointerId: 1 });
+
+      // A press alone is not a move: no full-width preview, no hidden segments,
+      // and the pressed segment keeps the column it shares with Standup.
+      expect(container.querySelectorAll("[data-dragging][aria-hidden]")).toHaveLength(0);
+      expect(originals.every((original) => original.style.visibility !== "hidden")).toBe(true);
+      expect([box.style.left, box.style.width]).toEqual(resting);
+      expect(box.style.width).not.toBe("");
+
+      fireEvent.pointerUp(box, { clientX: 150, clientY: 300, pointerId: 1 });
+      expect(onDragEvent).not.toHaveBeenCalled();
+      expect(onPressEvent).toHaveBeenCalledTimes(1);
+      expect(onPressEvent).toHaveBeenCalledWith(trip);
+    });
+
+    it("previews a multi-day move once the pointer moves", () => {
+      const trip: CalendarEvent = {
+        title: "Trip",
+        start: new Date(2026, 5, 25, 15),
+        end: new Date(2026, 5, 26, 8),
+      };
+      const { container, getAllByText } = render(TimeGrid, {
+        date: day,
+        mode: "week",
+        events: [trip],
+        hourHeight: 48,
+        onDragEvent: vi.fn(),
+      });
+      const originals = getAllByText("Trip").map(wrapperOf);
+      fireEvent.pointerDown(originals[0], { clientY: 300, pointerId: 1 });
+      fireEvent.pointerMove(originals[0], { clientY: 348, pointerId: 1 });
+      expect(container.querySelectorAll("[data-dragging][aria-hidden]").length).toBeGreaterThan(0);
+      expect(originals.every((original) => original.style.visibility === "hidden")).toBe(true);
+      fireEvent.pointerUp(originals[0], { clientY: 348, pointerId: 1 });
+    });
+
     it("keeps the held event when another event is inserted during a multi-day move", () => {
       const trip: CalendarEvent = {
         title: "Trip",
@@ -499,6 +559,35 @@ describe(rendererName, () => {
         new Date(2026, 5, 24, 18),
         new Date(2026, 5, 26, 22),
       );
+    });
+
+    it("keeps an event inserted before a multi-day press moves at its own position", () => {
+      const trip: CalendarEvent = {
+        title: "Trip",
+        start: new Date(2026, 5, 24, 17),
+        end: new Date(2026, 5, 26, 21),
+      };
+      const grid = (events: CalendarEvent[]): TimeGridProps => ({
+        date: day,
+        mode: "week",
+        events: events,
+        hourHeight: 48,
+        onDragEvent: vi.fn(),
+      });
+      const { getAllByText, getByText, rerender } = render(TimeGrid, grid([trip]));
+      const box = wrapperOf(getAllByText("Trip")[0]);
+      fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+      // Earlier takes the pressed segment's day:index slot before any movement.
+      rerender(
+        grid([
+          { title: "Earlier", start: new Date(2026, 5, 24, 10), end: new Date(2026, 5, 24, 11) },
+          { ...trip },
+        ]),
+      );
+      const earlier = wrapperOf(getByText("Earlier"));
+      expect([earlier.style.top, earlier.style.height]).toEqual(["480px", "48px"]);
+      expect(earlier.hasAttribute("data-dragging")).toBe(false);
+      fireEvent.pointerUp(box, { clientY: 300, pointerId: 1 });
     });
 
     it("offers the bottom resize grip only on the segment that owns the event's end", () => {
