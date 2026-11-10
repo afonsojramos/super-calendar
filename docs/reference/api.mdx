@@ -387,7 +387,10 @@ Render callbacks return `JSX.Element` from `@solidjs/web`.
 
 `Calendar` takes `renderTimeEvent`, `renderMonthEvent`, and
 `renderScheduleEvent`. Direct views take `renderEvent`. Read renderer props
-inside JSX to preserve reactivity. The Solid guide includes complete examples
+inside JSX to preserve reactivity. On React DOM and Solid, a time-grid renderer
+receives a copy of a moved or resized event whose `start` and `end` are the
+times the drop would report; compare events by a stable ID, and see
+[live drag times](/guides/dragging#move-and-resize) for the paging exception. The Solid guide includes complete examples
 for [custom events](/guides/solid#render-custom-events),
 [date pickers](/guides/solid#add-date-pickers), and
 [resource timelines](/guides/solid#schedule-resources).

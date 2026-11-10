@@ -174,7 +174,12 @@ const VISUALLY_HIDDEN: CSSProperties = {
 
 /** Props passed to a custom time-grid event renderer. */
 export interface DomRenderEventArgs<T = unknown> {
-  /** The event to render. */
+  /**
+   * The event to render. While it is being moved or resized, a copy whose
+   * `start` and `end` are the times `onDragEvent` would report on release.
+   * After a drag pages the view, the floating preview keeps the stored times
+   * until release.
+   */
   event: CalendarEvent<T>;
   /** The current view mode. */
   mode: CalendarMode;
@@ -405,6 +410,37 @@ function movedSegmentStart(
     origin.segmentStart,
     dayMinutes + Math.round((startHours - origin.startHours) * 60),
   );
+}
+
+// The start and end a drag reports. A bottom resize re-resolves the end from the
+// edge the layout drew, like the native renderer, so it lands on the row the edge
+// reached on either side of a DST change. A move or a top resize shifts the real
+// instants by how far the segment moved on `base`, the day it lands on, so a
+// move that now spans midnight keeps the parts outside the dragged day. The drop
+// and the live preview share it, so the renderer shows what the drop reports.
+function draggedEventBounds(
+  d: DragState,
+  origin: { startHours: number; durationHours: number; segmentStart: Date; base: Date },
+  event: { start: Date; end: Date },
+  base: Date,
+  snapMinutes: number,
+): { start: Date; end: Date } | null {
+  if (d.kind === "resize") {
+    const endDelta = Math.round(
+      (d.startHours + d.durationHours - origin.startHours - origin.durationHours) * 60,
+    );
+    return resolveDraggedBounds(event.start, event.end, 0, endDelta, snapMinutes);
+  }
+  const segmentStart = movedSegmentStart(
+    origin,
+    base,
+    d.kind === "move" ? d.requestedStartHours : d.startHours,
+  );
+  const startShift = segmentStart.getTime() - origin.segmentStart.getTime();
+  const endShift = d.kind === "move" ? startShift : 0;
+  const start = new Date(event.start.getTime() + startShift);
+  const end = new Date(event.end.getTime() + endShift);
+  return end > start ? { start, end } : null;
 }
 
 function DefaultDomEvent<T>({
@@ -1171,29 +1207,9 @@ function TimeGridInner<T = unknown>(
     } else {
       base = startOfDay(daysRef.current[originIndex] ?? daysRef.current[0]);
     }
-    if (held && origin && d.kind === "resize") {
-      // Resolve the end like the native renderer, from the edge the layout drew,
-      // so it lands at the row the edge was dragged to on either side of a DST
-      // change.
-      const endDelta = Math.round(
-        (d.startHours + d.durationHours - origin.startHours - origin.durationHours) * 60,
-      );
-      const next = resolveDraggedBounds(held.event.start, held.event.end, 0, endDelta, snapMinutes);
+    if (base && held && origin) {
+      const next = draggedEventBounds(d, origin, held.event, base, snapMinutes);
       if (next) onDragEventRef.current?.(held.event, next.start, next.end);
-    } else if (base && held && origin) {
-      // Shift the real event by how far its segment moved, so a move that now
-      // spans midnight (and every later drag of the resulting multi-day event)
-      // keeps the parts outside the dragged day instead of clipping to it.
-      const segmentStart = movedSegmentStart(
-        origin,
-        base,
-        d.kind === "move" ? d.requestedStartHours : d.startHours,
-      );
-      const startShift = segmentStart.getTime() - origin.segmentStart.getTime();
-      const endShift = d.kind === "move" ? startShift : 0;
-      const start = new Date(held.event.start.getTime() + startShift);
-      const end = new Date(held.event.end.getTime() + endShift);
-      if (end > start) onDragEventRef.current?.(held.event, start, end);
     }
     finishDrag();
   };
@@ -1622,6 +1638,25 @@ function TimeGridInner<T = unknown>(
         })()
       : null;
 
+  // Where a single-day drag would land if released now, for the renderer of the
+  // dragged box and its spill. The multi-day preview carries its own shifted
+  // event, and a paged drag resolves its day only on release.
+  const liveBounds =
+    !paged && drag?.moved && !multiDayMove && moveOrigin && draggedRef.current
+      ? draggedEventBounds(
+          drag,
+          moveOrigin,
+          draggedRef.current.event,
+          startOfDay(
+            days[moveOrigin.dayIndex + (drag.kind === "move" ? drag.dayDelta : 0)] ??
+              days[moveOrigin.dayIndex],
+          ),
+          snapMinutes,
+        )
+      : null;
+  const withLiveBounds = (event: CalendarEvent<T>): CalendarEvent<T> =>
+    liveBounds ? { ...event, start: liveBounds.start, end: liveBounds.end } : event;
+
   // The tail of an in-progress move that runs past midnight, shown on `dayIndex`
   // so the drop is visible on both days at once. `drag` and `draggedRef` are set
   // together in `beginDrag` and cleared together in `finishDrag`, so the guard on
@@ -1631,7 +1666,7 @@ function TimeGridInner<T = unknown>(
     const dragged = draggedRef.current?.event;
     if (!dragged) return null;
     return {
-      event: dragged,
+      event: withLiveBounds(dragged),
       mode,
       isAllDay: false,
       boxHeight: Math.max(drag.spillHours * hourHeight, minEventHeight),
@@ -2197,7 +2232,7 @@ function TimeGridInner<T = unknown>(
                   const floating = active?.kind === "move" && active.moved;
                   const onPress = () => onPressEvent?.(pe.event);
                   const args: DomRenderEventArgs<T> = {
-                    event: pe.event,
+                    event: active ? withLiveBounds(pe.event) : pe.event,
                     mode,
                     isAllDay: false,
                     boxHeight,

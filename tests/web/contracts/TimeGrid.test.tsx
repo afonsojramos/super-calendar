@@ -1299,6 +1299,71 @@ describe(rendererName, () => {
     });
   });
 
+  describe("TimeGrid live drag times", () => {
+    const hhmm = (date: Date) =>
+      `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+    // Reads the props object on each render, so Solid tracks it like React re-renders it.
+    const LiveEvent = (props: RenderEventArgs) => (
+      <div>{`${hhmm(props.event.start)}-${hhmm(props.event.end)}`}</div>
+    );
+    const grid = (extra: Partial<TimeGridProps> = {}) =>
+      render(TimeGrid, {
+        date: day,
+        mode: "day",
+        events: events,
+        hourHeight: 48,
+        onDragEvent: vi.fn(),
+        renderEvent: LiveEvent,
+        ...extra,
+      });
+
+    it("passes the previewed start and end to the renderer while moving", () => {
+      const { getByText, queryByText } = grid();
+      const box = getByText("14:00-16:00").parentElement!;
+      fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+      // A press alone previews nothing new.
+      expect(getByText("14:00-16:00")).toBeTruthy();
+      fireEvent.pointerMove(box, { clientY: 348, pointerId: 1 });
+      expect(getByText("15:00-17:00")).toBeTruthy();
+      expect(queryByText("14:00-16:00")).toBeNull();
+      fireEvent.pointerUp(box, { clientY: 348, pointerId: 1 });
+      // The parent kept its events, so the box returns to the stored times.
+      expect(getByText("14:00-16:00")).toBeTruthy();
+    });
+
+    it("passes the previewed end while resizing", () => {
+      const { getByText } = grid();
+      const box = getByText("14:00-16:00").parentElement!;
+      const handle = box.lastElementChild as HTMLElement;
+      fireEvent.pointerDown(handle, { clientY: 300, pointerId: 1 });
+      fireEvent.pointerMove(handle, { clientY: 348, pointerId: 1 });
+      expect(getByText("14:00-17:00")).toBeTruthy();
+      fireEvent.pointerUp(handle, { clientY: 348, pointerId: 1 });
+    });
+
+    it("previews the same times in the next-day spill", () => {
+      const late: CalendarEvent[] = [
+        { title: "Late", start: new Date(2026, 5, 25, 21), end: new Date(2026, 5, 25, 23) },
+      ];
+      const { getByText, getAllByText } = grid({ mode: "week", events: late });
+      const box = getByText("21:00-23:00").parentElement!;
+      fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+      fireEvent.pointerMove(box, { clientY: 396, pointerId: 1 });
+      // The dragged box and the preview of its tail in the next column agree.
+      expect(getAllByText("23:00-01:00")).toHaveLength(2);
+      fireEvent.pointerUp(box, { clientY: 396, pointerId: 1 });
+    });
+
+    it("updates the built-in time label while moving", () => {
+      const { getByText } = grid({ renderEvent: undefined });
+      const box = wrapperOf(getByText("Focus"));
+      fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+      fireEvent.pointerMove(box, { clientY: 348, pointerId: 1 });
+      expect(getByText("15:00 - 17:00")).toBeTruthy();
+      fireEvent.pointerUp(box, { clientY: 348, pointerId: 1 });
+    });
+  });
+
   describe("TimeGrid hiddenDays", () => {
     it("renders a five-column week when weekends are hidden", () => {
       const { queryByText, getByText } = render(TimeGrid, {
