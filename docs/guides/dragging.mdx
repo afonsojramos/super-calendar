@@ -18,6 +18,11 @@ change the end** or its **top edge to change the start**. Drag **vertically to
 change the time, horizontally to move it to another day** (within the visible
 range). New `start`/`end` are snapped to `dragStepMinutes` (default 15).
 
+On React DOM and Solid, an event you move floats across the **full width of its
+day column**, even when it rests in a narrow column beside overlapping events, so
+its whole title stays readable. It widens once the pointer moves; a click or a
+resize keeps the event in its shared column.
+
 ```tsx
 <Calendar
   /* ... */

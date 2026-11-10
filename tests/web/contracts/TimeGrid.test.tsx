@@ -463,6 +463,67 @@ describe(rendererName, () => {
       expect(originals.every((original) => original.style.visibility !== "hidden")).toBe(true);
     });
 
+    it("widens a moved single-day event to the full day column", () => {
+      const focus: CalendarEvent = {
+        title: "Focus",
+        start: new Date(2026, 5, 25, 14),
+        end: new Date(2026, 5, 25, 15),
+      };
+      const standup: CalendarEvent = {
+        title: "Standup",
+        start: new Date(2026, 5, 25, 14),
+        end: new Date(2026, 5, 25, 15),
+      };
+      const { getByText } = render(TimeGrid, {
+        date: day,
+        mode: "week",
+        events: [focus, standup],
+        hourHeight: 48,
+        eventGap: 3,
+        onDragEvent: vi.fn(),
+      });
+      const box = wrapperOf(getByText("Focus"));
+      const resting = [box.style.left, box.style.width];
+      expect(resting[1]).toBe("calc(50% - 6px)");
+
+      fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+      // A press alone keeps the shared column.
+      expect([box.style.left, box.style.width]).toEqual(resting);
+      fireEvent.pointerMove(box, { clientY: 348, pointerId: 1 });
+      expect([box.style.left, box.style.width]).toEqual(["3px", "calc(100% - 6px)"]);
+
+      fireEvent.pointerUp(box, { clientY: 348, pointerId: 1 });
+      expect([box.style.left, box.style.width]).toEqual(resting);
+    });
+
+    it("keeps a resized event in its shared column", () => {
+      const focus: CalendarEvent = {
+        title: "Focus",
+        start: new Date(2026, 5, 25, 14),
+        end: new Date(2026, 5, 25, 15),
+      };
+      const standup: CalendarEvent = {
+        title: "Standup",
+        start: new Date(2026, 5, 25, 14),
+        end: new Date(2026, 5, 25, 15),
+      };
+      const { getByText } = render(TimeGrid, {
+        date: day,
+        mode: "week",
+        events: [focus, standup],
+        hourHeight: 48,
+        onDragEvent: vi.fn(),
+      });
+      const box = wrapperOf(getByText("Focus"));
+      const resting = [box.style.left, box.style.width];
+      const handle = box.lastElementChild as HTMLElement;
+      fireEvent.pointerDown(handle, { clientY: 300, pointerId: 1 });
+      fireEvent.pointerMove(handle, { clientY: 348, pointerId: 1 });
+      expect(box.hasAttribute("data-dragging")).toBe(true);
+      expect([box.style.left, box.style.width]).toEqual(resting);
+      fireEvent.pointerUp(handle, { clientY: 348, pointerId: 1 });
+    });
+
     it("keeps a pressed multi-day segment in its column until the pointer moves", () => {
       const trip: CalendarEvent = {
         title: "Trip",
@@ -1259,7 +1320,7 @@ describe(rendererName, () => {
     // (jsdom has no layout). box -> column -> columns row.
     const stubColumns = (box: HTMLElement) => {
       const column = box.parentElement as HTMLElement;
-      column.getBoundingClientRect = () => ({ width: 100 }) as DOMRect;
+      column.getBoundingClientRect = () => ({ left: 0, width: 100 }) as DOMRect;
       const row = column.parentElement as HTMLElement;
       row.getBoundingClientRect = () => ({ left: 0, right: 700, width: 700 }) as DOMRect;
     };
@@ -1294,6 +1355,46 @@ describe(rendererName, () => {
         // A week steps 7 days forward.
         const next = onChangeDate.mock.calls[0][0] as Date;
         expect(next.getTime()).toBe(new Date(2026, 6, 3).getTime());
+        fireEvent.pointerUp(box, { clientX: 690, clientY: 300, pointerId: 1 });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("keeps the carried full column width in the ghost after paging", () => {
+      vi.useFakeTimers();
+      try {
+        const { container, getByText } = render(TimeGrid, {
+          date: day,
+          mode: "week",
+          events: events,
+          hourHeight: 48,
+          eventGap: 2,
+          onDragEvent: vi.fn(),
+          onChangeDate: vi.fn(),
+        });
+        const box = wrapperOf(getByText("Focus"));
+        stubColumns(box);
+        // A 1px left border: the boxes sit in the 100px padding box from 301.
+        const column = box.parentElement as HTMLElement;
+        column.getBoundingClientRect = () => ({ left: 300, width: 101 }) as DOMRect;
+        Object.defineProperty(column, "clientLeft", { value: 1 });
+        Object.defineProperty(column, "clientWidth", { value: 100 });
+        box.getBoundingClientRect = () =>
+          ({ left: 330, top: 280, width: 40, height: 96 }) as DOMRect;
+        fireEvent.pointerDown(box, { clientX: 350, clientY: 300, pointerId: 1 });
+        fireEvent.pointerMove(box, { clientX: 690, clientY: 300, pointerId: 1 });
+        act(() => {
+          vi.advanceTimersByTime(600);
+        });
+        fireEvent.pointerMove(box, { clientX: 690, clientY: 300, pointerId: 1 });
+        const ghost = [...container.querySelectorAll<HTMLElement>("[aria-hidden]")].find(
+          (element) => element.style.position === "fixed",
+        );
+        // The padding box spans 301 to 401 with a 2px gap, so the ghost is 96px
+        // wide and the pointer stays 47px into it.
+        expect(ghost?.style.width).toBe("96px");
+        expect(ghost?.style.transform).toBe("translate(643px, 280px)");
         fireEvent.pointerUp(box, { clientX: 690, clientY: 300, pointerId: 1 });
       } finally {
         vi.useRealTimers();

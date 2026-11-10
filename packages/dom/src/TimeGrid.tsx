@@ -1226,7 +1226,8 @@ function TimeGridInner<T = unknown>(
     // across days, so 0 is fine there.
     const boxEl = e.box;
     const column = kind === "move" ? boxEl.parentElement : null;
-    const dayWidth = column ? column.getBoundingClientRect().width : 0;
+    const columnRect = column ? column.getBoundingClientRect() : null;
+    const dayWidth = columnRect ? columnRect.width : 0;
     const boxRect = kind === "move" ? boxEl.getBoundingClientRect() : null;
     const originBase = startOfDay(days[dayIndex] ?? days[0]);
     const originNextDay = addDays(originBase, 1);
@@ -1248,9 +1249,12 @@ function TimeGridInner<T = unknown>(
     draggedRef.current = {
       event,
       onPress: onPress ?? (() => {}),
-      grabX: boxRect ? e.clientX - boxRect.left : 0,
+      // A moved box spans its whole day column, so the ghost that replaces it
+      // after a page change keeps that width and the pointer's place in it. The
+      // box sits in the column's padding box, inside any border.
+      grabX: column && columnRect ? e.clientX - columnRect.left - column.clientLeft - eventGap : 0,
       grabY: boxRect ? e.clientY - boxRect.top : 0,
-      w: boxRect ? boxRect.width : 0,
+      w: column ? Math.max(column.clientWidth - eventGap * 2, 0) : 0,
       h: boxRect ? boxRect.height : 0,
     };
     ptr.current = { x: e.clientX, y: e.clientY };
@@ -2186,6 +2190,11 @@ function TimeGridInner<T = unknown>(
                     minEventHeight,
                   );
                   const widthPct = 100 / pe.columns;
+                  // A moved event floats across its whole day column, like the
+                  // multi-day preview, so a narrow overlapping event shows its
+                  // full content while carried. A press or a resize keeps the
+                  // shared column.
+                  const floating = active?.kind === "move" && active.moved;
                   const onPress = () => onPressEvent?.(pe.event);
                   const args: DomRenderEventArgs<T> = {
                     event: pe.event,
@@ -2248,8 +2257,12 @@ function TimeGridInner<T = unknown>(
                           // is the renderer's concern: the built-in one clamps, and a
                           // custom renderer should adapt to the `boxHeight` it's given.
                           height: boxHeight,
-                          left: `calc(${pe.column * widthPct}% + ${eventGap}px)`,
-                          width: `calc(${widthPct}% - ${eventGap * 2}px)`,
+                          left: floating
+                            ? eventGap
+                            : `calc(${pe.column * widthPct}% + ${eventGap}px)`,
+                          width: floating
+                            ? `calc(100% - ${eventGap * 2}px)`
+                            : `calc(${widthPct}% - ${eventGap * 2}px)`,
                           cursor: canMove ? "grab" : "pointer",
                           touchAction: canMove ? "pan-y" : "auto",
                           userSelect: canMove ? "none" : undefined,
