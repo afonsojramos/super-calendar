@@ -1744,12 +1744,27 @@ export function TimeGrid<T = unknown>(
           }) ?? currentHeldEvent))
     );
   });
+  // A held multi-day event, moved or not. The active box must also be the held
+  // event, because an events refresh can give its `day:index` key to another
+  // event, even before the pointer moves.
+  const multiDayHeld = createMemo(() => {
+    const currentDrag = drag();
+    return (
+      !paged() &&
+      currentDrag?.kind === "move" &&
+      (currentDrag.continuesBefore || currentDrag.continuesAfter) &&
+      !!movingEvent()
+    );
+  });
   const multiDayMove = createMemo(() => {
     const currentDrag = drag();
     const currentMoveOrigin = moveOrigin();
     const currentMovingEvent = movingEvent();
+    // Only once the pointer has moved: a press that may still be a click keeps
+    // the segments in their shared columns instead of swapping in the preview.
     return !paged() &&
       currentDrag?.kind === "move" &&
+      currentDrag.moved &&
       (currentDrag.continuesBefore || currentDrag.continuesAfter) &&
       currentMoveOrigin &&
       currentMovingEvent
@@ -2484,7 +2499,7 @@ export function TimeGrid<T = unknown>(
                             const currentDrag = drag();
                             return !paged() &&
                               currentDrag?.key === key() &&
-                              (!multiDayMove() || pe().event === movingEvent())
+                              (!multiDayHeld() || pe().event === movingEvent())
                               ? currentDrag
                               : null;
                           });

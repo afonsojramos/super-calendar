@@ -1584,9 +1584,20 @@ function TimeGridInner<T = unknown>(
             event.end.getTime() === heldEvent.end.getTime() &&
             event.title === heldEvent.title,
         ) ?? heldEvent));
+  // A held multi-day event, moved or not. The active box must also be the held
+  // event, because an events refresh can give its `day:index` key to another
+  // event, even before the pointer moves.
+  const multiDayHeld =
+    !paged &&
+    drag?.kind === "move" &&
+    (drag.continuesBefore || drag.continuesAfter) &&
+    !!movingEvent;
+  // Only once the pointer has moved: a press that may still be a click keeps
+  // the segments in their shared columns instead of swapping in the preview.
   const multiDayMove =
     !paged &&
     drag?.kind === "move" &&
+    drag.moved &&
     (drag.continuesBefore || drag.continuesAfter) &&
     moveOrigin &&
     movingEvent
@@ -2152,7 +2163,7 @@ function TimeGridInner<T = unknown>(
                   // the ghost stands in, so a same-slot event on the new page (e.g. a
                   // recurring one) must not also render lifted.
                   const active =
-                    !paged && drag?.key === key && (!multiDayMove || pe.event === movingEvent)
+                    !paged && drag?.key === key && (!multiDayHeld || pe.event === movingEvent)
                       ? drag
                       : null;
                   const hiddenForMove = !!multiDayMove && pe.event === movingEvent;
