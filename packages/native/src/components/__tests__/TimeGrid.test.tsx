@@ -45,7 +45,7 @@ const moveGestureHarness = (index = 0) => {
       handlers: {
         onStart?: (event: Record<string, number>) => void;
         onUpdate?: (event: Record<string, number>) => void;
-        onEnd?: (event: Record<string, number>) => void;
+        onEnd?: (event: Record<string, number>, success?: boolean) => void;
         onFinalize?: (event?: Record<string, number>, success?: boolean) => void;
       };
     }>;
@@ -1409,7 +1409,13 @@ describe("TimeGrid cross-week drop", () => {
     { label: "full-width box mostly over Wednesday", overlaps: 1, left: 1.9, day: 14 },
     { label: "half-width box mostly over Wednesday", overlaps: 2, left: 1.9, day: 14 },
     { label: "narrow box mostly over Wednesday", overlaps: 4, left: 1.95, day: 14 },
-    { label: "narrow box still mostly over Tuesday", overlaps: 4, left: 1.8, day: 13 },
+    // A picked-up box floats across its whole day column, so a narrow one lands
+    // by the centre of its full-width ghost, not of its slice.
+    { label: "narrow box floated mostly over Wednesday", overlaps: 4, left: 1.8, day: 14 },
+    { label: "narrow box floated still mostly over Tuesday", overlaps: 4, left: 1.4, day: 13 },
+    // The second box of a pair, grabbed a quarter column into its own slice: its
+    // ghost starts at the day column, so it sits half a column further left.
+    { label: "second box of a pair", overlaps: 2, grab: 1, left: 1.9, day: 13 },
     { label: "full-width box still mostly over Tuesday", overlaps: 1, left: 1.4, day: 13 },
     { label: "box beyond the first column", overlaps: 1, left: -1, day: 12 },
     { label: "box beyond the last column", overlaps: 1, left: 7, day: 18 },
@@ -1418,7 +1424,7 @@ describe("TimeGrid cross-week drop", () => {
     { label: "rejected placement", overlaps: 2, left: 1.9, day: 14, reject: true },
   ])(
     "selects the destination by the ghost's centre: $label",
-    async ({ overlaps, left, day, isRTL, hideWednesday, reject }) => {
+    async ({ overlaps, grab = 0, left, day, isRTL, hideWednesday, reject }) => {
       const onDragEvent = vi.fn(() => !reject);
       const onChangeDate = vi.fn();
       const events = Array.from({ length: overlaps }, (_, index) => ({
@@ -1447,7 +1453,7 @@ describe("TimeGrid cross-week drop", () => {
       const width = Dimensions.get("window").width;
       const columnWidth = width / (hideWednesday ? 6 : 7);
       const grabX = columnWidth / overlaps / 2;
-      const move = moveGestureHarness();
+      const move = moveGestureHarness(grab);
       await act(() => {
         move.onStart?.({ x: grabX, y: 10, absoluteX: 200, absoluteY: 300 });
         move.onUpdate?.({
@@ -1472,7 +1478,7 @@ describe("TimeGrid cross-week drop", () => {
       });
       expect(onDragEvent).toHaveBeenCalledTimes(1);
       expect(onDragEvent).toHaveBeenCalledWith(
-        events[0],
+        events[grab],
         new Date(2026, 0, day, 14),
         new Date(2026, 0, day, 15),
       );
@@ -1528,6 +1534,152 @@ describe("TimeGrid cross-week drop", () => {
     const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent<WithId>, Date, Date];
     expect(start).toEqual(new Date(2026, 0, 18, 14, 0));
     expect(end).toEqual(new Date(2026, 0, 18, 15, 0));
+  });
+
+  it("floats a picked-up event across its whole day column until its drop lands", async () => {
+    let accept = true;
+    const onDragEvent = vi.fn(() => accept);
+    const grid = (events = ["0", "1"].map((id) => ({ ...event, id }))) => (
+      <TimeGrid<WithId>
+        mode="week"
+        date={event.start}
+        events={events}
+        cellHeight={{ value: 48 } as never}
+        hourHeight={48}
+        weekStartsOn={1}
+        hideHours
+        classNames={{ event: "event-slot" }}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        onDragEvent={onDragEvent}
+      />
+    );
+    const initial = ["0", "1"].map((id) => ({ ...event, id }));
+    const { container, rerender } = await render(grid(initial));
+    const columnWidth = Dimensions.get("window").width / 7;
+    const geometry = () =>
+      container
+        .queryAll((node) => node.props.className === "event-slot")
+        .map((box) => {
+          const style = StyleSheet.flatten(box.props.style);
+          return [style.left, style.width];
+        });
+    // Tuesday's column, split between the two overlapping events.
+    expect(geometry()).toEqual([
+      [columnWidth, columnWidth / 2],
+      [columnWidth * 1.5, columnWidth / 2],
+    ]);
+    const move = moveGestureHarness(1);
+    const slices = [
+      [columnWidth, columnWidth / 2],
+      [columnWidth * 1.5, columnWidth / 2],
+    ];
+    const floated = [
+      [columnWidth, columnWidth / 2],
+      [columnWidth, columnWidth],
+    ];
+    const drag = async (finish: () => void) => {
+      await act(() => {
+        move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 });
+        move.onUpdate?.({ translationX: 0, translationY: 24, absoluteX: 200, absoluteY: 324 });
+      });
+      await rerender(grid(initial));
+      expect(geometry()).toEqual(floated);
+      await act(finish);
+      await rerender(grid(initial));
+    };
+    // A held press floats the box; a cancelled one returns it to its slice.
+    await act(() => move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 }));
+    await rerender(grid(initial));
+    expect(geometry()).toEqual(floated);
+    await act(() => {
+      move.onEnd?.({ translationX: 0, translationY: 0 }, false);
+      move.onFinalize?.({}, false);
+    });
+    await rerender(grid(initial));
+    expect(geometry()).toEqual(slices);
+    // A rejected drop snaps straight back into the slice.
+    accept = false;
+    await drag(() => {
+      move.onEnd?.({ translationX: 0, translationY: 24 });
+      move.onFinalize?.({}, true);
+    });
+    expect(onDragEvent).toHaveBeenCalledTimes(1);
+    expect(geometry()).toEqual(slices);
+    // An accepted drop keeps floating at its held offset until the consumer's
+    // update lands, then takes its new slice beside the event it still overlaps.
+    accept = true;
+    await drag(() => {
+      move.onEnd?.({ translationX: 0, translationY: 24 });
+      move.onFinalize?.({}, true);
+    });
+    expect(onDragEvent).toHaveBeenCalledTimes(2);
+    expect(geometry()).toEqual(floated);
+    const moved = [
+      initial[0],
+      { ...initial[1], start: new Date(2026, 0, 6, 9, 30), end: new Date(2026, 0, 6, 10, 30) },
+    ];
+    await rerender(grid(moved));
+    await rerender(grid(moved));
+    expect(geometry()).toEqual(slices);
+  });
+
+  it("keeps an event in its slice when a hold on its resize handle picks it up", async () => {
+    const grid = () => (
+      <TimeGrid<WithId>
+        mode="week"
+        date={event.start}
+        events={["0", "1"].map((id) => ({ ...event, id }))}
+        cellHeight={{ value: 48 } as never}
+        hourHeight={48}
+        weekStartsOn={1}
+        hideHours
+        classNames={{ event: "event-slot" }}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        onDragEvent={vi.fn()}
+      />
+    );
+    const { container, rerender } = await render(grid());
+    const geometry = () =>
+      container
+        .queryAll((node) => node.props.className === "event-slot")
+        .map((box) => {
+          const style = StyleSheet.flatten(box.props.style);
+          return [style.left, style.width, style.top];
+        });
+    const resting = geometry();
+    const { __gestures } = gestureHandlerMock as unknown as {
+      __gestures: Array<{ handlers: Record<string, ((...args: unknown[]) => void) | undefined> }>;
+    };
+    // Each event has a bottom and a top handle pan; the second event's bottom one.
+    const handle = __gestures.filter((gesture) => gesture.handlers.onBegin)[2]?.handlers;
+    if (!handle) throw new Error("resize handle gesture not found");
+    const move = moveGestureHarness(1);
+    // The finger rests on the handle long enough for the move to pick the event up,
+    // then starts to drift before the resize activates.
+    await act(() => {
+      handle.onBegin?.();
+      move.onStart?.({ x: 10, y: 50, absoluteX: 200, absoluteY: 350 });
+      move.onUpdate?.({ translationX: 0, translationY: 4, absoluteX: 200, absoluteY: 354 });
+    });
+    await rerender(grid());
+    expect(geometry().map(([left, width]) => [left, width])).toEqual(
+      resting.map(([left, width]) => [left, width]),
+    );
+    // The resize takes over, cancelling the active move (Gesture Handler calls
+    // onEnd, then onFinalize, both unsuccessful); nothing it previewed sticks.
+    await act(() => {
+      move.onEnd?.({ translationX: 0, translationY: 4 }, false);
+      move.onFinalize?.({}, false);
+      handle.onFinalize?.();
+    });
+    await rerender(grid());
+    expect(geometry()).toEqual(resting);
   });
 });
 

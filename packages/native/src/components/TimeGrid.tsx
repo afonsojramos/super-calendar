@@ -481,10 +481,13 @@ function AnimatedEventBoxInner<T>({
   // Raised to DRAG_EVENT_Z while a gesture is active so the dragged event floats
   // above all the others, then back to 0 when it settles.
   const dragZ = useSharedValue(0);
-  // 1 while a move gesture is running. Only gates the spill preview: the box's own
-  // clip is geometric, so it can't disagree with the box during the frames between
-  // release and the committed re-render.
+  // 1 while a move gesture is running. Gates the spill preview and floats the box
+  // across its day column; the box's own clip is geometric, so it can't disagree
+  // with the box during the frames between release and the committed re-render.
   const moving = useSharedValue(0);
+  // 1 while a finger is down on a resize handle. The move gesture wraps the
+  // handles, so a hold on one picks the event up too until the resize takes over.
+  const onHandle = useSharedValue(0);
   // Edge auto-advance: which side the drag has pushed past the visible columns
   // (-1 left / 0 none / +1 right).
   const edgeDir = useSharedValue(0);
@@ -520,6 +523,9 @@ function AnimatedEventBoxInner<T>({
     }),
     [startHours, ownsStart],
   );
+  // How far into its day column the box sits, mirrored the same way: an overlap
+  // group reflows when the consumer updates `events` mid-drag.
+  const columnInsetSV = useDerivedValue(() => left - dayLeftPx, [left, dayLeftPx]);
 
   // Where a move in progress lands beyond its plain row offset, in hours: a start
   // in the hour a spring-forward change skips moves on past it (`top`), and the
@@ -596,14 +602,23 @@ function AnimatedEventBoxInner<T>({
     // drag commits.
     // Hidden while lifted: the floating ghost stands in for the box until the
     // drop commits (and, for a multi-day move, while the preview draws it).
+    // A picked-up event floats across its whole day column, like the multi-day
+    // preview and the spill, instead of keeping its slice of an overlap group. It
+    // keeps floating while a dropped move holds its offset, so the box doesn't
+    // flash back to its old slice before the committed layout lands. A resize keeps
+    // the slice, even when a hold on its handle picked the event up first.
+    const floating =
+      !onHandle.value && (moving.value || moveOffset.value !== 0 || moveOffsetX.value !== 0);
     return {
+      left: floating ? dayLeftPx : left,
+      width: floating ? dayWidth : width,
       top,
       height: visibleBoxHeight.value,
       transform: [{ translateX: moveOffsetX.value }],
       zIndex: dragZ.value,
       opacity: hiddenForMove || lifted.value ? 0 : 1,
     };
-  }, [startHours, minHour, hiddenForMove]);
+  }, [startHours, minHour, hiddenForMove, left, width, dayLeftPx, dayWidth]);
 
   // Pixel height of the part of a move that runs past midnight, or 0 when nothing
   // spills. Measured against the end of the day, not `maxHour`: a narrowed window
@@ -781,7 +796,7 @@ function AnimatedEventBoxInner<T>({
         // the same gesture keeps tracking after the page changes.
         if (!lifted.value) {
           lifted.value = 1;
-          edgePaging.ghostW.value = width;
+          edgePaging.ghostW.value = dayWidth;
           edgePaging.ghostH.value = boxHeight.value;
           edgePaging.ghostX.value = liveAbsX.value - grabX.value - edgePaging.pagerLeft.value;
           edgePaging.ghostY.value = liveAbsY.value - grabY.value - edgePaging.pagerTop.value;
@@ -797,7 +812,7 @@ function AnimatedEventBoxInner<T>({
       disarmEdge,
       edgePaging,
       lifted,
-      width,
+      dayWidth,
       boxHeight,
       liveAbsX,
       liveAbsY,
@@ -816,8 +831,9 @@ function AnimatedEventBoxInner<T>({
         edgeDir.value = 0;
         lifted.value = 0;
         // Where in the box the finger grabbed, and the live finger position, so
-        // the ghost can be seeded and tracked in window space (see armEdge).
-        grabX.value = event.x;
+        // the ghost can be seeded and tracked in window space (see armEdge). The
+        // grab is measured from the day column, where the floating box now starts.
+        grabX.value = event.x + columnInsetSV.value;
         grabY.value = event.y;
         liveAbsX.value = event.absoluteX;
         liveAbsY.value = event.absoluteY;
@@ -931,6 +947,7 @@ function AnimatedEventBoxInner<T>({
   }, [
     canMove,
     snapMinutes,
+    columnInsetSV,
     cellHeight,
     moveOffset,
     moveOffsetX,
@@ -987,6 +1004,9 @@ function AnimatedEventBoxInner<T>({
   const resizeGesture = useMemo(() => {
     const pan = Gesture.Pan()
       .enabled(resizable)
+      .onBegin(() => {
+        onHandle.value = 1;
+      })
       .onStart(() => {
         dragZ.value = DRAG_EVENT_Z;
         runOnJS(notifyDragStart)();
@@ -1005,6 +1025,7 @@ function AnimatedEventBoxInner<T>({
       })
       .onFinalize(() => {
         dragZ.value = 0;
+        onHandle.value = 0;
       });
     const tap = Gesture.Tap()
       .runOnJS(true)
@@ -1022,6 +1043,7 @@ function AnimatedEventBoxInner<T>({
     resizable,
     snapMinutes,
     cellHeight,
+    onHandle,
     resizeDelta,
     dragZ,
     commitDrag,
@@ -1036,6 +1058,9 @@ function AnimatedEventBoxInner<T>({
   const resizeStartGesture = useMemo(() => {
     const pan = Gesture.Pan()
       .enabled(resizableFromStart)
+      .onBegin(() => {
+        onHandle.value = 1;
+      })
       .onStart(() => {
         dragZ.value = DRAG_EVENT_Z;
         runOnJS(notifyDragStart)();
@@ -1054,6 +1079,7 @@ function AnimatedEventBoxInner<T>({
       })
       .onFinalize(() => {
         dragZ.value = 0;
+        onHandle.value = 0;
       });
     const tap = Gesture.Tap()
       .runOnJS(true)
@@ -1071,6 +1097,7 @@ function AnimatedEventBoxInner<T>({
     resizableFromStart,
     snapMinutes,
     cellHeight,
+    onHandle,
     resizeStartDelta,
     dragZ,
     commitDrag,
