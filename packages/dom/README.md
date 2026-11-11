@@ -133,6 +133,12 @@ Time-grid edge paging requires a mouse drag. Touch and pen remain within the
 visible period, so resting near an edge cannot repeatedly change the date.
 See the [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
 
+While you move or resize a time-grid event, `renderTimeEvent` (or a
+`TimeGrid` `renderEvent`) receives a copy of the event whose `start` and `end`
+are the times the drop would report, so the label updates as you drag. Compare
+events by a stable ID inside a renderer. After a drag pages the view, the floating
+preview keeps the stored times until release.
+
 On the time grid, dragging any segment of a multi-day event previews the whole
 range moving together and preserves its duration. Drag a resize grip to change
 only the start or end. See the [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).

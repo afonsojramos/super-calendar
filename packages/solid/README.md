@@ -309,7 +309,10 @@ timers or access the DOM.
 The [Solid guide](https://super-calendar.afonsojramos.me/guides/solid) includes
 complete examples for controlled date pickers, resource bookings, and custom
 events. `Calendar` uses `renderTimeEvent`, `renderMonthEvent`, and
-`renderScheduleEvent`; direct views use `renderEvent`.
+`renderScheduleEvent`; direct views use `renderEvent`. While a time-grid event
+is moved or resized, its renderer receives a copy whose `start` and `end` are
+the times the drop would report, so compare events by a stable ID. After a drag
+pages the view, the floating preview keeps the stored times until release.
 
 If updates stop, read accessors in JSX and update event arrays with signal
 setters. Keep custom renderer props reactive by reading `props.event` in JSX.
