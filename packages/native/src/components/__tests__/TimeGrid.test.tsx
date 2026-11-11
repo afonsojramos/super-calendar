@@ -45,7 +45,7 @@ const moveGestureHarness = (index = 0) => {
       handlers: {
         onStart?: (event: Record<string, number>) => void;
         onUpdate?: (event: Record<string, number>) => void;
-        onEnd?: (event: Record<string, number>) => void;
+        onEnd?: (event: Record<string, number>, success?: boolean) => void;
         onFinalize?: (event?: Record<string, number>, success?: boolean) => void;
       };
     }>;
@@ -1594,7 +1594,10 @@ describe("TimeGrid cross-week drop", () => {
     await act(() => move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 }));
     await rerender(grid(initial));
     expect(geometry()).toEqual(floated);
-    await act(() => move.onFinalize?.({}, false));
+    await act(() => {
+      move.onEnd?.({ translationX: 0, translationY: 0 }, false);
+      move.onFinalize?.({}, false);
+    });
     await rerender(grid(initial));
     expect(geometry()).toEqual(slices);
     // A rejected drop snaps straight back into the slice.
@@ -1657,18 +1660,21 @@ describe("TimeGrid cross-week drop", () => {
     const handle = __gestures.filter((gesture) => gesture.handlers.onBegin)[2]?.handlers;
     if (!handle) throw new Error("resize handle gesture not found");
     const move = moveGestureHarness(1);
-    // The finger rests on the handle long enough for the move to pick the event up.
+    // The finger rests on the handle long enough for the move to pick the event up,
+    // then starts to drift before the resize activates.
     await act(() => {
       handle.onBegin?.();
       move.onStart?.({ x: 10, y: 50, absoluteX: 200, absoluteY: 350 });
-      move.onUpdate?.({ translationX: 0, translationY: 24, absoluteX: 200, absoluteY: 374 });
+      move.onUpdate?.({ translationX: 0, translationY: 4, absoluteX: 200, absoluteY: 354 });
     });
     await rerender(grid());
     expect(geometry().map(([left, width]) => [left, width])).toEqual(
       resting.map(([left, width]) => [left, width]),
     );
-    // The resize takes over, cancelling the move; nothing it previewed sticks.
+    // The resize takes over, cancelling the active move (Gesture Handler calls
+    // onEnd, then onFinalize, both unsuccessful); nothing it previewed sticks.
     await act(() => {
+      move.onEnd?.({ translationX: 0, translationY: 4 }, false);
       move.onFinalize?.({}, false);
       handle.onFinalize?.();
     });

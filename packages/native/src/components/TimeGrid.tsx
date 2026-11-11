@@ -928,12 +928,12 @@ function AnimatedEventBoxInner<T>({
         }
         // The preview unmounts from the `spillHeight` reaction once the commit
         // lands and clears `moveOffset`; this is the safety net for a cancel,
-        // where `onEnd` never runs, such as a resize taking over the touch.
+        // where `onEnd` never runs.
         moving.value = 0;
-        if (!success) {
+        if (multiDay && !success) {
           moveOffset.value = 0;
           moveOffsetX.value = 0;
-          if (multiDay) runOnJS(endMovePreview)();
+          runOnJS(endMovePreview)();
         }
         runOnJS(releaseEdge)();
       });
