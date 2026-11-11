@@ -1,5 +1,57 @@
 # Changelog
 
+## [2.18.0](https://github.com/afonsojramos/super-calendar/compare/v2.17.0...v2.18.0) (2026-11-11)
+
+
+### Features
+
+* **native:** render custom drafts in month creation previews ([8a39a7e](https://github.com/afonsojramos/super-calendar/commit/8a39a7e050cd3f247c97b6ffb63d3c00c2404018))
+* **native:** render custom drafts in month creation previews ([#120](https://github.com/afonsojramos/super-calendar/issues/120)) ([461b7cb](https://github.com/afonsojramos/super-calendar/commit/461b7cb8637cf594f58ac4beb1fa2b5b56a795d6))
+* preview dragged event times in web time-grid renderers ([#141](https://github.com/afonsojramos/super-calendar/issues/141)) ([6cee89e](https://github.com/afonsojramos/super-calendar/commit/6cee89e9662c2902f565e0684fed07c287c1155a))
+* **web:** render custom month creation previews ([19d86ed](https://github.com/afonsojramos/super-calendar/commit/19d86ed217ded74bcf607764172d88cdd5306a61))
+* **web:** render custom month creation previews ([#123](https://github.com/afonsojramos/super-calendar/issues/123)) ([cc14442](https://github.com/afonsojramos/super-calendar/commit/cc144428db39af2032835519088466bb9bcf8106))
+
+
+### Bug Fixes
+
+* arm month chip drags after the pointer moves ([#138](https://github.com/afonsojramos/super-calendar/issues/138)) ([b8afbef](https://github.com/afonsojramos/super-calendar/commit/b8afbef29c510fcf21a0b0df1b1103f81941bb0f))
+* **core:** end month creation at the next day boundary ([1d0ef15](https://github.com/afonsojramos/super-calendar/commit/1d0ef15f84b1aa7139ba2507b68d029ae0aa62a2))
+* **core:** end month creation at the next day boundary ([#127](https://github.com/afonsojramos/super-calendar/issues/127)) ([22a1998](https://github.com/afonsojramos/super-calendar/commit/22a19989a346d7bab29c7ef1b9779009b0bbd4a1))
+* **core:** index event days across midnight clock changes ([c883850](https://github.com/afonsojramos/super-calendar/commit/c8838503d2e55a49f36000bf4e9540c0c280540d))
+* **core:** index event days across midnight clock changes ([#125](https://github.com/afonsojramos/super-calendar/issues/125)) ([9eb0644](https://github.com/afonsojramos/super-calendar/commit/9eb0644d392c4cbcd78d6f287041dfcade000d53))
+* **demo:** compare draft labels by calendar day ([0e97cbb](https://github.com/afonsojramos/super-calendar/commit/0e97cbb1fbd403d32f96f098e4d9e1141f38e6c6))
+* **demo:** compare native draft labels by calendar day ([5e75856](https://github.com/afonsojramos/super-calendar/commit/5e75856e21e29697f77610e0b45d01b0f87fdf4f))
+* **demo:** label native drafts across skipped dates ([724be6c](https://github.com/afonsojramos/super-calendar/commit/724be6c64d419c1547377e090c8ef3d4344ca850))
+* **demo:** label web drafts across skipped dates ([5d8aaad](https://github.com/afonsojramos/super-calendar/commit/5d8aaadd747b5b2f63ce622fdd215738c11f5606))
+* **demo:** normalize native draft date boundaries ([d7d9b39](https://github.com/afonsojramos/super-calendar/commit/d7d9b39fb779c4073475340e3f96ebf2b1293590))
+* **demo:** normalize web draft date boundaries ([b9e1ec7](https://github.com/afonsojramos/super-calendar/commit/b9e1ec7ddf2e1c0ebddcd7a5cdf7618a3b3e9d0f))
+* **demo:** simplify native calendar navigation ([b7b6b62](https://github.com/afonsojramos/super-calendar/commit/b7b6b6298231b39ebec98f3fb4ee46354b7703e4))
+* **demo:** simplify native calendar navigation ([#129](https://github.com/afonsojramos/super-calendar/issues/129)) ([ba40149](https://github.com/afonsojramos/super-calendar/commit/ba40149f050021f0b18211de650cd8ccf78fee6e))
+* float moved time-grid events across their day column ([#140](https://github.com/afonsojramos/super-calendar/issues/140)) ([6433647](https://github.com/afonsojramos/super-calendar/commit/64336476b6d9df6be16c7236d1d6a05830668774))
+* keep pressed multi-day events in their column until they move ([#139](https://github.com/afonsojramos/super-calendar/issues/139)) ([eecee0a](https://github.com/afonsojramos/super-calendar/commit/eecee0a1a39f1727e7fa4d086b2e736cd3be9325))
+* **native:** float picked-up time-grid events across their day column ([#142](https://github.com/afonsojramos/super-calendar/issues/142)) ([e29bf77](https://github.com/afonsojramos/super-calendar/commit/e29bf77a2e086f68f85b114d003a9174921ee6d2))
+* **native:** isolate month previews and refresh their styling ([babcf29](https://github.com/afonsojramos/super-calendar/commit/babcf29eee799d50ad68cabda76e8bedc935db22))
+* span all-day events across visible dates ([#134](https://github.com/afonsojramos/super-calendar/issues/134)) ([96c53ec](https://github.com/afonsojramos/super-calendar/commit/96c53ec0899c438ff60a740c9513562d046da8ae))
+* **web:** cancel month drags without committing ([15e1415](https://github.com/afonsojramos/super-calendar/commit/15e141545aeabe7ede6b180d358936c53639b8f4))
+* **web:** cancel month drags without committing ([#122](https://github.com/afonsojramos/super-calendar/issues/122)) ([f58b8c0](https://github.com/afonsojramos/super-calendar/commit/f58b8c0ff437669b2bab60c95c1157a87dd569be))
+* **web:** complete time-grid creation when capture is lost on release ([95d8185](https://github.com/afonsojramos/super-calendar/commit/95d81850c0c122a3aace21c06318278dbb361962))
+* **web:** complete time-grid creation when capture is lost on release ([#118](https://github.com/afonsojramos/super-calendar/issues/118)) ([f957a68](https://github.com/afonsojramos/super-calendar/commit/f957a688730c51f1dfb9581b44ef9f6831ebed59))
+* **web:** discard stale creation on secondary mouse presses ([ee128dc](https://github.com/afonsojramos/super-calendar/commit/ee128dcf3af5c4b9e83b79bc42bb424fd317ca68))
+* **web:** keep native text dragging out of creation sweeps ([499e9ad](https://github.com/afonsojramos/super-calendar/commit/499e9add8b431dde55fb9734539490d397e207dc))
+* **web:** match creation previews to minimum event height ([826fb15](https://github.com/afonsojramos/super-calendar/commit/826fb152f5dd6d4a9dfccc9680f1c1b8100c8306))
+* **web:** match creation previews to minimum event height ([#121](https://github.com/afonsojramos/super-calendar/issues/121)) ([a39471d](https://github.com/afonsojramos/super-calendar/commit/a39471de539bc43a5877975342d9460f5c63690e))
+* **web:** preserve month drag endpoints and keyboard activation ([d595c31](https://github.com/afonsojramos/super-calendar/commit/d595c31362dbae24dab6c8281d6ca8bf6fc5b0c3))
+* **web:** prevent stale creation and handle both capture-loss button states ([b116249](https://github.com/afonsojramos/super-calendar/commit/b116249faf092c27c5154f4e87d931d383eb9950))
+* **web:** retain click suppression during keyboard activation ([a817fa0](https://github.com/afonsojramos/super-calendar/commit/a817fa0b9c2c4a4c6d359a6fa71cae56f5796bc2))
+* **web:** snap creation previews to the committed time range ([ba81cf4](https://github.com/afonsojramos/super-calendar/commit/ba81cf43025ced995cbe80c3875134735c146aed))
+* **web:** snap creation previews to the committed time range ([#119](https://github.com/afonsojramos/super-calendar/issues/119)) ([5ff8690](https://github.com/afonsojramos/super-calendar/commit/5ff8690906ecaa51bd11c8d551cec9c0b52da496))
+
+
+### Performance Improvements
+
+* **web:** avoid unused event action calculations ([e967785](https://github.com/afonsojramos/super-calendar/commit/e967785bcbe2fe5511a0e1dfc7ccdff4b0a9819a))
+* **web:** avoid unused event action calculations ([#130](https://github.com/afonsojramos/super-calendar/issues/130)) ([c682c3c](https://github.com/afonsojramos/super-calendar/commit/c682c3c09ec9219bee1ef920707a0e74f469af61))
+
 ## [2.17.0](https://github.com/afonsojramos/super-calendar/compare/v2.16.0...v2.17.0) (2026-11-08)
 
 
