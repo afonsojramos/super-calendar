@@ -1,6 +1,6 @@
 {
   "name": "super-calendar",
-  "version": "2.17.0",
+  "version": "2.18.0",
   "private": true,
   "description": "Monorepo for super-calendar: a shared core with React Native, React DOM, and Solid renderers.",
   "homepage": "https://github.com/afonsojramos/super-calendar#readme",
