@@ -1409,7 +1409,13 @@ describe("TimeGrid cross-week drop", () => {
     { label: "full-width box mostly over Wednesday", overlaps: 1, left: 1.9, day: 14 },
     { label: "half-width box mostly over Wednesday", overlaps: 2, left: 1.9, day: 14 },
     { label: "narrow box mostly over Wednesday", overlaps: 4, left: 1.95, day: 14 },
-    { label: "narrow box still mostly over Tuesday", overlaps: 4, left: 1.8, day: 13 },
+    // A picked-up box floats across its whole day column, so a narrow one lands
+    // by the centre of its full-width ghost, not of its slice.
+    { label: "narrow box floated mostly over Wednesday", overlaps: 4, left: 1.8, day: 14 },
+    { label: "narrow box floated still mostly over Tuesday", overlaps: 4, left: 1.4, day: 13 },
+    // The second box of a pair, grabbed a quarter column into its own slice: its
+    // ghost starts at the day column, so it sits half a column further left.
+    { label: "second box of a pair", overlaps: 2, grab: 1, left: 1.9, day: 13 },
     { label: "full-width box still mostly over Tuesday", overlaps: 1, left: 1.4, day: 13 },
     { label: "box beyond the first column", overlaps: 1, left: -1, day: 12 },
     { label: "box beyond the last column", overlaps: 1, left: 7, day: 18 },
@@ -1418,7 +1424,7 @@ describe("TimeGrid cross-week drop", () => {
     { label: "rejected placement", overlaps: 2, left: 1.9, day: 14, reject: true },
   ])(
     "selects the destination by the ghost's centre: $label",
-    async ({ overlaps, left, day, isRTL, hideWednesday, reject }) => {
+    async ({ overlaps, grab = 0, left, day, isRTL, hideWednesday, reject }) => {
       const onDragEvent = vi.fn(() => !reject);
       const onChangeDate = vi.fn();
       const events = Array.from({ length: overlaps }, (_, index) => ({
@@ -1447,7 +1453,7 @@ describe("TimeGrid cross-week drop", () => {
       const width = Dimensions.get("window").width;
       const columnWidth = width / (hideWednesday ? 6 : 7);
       const grabX = columnWidth / overlaps / 2;
-      const move = moveGestureHarness();
+      const move = moveGestureHarness(grab);
       await act(() => {
         move.onStart?.({ x: grabX, y: 10, absoluteX: 200, absoluteY: 300 });
         move.onUpdate?.({
@@ -1472,7 +1478,7 @@ describe("TimeGrid cross-week drop", () => {
       });
       expect(onDragEvent).toHaveBeenCalledTimes(1);
       expect(onDragEvent).toHaveBeenCalledWith(
-        events[0],
+        events[grab],
         new Date(2026, 0, day, 14),
         new Date(2026, 0, day, 15),
       );
@@ -1528,6 +1534,54 @@ describe("TimeGrid cross-week drop", () => {
     const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent<WithId>, Date, Date];
     expect(start).toEqual(new Date(2026, 0, 18, 14, 0));
     expect(end).toEqual(new Date(2026, 0, 18, 15, 0));
+  });
+
+  it("floats a picked-up event across its whole day column", async () => {
+    const events = ["0", "1"].map((id) => ({ ...event, id }));
+    const grid = () => (
+      <TimeGrid<WithId>
+        mode="week"
+        date={event.start}
+        events={events}
+        cellHeight={{ value: 48 } as never}
+        hourHeight={48}
+        weekStartsOn={1}
+        hideHours
+        classNames={{ event: "event-slot" }}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        onDragEvent={noop}
+      />
+    );
+    const { container, rerender } = await render(grid());
+    const columnWidth = Dimensions.get("window").width / 7;
+    const geometry = () =>
+      container
+        .queryAll((node) => node.props.className === "event-slot")
+        .map((box) => {
+          const style = StyleSheet.flatten(box.props.style);
+          return [style.left, style.width];
+        });
+    // Tuesday's column, split between the two overlapping events.
+    expect(geometry()).toEqual([
+      [columnWidth, columnWidth / 2],
+      [columnWidth * 1.5, columnWidth / 2],
+    ]);
+    const move = moveGestureHarness(1);
+    await act(() => move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 }));
+    await rerender(grid());
+    expect(geometry()).toEqual([
+      [columnWidth, columnWidth / 2],
+      [columnWidth, columnWidth],
+    ]);
+    await act(() => move.onFinalize?.({}, false));
+    await rerender(grid());
+    expect(geometry()).toEqual([
+      [columnWidth, columnWidth / 2],
+      [columnWidth * 1.5, columnWidth / 2],
+    ]);
   });
 });
 

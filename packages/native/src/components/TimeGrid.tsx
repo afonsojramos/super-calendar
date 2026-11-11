@@ -520,6 +520,9 @@ function AnimatedEventBoxInner<T>({
     }),
     [startHours, ownsStart],
   );
+  // How far into its day column the box sits, mirrored the same way: an overlap
+  // group reflows when the consumer updates `events` mid-drag.
+  const columnInsetSV = useDerivedValue(() => left - dayLeftPx, [left, dayLeftPx]);
 
   // Where a move in progress lands beyond its plain row offset, in hours: a start
   // in the hour a spring-forward change skips moves on past it (`top`), and the
@@ -596,14 +599,18 @@ function AnimatedEventBoxInner<T>({
     // drag commits.
     // Hidden while lifted: the floating ghost stands in for the box until the
     // drop commits (and, for a multi-day move, while the preview draws it).
+    // A picked-up event floats across its whole day column, like the multi-day
+    // preview and the spill, instead of keeping its slice of an overlap group.
     return {
+      left: moving.value ? dayLeftPx : left,
+      width: moving.value ? dayWidth : width,
       top,
       height: visibleBoxHeight.value,
       transform: [{ translateX: moveOffsetX.value }],
       zIndex: dragZ.value,
       opacity: hiddenForMove || lifted.value ? 0 : 1,
     };
-  }, [startHours, minHour, hiddenForMove]);
+  }, [startHours, minHour, hiddenForMove, left, width, dayLeftPx, dayWidth]);
 
   // Pixel height of the part of a move that runs past midnight, or 0 when nothing
   // spills. Measured against the end of the day, not `maxHour`: a narrowed window
@@ -781,7 +788,7 @@ function AnimatedEventBoxInner<T>({
         // the same gesture keeps tracking after the page changes.
         if (!lifted.value) {
           lifted.value = 1;
-          edgePaging.ghostW.value = width;
+          edgePaging.ghostW.value = dayWidth;
           edgePaging.ghostH.value = boxHeight.value;
           edgePaging.ghostX.value = liveAbsX.value - grabX.value - edgePaging.pagerLeft.value;
           edgePaging.ghostY.value = liveAbsY.value - grabY.value - edgePaging.pagerTop.value;
@@ -797,7 +804,7 @@ function AnimatedEventBoxInner<T>({
       disarmEdge,
       edgePaging,
       lifted,
-      width,
+      dayWidth,
       boxHeight,
       liveAbsX,
       liveAbsY,
@@ -816,8 +823,9 @@ function AnimatedEventBoxInner<T>({
         edgeDir.value = 0;
         lifted.value = 0;
         // Where in the box the finger grabbed, and the live finger position, so
-        // the ghost can be seeded and tracked in window space (see armEdge).
-        grabX.value = event.x;
+        // the ghost can be seeded and tracked in window space (see armEdge). The
+        // grab is measured from the day column, where the floating box now starts.
+        grabX.value = event.x + columnInsetSV.value;
         grabY.value = event.y;
         liveAbsX.value = event.absoluteX;
         liveAbsY.value = event.absoluteY;
@@ -931,6 +939,7 @@ function AnimatedEventBoxInner<T>({
   }, [
     canMove,
     snapMinutes,
+    columnInsetSV,
     cellHeight,
     moveOffset,
     moveOffsetX,
