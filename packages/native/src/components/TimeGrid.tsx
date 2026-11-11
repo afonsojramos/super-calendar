@@ -481,10 +481,13 @@ function AnimatedEventBoxInner<T>({
   // Raised to DRAG_EVENT_Z while a gesture is active so the dragged event floats
   // above all the others, then back to 0 when it settles.
   const dragZ = useSharedValue(0);
-  // 1 while a move gesture is running. Only gates the spill preview: the box's own
-  // clip is geometric, so it can't disagree with the box during the frames between
-  // release and the committed re-render.
+  // 1 while a move gesture is running. Gates the spill preview and floats the box
+  // across its day column; the box's own clip is geometric, so it can't disagree
+  // with the box during the frames between release and the committed re-render.
   const moving = useSharedValue(0);
+  // 1 while a finger is down on a resize handle. The move gesture wraps the
+  // handles, so a hold on one picks the event up too until the resize takes over.
+  const onHandle = useSharedValue(0);
   // Edge auto-advance: which side the drag has pushed past the visible columns
   // (-1 left / 0 none / +1 right).
   const edgeDir = useSharedValue(0);
@@ -602,8 +605,10 @@ function AnimatedEventBoxInner<T>({
     // A picked-up event floats across its whole day column, like the multi-day
     // preview and the spill, instead of keeping its slice of an overlap group. It
     // keeps floating while a dropped move holds its offset, so the box doesn't
-    // flash back to its old slice before the committed layout lands.
-    const floating = moving.value || moveOffset.value !== 0 || moveOffsetX.value !== 0;
+    // flash back to its old slice before the committed layout lands. A resize keeps
+    // the slice, even when a hold on its handle picked the event up first.
+    const floating =
+      !onHandle.value && (moving.value || moveOffset.value !== 0 || moveOffsetX.value !== 0);
     return {
       left: floating ? dayLeftPx : left,
       width: floating ? dayWidth : width,
@@ -923,12 +928,12 @@ function AnimatedEventBoxInner<T>({
         }
         // The preview unmounts from the `spillHeight` reaction once the commit
         // lands and clears `moveOffset`; this is the safety net for a cancel,
-        // where `onEnd` never runs.
+        // where `onEnd` never runs, such as a resize taking over the touch.
         moving.value = 0;
-        if (multiDay && !success) {
+        if (!success) {
           moveOffset.value = 0;
           moveOffsetX.value = 0;
-          runOnJS(endMovePreview)();
+          if (multiDay) runOnJS(endMovePreview)();
         }
         runOnJS(releaseEdge)();
       });
@@ -999,6 +1004,9 @@ function AnimatedEventBoxInner<T>({
   const resizeGesture = useMemo(() => {
     const pan = Gesture.Pan()
       .enabled(resizable)
+      .onBegin(() => {
+        onHandle.value = 1;
+      })
       .onStart(() => {
         dragZ.value = DRAG_EVENT_Z;
         runOnJS(notifyDragStart)();
@@ -1017,6 +1025,7 @@ function AnimatedEventBoxInner<T>({
       })
       .onFinalize(() => {
         dragZ.value = 0;
+        onHandle.value = 0;
       });
     const tap = Gesture.Tap()
       .runOnJS(true)
@@ -1034,6 +1043,7 @@ function AnimatedEventBoxInner<T>({
     resizable,
     snapMinutes,
     cellHeight,
+    onHandle,
     resizeDelta,
     dragZ,
     commitDrag,
@@ -1048,6 +1058,9 @@ function AnimatedEventBoxInner<T>({
   const resizeStartGesture = useMemo(() => {
     const pan = Gesture.Pan()
       .enabled(resizableFromStart)
+      .onBegin(() => {
+        onHandle.value = 1;
+      })
       .onStart(() => {
         dragZ.value = DRAG_EVENT_Z;
         runOnJS(notifyDragStart)();
@@ -1066,6 +1079,7 @@ function AnimatedEventBoxInner<T>({
       })
       .onFinalize(() => {
         dragZ.value = 0;
+        onHandle.value = 0;
       });
     const tap = Gesture.Tap()
       .runOnJS(true)
@@ -1083,6 +1097,7 @@ function AnimatedEventBoxInner<T>({
     resizableFromStart,
     snapMinutes,
     cellHeight,
+    onHandle,
     resizeStartDelta,
     dragZ,
     commitDrag,

@@ -1622,6 +1622,59 @@ describe("TimeGrid cross-week drop", () => {
     await rerender(grid(moved));
     expect(geometry()).toEqual(slices);
   });
+
+  it("keeps an event in its slice when a hold on its resize handle picks it up", async () => {
+    const grid = () => (
+      <TimeGrid<WithId>
+        mode="week"
+        date={event.start}
+        events={["0", "1"].map((id) => ({ ...event, id }))}
+        cellHeight={{ value: 48 } as never}
+        hourHeight={48}
+        weekStartsOn={1}
+        hideHours
+        classNames={{ event: "event-slot" }}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        onDragEvent={vi.fn()}
+      />
+    );
+    const { container, rerender } = await render(grid());
+    const geometry = () =>
+      container
+        .queryAll((node) => node.props.className === "event-slot")
+        .map((box) => {
+          const style = StyleSheet.flatten(box.props.style);
+          return [style.left, style.width, style.top];
+        });
+    const resting = geometry();
+    const { __gestures } = gestureHandlerMock as unknown as {
+      __gestures: Array<{ handlers: Record<string, ((...args: unknown[]) => void) | undefined> }>;
+    };
+    // Each event has a bottom and a top handle pan; the second event's bottom one.
+    const handle = __gestures.filter((gesture) => gesture.handlers.onBegin)[2]?.handlers;
+    if (!handle) throw new Error("resize handle gesture not found");
+    const move = moveGestureHarness(1);
+    // The finger rests on the handle long enough for the move to pick the event up.
+    await act(() => {
+      handle.onBegin?.();
+      move.onStart?.({ x: 10, y: 50, absoluteX: 200, absoluteY: 350 });
+      move.onUpdate?.({ translationX: 0, translationY: 24, absoluteX: 200, absoluteY: 374 });
+    });
+    await rerender(grid());
+    expect(geometry().map(([left, width]) => [left, width])).toEqual(
+      resting.map(([left, width]) => [left, width]),
+    );
+    // The resize takes over, cancelling the move; nothing it previewed sticks.
+    await act(() => {
+      move.onFinalize?.({}, false);
+      handle.onFinalize?.();
+    });
+    await rerender(grid());
+    expect(geometry()).toEqual(resting);
+  });
 });
 
 describe("TimeGrid drag handle colour", () => {
