@@ -1536,9 +1536,10 @@ describe("TimeGrid cross-week drop", () => {
     expect(end).toEqual(new Date(2026, 0, 18, 15, 0));
   });
 
-  it("floats a picked-up event across its whole day column", async () => {
-    const events = ["0", "1"].map((id) => ({ ...event, id }));
-    const grid = () => (
+  it("floats a picked-up event across its whole day column until its drop lands", async () => {
+    let accept = true;
+    const onDragEvent = vi.fn(() => accept);
+    const grid = (events = ["0", "1"].map((id) => ({ ...event, id }))) => (
       <TimeGrid<WithId>
         mode="week"
         date={event.start}
@@ -1552,10 +1553,11 @@ describe("TimeGrid cross-week drop", () => {
         keyExtractor={(item) => item.id}
         onChangeDate={noop}
         onPressEvent={noop}
-        onDragEvent={noop}
+        onDragEvent={onDragEvent}
       />
     );
-    const { container, rerender } = await render(grid());
+    const initial = ["0", "1"].map((id) => ({ ...event, id }));
+    const { container, rerender } = await render(grid(initial));
     const columnWidth = Dimensions.get("window").width / 7;
     const geometry = () =>
       container
@@ -1570,18 +1572,55 @@ describe("TimeGrid cross-week drop", () => {
       [columnWidth * 1.5, columnWidth / 2],
     ]);
     const move = moveGestureHarness(1);
-    await act(() => move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 }));
-    await rerender(grid());
-    expect(geometry()).toEqual([
-      [columnWidth, columnWidth / 2],
-      [columnWidth, columnWidth],
-    ]);
-    await act(() => move.onFinalize?.({}, false));
-    await rerender(grid());
-    expect(geometry()).toEqual([
+    const slices = [
       [columnWidth, columnWidth / 2],
       [columnWidth * 1.5, columnWidth / 2],
-    ]);
+    ];
+    const floated = [
+      [columnWidth, columnWidth / 2],
+      [columnWidth, columnWidth],
+    ];
+    const drag = async (finish: () => void) => {
+      await act(() => {
+        move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 });
+        move.onUpdate?.({ translationX: 0, translationY: 24, absoluteX: 200, absoluteY: 324 });
+      });
+      await rerender(grid(initial));
+      expect(geometry()).toEqual(floated);
+      await act(finish);
+      await rerender(grid(initial));
+    };
+    // A held press floats the box; a cancelled one returns it to its slice.
+    await act(() => move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 }));
+    await rerender(grid(initial));
+    expect(geometry()).toEqual(floated);
+    await act(() => move.onFinalize?.({}, false));
+    await rerender(grid(initial));
+    expect(geometry()).toEqual(slices);
+    // A rejected drop snaps straight back into the slice.
+    accept = false;
+    await drag(() => {
+      move.onEnd?.({ translationX: 0, translationY: 24 });
+      move.onFinalize?.({}, true);
+    });
+    expect(onDragEvent).toHaveBeenCalledTimes(1);
+    expect(geometry()).toEqual(slices);
+    // An accepted drop keeps floating at its held offset until the consumer's
+    // update lands, then takes its new slice beside the event it still overlaps.
+    accept = true;
+    await drag(() => {
+      move.onEnd?.({ translationX: 0, translationY: 24 });
+      move.onFinalize?.({}, true);
+    });
+    expect(onDragEvent).toHaveBeenCalledTimes(2);
+    expect(geometry()).toEqual(floated);
+    const moved = [
+      initial[0],
+      { ...initial[1], start: new Date(2026, 0, 6, 9, 30), end: new Date(2026, 0, 6, 10, 30) },
+    ];
+    await rerender(grid(moved));
+    await rerender(grid(moved));
+    expect(geometry()).toEqual(slices);
   });
 });
 

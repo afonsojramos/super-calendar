@@ -600,10 +600,13 @@ function AnimatedEventBoxInner<T>({
     // Hidden while lifted: the floating ghost stands in for the box until the
     // drop commits (and, for a multi-day move, while the preview draws it).
     // A picked-up event floats across its whole day column, like the multi-day
-    // preview and the spill, instead of keeping its slice of an overlap group.
+    // preview and the spill, instead of keeping its slice of an overlap group. It
+    // keeps floating while a dropped move holds its offset, so the box doesn't
+    // flash back to its old slice before the committed layout lands.
+    const floating = moving.value || moveOffset.value !== 0 || moveOffsetX.value !== 0;
     return {
-      left: moving.value ? dayLeftPx : left,
-      width: moving.value ? dayWidth : width,
+      left: floating ? dayLeftPx : left,
+      width: floating ? dayWidth : width,
       top,
       height: visibleBoxHeight.value,
       transform: [{ translateX: moveOffsetX.value }],
