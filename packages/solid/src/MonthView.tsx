@@ -83,6 +83,10 @@ const CHIP_GAP = 2;
 const CELL_PAD = 4;
 // Opacity of an event chip while it is being dragged to another day.
 const DRAGGED_CHIP_OPACITY = 0.4;
+// How far a press travels before it becomes a drag. Until then the chips stay
+// hit-testable, so a click still reaches the chip it pressed.
+const DRAG_SLOP_PX = 4;
+const TOUCH_DRAG_SLOP_PX = 8;
 
 /** Props passed to a custom month event chip renderer. */
 export interface SolidMonthEventArgs<T = unknown> {
@@ -117,6 +121,10 @@ type MonthDrag<T> = (
 ) & {
   // The rows the drag began in, so a drag never commits into a different window.
   windowKey: string;
+  // Set once the pointer travels past the drag slop (or a touch hold fires).
+  // Chips stop taking pointer input only then, so a plain click is not
+  // retargeted to the day cell beneath.
+  armed: boolean;
 };
 
 // A day as the shared rows render it. Month days carry `isCurrentMonth`;
@@ -903,15 +911,22 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
     !event.disabled &&
     event.draggable !== false &&
     (event.startEditable ?? props.eventStartEditable);
+  // Where the current press began and how far it may travel before it drags.
+  let pressOrigin = { x: 0, y: 0, slop: DRAG_SLOP_PX };
   // A fresh press starts a new interaction, so any guard left over from the
   // previous one is stale.
   const beginPress = (e: PointerEvent) => {
     if (dragRef.current || e.isPrimary === false) return false;
     suppressClickRef.current = false;
     movedRef.current = false;
+    pressOrigin = {
+      x: e.clientX,
+      y: e.clientY,
+      slop: e.pointerType === "touch" ? TOUCH_DRAG_SLOP_PX : DRAG_SLOP_PX,
+    };
     return true;
   };
-  const beginCreate = (day: Date, pointerId: number) => {
+  const beginCreate = (day: Date, pointerId: number, armed: boolean) => {
     if (!props.onCreateEvent && !props.onSelectDrag) return;
     const t = startOfDay(day).getTime();
     applyDrag({
@@ -920,9 +935,10 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       anchor: t,
       hover: t,
       windowKey: windowKey(),
+      armed,
     });
   };
-  const beginMove = (event: CalendarEvent<T>, day: Date, pointerId: number) => {
+  const beginMove = (event: CalendarEvent<T>, day: Date, pointerId: number, armed: boolean) => {
     if (!canMove(event)) return;
     const t = startOfDay(day).getTime();
     applyDrag({
@@ -932,6 +948,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       from: t,
       to: t,
       windowKey: windowKey(),
+      armed,
     });
     props.onDragStart?.(event);
   };
@@ -946,10 +963,12 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
         ? {
             ...current,
             hover: t,
+            armed: true,
           }
         : {
             ...current,
             to: t,
+            armed: true,
           },
     );
     // A sweep reports its span live, so a selection can track the drag; a move
@@ -975,12 +994,12 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
     moving?: CalendarEvent<T>,
   ) => {
     if (event.button !== 0 || heldTouch || !beginPress(event)) return;
-    const start = () => {
-      if (moving) beginMove(moving, day, event.pointerId);
-      else beginCreate(day, event.pointerId);
+    const start = (armed: boolean) => {
+      if (moving) beginMove(moving, day, event.pointerId, armed);
+      else beginCreate(day, event.pointerId, armed);
     };
     if (!multiWeek() || !event.pointerType || event.pointerType === "mouse") {
-      start();
+      start(false);
       return;
     }
     heldOrigin = { day, event: moving };
@@ -992,7 +1011,8 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
         clientX: event.clientX,
         clientY: event.clientY,
       },
-      start,
+      // The hold itself is the deliberate gesture, so a held drag starts armed.
+      () => start(true),
       (x, y) => {
         const element = gridRef.current?.ownerDocument
           .elementFromPoint(x, y)
@@ -1052,6 +1072,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
     },
   );
   const isDragging = createMemo(() => drag() !== null);
+  const dragArmed = createMemo(() => drag()?.armed === true);
   // Whether any month drag is wired up at all, so the cells only take over touch
   // scrolling and pointer tracking when one of the handlers can actually fire.
   const dragWired = createMemo(
@@ -1066,7 +1087,13 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
           const current = dragRef.current;
           if (!current || current.pointerId !== e.pointerId) return;
           applyDrag(null);
-          if (!movedRef.current) return;
+          if (!movedRef.current) {
+            // An armed move that returns to its day is released over the day cell,
+            // because the chip ignored pointer input mid drag. The click that
+            // follows belongs to the abandoned drag, not to the day.
+            if (current.kind === "move" && current.armed) suppressClickRef.current = true;
+            return;
+          }
           suppressClickRef.current = true;
           // Multi-week rows drop a drag whose window was replaced before release.
           if (multiWeek() && current.windowKey !== windowKey()) return;
@@ -1096,15 +1123,24 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
         const cancel = (event: PointerEvent) => {
           if (dragRef.current?.pointerId === event.pointerId) clear();
         };
+        const arm = (event: PointerEvent) => {
+          const current = dragRef.current;
+          if (!current || current.armed || current.pointerId !== event.pointerId) return;
+          const distance = Math.hypot(event.clientX - pressOrigin.x, event.clientY - pressOrigin.y);
+          if (distance <= pressOrigin.slop) return;
+          applyDrag({ ...current, armed: true });
+        };
         const keyDown = (event: KeyboardEvent) => {
           if (event.key !== "Escape") return;
           event.preventDefault();
           clear();
         };
+        window.addEventListener("pointermove", arm);
         window.addEventListener("pointerup", finish);
         window.addEventListener("pointercancel", cancel);
         window.addEventListener("keydown", keyDown);
         return () => {
+          window.removeEventListener("pointermove", arm);
           window.removeEventListener("pointerup", finish);
           window.removeEventListener("pointercancel", cancel);
           window.removeEventListener("keydown", keyDown);
@@ -1647,7 +1683,8 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                 const isDragged = createMemo(() => {
                                                   const currentDrag = drag();
                                                   return (
-                                                    currentDrag?.kind === "move" &&
+                                                    currentDrag?.armed === true &&
+                                                    currentDrag.kind === "move" &&
                                                     currentDrag.event === b().seg.event
                                                   );
                                                 });
@@ -1697,7 +1734,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                         b().seg.lane *
                                                           (props.chipHeight + props.chipGap),
                                                       height: props.chipHeight,
-                                                      pointerEvents: isDragging() ? "none" : "auto",
+                                                      pointerEvents: dragArmed() ? "none" : "auto",
                                                       // Fade the bar being carried, so the tinted drop
                                                       // target reads as where it is going.
                                                       opacity: isDragged()
