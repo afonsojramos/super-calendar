@@ -43,8 +43,6 @@ import {
   rangeBandKind,
   type WeekdayFormat,
   type WeekStartsOn,
-} from "@super-calendar/core";
-import {
   type CalendarLabels,
   dayAccessibilityLabel,
   resolveCalendarLabels,

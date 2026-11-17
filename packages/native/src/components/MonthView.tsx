@@ -58,9 +58,8 @@ import {
   isDateSelectable,
   useCalendarSelection,
   weekdayFormatToken,
-} from "@super-calendar/core";
-import { dayBadgeKind, rangeBandKind } from "@super-calendar/core";
-import {
+  dayBadgeKind,
+  rangeBandKind,
   buildMonthWeeks,
   buildMultiWeekGrid,
   getIsToday,
@@ -69,11 +68,13 @@ import {
   getWeekDays,
   isSameCalendarDay,
   isWeekend,
-} from "@super-calendar/core";
-import { monthEventCapacity, monthVisibleCount } from "@super-calendar/core";
-import { layoutMonthWeek, type MonthWeekEvents } from "@super-calendar/core";
-import { monthCreateRange, monthDropBounds, overlapsOtherEvents } from "@super-calendar/core";
-import {
+  monthEventCapacity,
+  monthVisibleCount,
+  layoutMonthWeek,
+  type MonthWeekEvents,
+  monthCreateRange,
+  monthDropBounds,
+  overlapsOtherEvents,
   compareDayEvents,
   groupEventsByDay,
   isAllDayEvent,

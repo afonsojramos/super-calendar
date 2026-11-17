@@ -30,7 +30,7 @@ All renderers depend on core via `workspace:*`.
 
 ## Commands (run from the repo root)
 
-- `pnpm lint` / `pnpm lint:fix` — oxlint (type-aware)
+- `pnpm lint` / `pnpm lint:fix` — oxlint (type-aware; warnings fail). Rules live in `.oxlintrc.json`.
 - `pnpm format` / `pnpm format:fix` — oxfmt
 - `pnpm typecheck` — `tsc --noEmit`
 - `pnpm test` runs Vitest once; `pnpm test:watch` starts watch mode.
@@ -46,11 +46,11 @@ Use pnpm or nub, not npm/npx; both install correctly from the shared `pnpm-lock.
 
 `scripts/` holds dev tooling that runs directly with `node`, using workspace dependencies where needed, with no build step.
 
-- `scripts/visual-parity.mjs` (`pnpm parity:visual`) drives system Chrome over CDP to screenshot the dom (`examples/web`) and native-on-react-native-web (`examples/native`) renderers across every view at one fixed viewport, then writes `visual-parity/index.html` with the pairs side by side for eyeballing. It's a manual aid for keeping the two **web** outputs aligned when changing shared layout/styling; the automated guard is still `tests/architecture/renderer-parity.test.ts` (prop-name parity only). Start both dev servers first (`cd examples/web && pnpm dev`, `cd examples/native && pnpm start`). Output is gitignored. Override targets with `DOM_URL`, `NATIVE_URL`, `CHROME`, `VIEWS`, `WIDTH`, `HEIGHT`.
+- `scripts/visual-parity.mjs` (`pnpm parity:visual`) screenshots the dom and native-on-react-native-web renderers side by side, for manual visual parity on shared layout changes. Prop-name parity is enforced separately by `tests/architecture/renderer-parity.test.ts`. Read the script header for setup and overrides.
 
 ## Tests
 
-Vitest has five projects: `node` (core logic + native non-component tests), `dom` (React DOM in jsdom), `solid` (Solid in jsdom), `solid-server` (Solid SSR), and `native` (React Native through vitest-native's native engine). Native tests use Testing Library 14: await rendering, events, and updates, and query host elements. The native setup retains the recording gesture and animation harness; device tests verify actual gestures and layout.
+Vitest has five projects: `node` (core logic + native non-component tests), `dom` (React DOM in jsdom), `solid` (Solid in jsdom), `solid-server` (Solid SSR), and `native` (React Native through vitest-native's native engine). Native tests use Testing Library 14 and query host elements. The native setup retains the recording gesture and animation harness; device tests verify actual gestures and layout.
 
 Write shared React DOM/Solid behavior in `tests/web/contracts`; read the [shared web test guide](tests/web/README.md) before adding cases. Both projects compile the same JSX for their framework and use the real calendar components. Keep framework-specific tests beside the source under `packages/*/src/**`; use the [test directory guide](tests/README.md) for repository checks, setup, and reusable helpers. Tests resolve core imports to source, so no build is needed. Use `vi` from `vitest` for mocks and timers. The forks pool isolates process state; DST fixtures use `tests/support/timezone.ts` to select and restore their time zone.
 

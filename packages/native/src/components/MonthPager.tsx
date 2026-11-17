@@ -55,8 +55,8 @@ import {
   filterHiddenDays,
   getWeekDays,
   weekdayFormatToken,
+  type CalendarLabels,
 } from "@super-calendar/core";
-import type { CalendarLabels } from "@super-calendar/core";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { DateRows, type DateRowsSource, type MonthViewSlot } from "./MonthView";

@@ -1,7 +1,6 @@
 import { vi } from "vitest";
 import { waitFor } from "@testing-library/dom";
-import type { CalendarEvent, EventSourceOptions } from "../index";
-import { createEventSource } from "../index";
+import { type CalendarEvent, type EventSourceOptions, createEventSource } from "../index";
 import { act, renderState } from "../../../../tests/support/solid-render";
 
 const event = {

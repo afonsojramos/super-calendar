@@ -86,8 +86,6 @@ import {
   isSameCalendarDay,
   isWeekend,
   viewDayCount,
-} from "@super-calendar/core";
-import {
   backgroundBandsForDay,
   cellRangeFromDrag,
   clampMoveStartMinutes,
@@ -98,15 +96,16 @@ import {
   resolveDraggedBounds,
   movedClockSpan,
   snapDeltaMinutes,
+  formatHour,
+  layoutDayEvents,
+  type PositionedEvent,
+  type CalendarHandle,
+  type CalendarLabels,
+  type EventAccessibilityLabeler,
+  resolveCalendarLabels,
+  type WeekdayFormat,
+  weekdayFormatToken,
 } from "@super-calendar/core";
-import { formatHour, layoutDayEvents, type PositionedEvent } from "@super-calendar/core";
-import type {
-  CalendarHandle,
-  CalendarLabels,
-  EventAccessibilityLabeler,
-} from "@super-calendar/core";
-import { resolveCalendarLabels } from "@super-calendar/core";
-import { type WeekdayFormat, weekdayFormatToken } from "@super-calendar/core";
 import {
   type ResolvedSlot,
   SlotStylesProvider,

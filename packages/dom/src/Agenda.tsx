@@ -1,8 +1,9 @@
 import { LegendList } from "@legendapp/list/react";
 import { format, isSameDay, type Locale, startOfDay } from "date-fns";
 import { type ComponentType, type CSSProperties, type ReactElement, useMemo } from "react";
-import type { CalendarEvent, EventAccessibilityLabeler } from "@super-calendar/core";
 import {
+  type CalendarEvent,
+  type EventAccessibilityLabeler,
   eventTimeLabel,
   getIsToday,
   isAllDayEvent,

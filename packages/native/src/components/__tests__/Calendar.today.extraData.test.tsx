@@ -1,5 +1,4 @@
-import { useMemo } from "react";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { vi } from "vitest";
 import { render } from "../../../../../tests/support/native-time-grid";
 

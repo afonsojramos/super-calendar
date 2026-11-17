@@ -45,8 +45,9 @@ import {
   getViewDays,
   type WeekdayFormat,
   type WeekStartsOn,
+  type CalendarHandle,
+  type CalendarLabels,
 } from "@super-calendar/core";
-import type { CalendarHandle, CalendarLabels } from "@super-calendar/core";
 import { Agenda, type AgendaSlot, type DomAgendaEvent } from "./Agenda";
 import { YearView, type YearViewSlot } from "./YearView";
 import { type DomMonthEvent, MonthView, type MonthViewSlot } from "./MonthView";

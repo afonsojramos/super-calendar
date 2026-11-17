@@ -64,8 +64,8 @@ describe("interaction performance reports", () => {
       max: 70,
       count: 7,
     });
-    expect(() => summarize([])).toThrow();
-    expect(() => summarize([NaN])).toThrow();
+    expect(() => summarize([])).toThrow("Invalid performance sample");
+    expect(() => summarize([NaN])).toThrow("Invalid performance sample");
   });
 
   it("renders identical rows for both frameworks and labels native measurements as absent", () => {

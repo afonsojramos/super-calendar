@@ -1,0 +1,42 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "react", "vitest", "import", "promise"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "import/no-duplicates": ["error", { "preferInline": true }],
+    "typescript/no-floating-promises": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/switch-exhaustiveness-check": [
+      "error",
+      { "considerDefaultExhaustiveForUnions": true }
+    ],
+    "vitest/no-focused-tests": "error",
+    "vitest/no-disabled-tests": "error",
+    "vitest/expect-expect": ["error", { "assertFunctionNames": ["expect", "expect*"] }],
+    "react/immutability": "off",
+    "react/refs": "off",
+    "react/purity": "off",
+    "react/set-state-in-effect": "off",
+    "react/use-memo": "off",
+    "react/globals": "off",
+    "vitest/require-mock-type-parameters": "off",
+    "vitest/no-conditional-expect": "off",
+    "vitest/no-standalone-expect": "off",
+    "vitest/valid-title": ["error", { "allowArguments": true }],
+    "react-hooks/exhaustive-deps": "off"
+  },
+  "overrides": [
+    {
+      "files": [
+        "packages/solid/**",
+        "examples/solid/**",
+        "tests/**/solid*.tsx",
+        "tests/**/solid/**"
+      ],
+      "rules": { "react/jsx-key": "off" }
+    }
+  ]
+}

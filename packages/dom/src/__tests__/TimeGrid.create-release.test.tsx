@@ -12,6 +12,7 @@ it("completes creation with committed props while a parent update is suspended",
   function Pending({ active }: { active: boolean }) {
     if (active) {
       suspends();
+      // oxlint-disable-next-line typescript/only-throw-error -- Suspense requires throwing the pending promise.
       throw never;
     }
     return null;

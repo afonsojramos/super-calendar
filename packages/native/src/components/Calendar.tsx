@@ -49,8 +49,6 @@ import {
   expandRecurringEvents,
   type WeekdayFormat,
   getViewDays,
-} from "@super-calendar/core";
-import {
   type CalendarHandle,
   type CalendarLabels,
   resolveCalendarLabels,

@@ -1,6 +1,7 @@
 import { Dynamic, type JSX } from "@solidjs/web";
-import type { CalendarEvent, EventAccessibilityLabeler } from "@super-calendar/core/vanilla";
 import {
+  type CalendarEvent,
+  type EventAccessibilityLabeler,
   eventTimeLabel,
   getIsToday,
   nowInTimeZone,
