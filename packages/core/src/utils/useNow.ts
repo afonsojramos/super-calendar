@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { toZonedTime } from "./timezone";
+import { nowInTimeZone } from "./timezone";
 
 /** Options for {@link useNow}. */
 export interface UseNowOptions {
@@ -20,11 +20,6 @@ export interface UseNowOptions {
 
 const MINUTE_MS = 60_000;
 
-const resolveNow = (now?: Date, timeZone?: string): Date => {
-  const instant = now ?? new Date();
-  return timeZone ? toZonedTime(instant, timeZone) : instant;
-};
-
 /**
  * The current wall-clock time, re-read every `tickMs` while `enabled`, shifted
  * into `timeZone` when given, or pinned to a fixed `now` override. Drives the
@@ -34,13 +29,13 @@ export function useNow(
   enabled: boolean,
   { now, timeZone, tickMs = MINUTE_MS }: UseNowOptions = {},
 ): Date {
-  const [value, setValue] = useState(() => resolveNow(now, timeZone));
+  const [value, setValue] = useState(() => nowInTimeZone(now, timeZone));
   const nowMs = now?.getTime();
   useEffect(() => {
     if (!enabled) return;
-    setValue(resolveNow(nowMs != null ? new Date(nowMs) : undefined, timeZone));
+    setValue(nowInTimeZone(nowMs != null ? new Date(nowMs) : undefined, timeZone));
     if (nowMs != null) return; // a fixed instant doesn't tick
-    const id = setInterval(() => setValue(resolveNow(undefined, timeZone)), tickMs);
+    const id = setInterval(() => setValue(nowInTimeZone(undefined, timeZone)), tickMs);
     return () => clearInterval(id);
   }, [enabled, nowMs, timeZone, tickMs]);
   return value;

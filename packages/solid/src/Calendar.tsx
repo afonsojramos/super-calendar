@@ -79,9 +79,10 @@ export interface CalendarProps<T = unknown>
   /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
   hiddenDays?: number[];
   /**
-   * Fixed "now" instant for the current-time indicator (doesn't tick), e.g. a
-   * server-synced clock. Defaults to the device clock, shifted into `timeZone`
-   * when one is set so the line matches the displayed events.
+   * Fixed "now" instant for the current-time indicator (doesn't tick) and for
+   * the day highlighted as today in every mode, e.g. a server-synced clock.
+   * Defaults to the device clock, shifted into `timeZone` when one is set so
+   * both match the displayed events.
    */
   now?: Date;
   /** Column count for `mode="custom"`. */
@@ -437,6 +438,8 @@ export function Calendar<T = unknown>(
           weekStartsOn={props.weekStartsOn}
           hiddenDays={props.hiddenDays}
           locale={props.locale}
+          now={props.now}
+          timeZone={props.timeZone}
           labels={props.labels}
           theme={props.theme}
           className={props.className}
@@ -466,6 +469,8 @@ export function Calendar<T = unknown>(
         <Agenda<T>
           events={displayEvents()}
           locale={props.locale}
+          now={props.now}
+          timeZone={props.timeZone}
           ampm={props.ampm}
           theme={props.theme}
           height={props.height}
@@ -490,6 +495,8 @@ export function Calendar<T = unknown>(
           weekdayFormat={props.weekdayFormat}
           highlightWeekends={props.highlightWeekends}
           locale={props.locale}
+          now={props.now}
+          timeZone={props.timeZone}
           labels={props.labels}
           theme={props.theme}
           className={props.className}
@@ -535,6 +542,8 @@ export function Calendar<T = unknown>(
           weekdayFormat={props.weekdayFormat}
           highlightWeekends={props.highlightWeekends}
           locale={props.locale}
+          now={props.now}
+          timeZone={props.timeZone}
           labels={props.labels}
           theme={props.theme}
           className={props.className}

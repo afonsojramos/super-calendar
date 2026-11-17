@@ -115,7 +115,7 @@ export {
   toICalendar,
   type ToICalendarOptions,
 } from "@super-calendar/core";
-export { eventsInTimeZone, toZonedTime } from "@super-calendar/core";
+export { eventsInTimeZone, nowInTimeZone, toZonedTime } from "@super-calendar/core";
 export {
   buildMonthWeeks,
   getViewDays,

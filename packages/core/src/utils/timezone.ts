@@ -1,5 +1,31 @@
 import type { CalendarEvent } from "../types";
 
+// Building a formatter costs far more than formatting with it, and the views
+// convert once per event and per rendered day, so keep one per zone. Zone names
+// can come from untrusted input (an iCal `TZID`) and match in any letter case,
+// so the cache is bounded: an app uses a handful of zones.
+const MAX_ZONE_FORMATTERS = 32;
+const zoneFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function zoneFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = zoneFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    if (zoneFormatters.size >= MAX_ZONE_FORMATTERS) zoneFormatters.clear();
+    zoneFormatters.set(timeZone, formatter);
+  }
+  return formatter;
+}
+
 /**
  * Reinterpret an instant as its wall-clock time in `timeZone`, returned as a
  * device-local `Date` whose fields (hours, minutes, …) read back as that zone's
@@ -11,16 +37,7 @@ import type { CalendarEvent } from "../types";
  * original UTC instant, so don't round-trip it back to a real time.
  */
 export function toZonedTime(date: Date, timeZone: string): Date {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    hourCycle: "h23",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).formatToParts(date);
+  const parts = zoneFormatter(timeZone).formatToParts(date);
 
   const field = (type: Intl.DateTimeFormatPartTypes): number => {
     const part = parts.find((p) => p.type === type);
@@ -38,6 +55,17 @@ export function toZonedTime(date: Date, timeZone: string): Date {
     field("second"),
     date.getMilliseconds(),
   );
+}
+
+/**
+ * The current instant, or the fixed `now` when given, as the wall clock of
+ * `timeZone` (see {@link toZonedTime}). Without a `timeZone` it is the instant
+ * itself, read on the device clock. Compare calendar days against it to find
+ * "today" for a calendar displayed in another time zone.
+ */
+export function nowInTimeZone(now?: Date, timeZone?: string): Date {
+  const instant = now ?? new Date();
+  return timeZone ? toZonedTime(instant, timeZone) : instant;
 }
 
 // `timeZone`'s offset from UTC (ms) at `instant`: the zone's wall clock read as

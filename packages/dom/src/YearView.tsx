@@ -11,6 +11,7 @@ import {
   monthCreateRange,
   daySelectionState,
   getIsToday,
+  nowInTimeZone,
   filterHiddenDays,
   getWeekDays,
   getYearMonths,
@@ -59,6 +60,13 @@ export interface YearViewProps<T = unknown>
   /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
   hiddenDays?: number[];
   locale?: Locale;
+  /**
+   * The instant whose calendar day is highlighted as today. Defaults to the
+   * device clock, and is read in `timeZone` when one is set.
+   */
+  now?: Date;
+  /** Highlight today as it is in this IANA time zone (default: the device's). */
+  timeZone?: string;
   /** Translations for the screen-reader words; omitted keys use English. */
   labels?: Partial<CalendarLabels>;
   /** Highlight this date instead of the real "today". */
@@ -111,6 +119,8 @@ export function YearView<T = unknown>({
   weekStartsOn = 0,
   hiddenDays,
   locale,
+  now,
+  timeZone,
   labels: labelsProp,
   activeDate,
   selectedRange,
@@ -179,6 +189,7 @@ export function YearView<T = unknown>({
     return () => window.removeEventListener("pointerup", finish);
   }, [isCreating, onCreateEvent]);
 
+  const today = nowInTimeZone(now, timeZone);
   const months = useMemo(() => getYearMonths(date), [date]);
   const weekdayLabels = useMemo(
     () =>
@@ -294,7 +305,7 @@ export function YearView<T = unknown>({
                           />
                         );
                       }
-                      const isToday = getIsToday(day);
+                      const isToday = getIsToday(day, today);
                       const isHighlighted = activeDate
                         ? isSameCalendarDay(day, activeDate)
                         : isToday;

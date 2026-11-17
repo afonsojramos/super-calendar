@@ -49,6 +49,7 @@ import {
   eventTimeLabel,
   formatHour,
   getIsToday,
+  nowInTimeZone,
   getViewDays,
   isAllDayEvent,
   isSameCalendarDay,
@@ -277,9 +278,15 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   renderBackgroundEvent?: DomRenderEvent<T>;
   /** Show the current-time indicator on today's column (default true). */
   showNowIndicator?: boolean;
-  /** Fixed "now" instant for the indicator (doesn't tick). Defaults to the device clock. */
+  /**
+   * Fixed "now" instant for the indicator (doesn't tick) and for the day
+   * highlighted as today. Defaults to the device clock.
+   */
   now?: Date;
-  /** Shift the now indicator into this IANA zone (pair with `eventsInTimeZone`). */
+  /**
+   * Shift the now indicator and the day highlighted as today into this IANA zone
+   * (pair with `eventsInTimeZone`).
+   */
   timeZone?: string;
   /** Show the all-day lane above the grid (default true). */
   showAllDayEventCell?: boolean;
@@ -640,6 +647,9 @@ function TimeGridInner<T = unknown>(
   // Ticks every minute so the red now-line follows the wall clock; a `now`
   // override pins it, and `timeZone` shifts it to match zone-shifted events.
   const now = useNow(showNowIndicator, { now: nowProp, timeZone });
+  // The day the headers and columns mark as today: the indicator's clock while
+  // it runs, so the two can't disagree.
+  const todayDate = showNowIndicator ? now : nowInTimeZone(nowProp, timeZone);
 
   const [hourHeight, setHourHeight] = useState(initialHourHeight);
   useEffect(() => setHourHeight(initialHourHeight), [initialHourHeight]);
@@ -1850,7 +1860,7 @@ function TimeGridInner<T = unknown>(
             : null}
         </div>
         {days.map((day) => {
-          const today = getIsToday(day);
+          const today = getIsToday(day, todayDate);
           // Full, unambiguous date for assistive tech; the visible weekday + day
           // number below are decorative (aria-hidden) so it isn't read twice.
           const dateLabel = format(day, "EEEE, d MMMM yyyy", dfns);
@@ -2111,7 +2121,10 @@ function TimeGridInner<T = unknown>(
                 onPointerCancel={cellEnabled ? cancelCreate : undefined}
                 onLostPointerCapture={cellEnabled ? loseCreateCapture : undefined}
                 onClick={cellEnabled ? (e) => tapCell(e, dayIndex) : undefined}
-                {...dataState({ "data-today": getIsToday(day), "data-weekend": isWeekend(day) })}
+                {...dataState({
+                  "data-today": getIsToday(day, todayDate),
+                  "data-weekend": isWeekend(day),
+                })}
                 {...slot("dayColumn", {
                   base: { flex: 1, position: "relative" },
                   // Weekend columns are tinted (matching the native renderer); the

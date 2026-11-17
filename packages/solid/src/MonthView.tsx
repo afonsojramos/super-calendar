@@ -3,6 +3,7 @@ import {
   bandRounding,
   buildMonthGrid,
   buildMultiWeekGrid,
+  nowInTimeZone,
   type CalendarEvent,
   type CreateGhostArgs,
   type CalendarLabels,
@@ -198,6 +199,13 @@ export interface MonthViewProps<T = unknown>
   showWeekdays?: boolean;
   /** date-fns locale for the title and weekday labels. */
   locale?: Locale;
+  /**
+   * The instant whose calendar day is highlighted as today. Defaults to the
+   * device clock, and is read in `timeZone` when one is set.
+   */
+  now?: Date;
+  /** Highlight today as it is in this IANA time zone (default: the device's). */
+  timeZone?: string;
   /** Theme overrides; falls back to the default light theme. */
   theme?: Partial<SolidCalendarTheme>;
   /** Fired when a selectable day is clicked. */
@@ -725,6 +733,8 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
         maxDate: props.maxDate,
         isDateDisabled: props.isDateDisabled,
         locale: props.locale,
+        // Read here, not memoized apart, so each rebuild sees the current day.
+        today: nowInTimeZone(props.now, props.timeZone),
       };
       const weeks = numberOfWeeks();
       if (weeks === undefined) {

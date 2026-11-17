@@ -90,9 +90,10 @@ export interface CalendarProps<T = unknown>
   /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
   hiddenDays?: number[];
   /**
-   * Fixed "now" instant for the current-time indicator (doesn't tick), e.g. a
-   * server-synced clock. Defaults to the device clock, shifted into `timeZone`
-   * when one is set so the line matches the displayed events.
+   * Fixed "now" instant for the current-time indicator (doesn't tick) and for
+   * the day highlighted as today in every mode, e.g. a server-synced clock.
+   * Defaults to the device clock, shifted into `timeZone` when one is set so
+   * both match the displayed events.
    */
   now?: Date;
   /** Column count for `mode="custom"`. */
@@ -489,6 +490,8 @@ function CalendarInner<T = unknown>(
         weekStartsOn={weekStartsOn}
         hiddenDays={hiddenDays}
         locale={locale}
+        now={now}
+        timeZone={timeZone}
         labels={labels}
         theme={theme}
         className={className}
@@ -511,6 +514,8 @@ function CalendarInner<T = unknown>(
       <Agenda<T>
         events={displayEvents}
         locale={locale}
+        now={now}
+        timeZone={timeZone}
         ampm={ampm}
         theme={theme}
         height={height}
@@ -535,6 +540,8 @@ function CalendarInner<T = unknown>(
         weekdayFormat={weekdayFormat}
         highlightWeekends={highlightWeekends}
         locale={locale}
+        now={now}
+        timeZone={timeZone}
         labels={labels}
         theme={theme}
         className={className}
@@ -580,6 +587,8 @@ function CalendarInner<T = unknown>(
         weekdayFormat={weekdayFormat}
         highlightWeekends={highlightWeekends}
         locale={locale}
+        now={now}
+        timeZone={timeZone}
         labels={labels}
         theme={theme}
         className={className}

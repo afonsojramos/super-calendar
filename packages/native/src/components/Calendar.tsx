@@ -197,9 +197,10 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
   hiddenDays?: number[];
   /**
-   * Fixed "now" instant for the current-time indicator (doesn't tick), e.g. a
-   * server-synced clock. Defaults to the device clock, shifted into `timeZone`
-   * when one is set so the line matches the displayed events.
+   * Fixed "now" instant for the current-time indicator (doesn't tick) and for
+   * the day highlighted as today in every mode, e.g. a server-synced clock.
+   * Defaults to the device clock, shifted into `timeZone` when one is set so
+   * both match the displayed events.
    */
   now?: Date;
   /** Weekday header label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
@@ -761,6 +762,8 @@ function CalendarInner<T>(
             hiddenDays={hiddenDays}
             weekdayFormat={weekdayFormat}
             locale={locale}
+            now={now}
+            timeZone={timeZone}
             labels={labels}
             sortedMonthView={sortedMonthView}
             moreLabel={moreLabel}
@@ -807,6 +810,8 @@ function CalendarInner<T>(
             weekStartsOn={weekStartsOn}
             hiddenDays={hiddenDays}
             locale={locale}
+            now={now}
+            timeZone={timeZone}
             labels={labels}
             activeDate={activeDate}
             selectedDates={selectedDates}
@@ -825,6 +830,8 @@ function CalendarInner<T>(
           <Agenda
             events={displayEvents}
             locale={locale}
+            now={now}
+            timeZone={timeZone}
             renderEvent={resolvedRenderEvent}
             keyExtractor={keyExtractor}
             onPressEvent={handlePressEvent}

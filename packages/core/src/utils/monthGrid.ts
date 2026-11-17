@@ -202,6 +202,11 @@ export interface UseMonthGridOptions extends DateSelectionConstraints {
   selectedRange?: DateRange;
   /** A date-fns locale for the weekday labels. */
   locale?: Locale;
+  /**
+   * The calendar day flagged `isToday`. Defaults to the device's current day;
+   * pass `nowInTimeZone(now, timeZone)` for a grid shown in another time zone.
+   */
+  today?: Date;
 }
 
 /**
@@ -222,6 +227,7 @@ export function buildMonthGrid(month: Date, options: UseMonthGridOptions = {}): 
     maxDate,
     isDateDisabled,
     locale,
+    today,
   } = options;
 
   const rows = buildMonthWeeks(month, weekStartsOn, { showSixWeeks, isRTL, hiddenDays });
@@ -233,7 +239,7 @@ export function buildMonthGrid(month: Date, options: UseMonthGridOptions = {}): 
       id: format(date, "yyyy-MM-dd"),
       label: format(date, "d"),
       isCurrentMonth: isSameMonth(date, month),
-      isToday: getIsToday(date),
+      isToday: getIsToday(date, today),
       isWeekend: isWeekend(date),
       // Shared with MonthView, so the headless grid matches the built-in view.
       ...daySelectionState(

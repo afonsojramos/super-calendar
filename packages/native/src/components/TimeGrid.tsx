@@ -81,6 +81,7 @@ import type {
 } from "../types";
 import {
   getIsToday,
+  nowInTimeZone,
   getViewDays,
   isSameCalendarDay,
   isWeekend,
@@ -1797,6 +1798,9 @@ function TimetablePageInner<T>({
   const hoursRange = useMemo(() => hourRange(minHour, maxHour), [minHour, maxHour]);
 
   const now = useNow(showNowIndicator && isActive, { now: nowProp, timeZone: nowTimeZone });
+  // The day the header marks as today: the indicator's clock while it runs, so
+  // the two can't disagree.
+  const today = showNowIndicator && isActive ? now : nowInTimeZone(nowProp, nowTimeZone);
   // "Today" follows the (possibly zone-shifted or overridden) now, so the line
   // lands in the column the events are displayed in.
   const nowDayIndex = days.findIndex((day) => isSameCalendarDay(day, now));
@@ -2205,6 +2209,7 @@ function TimetablePageInner<T>({
             dayWidth={dayWidth}
             weekdayFormat={weekdayFormat}
             todayLabel={todayLabel}
+            today={today}
             locale={locale}
             activeDate={activeDate}
             onPressDateHeader={onPressDateHeader}
@@ -2507,9 +2512,15 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   weekEndsOn?: WeekStartsOn;
   /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
   hiddenDays?: number[];
-  /** Fixed "now" instant for the indicator (doesn't tick). Defaults to the device clock. */
+  /**
+   * Fixed "now" instant for the indicator (doesn't tick) and for the day
+   * highlighted as today. Defaults to the device clock.
+   */
   now?: Date;
-  /** Shift the now indicator into this IANA zone (pair with `eventsInTimeZone`). */
+  /**
+   * Shift the now indicator and the day highlighted as today into this IANA zone
+   * (pair with `eventsInTimeZone`).
+   */
   timeZone?: string;
   date: Date;
   events: CalendarEvent<T>[];
@@ -3530,6 +3541,8 @@ function TimeGridInner<T>(
   // `columnsWidth` resizes the mounted pages when the grid is re-measured.
   // `showDragHandle` refreshes grips without requiring an event-data change, and
   // `renderCreateGhost` swaps the preview content of mounted pages.
+  // `now` and `timeZone` move the today highlight and the now line.
+  const nowTime = now?.getTime();
   const listExtraData = useMemo(
     () => ({
       events,
@@ -3541,6 +3554,8 @@ function TimeGridInner<T>(
       dragStepMinutes,
       minHour,
       maxHour,
+      nowTime,
+      timeZone,
     }),
     [
       events,
@@ -3552,6 +3567,8 @@ function TimeGridInner<T>(
       dragStepMinutes,
       minHour,
       maxHour,
+      nowTime,
+      timeZone,
     ],
   );
 
@@ -3740,6 +3757,7 @@ type DayHeaderRowProps = {
   dayWidth: number;
   weekdayFormat?: WeekdayFormat;
   todayLabel: string;
+  today: Date;
   locale?: Locale;
   activeDate?: Date;
   onPressDateHeader?: (date: Date) => void;
@@ -3753,6 +3771,7 @@ const DayHeaderRow = ({
   dayWidth,
   weekdayFormat,
   todayLabel,
+  today,
   locale,
   activeDate,
   onPressDateHeader,
@@ -3768,6 +3787,7 @@ const DayHeaderRow = ({
           width={dayWidth}
           weekdayFormat={weekdayFormat}
           todayLabel={todayLabel}
+          today={today}
           locale={locale}
           activeDate={activeDate}
           onPressDateHeader={onPressDateHeader}
@@ -3783,6 +3803,7 @@ type DayHeaderProps = {
   width: number;
   weekdayFormat?: WeekdayFormat;
   todayLabel: string;
+  today: Date;
   locale?: Locale;
   activeDate?: Date;
   onPressDateHeader?: (date: Date) => void;
@@ -3793,13 +3814,14 @@ const DayHeader = ({
   width,
   weekdayFormat = "short",
   todayLabel,
+  today,
   locale,
   activeDate,
   onPressDateHeader,
 }: DayHeaderProps) => {
   const theme = useCalendarTheme();
   const slot = useSlots<TimeGridSlot>();
-  const isToday = getIsToday(day);
+  const isToday = getIsToday(day, today);
   // Highlight the chosen `activeDate` when supplied, else the real today.
   const isHighlighted = activeDate ? isSameCalendarDay(day, activeDate) : isToday;
 

@@ -76,6 +76,7 @@ export function buildMultiWeekGrid(date: Date, options: MultiWeekGridOptions = {
     maxDate,
     isDateDisabled,
     locale,
+    today,
   } = options;
 
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
@@ -114,7 +115,7 @@ export function buildMultiWeekGrid(date: Date, options: MultiWeekGridOptions = {
         date: day,
         id: format(day, "yyyy-MM-dd"),
         label: format(day, "d"),
-        isToday: getIsToday(day),
+        isToday: getIsToday(day, today),
         isWeekend: isWeekend(day),
         ...daySelectionState(day, selection, constraints),
       })),

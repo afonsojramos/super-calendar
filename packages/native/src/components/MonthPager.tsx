@@ -88,6 +88,8 @@ export type MonthPagerProps<T> = {
   hiddenDays?: number[];
   weekdayFormat?: WeekdayFormat;
   locale?: Locale;
+  now?: Date;
+  timeZone?: string;
   sortedMonthView?: boolean;
   moreLabel?: string;
   /** Translations for the screen-reader words and gutter text; omitted keys use English. */
@@ -189,6 +191,8 @@ function DateRowsPagerInner<T>({
   hiddenDays,
   weekdayFormat = "short",
   locale,
+  now,
+  timeZone,
   sortedMonthView,
   moreLabel,
   labels,
@@ -375,10 +379,14 @@ function DateRowsPagerInner<T>({
   // `fillCellOnSelection` and `onSelectDrag` ride along because they reach the
   // grids as renderItem props, not through the selection context below: toggling
   // a "pick dates" mode on must reach the pages already rendered.
+  // `now` and `timeZone` move the today highlight on the pages already rendered.
+  const nowTime = now?.getTime();
   const monthExtraData = useMemo(
     () => ({
       events,
       activeDate,
+      nowTime,
+      timeZone,
       fillCellOnSelection,
       dragSelect: onSelectDrag != null,
       chipHeight,
@@ -391,6 +399,8 @@ function DateRowsPagerInner<T>({
     [
       events,
       activeDate,
+      nowTime,
+      timeZone,
       fillCellOnSelection,
       onSelectDrag,
       chipHeight,
@@ -443,6 +453,8 @@ function DateRowsPagerInner<T>({
           weekStartsOn={weekStartsOn}
           hiddenDays={hiddenDays}
           locale={locale}
+          now={now}
+          timeZone={timeZone}
           sortedMonthView={sortedMonthView}
           moreLabel={moreLabel}
           labels={labels}
@@ -483,6 +495,8 @@ function DateRowsPagerInner<T>({
       weekStartsOn,
       hiddenDays,
       locale,
+      now,
+      timeZone,
       sortedMonthView,
       moreLabel,
       labels,

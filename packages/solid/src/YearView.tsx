@@ -11,6 +11,7 @@ import {
   daySelectionState,
   filterHiddenDays,
   getIsToday,
+  nowInTimeZone,
   getWeekDays,
   getYearMonths,
   groupEventsByDay,
@@ -59,6 +60,13 @@ export interface YearViewProps<T = unknown>
   /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
   hiddenDays?: number[];
   locale?: Locale;
+  /**
+   * The instant whose calendar day is highlighted as today. Defaults to the
+   * device clock, and is read in `timeZone` when one is set.
+   */
+  now?: Date;
+  /** Highlight today as it is in this IANA time zone (default: the device's). */
+  timeZone?: string;
   /** Translations for the screen-reader words; omitted keys use English. */
   labels?: Partial<CalendarLabels>;
   /** Highlight this date instead of the real "today". */
@@ -115,6 +123,12 @@ export function YearView<T = unknown>(incoming: YearViewProps<T>): JSX.Element {
   );
   const theme = createMemo(() => mergeSolidTheme(props.theme));
   const labels = createMemo(() => resolveCalendarLabels(props.labels));
+  // One memo for every day cell, yielding the day (not the instant) so the cells
+  // re-run only when it changes. Tracking `date` re-reads the clock on navigation.
+  const todayKey = createMemo(() => {
+    void props.date;
+    return startOfDay(nowInTimeZone(props.now, props.timeZone)).getTime();
+  });
   const slot = createSlots<YearViewSlot>(props);
 
   // Drag-to-select / drag-to-create: press a day and sweep across others (mini
@@ -360,7 +374,9 @@ export function YearView<T = unknown>(incoming: YearViewProps<T>): JSX.Element {
                                             />
                                           );
                                         }
-                                        const isToday = createMemo(() => getIsToday(day()));
+                                        const isToday = createMemo(() =>
+                                          getIsToday(day(), new Date(todayKey())),
+                                        );
                                         const isHighlighted = createMemo(() =>
                                           props.activeDate
                                             ? isSameCalendarDay(day(), props.activeDate)

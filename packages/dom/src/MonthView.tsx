@@ -23,6 +23,7 @@ import {
   bandRounding,
   buildMonthGrid,
   buildMultiWeekGrid,
+  nowInTimeZone,
   type CalendarEvent,
   type CreateGhostArgs,
   compareDayEvents,
@@ -188,6 +189,13 @@ export interface MonthViewProps<T = unknown>
   showWeekdays?: boolean;
   /** date-fns locale for the title and weekday labels. */
   locale?: Locale;
+  /**
+   * The instant whose calendar day is highlighted as today. Defaults to the
+   * device clock, and is read in `timeZone` when one is set.
+   */
+  now?: Date;
+  /** Highlight today as it is in this IANA time zone (default: the device's). */
+  timeZone?: string;
   /** Theme overrides; falls back to the default light theme. */
   theme?: Partial<DomCalendarTheme>;
   /** Fired when a selectable day is clicked. */
@@ -590,6 +598,8 @@ export function DateRows<T = unknown>({
   showTitle = true,
   showWeekdays = true,
   locale,
+  now,
+  timeZone,
   theme: themeOverrides,
   minDate,
   maxDate,
@@ -631,6 +641,8 @@ export function DateRows<T = unknown>({
   const dayRoving = !eventsMode || keyboardDayNavigation;
   // Use the list-built index when provided (MonthList), else build it for this
   // month. Either way lookups use startOfDay(date).toISOString().
+  // The day, not the instant, so the grid is rebuilt once a day.
+  const todayKey = startOfDay(nowInTimeZone(now, timeZone)).getTime();
   const eventsByDay = useMemo(() => {
     // The list (MonthList) sorts before passing its index in; only sort here when
     // building our own, so each day reads all-day events first, then by start.
@@ -700,6 +712,7 @@ export function DateRows<T = unknown>({
       maxDate,
       isDateDisabled,
       locale,
+      today: new Date(todayKey),
     };
     if (numberOfWeeks === undefined) {
       return {
@@ -727,6 +740,7 @@ export function DateRows<T = unknown>({
     maxDate,
     isDateDisabled,
     locale,
+    todayKey,
   ]);
 
   // Lay out each week row's spanning bars once per data change, not per render, so
