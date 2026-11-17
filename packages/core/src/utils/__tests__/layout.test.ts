@@ -216,7 +216,7 @@ describe("layoutDayEvents", () => {
     it("places a zero-length event beside the event that starts with it", () => {
       const result = layoutDayEvents([point(9, 0, "point"), ev(9, 10, "long")], day);
       expect(result.map((p) => p.columns)).toEqual([2, 2]);
-      expect(result.map((p) => p.column).sort()).toEqual([0, 1]);
+      expect(result.map((p) => p.column).sort((a, b) => a - b)).toEqual([0, 1]);
     });
 
     it("keeps a zero-length event under the event that ends as it starts", () => {
