@@ -648,21 +648,22 @@ function CalendarInner<T>(
 
   // Swallow presses on disabled events once, so every view inherits the guard.
   // With a display zone the views hold wall-clock copies of the events, so hand
-  // back the consumer's own event (`zonedEventSource` returns any other as is).
+  // back the consumer's own event. Without one, events pass through untouched,
+  // including copies the consumer zoned themselves.
   const handlePressEvent = useCallback(
     (event: CalendarEvent<T>) => {
-      if (!event.disabled) onPressEvent(zonedEventSource(event));
+      if (!event.disabled) onPressEvent(timeZone ? zonedEventSource(event) : event);
     },
-    [onPressEvent],
+    [onPressEvent, timeZone],
   );
   const handleLongPressEvent = useMemo(
     () =>
       onLongPressEvent
         ? (event: CalendarEvent<T>) => {
-            if (!event.disabled) onLongPressEvent(zonedEventSource(event));
+            if (!event.disabled) onLongPressEvent(timeZone ? zonedEventSource(event) : event);
           }
         : undefined,
-    [onLongPressEvent],
+    [onLongPressEvent, timeZone],
   );
 
   // The views also report wall-clock dates under a display zone. Convert them to

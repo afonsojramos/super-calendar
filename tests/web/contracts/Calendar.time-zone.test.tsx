@@ -76,6 +76,22 @@ describe(rendererName, () => {
       expect(end.toISOString()).toBe("2026-07-14T21:30:00.000Z");
     });
 
+    it("reports a recurring event's occurrence with its real instants", () => {
+      const onPressEvent = vi.fn();
+      const daily: CalendarEvent = { ...meeting, title: "Daily", recurrence: { freq: "daily" } };
+      const { getByText } = render(Calendar, {
+        ...day,
+        date: new Date(2026, 6, 17),
+        events: [daily],
+        onPressEvent,
+      });
+      fireEvent.click(getByText("Daily"));
+      const [occurrence] = onPressEvent.mock.calls[0] as [CalendarEvent];
+      expect(occurrence.start.toISOString()).toBe("2026-07-17T06:00:00.000Z");
+      expect(occurrence.end.toISOString()).toBe("2026-07-17T08:00:00.000Z");
+      expect(occurrence.recurrence).toBeUndefined();
+    });
+
     it("keeps an all-day event on its own day", () => {
       const { container } = render(Calendar, {
         mode: "month",

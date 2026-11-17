@@ -18,7 +18,9 @@ import { Calendar } from "@super-calendar/native";
 the callbacks hand them back that way:
 
 - `onPressEvent`, `onLongPressEvent`, `onDragStart`, `onDragEvent`, and
-  `onPressMore` receive the event objects you passed in, not display copies.
+  `onPressMore` receive the event objects you passed in, not display copies. For
+  a recurring event that is the occurrence `Calendar` expanded, with its real
+  `start` and `end`, as it is without a `timeZone`.
 - `onDragEvent` reports the new `start` and `end` as real instants: dropping an
   event at 10:00 on a New York calendar reports 15:00 UTC in winter. An edge the
   drag didn't move keeps your event's exact `Date`.

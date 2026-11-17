@@ -2,7 +2,7 @@ import { vi } from "vitest";
 import { LegendList } from "@legendapp/list/react-native";
 import { act, fireEvent } from "@testing-library/react-native";
 import { createRef } from "react";
-import type { CalendarHandle } from "@super-calendar/core";
+import { eventsInTimeZone, type CalendarHandle } from "@super-calendar/core";
 import { RefreshControl } from "react-native";
 import { render } from "../../../../../tests/support/native-time-grid";
 import type { CalendarEvent } from "../../types";
@@ -324,6 +324,22 @@ describe("Calendar callbacks with a timeZone", () => {
     expect(onPressEvent.mock.calls[0][0]).toBe(meeting);
     await fireEvent(el, "longPress");
     expect(onLongPressEvent.mock.calls[0][0]).toBe(meeting);
+  });
+
+  it("leaves events the consumer zoned themselves untouched without a timeZone", async () => {
+    const [zoned] = eventsInTimeZone([meeting], "Asia/Kolkata");
+    const onPressEvent = vi.fn();
+    const { getByLabelText } = await render(
+      <Calendar
+        {...props}
+        timeZone={undefined}
+        mode="day"
+        events={[zoned]}
+        onPressEvent={onPressEvent}
+      />,
+    );
+    await fireEvent.press(getByLabelText(/Meeting, 11:30 to 13:30/));
+    expect(onPressEvent.mock.calls[0][0]).toBe(zoned);
   });
 
   it("reports a move and a resize as real instants on the consumer's event", async () => {
