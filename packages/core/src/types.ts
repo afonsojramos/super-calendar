@@ -95,6 +95,13 @@ export interface RecurrenceRule {
    */
   weekdays?: WeekStartsOn[];
   /**
+   * For `weekly` rules with `weekdays`: the day a week starts on (0 = Sunday …
+   * 6 = Saturday). It decides which of the `weekdays` share a week, so it only
+   * changes the result when `interval` is greater than 1. Default 1 (Monday),
+   * as in RFC 5545. Maps to iCal `WKST`.
+   */
+  weekStartsOn?: WeekStartsOn;
+  /**
    * For `monthly`/`yearly`: repeat on the Nth weekday of the period instead of the
    * start date's day-of-month — e.g. `{ week: 3, weekday: 1 }` is the 3rd Monday.
    * `week` is 1–5, or -1 for the last such weekday. Maps to an ordinal iCal `BYDAY`
