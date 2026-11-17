@@ -1,31 +1,6 @@
 import type { CalendarEvent } from "../types";
 import { isAllDayEvent } from "./layout";
-
-// Building a formatter costs far more than formatting with it, and the views
-// convert once per event and per rendered day, so keep one per zone. Zone names
-// can come from untrusted input (an iCal `TZID`) and match in any letter case,
-// so the cache is bounded: an app uses a handful of zones.
-const MAX_ZONE_FORMATTERS = 32;
-const zoneFormatters = new Map<string, Intl.DateTimeFormat>();
-
-function zoneFormatter(timeZone: string): Intl.DateTimeFormat {
-  let formatter = zoneFormatters.get(timeZone);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone,
-      hourCycle: "h23",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-    if (zoneFormatters.size >= MAX_ZONE_FORMATTERS) zoneFormatters.clear();
-    zoneFormatters.set(timeZone, formatter);
-  }
-  return formatter;
-}
+import { zoneFields } from "./zoneFields";
 
 /**
  * Reinterpret an instant as its wall-clock time in `timeZone`, returned as a
@@ -38,24 +13,8 @@ function zoneFormatter(timeZone: string): Intl.DateTimeFormat {
  * original UTC instant, so don't round-trip it back to a real time.
  */
 export function toZonedTime(date: Date, timeZone: string): Date {
-  const parts = zoneFormatter(timeZone).formatToParts(date);
-
-  const field = (type: Intl.DateTimeFormatPartTypes): number => {
-    const part = parts.find((p) => p.type === type);
-    return part ? Number(part.value) : 0;
-  };
-
-  // `h23` can report midnight as 24; normalise to 0.
-  const hour = field("hour") % 24;
-  return new Date(
-    field("year"),
-    field("month") - 1,
-    field("day"),
-    hour,
-    field("minute"),
-    field("second"),
-    date.getMilliseconds(),
-  );
+  const [year, month, day, hour, minute, second] = zoneFields(date, timeZone);
+  return new Date(year, month, day, hour, minute, second, date.getMilliseconds());
 }
 
 /**
@@ -70,18 +29,11 @@ export function nowInTimeZone(now?: Date, timeZone?: string): Date {
 }
 
 // `timeZone`'s offset from UTC (ms) at `instant`: the zone's wall clock read as
-// if it were UTC, minus the real instant.
+// if it were UTC, minus the real instant. Read from plain fields, so the
+// device's own DST changes can't distort it.
 function zoneOffsetMs(instant: Date, timeZone: string): number {
-  const z = toZonedTime(instant, timeZone);
-  const wallAsUtc = Date.UTC(
-    z.getFullYear(),
-    z.getMonth(),
-    z.getDate(),
-    z.getHours(),
-    z.getMinutes(),
-    z.getSeconds(),
-    z.getMilliseconds(),
-  );
+  const [year, month, day, hour, minute, second] = zoneFields(instant, timeZone);
+  const wallAsUtc = Date.UTC(year, month, day, hour, minute, second, instant.getUTCMilliseconds());
   return wallAsUtc - instant.getTime();
 }
 
@@ -89,14 +41,21 @@ function zoneOffsetMs(instant: Date, timeZone: string): number {
  * The inverse of {@link toZonedTime}: given a wall-clock time in `timeZone`,
  * return the absolute UTC instant. Pass the wall clock as a `Date` whose **UTC**
  * fields hold the components (e.g. `new Date(Date.UTC(y, m, d, h, min))`). Used to
- * resolve iCal `TZID` times; DST-correct via a two-pass offset (ambiguous
- * fall-back times resolve to the post-transition offset).
+ * resolve iCal `TZID` times; DST-correct via a two-pass offset. A time in the
+ * hour a spring-forward change skips names no instant; it resolves the same
+ * distance after the skipped hour (02:30 becomes 03:30), as a device clock does.
  */
 export function zonedTimeToUtc(wallClock: Date, timeZone: string): Date {
   const guess = wallClock.getTime();
   const firstPass = zoneOffsetMs(new Date(guess), timeZone);
   const secondPass = zoneOffsetMs(new Date(guess - firstPass), timeZone);
-  return new Date(guess - secondPass);
+  const instant = new Date(guess - secondPass);
+  // Neither offset maps a skipped time back to itself. Read it with the offset
+  // in force before the change, which is the smaller of the two.
+  if (firstPass !== secondPass && zoneOffsetMs(instant, timeZone) !== secondPass) {
+    return new Date(guess - Math.min(firstPass, secondPass));
+  }
+  return instant;
 }
 
 /**
@@ -158,27 +117,45 @@ export function zonedEventSource<T>(event: CalendarEvent<T>): CalendarEvent<T> {
   return (zonedSources.get(event)?.event as CalendarEvent<T> | undefined) ?? event;
 }
 
+/** Options for {@link zonedDragBounds}. */
+export interface ZonedDragBoundsOptions {
+  /**
+   * Keep the event's real elapsed duration when the drag moved both edges, as a
+   * time-grid move does: the start is read off the zone's wall clock and the end
+   * follows it, so a move across a DST change in the zone doesn't stretch or
+   * shrink the event. Leave it off for a month-grid drop, which keeps the clock
+   * time of both edges.
+   */
+  keepDuration?: boolean;
+}
+
 /**
  * Convert the bounds a view reports for a dragged event back to real instants.
  * `event` is the displayed event the view passed to `onDragEvent`, and `start`
  * / `end` the bounds it reported. For a display copy made by
  * {@link eventsInTimeZone}, each bound is read as a wall-clock time in that
- * zone; an edge the drag left alone keeps the source event's exact instant.
- * Bounds of any other event (an all-day event, or one that was never shifted)
- * are returned unchanged.
+ * zone, following the zone's own DST changes; an edge the drag left alone keeps
+ * the source event's exact instant. Bounds of any other event (an all-day
+ * event, or one that was never shifted) are returned unchanged.
  */
 export function zonedDragBounds<T>(
   event: CalendarEvent<T>,
   start: Date,
   end: Date,
+  { keepDuration = false }: ZonedDragBoundsOptions = {},
 ): { start: Date; end: Date } {
   const zoned = zonedSources.get(event);
   if (!zoned) return { start, end };
   const source = zoned.event as CalendarEvent<T>;
-  const real = (reported: Date, displayed: Date, original: Date) =>
-    reported.getTime() === displayed.getTime() ? original : fromZonedTime(reported, zoned.timeZone);
+  const startMoved = start.getTime() !== event.start.getTime();
+  const endMoved = end.getTime() !== event.end.getTime();
+  const realStart = startMoved ? fromZonedTime(start, zoned.timeZone) : source.start;
+  if (keepDuration && startMoved && endMoved) {
+    const durationMs = source.end.getTime() - source.start.getTime();
+    return { start: realStart, end: new Date(realStart.getTime() + durationMs) };
+  }
   return {
-    start: real(start, event.start, source.start),
-    end: real(end, event.end, source.end),
+    start: realStart,
+    end: endMoved ? fromZonedTime(end, zoned.timeZone) : source.end,
   };
 }

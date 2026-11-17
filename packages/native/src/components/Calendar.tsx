@@ -616,7 +616,7 @@ function CalendarInner<T>(
   const displayEvents = useMemo(() => {
     let out = events;
     if (out.some((e) => e.recurrence)) {
-      let [start, end] = expansionRange(
+      const [start, end] = expansionRange(
         mode,
         date,
         weekStartsOn,
@@ -624,13 +624,13 @@ function CalendarInner<T>(
         weekEndsOn,
         numberOfWeeks,
       );
-      // A display zone shifts each occurrence's wall-clock by up to ~a day, which
-      // can move an edge occurrence into a visible column; widen so it's generated.
-      if (timeZone) {
-        start = addDays(start, -1);
-        end = addDays(end, 1);
-      }
-      out = expandRecurringEvents(out, start, end);
+      // The range is the days on screen, which under a display zone are that
+      // zone's days: expand on its clock, over the instants those days cover.
+      out = timeZone
+        ? expandRecurringEvents(out, fromZonedTime(start, timeZone), fromZonedTime(end, timeZone), {
+            timeZone,
+          })
+        : expandRecurringEvents(out, start, end);
     }
     if (timeZone) out = eventsInTimeZone(out, timeZone);
     return out;
@@ -670,6 +670,9 @@ function CalendarInner<T>(
   // real instants. Whole days (`onPressDay`, a month sweep, ...) stay
   // device-local dates, as `date` is, so only the time grid's cell callbacks
   // convert.
+  // A time-grid move keeps the event's elapsed duration; a month drop keeps the
+  // clock time of both edges.
+  const timeGridMode = mode !== "month" && mode !== "multiweek";
   const zoned = useMemo(() => {
     if (!timeZone) {
       return {
@@ -688,7 +691,7 @@ function CalendarInner<T>(
       onDragEvent:
         onDragEvent &&
         ((event: CalendarEvent<T>, start: Date, end: Date) => {
-          const bounds = zonedDragBounds(event, start, end);
+          const bounds = zonedDragBounds(event, start, end, { keepDuration: timeGridMode });
           return onDragEvent(zonedEventSource(event), bounds.start, bounds.end);
         }),
       onPressMore:
@@ -702,6 +705,7 @@ function CalendarInner<T>(
     };
   }, [
     timeZone,
+    timeGridMode,
     onDragStart,
     onDragEvent,
     onPressMore,

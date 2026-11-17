@@ -18,8 +18,20 @@ let worker: Worker;
 beforeEach(async () => {
   // A worker bounds the regression even if expansion stops yielding and loops forever.
   // Node's native TypeScript loader executes the same source used by the other tests.
+  // It needs file extensions on relative imports, which the source leaves to the
+  // bundler, so a resolve hook supplies them.
   worker = new Worker(
     `const { parentPort, workerData } = require("node:worker_threads");
+     require("node:module").registerHooks({
+       resolve(specifier, context, nextResolve) {
+         try {
+           return nextResolve(specifier, context);
+         } catch (error) {
+           if (!specifier.startsWith(".")) throw error;
+           return nextResolve(specifier + ".ts", context);
+         }
+       },
+     });
      const { expandRecurringEvents } = require(workerData.module);
      parentPort.once("message", rule => {
        const events = expandRecurringEvents([{

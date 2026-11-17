@@ -31,6 +31,22 @@ the callbacks hand them back that way:
   and year views) report local dates, like the `date` prop. See
   [Anchor dates are local](#anchor-dates-are-local).
 
+## Recurring events and DST
+
+With a `timeZone`, `Calendar` expands recurring events on that zone's wall clock,
+not the device's. A daily 09:00 event in New York stays at 09:00 there after its
+clocks change, on a device in any zone. See
+[Recurring events](/guides/recurring-events#time-zones).
+
+Drags follow the zone's DST changes too. A move on the time grid keeps the
+event's elapsed duration, a resize sets the edge to the clock time you dragged it
+to, and a time dropped into the hour a spring-forward change skips lands after
+it. The drag preview is drawn on the device's clock, so on a night when the
+device's own clocks change its height can be off by the offset change. The
+reported `start` and `end` are not affected.
+
+## Display copies
+
 Render props (`renderEvent` and the per-view variants) and
 `eventAccessibilityLabel` receive the display copy, whose `start` and `end` read
 as the zone's wall clock, so formatting them shows the zone's time.
@@ -71,7 +87,7 @@ import { TimeGrid, fromZonedTime, zonedDragBounds, zonedEventSource } from "@sup
   events={zoned}
   onPressEvent={(event) => open(zonedEventSource(event))}
   onDragEvent={(event, start, end) => {
-    const bounds = zonedDragBounds(event, start, end);
+    const bounds = zonedDragBounds(event, start, end, { keepDuration: true });
     save(zonedEventSource(event), bounds.start, bounds.end);
   }}
   onCreateEvent={(start, end) =>
@@ -81,8 +97,10 @@ import { TimeGrid, fromZonedTime, zonedDragBounds, zonedEventSource } from "@sup
 ```
 
 - `zonedEventSource(event)` returns the event a display copy was made from.
-- `zonedDragBounds(event, start, end)` converts a dragged event's reported bounds
-  to real instants.
+- `zonedDragBounds(event, start, end, options)` converts a dragged event's
+  reported bounds to real instants. Pass `{ keepDuration: true }` for a time
+  grid, so a move keeps the event's elapsed duration across a DST change. Leave
+  it off for a month grid, where a drop keeps the clock time of both edges.
 - `fromZonedTime(date, timeZone)` converts one wall-clock date to a real instant.
 
 ## Anchor dates are local

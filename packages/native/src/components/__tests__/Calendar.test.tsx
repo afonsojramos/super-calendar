@@ -361,6 +361,29 @@ describe("Calendar callbacks with a timeZone", () => {
     expect(later.toISOString()).toBe("2026-07-15T08:15:00.000Z");
   });
 
+  it("repeats a recurring event on the zone's clock across its DST change", async () => {
+    // 09:00 in New York from 30 October; clocks there go back on 1 November.
+    const standup: CalendarEvent = {
+      title: "Standup",
+      start: new Date("2026-10-30T13:00:00Z"),
+      end: new Date("2026-10-30T14:00:00Z"),
+      recurrence: { freq: "daily" },
+    };
+    const onPressEvent = vi.fn();
+    const { getByLabelText } = await render(
+      <Calendar
+        {...props}
+        mode="day"
+        date={new Date(2026, 10, 2)}
+        timeZone="America/New_York"
+        events={[standup]}
+        onPressEvent={onPressEvent}
+      />,
+    );
+    await fireEvent.press(getByLabelText(/Standup, 09:00 to 10:00/));
+    expect(onPressEvent.mock.calls[0][0].start.toISOString()).toBe("2026-11-02T14:00:00.000Z");
+  });
+
   it("keeps an all-day event on its own day and presses the consumer's event", async () => {
     const onPressEvent = vi.fn();
     const { getAllByText } = await render(
