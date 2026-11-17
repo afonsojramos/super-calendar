@@ -40,7 +40,8 @@ support files.
 
 The root `vitest.config.mts` owns discovery, environment setup, and framework
 aliases. Shared contracts are typechecked against both adapters. Tests import
-library source, so they do not require a build.
+library source, so they do not require a build. Projects that load built packages or demos
+fail fast when `dist` is older than its sources (`scripts/check-fresh-build.mjs`).
 
 The native project pins `test-renderer` to 1.2.0 for React 19.2. Version 1.3.1
 pulls in `react-reconciler@0.34.0`, which requires React 19.3. Update the renderer

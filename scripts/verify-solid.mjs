@@ -17,6 +17,10 @@ assert(
   "Usage: node scripts/verify-solid.mjs [--dist]",
 );
 const distribution = args[0] === "--dist";
+if (distribution) {
+  const { checkPackages } = await import("./check-fresh-build.mjs");
+  checkPackages();
+}
 const resolvedArtifacts = new Set();
 const example = join(root, "examples/solid");
 const require = createRequire(import.meta.url);

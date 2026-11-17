@@ -19,6 +19,7 @@ export default defineConfig({
         ],
         testTimeout: 15_000,
         hookTimeout: 30_000,
+        globalSetup: artifact === "dist" ? ["./tests/setup/fresh-packages.mjs"] : [],
         provide: {
           browserRenderer: "react",
           browserArtifact: artifact,

@@ -15,6 +15,7 @@ export default defineConfig({
             exclude: engine === "chromium" ? [] : ["tests/web/browser/contracts/chromium/**"],
             testTimeout: 15_000,
             hookTimeout: 30_000,
+            globalSetup: artifact === "dist" ? ["./tests/setup/fresh-packages.mjs"] : [],
             provide: {
               browserRenderer: renderer,
               browserArtifact: artifact,
