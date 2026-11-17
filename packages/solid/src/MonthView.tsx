@@ -716,8 +716,6 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       (multiWeek() ? Math.max(1, props.maxVisibleEventCount) : props.maxVisibleEventCount) *
         (props.chipHeight + props.chipGap),
   );
-  // The day, not the instant, so the grid is rebuilt once a day.
-  const todayKey = createMemo(() => startOfDay(nowInTimeZone(props.now, props.timeZone)).getTime());
   const _grid = createMemo(
     (): {
       weeks: RowWeek[];
@@ -735,7 +733,8 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
         maxDate: props.maxDate,
         isDateDisabled: props.isDateDisabled,
         locale: props.locale,
-        today: new Date(todayKey()),
+        // Read here, not memoized apart, so each rebuild sees the current day.
+        today: nowInTimeZone(props.now, props.timeZone),
       };
       const weeks = numberOfWeeks();
       if (weeks === undefined) {

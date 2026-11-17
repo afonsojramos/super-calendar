@@ -157,6 +157,9 @@ export function Agenda<T>({
       data={rows}
       keyExtractor={keyExtractorRow}
       renderItem={renderItem}
+      // LegendList keeps rendered rows until `data` or `extraData` changes, so
+      // the day that is today has to invalidate them.
+      extraData={todayKey}
       // The public prop is data-agnostic; LegendList types the separator by row.
       ItemSeparatorComponent={
         (itemSeparatorComponent ?? undefined) as ComponentType<{ leadingItem: Row<T> }> | undefined

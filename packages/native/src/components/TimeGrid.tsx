@@ -3541,6 +3541,8 @@ function TimeGridInner<T>(
   // `columnsWidth` resizes the mounted pages when the grid is re-measured.
   // `showDragHandle` refreshes grips without requiring an event-data change, and
   // `renderCreateGhost` swaps the preview content of mounted pages.
+  // `now` and `timeZone` move the today highlight and the now line.
+  const nowTime = now?.getTime();
   const listExtraData = useMemo(
     () => ({
       events,
@@ -3552,6 +3554,8 @@ function TimeGridInner<T>(
       dragStepMinutes,
       minHour,
       maxHour,
+      nowTime,
+      timeZone,
     }),
     [
       events,
@@ -3563,6 +3567,8 @@ function TimeGridInner<T>(
       dragStepMinutes,
       minHour,
       maxHour,
+      nowTime,
+      timeZone,
     ],
   );
 

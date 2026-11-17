@@ -69,8 +69,10 @@ import { buildMonthGrid, nowInTimeZone } from "@super-calendar/core";
 const grid = buildMonthGrid(month, { today: nowInTimeZone(undefined, "Asia/Tokyo") });
 ```
 
-`getIsToday(date, today)` accepts the same reference day. In `schedule` mode,
-`Calendar` highlights the day of its `date` prop instead of today.
+`getIsToday(date, today)` accepts the same reference day. In `schedule` mode the
+DOM and Solid `Calendar` highlight the day of the `date` prop instead of today;
+the native `Calendar` highlights `activeDate` when you set it, and today
+otherwise.
 
 ## The now indicator
 

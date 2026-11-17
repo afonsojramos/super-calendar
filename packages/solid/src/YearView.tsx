@@ -123,7 +123,12 @@ export function YearView<T = unknown>(incoming: YearViewProps<T>): JSX.Element {
   );
   const theme = createMemo(() => mergeSolidTheme(props.theme));
   const labels = createMemo(() => resolveCalendarLabels(props.labels));
-  const today = createMemo(() => nowInTimeZone(props.now, props.timeZone));
+  // One memo for every day cell, yielding the day (not the instant) so the cells
+  // re-run only when it changes. Tracking `date` re-reads the clock on navigation.
+  const todayKey = createMemo(() => {
+    void props.date;
+    return startOfDay(nowInTimeZone(props.now, props.timeZone)).getTime();
+  });
   const slot = createSlots<YearViewSlot>(props);
 
   // Drag-to-select / drag-to-create: press a day and sweep across others (mini
@@ -370,7 +375,7 @@ export function YearView<T = unknown>(incoming: YearViewProps<T>): JSX.Element {
                                           );
                                         }
                                         const isToday = createMemo(() =>
-                                          getIsToday(day(), today()),
+                                          getIsToday(day(), new Date(todayKey())),
                                         );
                                         const isHighlighted = createMemo(() =>
                                           props.activeDate

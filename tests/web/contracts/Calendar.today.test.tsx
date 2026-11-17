@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 import type { CalendarEvent } from "@super-calendar/core/vanilla";
 import { rendererName, render, Agenda, Calendar } from "@calendar-test/renderer";
 
@@ -58,6 +59,39 @@ describe(rendererName, () => {
       const pinned = new Date(2026, 10, 20, 12);
       const { container } = render(Calendar, { mode: "month", date, now: pinned });
       expect(todayOf(container, "day").map((day) => day.dataset.day)).toEqual(["2026-11-20"]);
+    });
+
+    describe("on the device clock", () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 10, 12, 23, 0));
+      });
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("re-reads the clock when a month view navigates after midnight", () => {
+        const view = render(Calendar, { mode: "month", date });
+        expect(todayOf(view.container, "day").map((day) => day.dataset.day)).toEqual([
+          "2026-11-12",
+        ]);
+        vi.setSystemTime(new Date(2026, 10, 13, 1, 0));
+        view.rerender({ mode: "month", date: new Date(2026, 10, 13) });
+        expect(todayOf(view.container, "day").map((day) => day.dataset.day)).toEqual([
+          "2026-11-13",
+        ]);
+      });
+
+      it("re-reads the clock in a week view without the now indicator", () => {
+        const props = { mode: "week" as const, showNowIndicator: false };
+        const view = render(Calendar, { ...props, date });
+        expect(todayOf(view.container, "columnHeader")[0].textContent).toContain("12");
+        vi.setSystemTime(new Date(2026, 10, 13, 1, 0));
+        view.rerender({ ...props, date: new Date(2026, 10, 13) });
+        const headers = todayOf(view.container, "columnHeader");
+        expect(headers).toHaveLength(1);
+        expect(headers[0].textContent).toContain("13");
+      });
     });
 
     it("highlights the zone's current day in a standalone agenda", () => {

@@ -17,6 +17,7 @@ import {
   eventTimeLabel,
   formatHour,
   getIsToday,
+  nowInTimeZone,
   getViewDays,
   isAllDayEvent,
   isBackgroundEvent,
@@ -781,6 +782,14 @@ export function TimeGrid<T = unknown>(
       props.hiddenDays,
     ),
   );
+  // The day the headers and columns mark as today: the indicator's clock while
+  // it runs, so the two can't disagree. `now` stops ticking with the indicator
+  // off, so the clock is read afresh then, and again when the days change.
+  const todayKey = createMemo(() => {
+    if (props.showNowIndicator) return startOfDay(now()).getTime();
+    void days();
+    return startOfDay(nowInTimeZone(props.now, props.timeZone)).getTime();
+  });
 
   // Edge auto-advance. During a move drag the pointer stream is handled at the
   // document level (attached in beginDrag) so it survives the day columns
@@ -2033,7 +2042,7 @@ export function TimeGrid<T = unknown>(
         {
           <For each={days()} keyed={false}>
             {(day) => {
-              const today = createMemo(() => getIsToday(day(), now()));
+              const today = createMemo(() => getIsToday(day(), new Date(todayKey())));
               // Full, unambiguous date for assistive tech; the visible weekday + day
               // number below are decorative (aria-hidden) so it isn't read twice.
               const dateLabel = createMemo(() => format(day(), "EEEE, d MMMM yyyy", dfns()));
@@ -2398,7 +2407,7 @@ export function TimeGrid<T = unknown>(
                     onLostPointerCapture={cellEnabled() ? loseCreateCapture : undefined}
                     onClick={cellEnabled() ? (e) => tapCell(e, dayIndex) : undefined}
                     {...dataState({
-                      "data-today": getIsToday(day(), now()),
+                      "data-today": getIsToday(day(), new Date(todayKey())),
                       "data-weekend": isWeekend(day()),
                     })}
                     {...slot("dayColumn", {

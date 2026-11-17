@@ -1,5 +1,27 @@
 import type { CalendarEvent } from "../types";
 
+// Building a formatter costs far more than formatting with it, and the views
+// convert once per event and per rendered day, so keep one per zone.
+const zoneFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function zoneFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = zoneFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    zoneFormatters.set(timeZone, formatter);
+  }
+  return formatter;
+}
+
 /**
  * Reinterpret an instant as its wall-clock time in `timeZone`, returned as a
  * device-local `Date` whose fields (hours, minutes, …) read back as that zone's
@@ -11,16 +33,7 @@ import type { CalendarEvent } from "../types";
  * original UTC instant, so don't round-trip it back to a real time.
  */
 export function toZonedTime(date: Date, timeZone: string): Date {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    hourCycle: "h23",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).formatToParts(date);
+  const parts = zoneFormatter(timeZone).formatToParts(date);
 
   const field = (type: Intl.DateTimeFormatPartTypes): number => {
     const part = parts.find((p) => p.type === type);

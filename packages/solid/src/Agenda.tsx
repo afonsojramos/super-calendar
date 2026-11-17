@@ -184,10 +184,17 @@ export function Agenda<T = unknown>(incoming: AgendaProps<T>): JSX.Element {
     });
     return out;
   });
-  const today = createMemo(() => nowInTimeZone(props.now, props.timeZone));
+  // One memo for every header, yielding the day (not the instant) so the headers
+  // re-run only when it changes. Tracking `events` re-reads the clock with new rows.
+  const todayKey = createMemo(() => {
+    void props.events;
+    return startOfDay(nowInTimeZone(props.now, props.timeZone)).getTime();
+  });
   const Header = (row: { date: Date }): JSX.Element => {
     const highlighted = createMemo(() =>
-      props.activeDate ? isSameDay(row.date, props.activeDate) : getIsToday(row.date, today()),
+      props.activeDate
+        ? isSameDay(row.date, props.activeDate)
+        : getIsToday(row.date, new Date(todayKey())),
     );
     const label = createMemo(() => format(row.date, "EEEE, d LLLL", { locale: props.locale }));
     const headerProps = createMemo(() =>
