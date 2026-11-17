@@ -285,3 +285,74 @@ describe("Calendar today highlight", () => {
     expect(getAllByLabelText(/20 November.*, today/i)).toHaveLength(1);
   });
 });
+
+describe("Calendar callbacks with a timeZone", () => {
+  // Asia/Kolkata is UTC+5:30 all year: 06:00-08:00 UTC is 11:30-13:30 there.
+  const meeting: CalendarEvent = {
+    title: "Meeting",
+    start: new Date(Date.UTC(2026, 6, 15, 6, 0)),
+    end: new Date(Date.UTC(2026, 6, 15, 8, 0)),
+  };
+  const holiday: CalendarEvent = {
+    title: "Holiday",
+    allDay: true,
+    start: new Date(2026, 6, 15),
+    end: new Date(2026, 6, 16),
+  };
+  const props = {
+    date: new Date(2026, 6, 15),
+    timeZone: "Asia/Kolkata",
+    onChangeDate: noop,
+    onPressEvent: noop,
+  };
+
+  it("presses the consumer's own event", async () => {
+    const onPressEvent = vi.fn();
+    const onLongPressEvent = vi.fn();
+    const { getByLabelText } = await render(
+      <Calendar
+        {...props}
+        mode="day"
+        events={[meeting]}
+        onPressEvent={onPressEvent}
+        onLongPressEvent={onLongPressEvent}
+      />,
+    );
+    const el = getByLabelText(/Meeting, 11:30 to 13:30/);
+    await fireEvent.press(el);
+    expect(onPressEvent).toHaveBeenCalledTimes(1);
+    expect(onPressEvent.mock.calls[0][0]).toBe(meeting);
+    await fireEvent(el, "longPress");
+    expect(onLongPressEvent.mock.calls[0][0]).toBe(meeting);
+  });
+
+  it("reports a move and a resize as real instants on the consumer's event", async () => {
+    const onDragEvent = vi.fn();
+    const { getByLabelText } = await render(
+      <Calendar {...props} mode="day" events={[meeting]} onDragEvent={onDragEvent} />,
+    );
+    const el = getByLabelText(/Meeting, 11:30 to 13:30/);
+    await fireEvent(el, "accessibilityAction", { nativeEvent: { actionName: "move-later" } });
+    const [moved, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent, Date, Date];
+    expect(moved).toBe(meeting);
+    expect(start.toISOString()).toBe("2026-07-15T06:15:00.000Z");
+    expect(end.toISOString()).toBe("2026-07-15T08:15:00.000Z");
+
+    await fireEvent(el, "accessibilityAction", { nativeEvent: { actionName: "extend" } });
+    const [, sameStart, later] = onDragEvent.mock.calls[1] as [CalendarEvent, Date, Date];
+    // The untouched edge is the event's own start, not a round-tripped copy.
+    expect(sameStart).toBe(meeting.start);
+    expect(later.toISOString()).toBe("2026-07-15T08:15:00.000Z");
+  });
+
+  it("keeps an all-day event on its own day and presses the consumer's event", async () => {
+    const onPressEvent = vi.fn();
+    const { getAllByText } = await render(
+      <Calendar {...props} mode="week" events={[holiday]} onPressEvent={onPressEvent} />,
+    );
+    const chips = getAllByText("Holiday");
+    expect(chips).toHaveLength(1);
+    await fireEvent.press(chips[0]);
+    expect(onPressEvent.mock.calls[0][0]).toBe(holiday);
+  });
+});

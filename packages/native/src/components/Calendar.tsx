@@ -42,6 +42,9 @@ import {
   type DateRange,
   type EventAccessibilityLabeler,
   eventsInTimeZone,
+  fromZonedTime,
+  zonedDragBounds,
+  zonedEventSource,
   expandRecurringEvents,
   type WeekdayFormat,
   getViewDays,
@@ -349,7 +352,9 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   /**
    * Display events in this IANA time zone (e.g. `"America/New_York"`), DST-correct
    * and independent of the device zone. Display-only: it shifts the wall-clock the
-   * grid lays out from, it doesn't change your `Date`s. Uses `eventsInTimeZone`.
+   * grid lays out from, it doesn't change your `Date`s, and callbacks report your
+   * own events and real instants. All-day events stay on their days. Uses
+   * `eventsInTimeZone`.
    */
   timeZone?: string;
   /** Highlight this date (header/cell/agenda) instead of the real "today". */
@@ -642,9 +647,11 @@ function CalendarInner<T>(
   ]);
 
   // Swallow presses on disabled events once, so every view inherits the guard.
+  // With a display zone the views hold wall-clock copies of the events, so hand
+  // back the consumer's own event (`zonedEventSource` returns any other as is).
   const handlePressEvent = useCallback(
     (event: CalendarEvent<T>) => {
-      if (!event.disabled) onPressEvent(event);
+      if (!event.disabled) onPressEvent(zonedEventSource(event));
     },
     [onPressEvent],
   );
@@ -652,11 +659,55 @@ function CalendarInner<T>(
     () =>
       onLongPressEvent
         ? (event: CalendarEvent<T>) => {
-            if (!event.disabled) onLongPressEvent(event);
+            if (!event.disabled) onLongPressEvent(zonedEventSource(event));
           }
         : undefined,
     [onLongPressEvent],
   );
+
+  // The views also report wall-clock dates under a display zone. Convert them to
+  // real instants. Whole days (`onPressDay`, a month sweep, ...) stay
+  // device-local dates, as `date` is, so only the time grid's cell callbacks
+  // convert.
+  const zoned = useMemo(() => {
+    if (!timeZone) {
+      return {
+        onDragStart,
+        onDragEvent,
+        onPressMore,
+        onPressTime: onPressCell,
+        onLongPressTime: onLongPressCell,
+        onCreateTimed: onCreateEvent,
+      };
+    }
+    const instant = (wallClock: Date) => fromZonedTime(wallClock, timeZone);
+    return {
+      onDragStart:
+        onDragStart && ((event: CalendarEvent<T>) => onDragStart(zonedEventSource(event))),
+      onDragEvent:
+        onDragEvent &&
+        ((event: CalendarEvent<T>, start: Date, end: Date) => {
+          const bounds = zonedDragBounds(event, start, end);
+          return onDragEvent(zonedEventSource(event), bounds.start, bounds.end);
+        }),
+      onPressMore:
+        onPressMore &&
+        ((dayEvents: CalendarEvent<T>[], day: Date) =>
+          onPressMore(dayEvents.map(zonedEventSource), day)),
+      onPressTime: onPressCell && ((time: Date) => onPressCell(instant(time))),
+      onLongPressTime: onLongPressCell && ((time: Date) => onLongPressCell(instant(time))),
+      onCreateTimed:
+        onCreateEvent && ((start: Date, end: Date) => onCreateEvent(instant(start), instant(end))),
+    };
+  }, [
+    timeZone,
+    onDragStart,
+    onDragEvent,
+    onPressMore,
+    onPressCell,
+    onLongPressCell,
+    onCreateEvent,
+  ]);
 
   // Echo every date change and, when asked, the full visible range derived from it.
   const handleChangeDate = useCallback(
@@ -782,12 +833,12 @@ function CalendarInner<T>(
             onPressCell={onPressCell}
             onPressEvent={handlePressEvent}
             onLongPressEvent={handleLongPressEvent}
-            onPressMore={onPressMore}
+            onPressMore={zoned.onPressMore}
             onCreateEvent={onCreateEvent}
             renderCreateGhost={renderCreateGhost}
             onSelectDrag={onSelectDrag}
-            onDragEvent={onDragEvent}
-            onDragStart={onDragStart}
+            onDragEvent={zoned.onDragEvent}
+            onDragStart={zoned.onDragStart}
             eventStartEditable={eventStartEditable}
             eventOverlap={eventOverlap}
             selectedDates={selectedDates}
@@ -897,14 +948,14 @@ function CalendarInner<T>(
             swipeEnabled={swipeEnabled}
             onPressEvent={handlePressEvent}
             onLongPressEvent={handleLongPressEvent}
-            onDragEvent={onDragEvent}
+            onDragEvent={zoned.onDragEvent}
             showDragHandle={showDragHandle}
-            onDragStart={onDragStart}
+            onDragStart={zoned.onDragStart}
             dragStepMinutes={dragStepMinutes}
-            onPressCell={onPressCell}
+            onPressCell={zoned.onPressTime}
             resetPageOnPressCell={resetPageOnPressCell}
-            onLongPressCell={onLongPressCell}
-            onCreateEvent={onCreateEvent}
+            onLongPressCell={zoned.onLongPressTime}
+            onCreateEvent={zoned.onCreateTimed}
             renderCreateGhost={renderCreateGhost}
             onPressDateHeader={onPressDateHeader}
             onChangeDate={handleChangeDate}

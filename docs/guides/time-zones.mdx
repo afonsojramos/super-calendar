@@ -14,9 +14,38 @@ import { Calendar } from "@super-calendar/native";
 <Calendar /* ... */ timeZone="America/New_York" events={events} />;
 ```
 
-Under the hood this runs your events through `eventsInTimeZone`. Call it (or
-`toZonedTime` for a single date) yourself if you need the shifted events outside
-`Calendar`:
+`timeZone` only changes how events display. Your `Date`s stay real instants, and
+the callbacks hand them back that way:
+
+- `onPressEvent`, `onLongPressEvent`, `onDragStart`, `onDragEvent`, and
+  `onPressMore` receive the event objects you passed in, not display copies.
+- `onDragEvent` reports the new `start` and `end` as real instants: dropping an
+  event at 10:00 on a New York calendar reports 15:00 UTC in winter. An edge the
+  drag didn't move keeps your event's exact `Date`.
+- On the time grid, `onCreateEvent`, `onPressCell`, and `onLongPressCell` report
+  real instants too.
+- Callbacks that name whole days (`onPressDay`, `onSelectDrag`,
+  `onPressDateHeader`, and `onPressCell` / `onCreateEvent` in the month, multiweek
+  and year views) report local dates, like the `date` prop. See
+  [Anchor dates are local](#anchor-dates-are-local).
+
+Render props (`renderEvent` and the per-view variants) and
+`eventAccessibilityLabel` receive the display copy, whose `start` and `end` read
+as the zone's wall clock, so formatting them shows the zone's time.
+
+## All-day events
+
+An all-day event names calendar days, not instants, so `timeZone` doesn't shift
+it: a holiday on 12 November stays on 12 November in every zone. An event is
+all-day when it sets `allDay: true`, or when it runs from local midnight to local
+midnight without setting `allDay`. Set `allDay: false` on a midnight-to-midnight
+event that should shift like a timed one.
+
+## Outside `Calendar`
+
+`Calendar` runs your events through `eventsInTimeZone`. Call it (or
+`toZonedTime` for a single date) yourself to display zoned events in a standalone
+view such as `TimeGrid`:
 
 ```tsx
 import { eventsInTimeZone } from "@super-calendar/native";
@@ -28,6 +57,31 @@ const zoned = eventsInTimeZone(events, "America/New_York");
   The returned dates are for display only — they carry the zone's wall clock, not the original
   instant. Keep your source events around for editing and saving.
 </Warning>
+
+A standalone view reports what it displays. Convert in your callbacks with the
+helpers `Calendar` uses:
+
+```tsx
+import { TimeGrid, fromZonedTime, zonedDragBounds, zonedEventSource } from "@super-calendar/native";
+
+<TimeGrid
+  /* ... */
+  events={zoned}
+  onPressEvent={(event) => open(zonedEventSource(event))}
+  onDragEvent={(event, start, end) => {
+    const bounds = zonedDragBounds(event, start, end);
+    save(zonedEventSource(event), bounds.start, bounds.end);
+  }}
+  onCreateEvent={(start, end) =>
+    create(fromZonedTime(start, "America/New_York"), fromZonedTime(end, "America/New_York"))
+  }
+/>;
+```
+
+- `zonedEventSource(event)` returns the event a display copy was made from.
+- `zonedDragBounds(event, start, end)` converts a dragged event's reported bounds
+  to real instants.
+- `fromZonedTime(date, timeZone)` converts one wall-clock date to a real instant.
 
 ## Anchor dates are local
 

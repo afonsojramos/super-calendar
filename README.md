@@ -597,6 +597,9 @@ import { Calendar, eventsInTimeZone } from "@super-calendar/native";
 
 The returned dates are for display only — they carry the zone's wall clock, not
 the original instant, so keep your source events around for editing/saving.
+All-day events name calendar days and are not shifted. `Calendar` also takes a
+`timeZone` prop that does this for you and reports your own events and real
+instants in its callbacks.
 
 ### Theming
 
