@@ -89,6 +89,76 @@ describe(rendererName, () => {
       expect(end.getHours()).toBe(14);
     });
 
+    it("drag-moves a zero-length event and reports equal start and end", () => {
+      const onDragEvent = vi.fn();
+      const deadline: CalendarEvent = {
+        title: "Deadline",
+        start: new Date(2026, 5, 26, 14, 0),
+        end: new Date(2026, 5, 26, 14, 0),
+      };
+      const { getByText } = render(TimeGrid, {
+        date: day,
+        mode: "day",
+        events: [deadline],
+        hourHeight: 48,
+        onDragEvent: onDragEvent,
+      });
+      const box = wrapperOf(getByText("Deadline"));
+      // Drag up 96px = 2h at 48px/hour: 14:00 -> 12:00.
+      fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+      fireEvent.pointerMove(box, { clientY: 204, pointerId: 1 });
+      fireEvent.pointerUp(box, { clientY: 204, pointerId: 1 });
+
+      expect(onDragEvent).toHaveBeenCalledTimes(1);
+      const [event, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent, Date, Date];
+      expect(event).toBe(deadline);
+      expect(start).toEqual(new Date(2026, 5, 26, 12, 0));
+      expect(end).toEqual(start);
+    });
+
+    it("still refuses to move an event whose end precedes its start", () => {
+      const onDragEvent = vi.fn();
+      const inverted: CalendarEvent = {
+        title: "Inverted",
+        start: new Date(2026, 5, 26, 14, 0),
+        end: new Date(2026, 5, 26, 13, 0),
+      };
+      const { getByText } = render(TimeGrid, {
+        date: day,
+        mode: "day",
+        events: [inverted],
+        hourHeight: 48,
+        onDragEvent: onDragEvent,
+      });
+      const box = wrapperOf(getByText("Inverted"));
+      fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+      fireEvent.pointerMove(box, { clientY: 204, pointerId: 1 });
+      fireEvent.pointerUp(box, { clientY: 204, pointerId: 1 });
+      expect(onDragEvent).not.toHaveBeenCalled();
+    });
+
+    it("eventOverlap={false} rejects a zero-length event dropped on another", () => {
+      const onDragEvent = vi.fn();
+      const points: CalendarEvent[] = [
+        { title: "A", start: new Date(2026, 5, 26, 9, 0), end: new Date(2026, 5, 26, 9, 0) },
+        { title: "B", start: new Date(2026, 5, 26, 12, 0), end: new Date(2026, 5, 26, 12, 0) },
+      ];
+      const { getByText } = render(TimeGrid, {
+        date: day,
+        mode: "day",
+        events: points,
+        hourHeight: 48,
+        eventOverlap: false,
+        onDragEvent: onDragEvent,
+      });
+      const box = wrapperOf(getByText("A"));
+      // Drag A (09:00) down 3h onto B at 12:00 -> rejected.
+      fireEvent.pointerDown(box, { clientY: 100, pointerId: 1 });
+      fireEvent.pointerMove(box, { clientY: 244, pointerId: 1 });
+      fireEvent.pointerUp(box, { clientY: 244, pointerId: 1 });
+      expect(onDragEvent).not.toHaveBeenCalled();
+    });
+
     it("resizes from the top edge: moves the start, keeps the end fixed", () => {
       const onDragEvent = vi.fn();
       const { getByText } = render(TimeGrid, {

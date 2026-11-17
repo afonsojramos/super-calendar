@@ -106,7 +106,14 @@ export function layoutDayEvents<T>(events: CalendarEvent<T>[], day: Date): Posit
     // paint as bands (see `backgroundBandsForDay`), not boxes.
     .filter((event) => !isAllDayEvent(event) && !isBackgroundEvent(event))
     // Overlaps this day if it starts before the day ends and ends after it begins.
-    .filter((event) => event.start < nextDayStart && event.end > dayStart)
+    // A zero-length event occupies its own instant, so one at midnight belongs to
+    // the day it starts.
+    .filter(
+      (event) =>
+        event.start < nextDayStart &&
+        (event.end > dayStart ||
+          (event.end.getTime() === event.start.getTime() && event.start >= dayStart)),
+    )
     .map((event) => {
       const segStart = maxDate([event.start, dayStart]);
       const segEnd = minDate([event.end, nextDayStart]);
@@ -123,6 +130,11 @@ export function layoutDayEvents<T>(events: CalendarEvent<T>[], day: Date): Posit
   let cluster: Segment<T>[] = [];
   let clusterEnd = Number.NEGATIVE_INFINITY;
 
+  // Columns are packed by each segment's minimum box (see `durationHours`), so
+  // two short events whose minimum boxes would overlap sit side by side even
+  // when their times don't.
+  const drawnEndOf = (seg: Segment<T>) => Math.max(seg.end, seg.start + MIN_DURATION_HOURS);
+
   const flushCluster = () => {
     const columnEnds: number[] = [];
     const columnOf = new Map<Segment<T>, number>();
@@ -130,9 +142,9 @@ export function layoutDayEvents<T>(events: CalendarEvent<T>[], day: Date): Posit
       let column = columnEnds.findIndex((end) => end <= seg.start);
       if (column === -1) {
         column = columnEnds.length;
-        columnEnds.push(seg.end);
+        columnEnds.push(drawnEndOf(seg));
       } else {
-        columnEnds[column] = seg.end;
+        columnEnds[column] = drawnEndOf(seg);
       }
       columnOf.set(seg, column);
     }
@@ -153,7 +165,7 @@ export function layoutDayEvents<T>(events: CalendarEvent<T>[], day: Date): Posit
   for (const seg of segments) {
     if (cluster.length > 0 && seg.start >= clusterEnd) flushCluster();
     cluster.push(seg);
-    clusterEnd = Math.max(clusterEnd, seg.end);
+    clusterEnd = Math.max(clusterEnd, drawnEndOf(seg));
   }
   if (cluster.length > 0) flushCluster();
 

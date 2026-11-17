@@ -6,11 +6,19 @@ import { MIN_DURATION_HOURS } from "./minDuration";
 
 /**
  * True when two time ranges overlap. Edges touching (one ends exactly when the
- * next begins) do not count as an overlap. Compares absolute instants, so events
- * at the same wall-clock time on different days do not overlap.
+ * next begins) do not count as an overlap. A zero-length range occupies its own
+ * instant: it overlaps a range that contains that instant or starts at it, and
+ * another zero-length range at the same instant. Compares absolute instants, so
+ * events at the same wall-clock time on different days do not overlap.
  */
 export function eventsOverlap(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
-  return aStart.getTime() < bEnd.getTime() && bStart.getTime() < aEnd.getTime();
+  const a0 = aStart.getTime();
+  const a1 = aEnd.getTime();
+  const b0 = bStart.getTime();
+  const b1 = bEnd.getTime();
+  if (a0 === a1) return b0 === b1 ? a0 === b0 : b0 <= a0 && a0 < b1;
+  if (b0 === b1) return a0 <= b0 && b0 < a1;
+  return a0 < b1 && b0 < a1;
 }
 
 /**

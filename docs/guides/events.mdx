@@ -112,6 +112,13 @@ dom renderer); set it to `0` if your renderer should get the exact duration
 height. The box is inset from its slot by `eventGap` (see
 [Event boxes](/guides/time-grid#event-boxes)).
 
+An event whose `start` and `end` are the same instant (a deadline, a reminder) is
+valid. The grid draws it as a 15-minute box on the day it starts, and events whose
+boxes would overlap sit side by side. You can drag it to another time: `onDragEvent`
+reports an equal `start` and `end`. With `eventOverlap={false}`, it collides with
+an event that contains its instant or starts at it, and with another zero-length
+event at the same instant.
+
 ## Lighter touches
 
 If you only want to tweak the built-in event box, you don't need a full

@@ -19,6 +19,19 @@ describe("eventsOverlap", () => {
     expect(eventsOverlap(at(9), at(10), at(10), at(11))).toBe(false); // touch at 10:00
     expect(eventsOverlap(at(9), at(10), at(11), at(12))).toBe(false);
   });
+  it("treats a zero-length range as the instant it occupies", () => {
+    // Two at the same instant collide; apart they don't.
+    expect(eventsOverlap(at(9), at(9), at(9), at(9))).toBe(true);
+    expect(eventsOverlap(at(9), at(9), at(9, 15), at(9, 15))).toBe(false);
+    // Inside a range, or at its start, in either argument order.
+    expect(eventsOverlap(at(9, 30), at(9, 30), at(9), at(10))).toBe(true);
+    expect(eventsOverlap(at(9), at(10), at(9, 30), at(9, 30))).toBe(true);
+    expect(eventsOverlap(at(9), at(9), at(9), at(10))).toBe(true);
+    expect(eventsOverlap(at(9), at(10), at(9), at(9))).toBe(true);
+    // A range that ends at the instant has already finished.
+    expect(eventsOverlap(at(10), at(10), at(9), at(10))).toBe(false);
+    expect(eventsOverlap(at(9), at(10), at(10), at(10))).toBe(false);
+  });
   it("does not overlap the same wall-clock time on different days", () => {
     expect(eventsOverlap(at(9), at(10), new Date(2026, 0, 7, 9), new Date(2026, 0, 7, 10))).toBe(
       false,
@@ -36,6 +49,12 @@ describe("overlapsOtherEvents", () => {
     expect(overlapsOtherEvents(events, a, at(11), at(12))).toBe(true);
     // Move A to a free slot -> no collision (and it doesn't collide with itself).
     expect(overlapsOtherEvents(events, a, at(13), at(14))).toBe(false);
+  });
+  it("flags a zero-length event dropped on another at the same instant", () => {
+    const first: CalendarEvent = { start: at(14), end: at(14), title: "Deadline" };
+    const second: CalendarEvent = { start: at(15), end: at(15), title: "Reminder" };
+    expect(overlapsOtherEvents([first, second], second, at(14), at(14))).toBe(true);
+    expect(overlapsOtherEvents([first, second], second, at(16), at(16))).toBe(false);
   });
 });
 
@@ -197,6 +216,14 @@ describe("resolveDraggedBounds", () => {
     if (!moved) throw new Error("expected the move to be accepted");
     expect(moved.start.getMinutes()).toBe(30);
     expect(moved.end.getTime() - moved.start.getTime()).toBe(10 * 60_000);
+  });
+
+  it("moves and extends a zero-length event", () => {
+    const moved = resolveDraggedBounds(start, start, -45, -45, 15);
+    expect(moved?.start).toEqual(new Date(2026, 0, 1, 8, 15));
+    expect(moved?.end).toEqual(moved?.start);
+    const extended = resolveDraggedBounds(start, start, 0, 15, 15);
+    expect(extended).toEqual({ start, end: new Date(2026, 0, 1, 9, 15) });
   });
 
   it("still rejects shrinking a sub-step event further", () => {
