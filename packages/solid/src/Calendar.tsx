@@ -11,6 +11,7 @@ import {
   type DateSelectionConstraints,
   type EventAccessibilityLabeler,
   eventsInTimeZone,
+  fromZonedRange,
   fromZonedTime,
   zonedDragBounds,
   zonedEventSource,
@@ -383,20 +384,21 @@ export function Calendar<T = unknown>(
   const displayEvents = createMemo(() => {
     let out: CalendarEvent<T>[] = props.events ?? EMPTY_EVENTS;
     if (out.some((e) => e.recurrence)) {
-      let [start, end] = expansionRange(
+      const [start, end] = expansionRange(
         props.mode,
         props.date,
         props.weekStartsOn,
         props.numberOfDays,
         props.numberOfWeeks,
       );
-      // A display zone shifts each occurrence's wall-clock by up to ~a day, which
-      // can move an edge occurrence into a visible column; widen so it's generated.
-      if (props.timeZone) {
-        start = addDays(start, -1);
-        end = addDays(end, 1);
-      }
-      out = expandRecurringEvents(out, start, end);
+      // The range is the days on screen, which under a display zone are that
+      // zone's days: expand on its clock, over the instants those days cover.
+      const timeZone = props.timeZone;
+      out = timeZone
+        ? expandRecurringEvents(out, fromZonedTime(start, timeZone), fromZonedTime(end, timeZone), {
+            timeZone,
+          })
+        : expandRecurringEvents(out, start, end);
     }
     if (props.timeZone) out = eventsInTimeZone(out, props.timeZone);
     return out;
@@ -424,7 +426,14 @@ export function Calendar<T = unknown>(
       const handler = props.onDragEvent;
       return handler && props.timeZone
         ? (event: CalendarEvent<T>, start: Date, end: Date) => {
-            const bounds = zonedDragBounds(event, start, end);
+            // A time-grid move keeps the event's elapsed duration; a month drop
+            // keeps the clock time of both edges.
+            const bounds = zonedDragBounds(event, start, end, {
+              keepDuration: props.mode !== "month" && props.mode !== "multiweek",
+            });
+            // An edge dropped into an hour the zone's clock skips can leave no
+            // usable span; reject the drop, so the event snaps back.
+            if (!bounds) return false;
             return handler(zonedEventSource(event), bounds.start, bounds.end);
           }
         : handler;
@@ -445,8 +454,11 @@ export function Calendar<T = unknown>(
       const handler = props.onCreateEvent;
       const timeZone = props.timeZone;
       return handler && timeZone
-        ? (start: Date, end: Date) =>
-            handler(fromZonedTime(start, timeZone), fromZonedTime(end, timeZone))
+        ? (start: Date, end: Date) => {
+            // A sweep that collapses inside a skipped hour creates nothing.
+            const range = fromZonedRange(start, end, timeZone);
+            if (range) handler(range.start, range.end);
+          }
         : handler;
     }),
   };

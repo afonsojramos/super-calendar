@@ -220,16 +220,16 @@ describe("zonedDragBounds", () => {
   const wall = (day: number, hour: number, minute = 0) => new Date(2026, 10, day, hour, minute);
 
   it("reads a moved event's bounds as the zone's wall clock", () => {
-    const { start, end } = zonedDragBounds(zoned, wall(13, 14, 30), wall(13, 15, 30));
+    const { start, end } = zonedDragBounds(zoned, wall(13, 14, 30), wall(13, 15, 30))!;
     expect(start.toISOString()).toBe("2026-11-13T19:30:00.000Z");
     expect(end.toISOString()).toBe("2026-11-13T20:30:00.000Z");
   });
 
   it("keeps the exact instant of an edge the drag left alone", () => {
-    const resized = zonedDragBounds(zoned, zoned.start, wall(12, 12));
+    const resized = zonedDragBounds(zoned, zoned.start, wall(12, 12))!;
     expect(resized.start).toBe(meeting.start);
     expect(resized.end.toISOString()).toBe("2026-11-12T17:00:00.000Z");
-    const fromTop = zonedDragBounds(zoned, wall(12, 9), zoned.end);
+    const fromTop = zonedDragBounds(zoned, wall(12, 9), zoned.end)!;
     expect(fromTop.start.toISOString()).toBe("2026-11-12T14:00:00.000Z");
     expect(fromTop.end).toBe(meeting.end);
   });
@@ -244,6 +244,6 @@ describe("zonedDragBounds", () => {
     const start = new Date(2026, 10, 14);
     const end = new Date(2026, 10, 15);
     expect(zonedDragBounds(same, start, end)).toEqual({ start, end });
-    expect(zonedDragBounds(same, start, end).start).toBe(start);
+    expect(zonedDragBounds(same, start, end)?.start).toBe(start);
   });
 });

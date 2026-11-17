@@ -92,6 +92,31 @@ describe(rendererName, () => {
       expect(occurrence.recurrence).toBeUndefined();
     });
 
+    it("repeats a recurring event on the zone's clock across its DST change", () => {
+      // 09:00 in New York from 30 October. Clocks there go back on 1 November,
+      // so the 2 November occurrence is an hour later in UTC and still 09:00.
+      const standup: CalendarEvent = {
+        title: "Standup",
+        start: new Date("2026-10-30T13:00:00Z"),
+        end: new Date("2026-10-30T15:00:00Z"),
+        recurrence: { freq: "daily" },
+      };
+      const onPressEvent = vi.fn();
+      const { getByText } = render(Calendar, {
+        mode: "day",
+        date: new Date(2026, 10, 2),
+        timeZone: "America/New_York",
+        hourHeight: 48,
+        events: [standup],
+        onPressEvent,
+      });
+      // Two hours long, so the box is tall enough to show its times.
+      expect(getByText("09:00 - 11:00")).toBeTruthy();
+      fireEvent.click(getByText("Standup"));
+      const [occurrence] = onPressEvent.mock.calls[0] as [CalendarEvent];
+      expect(occurrence.start.toISOString()).toBe("2026-11-02T14:00:00.000Z");
+    });
+
     it("keeps an all-day event on its own day", () => {
       const { container } = render(Calendar, {
         mode: "month",

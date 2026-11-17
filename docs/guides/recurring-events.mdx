@@ -68,6 +68,37 @@ weekday: 5 }` (the last Friday).
 - `rdates` — extra one-off dates added to the set, even ones the rule wouldn't
   produce.
 
+## Time zones
+
+A rule keeps its event's clock time from one occurrence to the next, so the
+result depends on whose clock that is. By default it is the device's. Pass
+`timeZone` to repeat on another zone's wall clock, with that zone's DST changes:
+
+```tsx
+import { expandRecurringEvents } from "@super-calendar/native";
+
+// 09:00 in New York every day, whatever zone the device is in.
+const occurrences = expandRecurringEvents(events, rangeStart, rangeEnd, {
+  timeZone: "America/New_York",
+});
+```
+
+- The range and the returned occurrences are real instants.
+- `weekdays`, `monthDays`, `nthWeekday`, and `months` read the zone's calendar, so
+  a 22:00 Monday event in New York stays on Mondays there.
+- An occurrence that lands in the hour a spring-forward change skips moves to
+  after it for that day (02:30 becomes 03:30).
+- An exception in `exdates` that reads the event's own time of day in the zone
+  (or equals one of the `rdates`) drops the occurrence at that instant. Any other
+  exception at midnight, on the device or in the zone, drops every occurrence on
+  that day of the zone's calendar.
+- All-day events name calendar days, so they still repeat on the device's
+  calendar (see [All-day events](/guides/time-zones#all-day-events)).
+
+`Calendar` does this for you when you set its `timeZone` prop.
+
+## Occurrences
+
 Each occurrence keeps the original duration and fields; non-recurring events pass
 through unchanged. These rules map to and from iCal
 `RRULE`/`WKST`/`BYMONTHDAY`/`BYMONTH`/`EXDATE`/`RDATE` — see [iCalendar](/guides/ical).
