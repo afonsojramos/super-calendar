@@ -836,6 +836,7 @@ export function TimeGrid<T = unknown>(
     move: (e: PointerEvent) => void;
     up: (e: PointerEvent) => void;
     cancel: (e: PointerEvent) => void;
+    preventNative: (e: Event) => void;
   } | null> = {
     current: null,
   };
@@ -1189,6 +1190,8 @@ export function TimeGrid<T = unknown>(
     document.removeEventListener("pointermove", h.move);
     document.removeEventListener("pointerup", h.up);
     document.removeEventListener("pointercancel", h.cancel);
+    document.removeEventListener("selectstart", h.preventNative, true);
+    document.removeEventListener("dragstart", h.preventNative, true);
     docHandlersRef.current = null;
   };
   const finishDrag = () => {
@@ -1481,11 +1484,16 @@ export function TimeGrid<T = unknown>(
           cancelDrag();
         }
       },
+      // Text selected by an earlier drag can turn this one into a native text
+      // drag, after which the browser stops sending pointer events (WebKit).
+      preventNative: (event: Event) => event.preventDefault(),
     };
     docHandlersRef.current = handlers;
     document.addEventListener("pointermove", handlers.move);
     document.addEventListener("pointerup", handlers.up);
     document.addEventListener("pointercancel", handlers.cancel);
+    document.addEventListener("selectstart", handlers.preventNative, true);
+    document.addEventListener("dragstart", handlers.preventNative, true);
   };
   const pressEvent = (
     e: DomPointerEvent<HTMLElement>,

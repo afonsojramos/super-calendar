@@ -159,6 +159,33 @@ describe(rendererName, () => {
       expect(onDragEvent).not.toHaveBeenCalled();
     });
 
+    it.each(["release", "cancel", "unmount"])(
+      "blocks native selection and dragging during an event drag, until %s",
+      (reason) => {
+        const view = render(TimeGrid, {
+          date: day,
+          mode: "day",
+          events: events,
+          hourHeight: 48,
+          onDragEvent: vi.fn(),
+        });
+        const nativeInputAllowed = (type: string) =>
+          document.dispatchEvent(new Event(type, { bubbles: true, cancelable: true }));
+        expect(nativeInputAllowed("dragstart")).toBe(true);
+        const box = wrapperOf(view.getByText("Focus"));
+        fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+        fireEvent.pointerMove(box, { clientY: 310, pointerId: 1 });
+        // A native text drag here would end pointer input mid-drag.
+        expect(nativeInputAllowed("selectstart")).toBe(false);
+        expect(nativeInputAllowed("dragstart")).toBe(false);
+        if (reason === "release") fireEvent.pointerUp(box, { clientY: 310, pointerId: 1 });
+        else if (reason === "cancel") fireEvent.pointerCancel(document, { pointerId: 1 });
+        else view.unmount();
+        expect(nativeInputAllowed("selectstart")).toBe(true);
+        expect(nativeInputAllowed("dragstart")).toBe(true);
+      },
+    );
+
     it("resizes from the top edge: moves the start, keeps the end fixed", () => {
       const onDragEvent = vi.fn();
       const { getByText } = render(TimeGrid, {
