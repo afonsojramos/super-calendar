@@ -1,4 +1,5 @@
 import type { CalendarEvent } from "../types";
+import { isAllDayEvent } from "./layout";
 
 // Building a formatter costs far more than formatting with it, and the views
 // convert once per event and per rendered day, so keep one per zone. Zone names
@@ -99,17 +100,85 @@ export function zonedTimeToUtc(wallClock: Date, timeZone: string): Date {
 }
 
 /**
- * Map every event's `start`/`end` through {@link toZonedTime} so the calendar
- * displays them in `timeZone`. Other fields are preserved. Memoize the result
- * (e.g. with `useMemo`) since it allocates new dates.
+ * The inverse of {@link toZonedTime}: the real instant for a date whose
+ * device-local fields hold a wall-clock time in `timeZone`, such as a date a
+ * calendar displaying that zone reports. DST-correct via {@link zonedTimeToUtc}.
+ */
+export function fromZonedTime(date: Date, timeZone: string): Date {
+  return zonedTimeToUtc(
+    new Date(
+      Date.UTC(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        date.getHours(),
+        date.getMinutes(),
+        date.getSeconds(),
+        date.getMilliseconds(),
+      ),
+    ),
+    timeZone,
+  );
+}
+
+// Each display copy made by `eventsInTimeZone`, mapped to the event it copies
+// and the zone it was shifted into.
+const zonedSources = new WeakMap<object, { event: object; timeZone: string }>();
+
+/**
+ * Shift every timed event's `start`/`end` through {@link toZonedTime} so the
+ * calendar displays them in `timeZone`. Other fields are preserved. All-day
+ * events (see `isAllDayEvent`) name calendar days, not instants, so they are
+ * returned as they are and stay on their days. Memoize the result (e.g. with
+ * `useMemo`) since it allocates new dates.
  */
 export function eventsInTimeZone<T>(
   events: CalendarEvent<T>[],
   timeZone: string,
 ): CalendarEvent<T>[] {
-  return events.map((event) => ({
-    ...event,
-    start: toZonedTime(event.start, timeZone),
-    end: toZonedTime(event.end, timeZone),
-  }));
+  return events.map((event) => {
+    if (isAllDayEvent(event)) return event;
+    const zoned = {
+      ...event,
+      start: toZonedTime(event.start, timeZone),
+      end: toZonedTime(event.end, timeZone),
+    };
+    zonedSources.set(zoned, { event, timeZone });
+    return zoned;
+  });
+}
+
+/**
+ * The event a display copy made by {@link eventsInTimeZone} stands for, with its
+ * real `start` and `end`. Any other event is returned as it is. Use it in the
+ * callbacks of a view that displays zoned events, to get back the event you
+ * passed in.
+ */
+export function zonedEventSource<T>(event: CalendarEvent<T>): CalendarEvent<T> {
+  return (zonedSources.get(event)?.event as CalendarEvent<T> | undefined) ?? event;
+}
+
+/**
+ * Convert the bounds a view reports for a dragged event back to real instants.
+ * `event` is the displayed event the view passed to `onDragEvent`, and `start`
+ * / `end` the bounds it reported. For a display copy made by
+ * {@link eventsInTimeZone}, each bound is read as a wall-clock time in that
+ * zone; an edge the drag left alone keeps the source event's exact instant.
+ * Bounds of any other event (an all-day event, or one that was never shifted)
+ * are returned unchanged.
+ */
+export function zonedDragBounds<T>(
+  event: CalendarEvent<T>,
+  start: Date,
+  end: Date,
+): { start: Date; end: Date } {
+  const zoned = zonedSources.get(event);
+  if (!zoned) return { start, end };
+  const source = zoned.event as CalendarEvent<T>;
+  const real = (reported: Date, displayed: Date, original: Date) =>
+    reported.getTime() === displayed.getTime() ? original : fromZonedTime(reported, zoned.timeZone);
+  return {
+    start: real(start, event.start, source.start),
+    end: real(end, event.end, source.end),
+  };
 }

@@ -70,13 +70,9 @@ describe(rendererName, () => {
           touchPoints: [{ ...contact, x: to.x + to.width / 2, y: to.y + 10 }],
         });
         await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-        await expect
-          .poll(calls)
-          .toBe(
-            view === "multiweek-transformed"
-              ? '["Planning@22:8:0-22:9:0"]'
-              : '["Planning@22:9:0-22:10:0"]',
-          );
+        // The transformed view displays the event an hour earlier, in Lisbon's
+        // time, but reports the drop as the same real instants.
+        await expect.poll(calls).toBe('["Planning@22:9:0-22:10:0"]');
       } finally {
         await cdp.detach();
       }

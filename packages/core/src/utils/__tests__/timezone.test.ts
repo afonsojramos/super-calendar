@@ -1,5 +1,13 @@
 import type { CalendarEvent } from "../../types";
-import { eventsInTimeZone, nowInTimeZone, toZonedTime, zonedTimeToUtc } from "../timezone";
+import {
+  eventsInTimeZone,
+  fromZonedTime,
+  nowInTimeZone,
+  toZonedTime,
+  zonedDragBounds,
+  zonedEventSource,
+  zonedTimeToUtc,
+} from "../timezone";
 
 // 1 June 2026, 12:00 UTC. June avoids the US/EU DST transition dates, so the
 // offsets below are stable regardless of the machine running the test.
@@ -126,5 +134,116 @@ describe("eventsInTimeZone", () => {
     expect(zoned.title).toBe("Sync");
     expect(zoned.start.getHours()).toBe(21);
     expect(zoned.end.getHours()).toBe(22);
+  });
+
+  it("leaves all-day events as they are, on their own days", () => {
+    const flagged: CalendarEvent = {
+      title: "Holiday",
+      allDay: true,
+      start: new Date("2026-11-12T00:00:00Z"),
+      end: new Date("2026-11-13T00:00:00Z"),
+    };
+    // Midnight to midnight on the device clock reads as all-day without the flag.
+    const inferred: CalendarEvent = { start: new Date(2026, 10, 12), end: new Date(2026, 10, 14) };
+    for (const timeZone of ["America/New_York", "Asia/Tokyo", "Pacific/Kiritimati"]) {
+      const zoned = eventsInTimeZone([flagged, inferred], timeZone);
+      expect(zoned[0]).toBe(flagged);
+      expect(zoned[1]).toBe(inferred);
+    }
+  });
+
+  it("shifts a midnight-bounded event marked as timed", () => {
+    const timed: CalendarEvent = {
+      allDay: false,
+      start: new Date("2026-11-12T00:00:00Z"),
+      end: new Date("2026-11-13T00:00:00Z"),
+    };
+    const [zoned] = eventsInTimeZone([timed], "America/New_York");
+    expect(zoned).not.toBe(timed);
+    expect([zoned.start.getDate(), zoned.start.getHours()]).toEqual([11, 19]);
+    expect([zoned.end.getDate(), zoned.end.getHours()]).toEqual([12, 19]);
+  });
+});
+
+describe("fromZonedTime", () => {
+  it.each(["UTC", "America/New_York", "Asia/Kolkata", "Pacific/Kiritimati", "Pacific/Pago_Pago"])(
+    "inverts toZonedTime in %s",
+    (timeZone) => {
+      for (const iso of [
+        "2026-01-15T03:20:30.123Z",
+        "2026-07-15T23:45:00Z",
+        "2026-11-12T15:00:00Z",
+      ]) {
+        const real = new Date(iso);
+        expect(fromZonedTime(toZonedTime(real, timeZone), timeZone).toISOString()).toBe(
+          real.toISOString(),
+        );
+      }
+    },
+  );
+
+  it("reads device-local fields as the zone's wall clock", () => {
+    // 10:00 on 12 November in New York (EST, UTC-5) is 15:00 UTC.
+    expect(fromZonedTime(new Date(2026, 10, 12, 10), "America/New_York").toISOString()).toBe(
+      "2026-11-12T15:00:00.000Z",
+    );
+  });
+});
+
+describe("zonedEventSource", () => {
+  const meeting: CalendarEvent<{ id: string }> = {
+    id: "m",
+    start: new Date("2026-11-12T15:00:00Z"),
+    end: new Date("2026-11-12T16:00:00Z"),
+  };
+
+  it("returns the event a display copy was made from", () => {
+    const [zoned] = eventsInTimeZone([meeting], "America/New_York");
+    expect(zoned).not.toBe(meeting);
+    expect(zonedEventSource(zoned)).toBe(meeting);
+  });
+
+  it("returns any other event as it is", () => {
+    expect(zonedEventSource(meeting)).toBe(meeting);
+    const copy = { ...eventsInTimeZone([meeting], "America/New_York")[0] };
+    expect(zonedEventSource(copy)).toBe(copy);
+  });
+});
+
+describe("zonedDragBounds", () => {
+  const timeZone = "America/New_York";
+  const meeting: CalendarEvent = {
+    start: new Date("2026-11-12T15:00:00Z"), // 10:00 in New York
+    end: new Date("2026-11-12T16:00:00Z"),
+  };
+  const [zoned] = eventsInTimeZone([meeting], timeZone);
+  const wall = (day: number, hour: number, minute = 0) => new Date(2026, 10, day, hour, minute);
+
+  it("reads a moved event's bounds as the zone's wall clock", () => {
+    const { start, end } = zonedDragBounds(zoned, wall(13, 14, 30), wall(13, 15, 30));
+    expect(start.toISOString()).toBe("2026-11-13T19:30:00.000Z");
+    expect(end.toISOString()).toBe("2026-11-13T20:30:00.000Z");
+  });
+
+  it("keeps the exact instant of an edge the drag left alone", () => {
+    const resized = zonedDragBounds(zoned, zoned.start, wall(12, 12));
+    expect(resized.start).toBe(meeting.start);
+    expect(resized.end.toISOString()).toBe("2026-11-12T17:00:00.000Z");
+    const fromTop = zonedDragBounds(zoned, wall(12, 9), zoned.end);
+    expect(fromTop.start.toISOString()).toBe("2026-11-12T14:00:00.000Z");
+    expect(fromTop.end).toBe(meeting.end);
+  });
+
+  it("returns the bounds of an event that was never shifted", () => {
+    const holiday: CalendarEvent = {
+      allDay: true,
+      start: new Date(2026, 10, 12),
+      end: new Date(2026, 10, 13),
+    };
+    const [same] = eventsInTimeZone([holiday], timeZone);
+    const start = new Date(2026, 10, 14);
+    const end = new Date(2026, 10, 15);
+    expect(zonedDragBounds(same, start, end)).toEqual({ start, end });
+    expect(zonedDragBounds(same, start, end).start).toBe(start);
   });
 });

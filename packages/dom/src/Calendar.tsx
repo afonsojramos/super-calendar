@@ -37,6 +37,9 @@ import {
   type EventAccessibilityLabeler,
   buildMultiWeekGrid,
   eventsInTimeZone,
+  fromZonedTime,
+  zonedDragBounds,
+  zonedEventSource,
   expandRecurringEvents,
   getViewDays,
   type WeekdayFormat,
@@ -108,7 +111,9 @@ export interface CalendarProps<T = unknown>
   /**
    * Display events in this IANA time zone (e.g. `"America/New_York"`), DST-correct
    * and independent of the device zone. Display-only: it shifts the wall-clock the
-   * grid lays out from, it doesn't change your `Date`s. Uses `eventsInTimeZone`.
+   * grid lays out from, it doesn't change your `Date`s, and callbacks report your
+   * own events and real instants. All-day events stay on their days. Uses
+   * `eventsInTimeZone`.
    */
   timeZone?: string;
   /** Theme overrides; falls back to the default light theme. */
@@ -469,6 +474,43 @@ function CalendarInner<T = unknown>(
     // `date.getTime()`: recompute on the instant, not a re-created Date identity.
   }, [events, mode, date.getTime(), weekStartsOn, numberOfDays, numberOfWeeks, timeZone]);
 
+  // With a display zone the views lay out wall-clock copies of the events and
+  // report wall-clock dates. Hand back the consumer's own events and real
+  // instants. Whole days (`onPressDay`, a month sweep, ...) stay device-local
+  // dates, as `date` is, so only the time grid's cell callbacks convert.
+  const zoned = useMemo(() => {
+    if (!timeZone) {
+      return {
+        onPressEvent,
+        onDragStart,
+        onDragEvent,
+        onPressMore,
+        onPressTime: onPressCell,
+        onCreateTimed: onCreateEvent,
+      };
+    }
+    const instant = (wallClock: Date) => fromZonedTime(wallClock, timeZone);
+    return {
+      onPressEvent:
+        onPressEvent && ((event: CalendarEvent<T>) => onPressEvent(zonedEventSource(event))),
+      onDragStart:
+        onDragStart && ((event: CalendarEvent<T>) => onDragStart(zonedEventSource(event))),
+      onDragEvent:
+        onDragEvent &&
+        ((event: CalendarEvent<T>, start: Date, end: Date) => {
+          const bounds = zonedDragBounds(event, start, end);
+          return onDragEvent(zonedEventSource(event), bounds.start, bounds.end);
+        }),
+      onPressMore:
+        onPressMore &&
+        ((dayEvents: CalendarEvent<T>[], day: Date) =>
+          onPressMore(dayEvents.map(zonedEventSource), day)),
+      onPressTime: onPressCell && ((time: Date) => onPressCell(instant(time))),
+      onCreateTimed:
+        onCreateEvent && ((start: Date, end: Date) => onCreateEvent(instant(start), instant(end))),
+    };
+  }, [timeZone, onPressEvent, onDragStart, onDragEvent, onPressMore, onPressCell, onCreateEvent]);
+
   // PageDown / PageUp page the calendar when the consumer opts in with
   // `onChangeDate`; keydowns bubble up from the focused grid to this handler.
   const handlePageKeys = (e: ReactKeyboardEvent) => {
@@ -526,7 +568,7 @@ function CalendarInner<T = unknown>(
         styles={styles}
         renderEvent={renderScheduleEvent}
         eventAccessibilityLabel={eventAccessibilityLabel}
-        onPressEvent={onPressEvent}
+        onPressEvent={zoned.onPressEvent}
         onPressDay={onPressDay}
       />
     );
@@ -566,12 +608,12 @@ function CalendarInner<T = unknown>(
         onCreateEvent={onCreateEvent}
         renderCreateGhost={renderCreateGhost}
         onSelectDrag={onSelectDrag}
-        onDragEvent={onDragEvent}
-        onDragStart={onDragStart}
+        onDragEvent={zoned.onDragEvent}
+        onDragStart={zoned.onDragStart}
         eventStartEditable={eventStartEditable}
         eventOverlap={eventOverlap}
-        onPressEvent={onPressEvent}
-        onPressMore={onPressMore}
+        onPressEvent={zoned.onPressEvent}
+        onPressMore={zoned.onPressMore}
         renderEvent={renderMonthEvent}
         eventAccessibilityLabel={eventAccessibilityLabel}
       />
@@ -612,12 +654,12 @@ function CalendarInner<T = unknown>(
         onCreateEvent={onCreateEvent}
         renderCreateGhost={renderCreateGhost}
         onSelectDrag={onSelectDrag}
-        onDragEvent={onDragEvent}
-        onDragStart={onDragStart}
+        onDragEvent={zoned.onDragEvent}
+        onDragStart={zoned.onDragStart}
         eventStartEditable={eventStartEditable}
         eventOverlap={eventOverlap}
-        onPressEvent={onPressEvent}
-        onPressMore={onPressMore}
+        onPressEvent={zoned.onPressEvent}
+        onPressMore={zoned.onPressMore}
         renderEvent={renderMonthEvent}
         eventAccessibilityLabel={eventAccessibilityLabel}
       />
@@ -667,12 +709,12 @@ function CalendarInner<T = unknown>(
         dragStepMinutes={dragStepMinutes}
         touchDragDelay={touchDragDelay}
         touchDragThreshold={touchDragThreshold}
-        onPressEvent={onPressEvent}
-        onPressCell={onPressCell}
-        onCreateEvent={onCreateEvent}
+        onPressEvent={zoned.onPressEvent}
+        onPressCell={zoned.onPressTime}
+        onCreateEvent={zoned.onCreateTimed}
         renderCreateGhost={renderCreateGhost}
-        onDragStart={onDragStart}
-        onDragEvent={onDragEvent}
+        onDragStart={zoned.onDragStart}
+        onDragEvent={zoned.onDragEvent}
         getEventId={getEventId}
         onChangeDate={onChangeDate}
         onPressDateHeader={onPressDateHeader}
