@@ -41,7 +41,7 @@ clocks change, on a device in any zone. See
 Drags follow the zone's DST changes too. A move on the time grid keeps the
 event's elapsed duration, a resize sets the edge to the clock time you dragged it
 to, and a time dropped into the hour a spring-forward change skips lands after
-it. The drag preview is drawn on the device's clock, so on a night when the
+it. A drop or a sweep that would then end at or before its start is rejected. The drag preview is drawn on the device's clock, so on a night when the
 device's own clocks change its height can be off by the offset change. The
 reported `start` and `end` are not affected.
 
@@ -80,7 +80,12 @@ A standalone view reports what it displays. Convert in your callbacks with the
 helpers `Calendar` uses:
 
 ```tsx
-import { TimeGrid, fromZonedTime, zonedDragBounds, zonedEventSource } from "@super-calendar/native";
+import {
+  TimeGrid,
+  fromZonedRange,
+  zonedDragBounds,
+  zonedEventSource,
+} from "@super-calendar/native";
 
 <TimeGrid
   /* ... */
@@ -88,11 +93,13 @@ import { TimeGrid, fromZonedTime, zonedDragBounds, zonedEventSource } from "@sup
   onPressEvent={(event) => open(zonedEventSource(event))}
   onDragEvent={(event, start, end) => {
     const bounds = zonedDragBounds(event, start, end, { keepDuration: true });
+    if (!bounds) return false;
     save(zonedEventSource(event), bounds.start, bounds.end);
   }}
-  onCreateEvent={(start, end) =>
-    create(fromZonedTime(start, "America/New_York"), fromZonedTime(end, "America/New_York"))
-  }
+  onCreateEvent={(start, end) => {
+    const range = fromZonedRange(start, end, "America/New_York");
+    if (range) create(range.start, range.end);
+  }}
 />;
 ```
 
@@ -101,6 +108,11 @@ import { TimeGrid, fromZonedTime, zonedDragBounds, zonedEventSource } from "@sup
   reported bounds to real instants. Pass `{ keepDuration: true }` for a time
   grid, so a move keeps the event's elapsed duration across a DST change. Leave
   it off for a month grid, where a drop keeps the clock time of both edges.
+- `fromZonedRange(start, end, timeZone)` converts a reported wall-clock range,
+  such as a created event's, to real instants.
+- Both return `null` when the span doesn't survive: a time dropped into the hour a
+  spring-forward change skips moves to after it, which can leave the range
+  ending at or before its start. Reject that drop, or create nothing.
 - `fromZonedTime(date, timeZone)` converts one wall-clock date to a real instant.
 
 ## Anchor dates are local

@@ -1,7 +1,7 @@
 import type { CalendarEvent, RecurrenceFrequency, RecurrenceRule } from "../types";
 import { isAllDayEvent } from "./layout";
 import { toZonedTime, zonedTimeToUtc } from "./timezone";
-import { zoneFields } from "./zoneFields";
+import { utcTime, zoneFields } from "./zoneFields";
 
 // Runaway guard on in-range occurrences. Generous enough for realistic windows
 // (e.g. ~13 years of a daily event); set `count`/`until`, or query a tighter
@@ -75,7 +75,7 @@ function zoneClock(timeZone: string, start: Date): Clock {
     fields,
     at(...reading) {
       if (reading.every((value, index) => value === origin[index])) return new Date(start);
-      const wallClock = Date.UTC(...reading);
+      const wallClock = utcTime(...reading);
       // Resolving a reading needs a day's room either side of it.
       if (!(Math.abs(wallClock) <= MAX_DATE_MS - DAY_MS)) return new Date(Number.NaN);
       return zonedTimeToUtc(new Date(wallClock), timeZone);
@@ -85,9 +85,9 @@ function zoneClock(timeZone: string, start: Date): Clock {
 
 // Calendar arithmetic on plain fields, the same on every clock.
 const weekdayOf = (year: number, month: number, day: number): number =>
-  new Date(Date.UTC(year, month, day)).getUTCDay();
+  new Date(utcTime(year, month, day)).getUTCDay();
 const daysInMonth = (year: number, month: number): number =>
-  new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  new Date(utcTime(year, month + 1, 0)).getUTCDate();
 
 // The day of the month of the `week`th `weekday` in a given month (`week` 1–5, or
 // -1 for the last). Returns null when that week doesn't exist (e.g. a 5th Monday
@@ -273,6 +273,11 @@ function instanceAt<T>(event: CalendarEvent<T>, start: Date, durationMs: number)
   return instance;
 }
 
+// `date` on `timeZone`'s wall clock; an invalid date stays invalid, where `Intl`
+// would throw.
+const zonedOrInvalid = (date: Date, timeZone: string): Date =>
+  Number.isNaN(date.getTime()) ? date : toZonedTime(date, timeZone);
+
 // A reading of exactly midnight.
 const isMidnight = (fields: readonly number[]): boolean =>
   fields[3] === 0 && fields[4] === 0 && fields[5] === 0 && fields[6] === 0;
@@ -283,7 +288,10 @@ export interface ExpandRecurringEventsOptions {
    * The IANA time zone whose wall clock the rules repeat on (e.g.
    * `"America/New_York"`). A timed event keeps its clock time in that zone across
    * the zone's DST changes, and its weekday, month-day and exception rules read
-   * that zone's calendar. Omit it to repeat on the device's clock. All-day events
+   * that zone's calendar. An exception that reads the event's own time of day
+   * there (or equals one of the `rdates`) drops the occurrence at that instant;
+   * any other exception at midnight, on the device or in the zone, drops its
+   * whole day. Omit it to repeat on the device's clock. All-day events
    * name calendar days, so they always repeat on the device's calendar.
    */
   timeZone?: string;
@@ -314,11 +322,13 @@ export function expandRecurringEvents<T>(
     // An all-day event names calendar days, which a display zone doesn't shift
     // (see `eventsInTimeZone`), so it repeats on the device's calendar and the
     // window is read as the zone's days.
-    const zoned = timeZone != null && !isAllDayEvent(event);
+    // An invalid start has no reading on a zone's clock; the device clock turns
+    // it into no occurrences.
+    const zoned = timeZone != null && !isAllDayEvent(event) && !Number.isNaN(event.start.getTime());
     const clock = zoned ? zoneClock(timeZone, event.start) : DEVICE_CLOCK;
     const [from, to] =
-      timeZone != null && !zoned
-        ? [toZonedTime(rangeStart, timeZone), toZonedTime(rangeEnd, timeZone)]
+      timeZone != null && isAllDayEvent(event)
+        ? [zonedOrInvalid(rangeStart, timeZone), zonedOrInvalid(rangeEnd, timeZone)]
         : [rangeStart, rangeEnd];
     // Union the rule's occurrences with any explicit RDATE additions, keyed by
     // exact start time so a date the rule already produces isn't duplicated.
@@ -338,7 +348,10 @@ export function expandRecurringEvents<T>(
     const dayKey = (fields: readonly number[]) => `${fields[0]}-${fields[1]}-${fields[2]}`;
     const excludedDays = new Set<string>();
     const excludedInstants = new Set<number>();
+    const startFields = clock.fields(event.start);
+    const rdateTimes = new Set((event.recurrence.rdates ?? []).map((rdate) => rdate.getTime()));
     for (const exdate of event.recurrence.exdates ?? []) {
+      if (Number.isNaN(exdate.getTime())) continue;
       const onDevice = DEVICE_CLOCK.fields(exdate);
       if (!zoned) {
         if (isMidnight(onDevice)) excludedDays.add(dayKey(onDevice));
@@ -346,12 +359,16 @@ export function expandRecurringEvents<T>(
         continue;
       }
       // On a zone's clock, device midnight is an arbitrary time of day, so an
-      // exception that matches an occurrence's instant is that occurrence's. Any
-      // other date at midnight, on the device (a parsed `VALUE=DATE`) or in the
-      // zone, names the calendar day it reads there.
+      // exception that can be an occurrence's own start (it reads the start's
+      // time of day in the zone, or is one of the `rdates`) is that occurrence's.
+      // Any other date at midnight, on the device (a parsed `VALUE=DATE`) or in
+      // the zone, names the calendar day it reads there. Decided from the dates
+      // alone, so the answer doesn't change with the query window.
       const inZone = clock.fields(exdate);
-      if (starts.has(exdate.getTime())) excludedInstants.add(exdate.getTime());
-      else if (isMidnight(onDevice)) excludedDays.add(dayKey(onDevice));
+      excludedInstants.add(exdate.getTime());
+      if (rdateTimes.has(exdate.getTime())) continue;
+      if ([3, 4, 5, 6].every((index) => inZone[index] === startFields[index])) continue;
+      if (isMidnight(onDevice)) excludedDays.add(dayKey(onDevice));
       else if (isMidnight(inZone)) excludedDays.add(dayKey(inZone));
     }
     const ordered = [...starts.values()].sort((a, b) => a.getTime() - b.getTime());

@@ -1,8 +1,17 @@
 import type { CalendarEvent, RecurrenceRule } from "../../types";
 import { expandRecurringEvents } from "../recurrence";
-import { eventsInTimeZone, fromZonedTime, zonedDragBounds, zonedTimeToUtc } from "../timezone";
+import {
+  eventsInTimeZone,
+  fromZonedRange,
+  fromZonedTime,
+  zonedDragBounds,
+  zonedTimeToUtc,
+} from "../timezone";
 
 const NEW_YORK = "America/New_York";
+// Stands in for `it` where a case doesn't apply to a device zone, without
+// reporting a skipped test.
+const unregistered = (_name: string, _run: () => void) => {};
 const iso = (events: CalendarEvent[]) => events.map((event) => event.start.toISOString());
 const utc = (value: string) => new Date(`${value}Z`);
 const expand = (
@@ -265,6 +274,90 @@ describe.each(["UTC", "Europe/Warsaw", "America/New_York", "Pacific/Apia"])(
       );
     });
 
+    it("classifies an exception the same way for any query window", () => {
+      // 19:00 in New York is midnight UTC, so this exception reads as a date on
+      // a UTC device, but it has the event's own time of day in the zone.
+      const run = (from: string) =>
+        iso(
+          expand(
+            "2026-11-10T00:00:00",
+            { freq: "daily", exdates: [utc("2026-11-12T00:00:00")] },
+            from,
+            "2026-11-15T00:00:00",
+          ),
+        );
+      const wide = run("2026-11-09T00:00:00");
+      expect(wide).toEqual([
+        "2026-11-10T00:00:00.000Z",
+        "2026-11-11T00:00:00.000Z",
+        "2026-11-13T00:00:00.000Z",
+        "2026-11-14T00:00:00.000Z",
+        "2026-11-15T00:00:00.000Z",
+      ]);
+      // A window that opens after the excluded occurrence keeps the next day's.
+      expect(run("2026-11-12T12:00:00")).toEqual(wide.slice(2));
+    });
+
+    it("ignores invalid exception, extra and until dates, and an invalid start", () => {
+      const invalid = new Date(Number.NaN);
+      const run = (rule: Partial<RecurrenceRule>, extra: Partial<CalendarEvent> = {}) =>
+        iso(
+          expand(
+            "2026-10-30T13:00:00",
+            { freq: "daily", ...rule },
+            "2026-10-30T00:00:00",
+            "2026-11-01T00:00:00",
+            extra,
+          ),
+        );
+      const plain = run({});
+      expect(plain).toHaveLength(2);
+      expect(run({ exdates: [invalid] })).toEqual(plain);
+      expect(run({ rdates: [invalid] })).toEqual(plain);
+      expect(run({ until: invalid })).toEqual(plain);
+      expect(run({}, { start: invalid })).toEqual([]);
+      const holiday: CalendarEvent = {
+        allDay: true,
+        start: new Date(2026, 9, 30),
+        end: new Date(2026, 9, 31),
+        recurrence: { freq: "daily" },
+      };
+      expect(expandRecurringEvents([holiday], invalid, invalid, { timeZone: NEW_YORK })).toEqual(
+        [],
+      );
+    });
+
+    // In year 50 a device zone runs on local mean time, with an offset down to
+    // the second; that is the device clock's own quirk, so check it on UTC only.
+    (deviceZone === "UTC" ? it : unregistered)(
+      "keeps weekdays right in years below 100, on either clock",
+      () => {
+        // Monday 3 January of the year 50.
+        const start = new Date(2000, 0, 3, 9);
+        start.setFullYear(50, 0, 3);
+        const end = new Date(start.getTime() + 3_600_000);
+        const until = new Date(start.getTime() + 10 * 864e5);
+        const event: CalendarEvent = { start, end, recurrence: { freq: "weekly", weekdays: [1] } };
+        for (const options of [undefined, { timeZone: "UTC" }]) {
+          const occurrences = expandRecurringEvents([event], start, until, options);
+          expect(occurrences.map((e) => e.start.getTime() - start.getTime())).toEqual([
+            0,
+            7 * 864e5,
+          ]);
+        }
+        const monthly: CalendarEvent = {
+          start,
+          end,
+          recurrence: { freq: "monthly", monthDays: [3] },
+        };
+        expect(
+          expandRecurringEvents([monthly], start, new Date(start.getTime() + 40 * 864e5)).map((e) =>
+            e.start.getFullYear(),
+          ),
+        ).toEqual([50, 50]);
+      },
+    );
+
     it("repeats an all-day event on calendar days, not on the zone's clock", () => {
       const holiday: CalendarEvent = {
         title: "Holiday",
@@ -348,14 +441,45 @@ describe.each(["UTC", "Europe/Warsaw", "America/New_York", "Pacific/Apia"])(
         };
         const [zoned] = eventsInTimeZone([night], NEW_YORK);
         // Dropped a day later, its span now holds the repeated hour.
-        const moved = zonedDragBounds(zoned, at(31, 23), at(32, 2), { keepDuration: true });
+        const moved = zonedDragBounds(zoned, at(31, 23), at(32, 2), { keepDuration: true })!;
         expect(moved.start.toISOString()).toBe("2026-11-01T03:00:00.000Z");
         expect(moved.end.toISOString()).toBe("2026-11-01T06:00:00.000Z"); // 01:00 EST
         // A month drop keeps both clock times instead, so it gains the hour.
-        const dropped = zonedDragBounds(zoned, at(31, 23), at(32, 2));
+        const dropped = zonedDragBounds(zoned, at(31, 23), at(32, 2))!;
         expect(dropped.start.toISOString()).toBe("2026-11-01T03:00:00.000Z");
         expect(dropped.end.toISOString()).toBe("2026-11-01T07:00:00.000Z"); // 02:00 EST
       });
+
+      // A New York device can't hold 02:45 on that day, so no view reports it.
+      (deviceZone === NEW_YORK ? unregistered : it)(
+        "refuses a span that collapses in the skipped hour",
+        () => {
+          // 01:30 to 03:00 on 8 March in New York, which has no 02:00 to 03:00.
+          const morning: CalendarEvent = {
+            start: utc("2026-03-08T06:30:00"),
+            end: utc("2026-03-08T07:00:00"),
+          };
+          const [zoned] = eventsInTimeZone([morning], NEW_YORK);
+          const march = (hour: number, minute = 0) => new Date(2026, 2, 8, hour, minute);
+          // A start dragged to 02:45 would resolve to 03:45, after the end.
+          expect(zonedDragBounds(zoned, march(2, 45), zoned.end)).toBeNull();
+          // A start dragged to 01:45 is fine.
+          expect(zonedDragBounds(zoned, march(1, 45), zoned.end)?.start.toISOString()).toBe(
+            "2026-03-08T06:45:00.000Z",
+          );
+          // A sweep inside the skipped hour, or up to its end, creates nothing.
+          expect(fromZonedRange(march(2, 30), march(3), NEW_YORK)).toBeNull();
+          expect(fromZonedRange(march(2), march(3), NEW_YORK)).toBeNull();
+          // One that ends after the gap keeps a real span.
+          const range = fromZonedRange(march(2, 30), march(4), NEW_YORK);
+          expect([range?.start.toISOString(), range?.end.toISOString()]).toEqual([
+            "2026-03-08T07:30:00.000Z",
+            "2026-03-08T08:00:00.000Z",
+          ]);
+          // A zero-length range stays zero-length.
+          expect(fromZonedRange(march(1), march(1), NEW_YORK)).not.toBeNull();
+        },
+      );
 
       it("resizes an end across the change to the zone's clock time", () => {
         // 23:00 to 23:30 on 31 October in New York.
@@ -364,7 +488,7 @@ describe.each(["UTC", "Europe/Warsaw", "America/New_York", "Pacific/Apia"])(
           end: utc("2026-11-01T03:30:00"),
         };
         const [zoned] = eventsInTimeZone([late], NEW_YORK);
-        const resized = zonedDragBounds(zoned, zoned.start, at(32, 3), { keepDuration: true });
+        const resized = zonedDragBounds(zoned, zoned.start, at(32, 3), { keepDuration: true })!;
         expect(resized.start).toBe(late.start);
         expect(resized.end.toISOString()).toBe("2026-11-01T08:00:00.000Z"); // 03:00 EST
       });

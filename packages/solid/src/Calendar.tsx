@@ -11,6 +11,7 @@ import {
   type DateSelectionConstraints,
   type EventAccessibilityLabeler,
   eventsInTimeZone,
+  fromZonedRange,
   fromZonedTime,
   zonedDragBounds,
   zonedEventSource,
@@ -430,6 +431,9 @@ export function Calendar<T = unknown>(
             const bounds = zonedDragBounds(event, start, end, {
               keepDuration: props.mode !== "month" && props.mode !== "multiweek",
             });
+            // An edge dropped into an hour the zone's clock skips can leave no
+            // usable span; reject the drop, so the event snaps back.
+            if (!bounds) return false;
             return handler(zonedEventSource(event), bounds.start, bounds.end);
           }
         : handler;
@@ -450,8 +454,11 @@ export function Calendar<T = unknown>(
       const handler = props.onCreateEvent;
       const timeZone = props.timeZone;
       return handler && timeZone
-        ? (start: Date, end: Date) =>
-            handler(fromZonedTime(start, timeZone), fromZonedTime(end, timeZone))
+        ? (start: Date, end: Date) => {
+            // A sweep that collapses inside a skipped hour creates nothing.
+            const range = fromZonedRange(start, end, timeZone);
+            if (range) handler(range.start, range.end);
+          }
         : handler;
     }),
   };

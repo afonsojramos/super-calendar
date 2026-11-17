@@ -51,3 +51,21 @@ export function zoneFields(date: Date, timeZone: string): ZoneFields {
     field("second"),
   ];
 }
+
+/**
+ * A calendar reading as a UTC time value. Fields may overflow and roll over.
+ * Setters, not `Date.UTC`, which reads a year below 100 as 19xx.
+ */
+export function utcTime(
+  year: number,
+  month: number,
+  day: number,
+  hour = 0,
+  minute = 0,
+  second = 0,
+  ms = 0,
+): number {
+  const date = new Date(0);
+  date.setUTCFullYear(year, month, day);
+  return date.setUTCHours(hour, minute, second, ms);
+}

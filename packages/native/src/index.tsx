@@ -117,6 +117,7 @@ export {
 } from "@super-calendar/core";
 export {
   eventsInTimeZone,
+  fromZonedRange,
   fromZonedTime,
   nowInTimeZone,
   toZonedTime,

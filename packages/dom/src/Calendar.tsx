@@ -37,6 +37,7 @@ import {
   type EventAccessibilityLabeler,
   buildMultiWeekGrid,
   eventsInTimeZone,
+  fromZonedRange,
   fromZonedTime,
   zonedDragBounds,
   zonedEventSource,
@@ -502,6 +503,9 @@ function CalendarInner<T = unknown>(
         onDragEvent &&
         ((event: CalendarEvent<T>, start: Date, end: Date) => {
           const bounds = zonedDragBounds(event, start, end, { keepDuration: timeGridMode });
+          // An edge dropped into an hour the zone's clock skips can leave no
+          // usable span; reject the drop, so the event snaps back.
+          if (!bounds) return false;
           return onDragEvent(zonedEventSource(event), bounds.start, bounds.end);
         }),
       onPressMore:
@@ -510,7 +514,12 @@ function CalendarInner<T = unknown>(
           onPressMore(dayEvents.map(zonedEventSource), day)),
       onPressTime: onPressCell && ((time: Date) => onPressCell(instant(time))),
       onCreateTimed:
-        onCreateEvent && ((start: Date, end: Date) => onCreateEvent(instant(start), instant(end))),
+        onCreateEvent &&
+        ((start: Date, end: Date) => {
+          // A sweep that collapses inside a skipped hour creates nothing.
+          const range = fromZonedRange(start, end, timeZone);
+          if (range) onCreateEvent(range.start, range.end);
+        }),
     };
   }, [
     timeZone,

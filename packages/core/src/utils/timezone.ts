@@ -1,6 +1,6 @@
 import type { CalendarEvent } from "../types";
 import { isAllDayEvent } from "./layout";
-import { zoneFields } from "./zoneFields";
+import { utcTime, zoneFields } from "./zoneFields";
 
 /**
  * Reinterpret an instant as its wall-clock time in `timeZone`, returned as a
@@ -33,7 +33,7 @@ export function nowInTimeZone(now?: Date, timeZone?: string): Date {
 // device's own DST changes can't distort it.
 function zoneOffsetMs(instant: Date, timeZone: string): number {
   const [year, month, day, hour, minute, second] = zoneFields(instant, timeZone);
-  const wallAsUtc = Date.UTC(year, month, day, hour, minute, second, instant.getUTCMilliseconds());
+  const wallAsUtc = utcTime(year, month, day, hour, minute, second, instant.getUTCMilliseconds());
   return wallAsUtc - instant.getTime();
 }
 
@@ -66,7 +66,7 @@ export function zonedTimeToUtc(wallClock: Date, timeZone: string): Date {
 export function fromZonedTime(date: Date, timeZone: string): Date {
   return zonedTimeToUtc(
     new Date(
-      Date.UTC(
+      utcTime(
         date.getFullYear(),
         date.getMonth(),
         date.getDate(),
@@ -137,13 +137,17 @@ export interface ZonedDragBoundsOptions {
  * zone, following the zone's own DST changes; an edge the drag left alone keeps
  * the source event's exact instant. Bounds of any other event (an all-day
  * event, or one that was never shifted) are returned unchanged.
+ *
+ * Returns `null` when the reported span doesn't survive the conversion: an edge
+ * dropped into the hour a spring-forward change skips moves to after it, which
+ * can leave the event ending at or before its start. Reject such a drop.
  */
 export function zonedDragBounds<T>(
   event: CalendarEvent<T>,
   start: Date,
   end: Date,
   { keepDuration = false }: ZonedDragBoundsOptions = {},
-): { start: Date; end: Date } {
+): { start: Date; end: Date } | null {
   const zoned = zonedSources.get(event);
   if (!zoned) return { start, end };
   const source = zoned.event as CalendarEvent<T>;
@@ -154,8 +158,32 @@ export function zonedDragBounds<T>(
     const durationMs = source.end.getTime() - source.start.getTime();
     return { start: realStart, end: new Date(realStart.getTime() + durationMs) };
   }
-  return {
-    start: realStart,
-    end: endMoved ? fromZonedTime(end, zoned.timeZone) : source.end,
-  };
+  const realEnd = endMoved ? fromZonedTime(end, zoned.timeZone) : source.end;
+  return orderedLike(start, end, realStart, realEnd);
+}
+
+/**
+ * Convert a wall-clock range a view reports in `timeZone` (a created event, for
+ * example) to real instants. Returns `null` when the span doesn't survive the
+ * conversion: a time in the hour a spring-forward change skips moves to after
+ * it, which can leave the range ending at or before its start.
+ */
+export function fromZonedRange(
+  start: Date,
+  end: Date,
+  timeZone: string,
+): { start: Date; end: Date } | null {
+  return orderedLike(start, end, fromZonedTime(start, timeZone), fromZonedTime(end, timeZone));
+}
+
+// The real bounds, unless they lost the order the reported ones had.
+function orderedLike(
+  start: Date,
+  end: Date,
+  realStart: Date,
+  realEnd: Date,
+): { start: Date; end: Date } | null {
+  const reported = Math.sign(end.getTime() - start.getTime());
+  const real = Math.sign(realEnd.getTime() - realStart.getTime());
+  return reported === real ? { start: realStart, end: realEnd } : null;
 }
