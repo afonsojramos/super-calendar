@@ -481,6 +481,19 @@ describe.each(["UTC", "Europe/Warsaw", "America/New_York", "Pacific/Apia"])(
         },
       );
 
+      it("accepts a resize in the repeated hour, where two instants read the same", () => {
+        // 01:45 EDT to 01:15 EST on 1 November: half an hour that reads backwards.
+        const repeated: CalendarEvent = {
+          start: utc("2026-11-01T05:45:00"),
+          end: utc("2026-11-01T06:15:00"),
+        };
+        const [zoned] = eventsInTimeZone([repeated], NEW_YORK);
+        // The start dragged to 01:15 reads the same as the end, an hour before it.
+        const resized = zonedDragBounds(zoned, new Date(2026, 10, 1, 1, 15), zoned.end);
+        expect(resized?.end).toBe(repeated.end);
+        expect(resized!.start.getTime()).toBeLessThan(repeated.end.getTime());
+      });
+
       it("resizes an end across the change to the zone's clock time", () => {
         // 23:00 to 23:30 on 31 October in New York.
         const late: CalendarEvent = {

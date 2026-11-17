@@ -176,14 +176,15 @@ export function fromZonedRange(
   return orderedLike(start, end, fromZonedTime(start, timeZone), fromZonedTime(end, timeZone));
 }
 
-// The real bounds, unless they lost the order the reported ones had.
+// The real bounds, unless a reported span collapsed: it ran forwards on the
+// clock and the real one doesn't. The reverse is fine. In the hour a fall-back
+// change repeats, two instants read the same, so a real span can show as empty.
 function orderedLike(
   start: Date,
   end: Date,
   realStart: Date,
   realEnd: Date,
 ): { start: Date; end: Date } | null {
-  const reported = Math.sign(end.getTime() - start.getTime());
-  const real = Math.sign(realEnd.getTime() - realStart.getTime());
-  return reported === real ? { start: realStart, end: realEnd } : null;
+  const collapsed = end.getTime() > start.getTime() && realEnd.getTime() <= realStart.getTime();
+  return collapsed ? null : { start: realStart, end: realEnd };
 }
