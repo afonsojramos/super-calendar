@@ -159,15 +159,20 @@ describe(rendererName, () => {
       expect(onDragEvent).not.toHaveBeenCalled();
     });
 
-    it.each(["release", "cancel", "unmount"])(
+    it.each(["release", "cancel", "unmount", "a drop handler that throws"])(
       "blocks native selection and dragging during an event drag, until %s",
       (reason) => {
+        const throws = reason === "a drop handler that throws";
         const view = render(TimeGrid, {
           date: day,
           mode: "day",
           events: events,
           hourHeight: 48,
-          onDragEvent: vi.fn(),
+          onDragEvent: throws
+            ? () => {
+                throw new Error("drop failed");
+              }
+            : vi.fn(),
         });
         const nativeInputAllowed = (type: string) =>
           document.dispatchEvent(new Event(type, { bubbles: true, cancelable: true }));
@@ -178,7 +183,18 @@ describe(rendererName, () => {
         // A native text drag here would end pointer input mid-drag.
         expect(nativeInputAllowed("selectstart")).toBe(false);
         expect(nativeInputAllowed("dragstart")).toBe(false);
-        if (reason === "release") fireEvent.pointerUp(box, { clientY: 310, pointerId: 1 });
+        if (throws) {
+          // The handler's error surfaces as an uncaught window error.
+          const uncaught: unknown[] = [];
+          const onError = (event: ErrorEvent) => {
+            uncaught.push(event.error);
+            event.preventDefault();
+          };
+          window.addEventListener("error", onError);
+          fireEvent.pointerUp(box, { clientY: 310, pointerId: 1 });
+          window.removeEventListener("error", onError);
+          expect(uncaught).toHaveLength(1);
+        } else if (reason === "release") fireEvent.pointerUp(box, { clientY: 310, pointerId: 1 });
         else if (reason === "cancel") fireEvent.pointerCancel(document, { pointerId: 1 });
         else view.unmount();
         expect(nativeInputAllowed("selectstart")).toBe(true);

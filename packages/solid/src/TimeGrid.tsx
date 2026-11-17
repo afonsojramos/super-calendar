@@ -1375,11 +1375,16 @@ export function TimeGrid<T = unknown>(
     } else {
       base = startOfDay(daysRef.current[originIndex] ?? daysRef.current[0]);
     }
-    if (base && held && origin) {
-      const next = draggedEventBounds(d, origin, held.event, base, snapMinutes());
-      if (next) onDragEventRef.current?.(held.event, next.start, next.end);
+    try {
+      if (base && held && origin) {
+        const next = draggedEventBounds(d, origin, held.event, base, snapMinutes());
+        if (next) onDragEventRef.current?.(held.event, next.start, next.end);
+      }
+    } finally {
+      // A handler that throws must not leave the drag and its document listeners,
+      // which block native selection, in place.
+      finishDrag();
     }
-    finishDrag();
   };
   const cancelDrag = () => {
     finishDrag();
