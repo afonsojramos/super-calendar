@@ -22,6 +22,8 @@ const APPROX_STEP_MS: Record<RecurrenceFrequency, number> = {
   yearly: 31556952e3,
 };
 
+const WEEKDAYS: ReadonlySet<number> = new Set([0, 1, 2, 3, 4, 5, 6]);
+
 // Copy `source`'s time of day onto `date`.
 function withTimeOf(date: Date, source: Date): Date {
   const next = new Date(date);
@@ -83,11 +85,16 @@ function* occurrenceStarts(
   };
 
   if (rule.freq === "weekly" && rule.weekdays?.length) {
-    const weekdays = [...new Set(rule.weekdays)].sort((a, b) => a - b);
-    let weekStart = startOfWeek(start, { weekStartsOn: 0 });
+    // The week start decides which days share a week, so it changes the result
+    // only when `interval` skips weeks. RFC 5545 defaults WKST to Monday.
+    const weekStartsOn = WEEKDAYS.has(rule.weekStartsOn as number) ? rule.weekStartsOn! : 1;
+    const offsets = [...new Set(rule.weekdays.map((day) => (day - weekStartsOn + 7) % 7))].sort(
+      (a, b) => a - b,
+    );
+    let weekStart = startOfWeek(start, { weekStartsOn });
     while (true) {
-      for (const weekday of weekdays) {
-        const date = withTimeOf(addDays(weekStart, weekday), start);
+      for (const offset of offsets) {
+        const date = withTimeOf(addDays(weekStart, offset), start);
         const verdict = consider(date);
         if (verdict === "stop") return;
         if (verdict === "skip") continue;

@@ -94,6 +94,22 @@ describe("parseICalendar", () => {
     });
   });
 
+  it("parses WKST into the rule's week start", () => {
+    const rule = (rrule: string) =>
+      parseICalendar(wrap(["DTSTART:20261116T090000Z", `RRULE:${rrule}`].join("\r\n")))[0]
+        .recurrence;
+    expect(rule("FREQ=WEEKLY;INTERVAL=2;WKST=SU;BYDAY=MO,SU")).toEqual({
+      freq: "weekly",
+      interval: 2,
+      weekdays: [1, 0],
+      weekStartsOn: 0,
+    });
+    expect(rule("FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,SU;wkst=mo")?.weekStartsOn).toBe(1);
+    // Absent or unknown: left unset, so expansion uses the RFC 5545 default (Monday).
+    expect(rule("FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,SU")).not.toHaveProperty("weekStartsOn");
+    expect(rule("FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,SU;WKST=XX")).not.toHaveProperty("weekStartsOn");
+  });
+
   it("parses an ordinal BYDAY into an nthWeekday recurrence", () => {
     const ics = wrap(
       ["DTSTART:20260101T090000Z", "SUMMARY:Board", "RRULE:FREQ=MONTHLY;BYDAY=3MO"].join("\r\n"),
@@ -200,6 +216,23 @@ describe("toICalendar", () => {
     expect(round.start.toISOString()).toBe(events[0].start.toISOString());
     expect(round.end.toISOString()).toBe(events[0].end.toISOString());
     expect(round.recurrence).toEqual({ freq: "weekly", weekdays: [1, 3] });
+  });
+
+  it("round-trips a week start as WKST", () => {
+    const events: ICalEvent[] = [
+      {
+        start: new Date(Date.UTC(2026, 10, 16, 9)),
+        end: new Date(Date.UTC(2026, 10, 16, 10)),
+        title: "Sync",
+        recurrence: { freq: "weekly", interval: 2, weekdays: [1, 0], weekStartsOn: 0 },
+      },
+    ];
+    const ics = toICalendar(events, { now });
+    expect(ics).toContain("RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,SU;WKST=SU");
+    expect(parseICalendar(ics)[0].recurrence).toEqual(events[0].recurrence);
+    // Without a week start the rule keeps the RFC default and writes no WKST.
+    delete events[0].recurrence!.weekStartsOn;
+    expect(toICalendar(events, { now })).not.toContain("WKST");
   });
 
   it("round-trips an ordinal-weekday (last Friday) recurrence", () => {

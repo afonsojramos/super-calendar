@@ -89,6 +89,84 @@ describe("expandRecurringEvents", () => {
     expect(result.map((e) => e.start.getDate())).toEqual([5, 7, 9]);
   });
 
+  describe("week start of a weekly rule that skips weeks", () => {
+    // Mon 16 Nov 2026, every other week on Monday and Sunday.
+    const biweekly = (weekStartsOn?: 0 | 1 | 6): CalendarEvent => ({
+      start: at(2026, 10, 16),
+      end: at(2026, 10, 16, 10),
+      title: "Sync",
+      recurrence: { freq: "weekly", interval: 2, weekdays: [1, 0], weekStartsOn },
+    });
+    const days = (event: CalendarEvent) =>
+      expandRecurringEvents([event], at(2026, 10, 1), at(2026, 11, 14, 23)).map((e) => [
+        e.start.getMonth(),
+        e.start.getDate(),
+      ]);
+
+    it("groups Monday with the following Sunday by default", () => {
+      expect(days(biweekly())).toEqual([
+        [10, 16],
+        [10, 22],
+        [10, 30],
+        [11, 6],
+        [11, 14],
+      ]);
+    });
+
+    it("groups Sunday with the following Monday in a Sunday-first week", () => {
+      expect(days(biweekly(0))).toEqual([
+        [10, 16],
+        [10, 29],
+        [10, 30],
+        [11, 13],
+        [11, 14],
+      ]);
+    });
+
+    it("starts the first week on the given day", () => {
+      // A Saturday-first week holds Sat 14 to Fri 20: Sunday 15 precedes the start.
+      expect(days(biweekly(6))).toEqual([
+        [10, 16],
+        [10, 29],
+        [10, 30],
+        [11, 13],
+        [11, 14],
+      ]);
+    });
+
+    it("counts occurrences in the corrected order", () => {
+      const event = biweekly();
+      event.recurrence = { ...event.recurrence!, count: 3 };
+      expect(days(event)).toEqual([
+        [10, 16],
+        [10, 22],
+        [10, 30],
+      ]);
+    });
+
+    it("falls back to Monday for a week start outside 0 to 6", () => {
+      expect(days(biweekly(9 as 0))).toEqual(days(biweekly()));
+    });
+  });
+
+  it("produces the same weekly dates for any week start when no week is skipped", () => {
+    const expand = (weekStartsOn: 0 | 1 | 3) =>
+      expandRecurringEvents(
+        [
+          {
+            start: at(2026, 0, 5),
+            end: at(2026, 0, 5, 10),
+            title: "Gym",
+            recurrence: { freq: "weekly", weekdays: [0, 1, 3, 5], weekStartsOn },
+          },
+        ],
+        at(2026, 0, 1),
+        at(2026, 1, 1),
+      ).map((e) => e.start.getTime());
+    expect(expand(0)).toEqual(expand(1));
+    expect(expand(3)).toEqual(expand(1));
+  });
+
   it("steps months without drifting the day-of-month", () => {
     const event: CalendarEvent = {
       start: at(2026, 0, 15),

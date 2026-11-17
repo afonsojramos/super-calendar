@@ -48,6 +48,11 @@ Rules support:
 - `count` — stop after N occurrences.
 - `until` — stop on or before a date.
 - `weekdays` — which days, for `weekly` rules (0 = Sunday).
+- `weekStartsOn` — for `weekly` rules with `weekdays`, the day a week starts on
+  (0 = Sunday, default 1 = Monday, as in iCal). It decides which of the `weekdays`
+  share a week, so it only matters when `interval` skips weeks: every 2 weeks on
+  Monday and Sunday, starting on a Monday, repeats on that Monday and the Sunday
+  after it, then skips a week.
 - `nthWeekday` — for `monthly`/`yearly`, repeat on the Nth weekday instead of the
   day-of-month, e.g. `{ week: 3, weekday: 1 }` (the 3rd Monday) or `{ week: -1,
 weekday: 5 }` (the last Friday).
@@ -65,7 +70,7 @@ weekday: 5 }` (the last Friday).
 
 Each occurrence keeps the original duration and fields; non-recurring events pass
 through unchanged. These rules map to and from iCal
-`RRULE`/`BYMONTHDAY`/`BYMONTH`/`EXDATE`/`RDATE` — see [iCalendar](/guides/ical).
+`RRULE`/`WKST`/`BYMONTHDAY`/`BYMONTH`/`EXDATE`/`RDATE` — see [iCalendar](/guides/ical).
 
 <Tip>
   Compute the range from the visible window. `onChangeDateRange` gives you the `[start, end]` of

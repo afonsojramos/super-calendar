@@ -90,6 +90,8 @@ function recurrenceFromJSON(value: unknown, field: string): RecurrenceRule {
     rule.weekdays = arrayFromJSON(input.weekdays, `${field}.weekdays`).map((day) =>
       weekdayFromJSON(day, `${field}.weekdays`),
     );
+  if (input.weekStartsOn !== undefined)
+    rule.weekStartsOn = weekdayFromJSON(input.weekStartsOn, `${field}.weekStartsOn`);
   if (input.months !== undefined)
     rule.months = arrayFromJSON(input.months, `${field}.months`).map((month) =>
       integerFromJSON(month, `${field}.months`, 1, 12),

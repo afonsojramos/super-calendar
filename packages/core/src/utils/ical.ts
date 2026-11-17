@@ -188,6 +188,8 @@ function parseRRule(value: string): RecurrenceRule | undefined {
     }
     if (plain.length) rule.weekdays = plain;
   }
+  const wkst = BYDAY.indexOf(parts.get("WKST")?.trim().toUpperCase() as (typeof BYDAY)[number]);
+  if (wkst >= 0) rule.weekStartsOn = wkst as WeekStartsOn;
   const bymonthday = parts.get("BYMONTHDAY");
   if (bymonthday) {
     const days = bymonthday
@@ -216,6 +218,9 @@ function formatRRule(rule: RecurrenceRule): string {
     parts.push(`BYDAY=${rule.nthWeekday.week}${BYDAY[rule.nthWeekday.weekday]}`);
   } else if (rule.weekdays?.length) {
     parts.push(`BYDAY=${rule.weekdays.map((d) => BYDAY[d]).join(",")}`);
+  }
+  if (rule.weekStartsOn != null && BYDAY[rule.weekStartsOn]) {
+    parts.push(`WKST=${BYDAY[rule.weekStartsOn]}`);
   }
   if (rule.monthDays?.length) parts.push(`BYMONTHDAY=${rule.monthDays.join(",")}`);
   if (rule.months?.length) parts.push(`BYMONTH=${rule.months.join(",")}`);
