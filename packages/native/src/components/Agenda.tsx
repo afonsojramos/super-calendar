@@ -5,7 +5,7 @@ import { StyleSheet, Text, type TextStyle, View, type ScrollViewProps } from "re
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent } from "../types";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
-import { getIsToday } from "@super-calendar/core";
+import { getIsToday, nowInTimeZone } from "@super-calendar/core";
 import { isAllDayEvent, isBackgroundEvent } from "@super-calendar/core";
 
 /**
@@ -18,6 +18,13 @@ export type AgendaSlot = "dayHeader" | "eventRow" | "empty";
 export type AgendaProps<T> = SlotStyleProps<AgendaSlot> & {
   events: CalendarEvent<T>[];
   locale?: Locale;
+  /**
+   * The instant whose calendar day is highlighted as today. Defaults to the
+   * device clock, and is read in `timeZone` when one is set.
+   */
+  now?: Date;
+  /** Highlight today as it is in this IANA time zone (default: the device's). */
+  timeZone?: string;
   renderEvent: RenderEvent<T>;
   keyExtractor: EventKeyExtractor<T>;
   onPressEvent: (event: CalendarEvent<T>) => void;
@@ -43,6 +50,8 @@ type Row<T> =
 export function Agenda<T>({
   events,
   locale,
+  now,
+  timeZone,
   renderEvent,
   keyExtractor,
   onPressEvent,
@@ -80,10 +89,14 @@ export function Agenda<T>({
   }, [events, keyExtractor]);
 
   const keyExtractorRow = useCallback((row: Row<T>) => row.key, []);
+  // The day, not the instant, so the rows re-render once a day.
+  const todayKey = startOfDay(nowInTimeZone(now, timeZone)).getTime();
   const renderItem = useCallback(
     ({ item }: LegendListRenderItemProps<Row<T>>) => {
       if (item.kind === "header") {
-        const isHighlighted = activeDate ? isSameDay(item.date, activeDate) : getIsToday(item.date);
+        const isHighlighted = activeDate
+          ? isSameDay(item.date, activeDate)
+          : getIsToday(item.date, new Date(todayKey));
         return (
           <Text
             {...slot<TextStyle>("dayHeader", {
@@ -116,6 +129,7 @@ export function Agenda<T>({
       theme,
       locale,
       activeDate,
+      todayKey,
       onPressDay,
       onPressEvent,
       onLongPressEvent,

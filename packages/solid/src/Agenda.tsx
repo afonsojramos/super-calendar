@@ -3,6 +3,7 @@ import type { CalendarEvent, EventAccessibilityLabeler } from "@super-calendar/c
 import {
   eventTimeLabel,
   getIsToday,
+  nowInTimeZone,
   isAllDayEvent,
   isBackgroundEvent,
 } from "@super-calendar/core/vanilla";
@@ -43,6 +44,13 @@ export interface AgendaProps<T = unknown> extends SlotStyleProps<AgendaSlot> {
   events: CalendarEvent<T>[];
   /** date-fns locale for the day headers and time labels. */
   locale?: Locale;
+  /**
+   * The instant whose calendar day is highlighted as today. Defaults to the
+   * device clock, and is read in `timeZone` when one is set.
+   */
+  now?: Date;
+  /** Highlight today as it is in this IANA time zone (default: the device's). */
+  timeZone?: string;
   /** Render times in 12-hour AM/PM (default false, 24h). */
   ampm?: boolean;
   /** Highlight this date's header instead of the real "today". */
@@ -176,9 +184,10 @@ export function Agenda<T = unknown>(incoming: AgendaProps<T>): JSX.Element {
     });
     return out;
   });
+  const today = createMemo(() => nowInTimeZone(props.now, props.timeZone));
   const Header = (row: { date: Date }): JSX.Element => {
     const highlighted = createMemo(() =>
-      props.activeDate ? isSameDay(row.date, props.activeDate) : getIsToday(row.date),
+      props.activeDate ? isSameDay(row.date, props.activeDate) : getIsToday(row.date, today()),
     );
     const label = createMemo(() => format(row.date, "EEEE, d LLLL", { locale: props.locale }));
     const headerProps = createMemo(() =>

@@ -2,7 +2,13 @@ import { LegendList } from "@legendapp/list/react";
 import { format, isSameDay, type Locale, startOfDay } from "date-fns";
 import { type ComponentType, type CSSProperties, type ReactElement, useMemo } from "react";
 import type { CalendarEvent, EventAccessibilityLabeler } from "@super-calendar/core";
-import { eventTimeLabel, getIsToday, isAllDayEvent, isBackgroundEvent } from "@super-calendar/core";
+import {
+  eventTimeLabel,
+  getIsToday,
+  isAllDayEvent,
+  isBackgroundEvent,
+  nowInTimeZone,
+} from "@super-calendar/core";
 import { createSlots, type ResolvedSlot, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
@@ -35,6 +41,13 @@ export interface AgendaProps<T = unknown> extends SlotStyleProps<AgendaSlot> {
   events: CalendarEvent<T>[];
   /** date-fns locale for the day headers and time labels. */
   locale?: Locale;
+  /**
+   * The instant whose calendar day is highlighted as today. Defaults to the
+   * device clock, and is read in `timeZone` when one is set.
+   */
+  now?: Date;
+  /** Highlight today as it is in this IANA time zone (default: the device's). */
+  timeZone?: string;
   /** Render times in 12-hour AM/PM (default false, 24h). */
   ampm?: boolean;
   /** Highlight this date's header instead of the real "today". */
@@ -104,6 +117,8 @@ function DefaultAgendaRow<T>({
 export function Agenda<T = unknown>({
   events,
   locale,
+  now,
+  timeZone,
   ampm = false,
   activeDate,
   theme: themeOverrides,
@@ -118,6 +133,7 @@ export function Agenda<T = unknown>({
   styles,
 }: AgendaProps<T>): ReactElement {
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
+  const today = nowInTimeZone(now, timeZone);
   const slot = createSlots<AgendaSlot>({ classNames, styles });
   const Renderer = renderEvent;
 
@@ -153,7 +169,7 @@ export function Agenda<T = unknown>({
           if (item.kind === "header") {
             const highlighted = activeDate
               ? isSameDay(item.date, activeDate)
-              : getIsToday(item.date);
+              : getIsToday(item.date, today);
             const label = format(item.date, "EEEE, d LLLL", locale ? { locale } : undefined);
             const color = highlighted ? theme.todayBackground : theme.textMuted;
             const headerProps = slot("dayHeader", {

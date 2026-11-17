@@ -146,8 +146,13 @@ export const isWeekend = (date: Date): boolean => {
   return day === 0 || day === 6;
 };
 
-/** True when `date` falls on the current calendar day. */
-export const getIsToday = (date: Date): boolean => isToday(date);
+/**
+ * True when `date` falls on the current calendar day. Pass `today` to compare
+ * against that day instead of the device clock, e.g. the result of
+ * `nowInTimeZone` for a calendar displayed in another time zone.
+ */
+export const getIsToday = (date: Date, today?: Date): boolean =>
+  today ? isSameDay(date, today) : isToday(date);
 
 /** True when `a` and `b` are the same calendar day (ignoring the time of day). */
 export const isSameCalendarDay = (a: Date, b: Date): boolean => isSameDay(a, b);

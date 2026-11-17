@@ -52,6 +52,26 @@ Monday). The same shift moves a `month` anchor built from
 `onChangeDateRange`, `onPressDay`, ...) are local dates too, so feeding them
 straight back into `date` is always safe.
 
+## Today
+
+The day highlighted as today follows the same clock in every mode: with a
+`timeZone`, it is that zone's current day, so at 22:00 UTC a calendar set to
+`Asia/Tokyo` already highlights tomorrow. Pass `now` to pin it to a fixed instant.
+Without either prop it is the device's current day.
+
+The standalone views (`MonthView`, `MultiWeekView`, `YearView`, `Agenda`, and
+`TimeGrid`) take the same `now` and `timeZone` props. For a headless grid, pass
+the day to flag as `today`:
+
+```tsx
+import { buildMonthGrid, nowInTimeZone } from "@super-calendar/core";
+
+const grid = buildMonthGrid(month, { today: nowInTimeZone(undefined, "Asia/Tokyo") });
+```
+
+`getIsToday(date, today)` accepts the same reference day. In `schedule` mode,
+`Calendar` highlights the day of its `date` prop instead of today.
+
 ## The now indicator
 
 The current-time line follows the same zone as your events: set `timeZone` on

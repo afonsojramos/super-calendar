@@ -279,9 +279,15 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   renderBackgroundEvent?: SolidRenderEvent<T>;
   /** Show the current-time indicator on today's column (default true). */
   showNowIndicator?: boolean;
-  /** Fixed "now" instant for the indicator (doesn't tick). Defaults to the device clock. */
+  /**
+   * Fixed "now" instant for the indicator (doesn't tick) and for the day
+   * highlighted as today. Defaults to the device clock.
+   */
   now?: Date;
-  /** Shift the now indicator into this IANA zone (pair with `eventsInTimeZone`). */
+  /**
+   * Shift the now indicator and the day highlighted as today into this IANA zone
+   * (pair with `eventsInTimeZone`).
+   */
   timeZone?: string;
   /** Show the all-day lane above the grid (default true). */
   showAllDayEventCell?: boolean;
@@ -2027,7 +2033,7 @@ export function TimeGrid<T = unknown>(
         {
           <For each={days()} keyed={false}>
             {(day) => {
-              const today = createMemo(() => getIsToday(day()));
+              const today = createMemo(() => getIsToday(day(), now()));
               // Full, unambiguous date for assistive tech; the visible weekday + day
               // number below are decorative (aria-hidden) so it isn't read twice.
               const dateLabel = createMemo(() => format(day(), "EEEE, d MMMM yyyy", dfns()));
@@ -2392,7 +2398,7 @@ export function TimeGrid<T = unknown>(
                     onLostPointerCapture={cellEnabled() ? loseCreateCapture : undefined}
                     onClick={cellEnabled() ? (e) => tapCell(e, dayIndex) : undefined}
                     {...dataState({
-                      "data-today": getIsToday(day()),
+                      "data-today": getIsToday(day(), now()),
                       "data-weekend": isWeekend(day()),
                     })}
                     {...slot("dayColumn", {

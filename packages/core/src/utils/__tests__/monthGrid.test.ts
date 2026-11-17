@@ -125,3 +125,19 @@ describe("buildMonthGrid", () => {
     expect(findDay(g, "2026-06-15")?.isDisabled).toBe(false);
   });
 });
+
+describe("buildMonthGrid today", () => {
+  const flagged = (today?: Date) =>
+    buildMonthGrid(new Date(2026, 10, 12), { today })
+      .weeks.flatMap((week) => week.days)
+      .filter((day) => day.isToday)
+      .map((day) => day.id);
+
+  it("flags the given day instead of the device's", () => {
+    expect(flagged(new Date(2026, 10, 13, 7))).toEqual(["2026-11-13"]);
+  });
+
+  it("flags nothing when the given day is outside the grid", () => {
+    expect(flagged(new Date(2030, 0, 1))).toEqual([]);
+  });
+});

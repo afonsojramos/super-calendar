@@ -1,3 +1,4 @@
+import { startOfDay } from "date-fns";
 import { useMemo } from "react";
 import { buildMonthGrid, type MonthGrid, type UseMonthGridOptions } from "./monthGrid";
 
@@ -22,7 +23,10 @@ export function useMonthGrid(month: Date, options: UseMonthGridOptions = {}): Mo
     maxDate,
     isDateDisabled,
     locale,
+    today,
   } = options;
+  // The day, not the instant, so a ticking clock rebuilds the grid once a day.
+  const todayKey = today ? startOfDay(today).getTime() : undefined;
   return useMemo(
     () => buildMonthGrid(month, options),
     // Deps are the destructured option fields, not the (unstable) options object.
@@ -37,6 +41,7 @@ export function useMonthGrid(month: Date, options: UseMonthGridOptions = {}): Mo
       maxDate,
       isDateDisabled,
       locale,
+      todayKey,
     ],
   );
 }

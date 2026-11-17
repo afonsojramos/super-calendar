@@ -245,3 +245,43 @@ describe("Calendar ref", () => {
     expect(() => ref.current!.scrollToTime(9 * 60)).not.toThrow();
   });
 });
+
+describe("Calendar today highlight", () => {
+  // 22:00 UTC on 12 November is already the 13th in Tokyo, whatever zone the
+  // tests run in.
+  const now = new Date("2026-11-12T22:00:00Z");
+  const props = {
+    date: new Date(2026, 10, 12),
+    events: [] as CalendarEvent[],
+    onChangeDate: noop,
+    onPressEvent: noop,
+    now,
+    timeZone: "Asia/Tokyo",
+  };
+
+  it.each(["month", "multiweek", "year", "week"] as const)(
+    "marks the zone's current day as today in %s mode",
+    async (mode) => {
+      const { getAllByLabelText, queryAllByLabelText } = await render(
+        <Calendar {...props} mode={mode} />,
+      );
+      expect(getAllByLabelText(/13 November.*, today/i)).toHaveLength(1);
+      expect(queryAllByLabelText(/, today/i)).toHaveLength(1);
+    },
+  );
+
+  it("marks the week header's today without the now indicator", async () => {
+    const { getAllByLabelText, queryAllByLabelText } = await render(
+      <Calendar {...props} mode="week" showNowIndicator={false} />,
+    );
+    expect(getAllByLabelText(/13 November.*, today/i)).toHaveLength(1);
+    expect(queryAllByLabelText(/, today/i)).toHaveLength(1);
+  });
+
+  it("follows a pinned now without a timeZone", async () => {
+    const { getAllByLabelText } = await render(
+      <Calendar {...props} mode="month" timeZone={undefined} now={new Date(2026, 10, 20, 12)} />,
+    );
+    expect(getAllByLabelText(/20 November.*, today/i)).toHaveLength(1);
+  });
+});

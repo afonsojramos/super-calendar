@@ -23,6 +23,7 @@ import {
   monthCreateRange,
   daySelectionState,
   getIsToday,
+  nowInTimeZone,
   filterHiddenDays,
   getWeekDays,
   getYearMonths,
@@ -72,6 +73,13 @@ export type YearViewProps<T = unknown> = SlotStyleProps<YearViewSlot> & {
   /** Weekdays (0=Sunday…6=Saturday) hidden from the grid, e.g. `[0, 6]` for weekends off. */
   hiddenDays?: number[];
   locale?: Locale;
+  /**
+   * The instant whose calendar day is highlighted as today. Defaults to the
+   * device clock, and is read in `timeZone` when one is set.
+   */
+  now?: Date;
+  /** Highlight today as it is in this IANA time zone (default: the device's). */
+  timeZone?: string;
   /** Translations for the screen-reader words; omitted keys use English. */
   labels?: Partial<CalendarLabels>;
   /** Highlight this date instead of the real "today". */
@@ -125,6 +133,8 @@ function YearViewInner<T>({
   weekStartsOn,
   hiddenDays,
   locale,
+  now,
+  timeZone,
   labels: labelsProp,
   activeDate,
   selectedRange,
@@ -152,6 +162,7 @@ function YearViewInner<T>({
     setColumns(Math.max(2, Math.min(4, Math.floor(width / minMonthWidth))));
   };
 
+  const today = nowInTimeZone(now, timeZone);
   const months = useMemo(() => getYearMonths(date), [date]);
   // Each mini month's week rows, built once per year rather than per render, so
   // the drag hit-test (and the pan it is built into) keeps a stable identity.
@@ -332,7 +343,7 @@ function YearViewInner<T>({
                       if (day.getMonth() !== month.getMonth()) {
                         return <View key={day.toISOString()} style={styles.day} />;
                       }
-                      const isToday = getIsToday(day);
+                      const isToday = getIsToday(day, today);
                       const isHighlighted = activeDate
                         ? isSameCalendarDay(day, activeDate)
                         : isToday;

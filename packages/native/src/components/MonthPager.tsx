@@ -88,6 +88,8 @@ export type MonthPagerProps<T> = {
   hiddenDays?: number[];
   weekdayFormat?: WeekdayFormat;
   locale?: Locale;
+  now?: Date;
+  timeZone?: string;
   sortedMonthView?: boolean;
   moreLabel?: string;
   /** Translations for the screen-reader words and gutter text; omitted keys use English. */
@@ -189,6 +191,8 @@ function DateRowsPagerInner<T>({
   hiddenDays,
   weekdayFormat = "short",
   locale,
+  now,
+  timeZone,
   sortedMonthView,
   moreLabel,
   labels,
@@ -443,6 +447,8 @@ function DateRowsPagerInner<T>({
           weekStartsOn={weekStartsOn}
           hiddenDays={hiddenDays}
           locale={locale}
+          now={now}
+          timeZone={timeZone}
           sortedMonthView={sortedMonthView}
           moreLabel={moreLabel}
           labels={labels}
@@ -483,6 +489,8 @@ function DateRowsPagerInner<T>({
       weekStartsOn,
       hiddenDays,
       locale,
+      now,
+      timeZone,
       sortedMonthView,
       moreLabel,
       labels,

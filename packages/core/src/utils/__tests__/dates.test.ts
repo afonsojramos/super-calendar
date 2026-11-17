@@ -166,4 +166,11 @@ describe("getIsToday", () => {
     expect(getIsToday(new Date())).toBe(true);
     expect(getIsToday(new Date(2000, 0, 1))).toBe(false);
   });
+
+  it("compares against a given day instead of the device clock", () => {
+    const today = new Date(2026, 10, 13, 7);
+    expect(getIsToday(new Date(2026, 10, 13, 23, 59), today)).toBe(true);
+    expect(getIsToday(new Date(2026, 10, 12, 23, 59), today)).toBe(false);
+    expect(getIsToday(new Date(), today)).toBe(false);
+  });
 });

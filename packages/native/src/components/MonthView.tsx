@@ -64,6 +64,7 @@ import {
   buildMonthWeeks,
   buildMultiWeekGrid,
   getIsToday,
+  nowInTimeZone,
   filterHiddenDays,
   getWeekDays,
   isSameCalendarDay,
@@ -185,6 +186,13 @@ export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
   /** Weekday header label width: `narrow` ("M"), `short` ("Mon", default), or `long` ("Monday"). */
   weekdayFormat?: WeekdayFormat;
   locale?: Locale;
+  /**
+   * The instant whose calendar day is highlighted as today. Defaults to the
+   * device clock, and is read in `timeZone` when one is set.
+   */
+  now?: Date;
+  /** Highlight today as it is in this IANA time zone (default: the device's). */
+  timeZone?: string;
   /** Sort each day's events by start time before slicing. Default true. */
   sortedMonthView?: boolean;
   /** Template for the overflow label; `{moreCount}` is replaced. Default "{moreCount} More". */
@@ -337,6 +345,8 @@ function DateRowsInner<T>({
   hiddenDays,
   weekdayFormat = "short",
   locale,
+  now,
+  timeZone,
   sortedMonthView = true,
   moreLabel = "{moreCount} More",
   labels: labelsProp,
@@ -414,6 +424,7 @@ function DateRowsInner<T>({
     events: CalendarEvent<T>[];
   } | null>(null);
 
+  const today = nowInTimeZone(now, timeZone);
   const multiWeekGrid = useMemo(
     () =>
       numberOfWeeks === undefined
@@ -849,7 +860,7 @@ function DateRowsInner<T>({
     }
 
     const dayEvents = eventsByDay.get(startOfDay(day).toISOString()) ?? [];
-    const isToday = getIsToday(day);
+    const isToday = getIsToday(day, today);
     // Highlight the chosen `activeDate` when supplied, else the real today.
     const isHighlighted = activeDate ? isSameCalendarDay(day, activeDate) : isToday;
     // Selection band wins over the weekend tint; the today badge shows unless the

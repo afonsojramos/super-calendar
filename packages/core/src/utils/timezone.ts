@@ -40,6 +40,17 @@ export function toZonedTime(date: Date, timeZone: string): Date {
   );
 }
 
+/**
+ * The current instant, or the fixed `now` when given, as the wall clock of
+ * `timeZone` (see {@link toZonedTime}). Without a `timeZone` it is the instant
+ * itself, read on the device clock. Compare calendar days against it to find
+ * "today" for a calendar displayed in another time zone.
+ */
+export function nowInTimeZone(now?: Date, timeZone?: string): Date {
+  const instant = now ?? new Date();
+  return timeZone ? toZonedTime(instant, timeZone) : instant;
+}
+
 // `timeZone`'s offset from UTC (ms) at `instant`: the zone's wall clock read as
 // if it were UTC, minus the real instant.
 function zoneOffsetMs(instant: Date, timeZone: string): number {

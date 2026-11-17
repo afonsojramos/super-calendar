@@ -83,7 +83,7 @@ Each `day` in `weeks[].days` carries:
 | `id`                          | Stable `yyyy-MM-dd` string (handy as a React key). |
 | `label`                       | Day of month, e.g. `"1"`.                          |
 | `isCurrentMonth`              | False for leading/trailing adjacent-month days.    |
-| `isToday`                     | Matches the real today.                            |
+| `isToday`                     | Matches today, or the `today` option when set.     |
 | `isWeekend`                   | Saturday or Sunday.                                |
 | `isDisabled`                  | Fails `minDate`/`maxDate`/`isDateDisabled`.        |
 | `isSelected`                  | A `selectedDates` day or a range endpoint.         |

@@ -177,3 +177,19 @@ describe("timed-column helpers reject multiweek", () => {
     expect(getViewDays("custom", new Date(2026, 10, 4), 0, 10)).toHaveLength(10);
   });
 });
+
+describe("buildMultiWeekGrid today", () => {
+  const flagged = (today?: Date) =>
+    buildMultiWeekGrid(new Date(2026, 10, 12), { today })
+      .weeks.flatMap((week) => week.days)
+      .filter((day) => day.isToday)
+      .map((day) => day.id);
+
+  it("flags the given day instead of the device's", () => {
+    expect(flagged(new Date(2026, 10, 13, 7))).toEqual(["2026-11-13"]);
+  });
+
+  it("flags nothing when the given day is outside the grid", () => {
+    expect(flagged(new Date(2030, 0, 1))).toEqual([]);
+  });
+});

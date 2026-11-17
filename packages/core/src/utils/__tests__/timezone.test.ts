@@ -1,5 +1,5 @@
 import type { CalendarEvent } from "../../types";
-import { eventsInTimeZone, toZonedTime, zonedTimeToUtc } from "../timezone";
+import { eventsInTimeZone, nowInTimeZone, toZonedTime, zonedTimeToUtc } from "../timezone";
 
 // 1 June 2026, 12:00 UTC. June avoids the US/EU DST transition dates, so the
 // offsets below are stable regardless of the machine running the test.
@@ -32,6 +32,29 @@ describe("toZonedTime", () => {
   it("preserves milliseconds", () => {
     const withMs = new Date(Date.UTC(2026, 5, 1, 12, 0, 0, 123));
     expect(toZonedTime(withMs, "UTC").getMilliseconds()).toBe(123);
+  });
+});
+
+describe("nowInTimeZone", () => {
+  // 22:00 UTC on 12 November is already 07:00 on the 13th in Tokyo.
+  const evening = new Date("2026-11-12T22:00:00Z");
+
+  it("reads a fixed instant on the zone's wall clock", () => {
+    const tokyo = nowInTimeZone(evening, "Asia/Tokyo");
+    expect([tokyo.getMonth(), tokyo.getDate(), tokyo.getHours()]).toEqual([10, 13, 7]);
+    const losAngeles = nowInTimeZone(evening, "America/Los_Angeles");
+    expect([losAngeles.getDate(), losAngeles.getHours()]).toEqual([12, 14]);
+  });
+
+  it("returns the instant itself without a zone", () => {
+    expect(nowInTimeZone(evening)).toBe(evening);
+  });
+
+  it("defaults to the device clock", () => {
+    const before = Date.now();
+    const value = nowInTimeZone().getTime();
+    expect(value).toBeGreaterThanOrEqual(before);
+    expect(value).toBeLessThanOrEqual(Date.now());
   });
 });
 
