@@ -35,6 +35,28 @@ describe("toZonedTime", () => {
   });
 });
 
+describe("toZonedTime formatter cache", () => {
+  it("stays correct for more zones than it keeps formatters for", () => {
+    // Every case variant of a zone name is a distinct key.
+    const variants = Array.from({ length: 80 }, (_, index) =>
+      "asia/tokyo"
+        .split("")
+        .map((ch, at) => ((index >> at) & 1 ? ch.toUpperCase() : ch))
+        .join(""),
+    );
+    for (const zone of [...variants, "America/New_York", ...variants]) {
+      const expected = zone === "America/New_York" ? 8 : 21;
+      expect(toZonedTime(instant, zone).getHours()).toBe(expected);
+    }
+  });
+
+  it("does not cache an invalid zone", () => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect(() => toZonedTime(instant, "Not/A_Zone")).toThrow(RangeError);
+    }
+  });
+});
+
 describe("nowInTimeZone", () => {
   // 22:00 UTC on 12 November is already 07:00 on the 13th in Tokyo.
   const evening = new Date("2026-11-12T22:00:00Z");

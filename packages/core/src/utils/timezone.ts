@@ -1,7 +1,10 @@
 import type { CalendarEvent } from "../types";
 
 // Building a formatter costs far more than formatting with it, and the views
-// convert once per event and per rendered day, so keep one per zone.
+// convert once per event and per rendered day, so keep one per zone. Zone names
+// can come from untrusted input (an iCal `TZID`) and match in any letter case,
+// so the cache is bounded: an app uses a handful of zones.
+const MAX_ZONE_FORMATTERS = 32;
 const zoneFormatters = new Map<string, Intl.DateTimeFormat>();
 
 function zoneFormatter(timeZone: string): Intl.DateTimeFormat {
@@ -17,6 +20,7 @@ function zoneFormatter(timeZone: string): Intl.DateTimeFormat {
       minute: "2-digit",
       second: "2-digit",
     });
+    if (zoneFormatters.size >= MAX_ZONE_FORMATTERS) zoneFormatters.clear();
     zoneFormatters.set(timeZone, formatter);
   }
   return formatter;
