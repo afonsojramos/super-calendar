@@ -441,7 +441,9 @@ function draggedEventBounds(
   const start = new Date(event.start.getTime() + startShift);
   const end = new Date(event.end.getTime() + endShift);
   // A move keeps the event's duration, so it commits even when that is zero.
-  return d.kind === "move" || end > start ? { start, end } : null;
+  return end > start || (d.kind === "move" && end.getTime() === start.getTime())
+    ? { start, end }
+    : null;
 }
 
 function DefaultDomEvent<T>({

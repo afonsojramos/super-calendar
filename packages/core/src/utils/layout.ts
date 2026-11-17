@@ -130,9 +130,9 @@ export function layoutDayEvents<T>(events: CalendarEvent<T>[], day: Date): Posit
   let cluster: Segment<T>[] = [];
   let clusterEnd = Number.NEGATIVE_INFINITY;
 
-  // Columns are packed by the box each segment is drawn as, which is never
-  // shorter than the minimum, so two short events whose boxes would overlap sit
-  // side by side even when their times don't.
+  // Columns are packed by each segment's minimum box (see `durationHours`), so
+  // two short events whose minimum boxes would overlap sit side by side even
+  // when their times don't.
   const drawnEndOf = (seg: Segment<T>) => Math.max(seg.end, seg.start + MIN_DURATION_HOURS);
 
   const flushCluster = () => {

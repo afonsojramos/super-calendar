@@ -116,6 +116,27 @@ describe(rendererName, () => {
       expect(end).toEqual(start);
     });
 
+    it("still refuses to move an event whose end precedes its start", () => {
+      const onDragEvent = vi.fn();
+      const inverted: CalendarEvent = {
+        title: "Inverted",
+        start: new Date(2026, 5, 26, 14, 0),
+        end: new Date(2026, 5, 26, 13, 0),
+      };
+      const { getByText } = render(TimeGrid, {
+        date: day,
+        mode: "day",
+        events: [inverted],
+        hourHeight: 48,
+        onDragEvent: onDragEvent,
+      });
+      const box = wrapperOf(getByText("Inverted"));
+      fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+      fireEvent.pointerMove(box, { clientY: 204, pointerId: 1 });
+      fireEvent.pointerUp(box, { clientY: 204, pointerId: 1 });
+      expect(onDragEvent).not.toHaveBeenCalled();
+    });
+
     it("eventOverlap={false} rejects a zero-length event dropped on another", () => {
       const onDragEvent = vi.fn();
       const points: CalendarEvent[] = [
