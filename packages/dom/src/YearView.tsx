@@ -1,6 +1,13 @@
 import { format, startOfDay, type Locale } from "date-fns";
-import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactElement } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type ReactElement,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   bandRounding,
   buildMonthWeeks,
@@ -21,8 +28,6 @@ import {
   rangeBandKind,
   type WeekStartsOn,
   weekdayFormatToken,
-} from "@super-calendar/core";
-import {
   type CalendarLabels,
   dayAccessibilityLabel,
   resolveCalendarLabels,

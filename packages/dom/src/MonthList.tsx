@@ -12,8 +12,8 @@ import {
   isBackgroundEvent,
   type WeekdayFormat,
   type WeekStartsOn,
+  type CalendarLabels,
 } from "@super-calendar/core";
-import type { CalendarLabels } from "@super-calendar/core";
 import { type DomMonthEvent, MonthView, type MonthViewSlot } from "./MonthView";
 import { createSlots, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";

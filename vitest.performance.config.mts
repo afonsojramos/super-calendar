@@ -13,6 +13,7 @@ export default defineConfig({
         include: ["tests/performance/**/*.test.ts"],
         testTimeout: 60_000,
         hookTimeout: 60_000,
+        globalSetup: ["./tests/setup/fresh-packages.mjs"],
         provide: { browserRenderer: renderer },
       },
     })),

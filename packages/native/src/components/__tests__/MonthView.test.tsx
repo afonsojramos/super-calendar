@@ -51,7 +51,7 @@ describe("MonthView selection", () => {
     const interior = getByLabelText(/12 June 2026, 0 events/);
     const band = within(interior).getByTestId("month-range-band");
     expect(backgroundColorOf(band)).toBe(defaultTheme.colors.rangeBackground);
-    expect(() => getByLabelText(/12 June 2026, selected/)).toThrow();
+    expect(() => getByLabelText(/12 June 2026, selected/)).toThrow(/Unable to find/);
   });
 
   it("renders the band as a rounded pill by default and a full-cell fill when opted in", async () => {
@@ -151,7 +151,7 @@ describe("MonthView disabled days", () => {
     expect(getByLabelText(/, 9 June 2026, unavailable/)).toBeTruthy();
     expect(getByLabelText(/, 21 June 2026, unavailable/)).toBeTruthy();
     // Inside the window stays available.
-    expect(() => getByLabelText(/, 15 June 2026, unavailable/)).toThrow();
+    expect(() => getByLabelText(/, 15 June 2026, unavailable/)).toThrow(/Unable to find/);
   });
 
   it("honours an isDateDisabled predicate", async () => {
@@ -176,7 +176,7 @@ describe("MonthView disabled days", () => {
         isDateDisabled={(d) => d.getDate() === 12}
       />,
     );
-    expect(() => getByLabelText(/, 12 June 2026, selected/)).toThrow();
+    expect(() => getByLabelText(/, 12 June 2026, selected/)).toThrow(/Unable to find/);
   });
 
   it("uses eventAccessibilityLabel to override an event chip's label", async () => {

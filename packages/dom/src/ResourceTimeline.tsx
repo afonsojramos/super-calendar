@@ -1,11 +1,15 @@
-import type {
-  ComponentType,
-  CSSProperties,
-  PointerEvent as ReactPointerEvent,
-  ReactElement,
-  ReactNode,
+import {
+  type ComponentType,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type ReactElement,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   backgroundBandsForDay,
   type BusinessHoursBand,

@@ -33,8 +33,6 @@ import {
   isSameCalendarDay,
   rangeBandKind,
   weekdayFormatToken,
-} from "@super-calendar/core";
-import {
   type CalendarLabels,
   dayAccessibilityLabel,
   resolveCalendarLabels,

@@ -1,7 +1,6 @@
 import * as gestureHandlerMock from "react-native-gesture-handler";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { vi } from "vitest";
-import type { ReactNode } from "react";
 import { act } from "@testing-library/react-native";
 import { StyleSheet, Text } from "react-native";
 import type { CalendarEvent, CreateGhostArgs } from "../../types";

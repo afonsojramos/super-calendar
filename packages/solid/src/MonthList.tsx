@@ -1,6 +1,6 @@
 import { type JSX } from "@solidjs/web";
-import type { CalendarLabels } from "@super-calendar/core/vanilla";
 import {
+  type CalendarLabels,
   buildMonthGrid,
   type CalendarEvent,
   compareDayEvents,

@@ -1,6 +1,6 @@
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, resolve, sep } from "node:path";
 
 const contentTypes: Record<string, string> = {
@@ -17,7 +17,10 @@ const contentTypes: Record<string, string> = {
 // No SPA fallback: missing deployment assets must fail instead of returning HTML.
 export async function serveDirectory(directory: string) {
   const root = resolve(directory);
-  const server = createServer(async (request, response) => {
+  const server = createServer((request, response) => {
+    void respond(request, response);
+  });
+  async function respond(request: IncomingMessage, response: ServerResponse) {
     try {
       const pathname = decodeURIComponent(new URL(request.url ?? "/", "http://localhost").pathname);
       let file = resolve(root, `.${pathname}`);
@@ -38,7 +41,7 @@ export async function serveDirectory(directory: string) {
     } catch {
       response.writeHead(404).end("Not found");
     }
-  });
+  }
   await new Promise<void>((done, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", done);

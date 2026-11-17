@@ -44,9 +44,11 @@ import {
   type EventAccessibilityLabeler,
   type WeekdayFormat,
   isDateSelectable,
+  type CalendarLabels,
+  buildMonthWeeks,
+  getWeekDays,
+  weekdayFormatToken,
 } from "@super-calendar/core";
-import type { CalendarLabels } from "@super-calendar/core";
-import { buildMonthWeeks, getWeekDays, weekdayFormatToken } from "@super-calendar/core";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { DefaultMonthEvent } from "./DefaultMonthEvent";
 import { MonthView, type MonthViewSlot } from "./MonthView";

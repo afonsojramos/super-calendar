@@ -20,10 +20,9 @@
 //   WIDTH, HEIGHT, VIEWS (comma list, e.g. VIEWS=week,month).
 
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdtempSync } from "node:fs";
 
 const DOM_URL = process.env.DOM_URL ?? "http://localhost:5173";
 const NATIVE_URL = process.env.NATIVE_URL ?? "http://localhost:8081";

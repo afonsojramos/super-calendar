@@ -5,8 +5,7 @@ import { StyleSheet, Text, type TextStyle, View, type ScrollViewProps } from "re
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, EventKeyExtractor, RenderEvent } from "../types";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
-import { getIsToday, nowInTimeZone } from "@super-calendar/core";
-import { isAllDayEvent, isBackgroundEvent } from "@super-calendar/core";
+import { getIsToday, nowInTimeZone, isAllDayEvent, isBackgroundEvent } from "@super-calendar/core";
 
 /**
  * The styleable parts of {@link Agenda}. Mirrors the dom renderer's slot names;

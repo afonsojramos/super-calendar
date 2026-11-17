@@ -1,6 +1,5 @@
 import { vi, type MockInstance } from "vitest";
-import type { JSX } from "@solidjs/web";
-import { render as renderRoot } from "@solidjs/web";
+import { type JSX, render as renderRoot } from "@solidjs/web";
 import {
   fireEvent as dispatch,
   getQueriesForElement,

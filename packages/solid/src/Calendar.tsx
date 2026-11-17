@@ -1,6 +1,7 @@
 import { type JSX } from "@solidjs/web";
-import type { CalendarHandle, CalendarLabels } from "@super-calendar/core/vanilla";
 import {
+  type CalendarHandle,
+  type CalendarLabels,
   buildMultiWeekGrid,
   type BusinessHours,
   type BusinessHoursBand,
