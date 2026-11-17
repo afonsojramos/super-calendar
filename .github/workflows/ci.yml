@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -23,11 +23,41 @@ jobs:
       - run: pnpm --filter @super-calendar/example-solid typecheck
       - run: pnpm test:parity
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium firefox webkit
-      - run: pnpm test:browser
-      - run: pnpm test:react18:browser
-      - run: pnpm test:solid:browser
-      - run: pnpm test:solid:browser:dist
+
+  browser:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - id: playwright
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ matrix.engine }}
+      - run: pnpm exec playwright install --with-deps ${{ matrix.engine }}
+      - run: pnpm test:browser --engine ${{ matrix.engine }}
+      - if: matrix.engine == 'chromium'
+        run: pnpm test:react18:browser
+      - if: matrix.engine == 'chromium'
+        run: pnpm test:solid:browser
+      - if: matrix.engine == 'chromium'
+        run: pnpm test:solid:browser:dist
+
+  # The main ruleset requires a `test` check, so this job gates on the split jobs.
+  test:
+    if: always()
+    needs: [checks, browser]
+    runs-on: ubuntu-latest
+    steps:
+      - if: needs.checks.result != 'success' || needs.browser.result != 'success'
+        run: exit 1
 
   performance:
     runs-on: ubuntu-latest

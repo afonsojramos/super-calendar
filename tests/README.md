@@ -31,6 +31,7 @@ support files.
   once for React DOM and once for Solid.
 - `pnpm test:browser`: after `pnpm build`, run the shared browser contracts and
   require the same cases to pass for each framework's source and built packages.
+  Add `--engine chromium|firefox|webkit` to run one engine, as CI does.
 - `pnpm test:react18:browser`: after `pnpm build`, run the shared creation-preview
   contracts against React 18 source and built entries in Chromium.
 - `pnpm build:demos && pnpm test:demos`: build and check the three published demos.

@@ -10,14 +10,21 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const browser = args[0] === "--browser";
 if (browser) args.shift();
+const engines = ["chromium", "firefox", "webkit"];
+let engine;
+if (browser && args[0] === "--engine") {
+  engine = args[1];
+  args.splice(0, 2);
+  assert(engines.includes(engine), `--engine must be one of ${engines.join(", ")}`);
+}
 assert(
   args.length === 0 || (args.length === 2 && args[0] === "--report"),
-  "Usage: node scripts/verify-web-test-parity.mjs [--browser] [--report vitest-results.json]",
+  "Usage: node scripts/verify-web-test-parity.mjs [--browser [--engine chromium|firefox|webkit]] [--report vitest-results.json]",
 );
 const renderers = browser
   ? ["React DOM", "Solid"].flatMap((renderer) =>
       ["source", "dist"].flatMap((artifact) =>
-        ["chromium", "firefox", "webkit"].map((engine) => `${renderer} (${artifact}, ${engine})`),
+        (engine ? [engine] : engines).map((name) => `${renderer} (${artifact}, ${name})`),
       ),
     )
   : ["React DOM", "Solid"];
@@ -32,6 +39,7 @@ try {
         "vitest",
         "run",
         ...(browser ? ["--config", "vitest.browser.config.mts"] : []),
+        ...(engine ? ["--project", `*-${engine}`] : []),
         "--reporter=default",
         "--reporter=json",
         "--outputFile",
@@ -59,6 +67,7 @@ try {
       browser && name.startsWith(`chromium/`)
         ? renderers.filter((renderer) => renderer.endsWith(", chromium)"))
         : renderers;
+    if (!expectedRenderers.length) continue;
     const suites = report.testResults.filter((result) => result.name === join(contractsRoot, name));
     assert.equal(
       suites.length,
