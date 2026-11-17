@@ -198,6 +198,73 @@ describe("layoutDayEvents", () => {
     expect(positioned.durationHours).toBeCloseTo(0.25);
   });
 
+  describe("events shorter than the minimum box", () => {
+    const point = (h: number, m = 0, id?: string): CalendarEvent<{ id?: string }> => ({
+      id,
+      start: at(h, m),
+      end: at(h, m),
+    });
+
+    it("places zero-length events at the same time side by side", () => {
+      const result = layoutDayEvents([point(7, 30), point(7, 30)], day);
+      expect(result.map((p) => [p.column, p.columns])).toEqual([
+        [0, 2],
+        [1, 2],
+      ]);
+    });
+
+    it("places a zero-length event beside the event that starts with it", () => {
+      const result = layoutDayEvents([point(9, 0, "point"), ev(9, 10, "long")], day);
+      expect(result.map((p) => p.columns)).toEqual([2, 2]);
+      expect(result.map((p) => p.column).sort()).toEqual([0, 1]);
+    });
+
+    it("keeps a zero-length event under the event that ends as it starts", () => {
+      const result = layoutDayEvents([ev(8, 9), point(9)], day);
+      expect(result.map((p) => [p.column, p.columns])).toEqual([
+        [0, 1],
+        [0, 1],
+      ]);
+    });
+
+    it("separates short events whose minimum boxes would overlap", () => {
+      // 09:00-09:05 is drawn to 09:15, so an event at 09:10 can't share its column.
+      const result = layoutDayEvents(
+        [
+          { start: at(9), end: at(9, 5) },
+          { start: at(9, 10), end: at(9, 40) },
+        ],
+        day,
+      );
+      expect(result.map((p) => [p.column, p.columns])).toEqual([
+        [0, 2],
+        [1, 2],
+      ]);
+    });
+
+    it("reuses a short event's column once its minimum box ends", () => {
+      const result = layoutDayEvents(
+        [
+          { start: at(9), end: at(9, 5) },
+          { start: at(9, 15), end: at(9, 45) },
+        ],
+        day,
+      );
+      expect(result.map((p) => [p.column, p.columns])).toEqual([
+        [0, 1],
+        [0, 1],
+      ]);
+    });
+
+    it("shows a zero-length event at midnight on the day it starts", () => {
+      const midnight: CalendarEvent = { start: at(0), end: at(0) };
+      expect(layoutDayEvents([midnight], day)).toMatchObject([
+        { startHours: 0, durationHours: 0.25, continuesBefore: false, continuesAfter: false },
+      ]);
+      expect(layoutDayEvents([midnight], new Date(2026, 5, 14))).toEqual([]);
+    });
+  });
+
   it("keeps non-overlapping events in a single column", () => {
     const result = layoutDayEvents([ev(9, 10), ev(11, 12)], day);
     expect(result.map((p) => p.columns)).toEqual([1, 1]);
