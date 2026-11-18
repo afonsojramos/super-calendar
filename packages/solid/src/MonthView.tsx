@@ -19,7 +19,9 @@ import {
   layoutMonthWeek,
   monthCreateRange,
   monthDropBounds,
+  monthExtraLaneColumns,
   type MonthGridWeekday,
+  monthVisibleBars,
   type MultiWeekGridDay,
   overlapsOtherEvents,
   rangeBandKind,
@@ -1312,6 +1314,13 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
               // With adjacent months hidden, clamp bars to the current-month columns so
               // none draw over the blank leading/trailing cells.
               const cols = createMemo(() => week().days.length);
+              // A day whose only hidden event sits on the "+more" row's lane draws that
+              // event there instead, so no cell reads "+1 more".
+              const extraLane = createMemo(() =>
+                visibleLanes() < props.maxVisibleEventCount
+                  ? monthExtraLaneColumns(rowLayout(), visibleLanes(), cols())
+                  : week().days.map(() => false),
+              );
               const columns = createMemo(() => {
                 let first = 0;
                 let last = cols() - 1;
@@ -1355,8 +1364,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                 <>
                   {(() => {
                     const barSegs = createMemo(() =>
-                      rowLayout()
-                        .segments.filter((s) => s.lane < visibleLanes())
+                      monthVisibleBars(rowLayout(), visibleLanes(), extraLane())
                         .map((s) => {
                           const startCol = Math.max(s.startCol, columns().first);
                           const endCol = Math.min(s.endCol, columns().last);
@@ -1387,6 +1395,11 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                         {
                           <For each={week().days} keyed={false}>
                             {(day, dayCol) => {
+                              // Lanes this day shows: the row's, plus the "+more" row's when it
+                              // holds the day's only hidden event.
+                              const dayLanes = createMemo(
+                                () => visibleLanes() + (extraLane()[dayCol] ? 1 : 0),
+                              );
                               const hidden = createMemo(
                                 () => !showAdjacentMonths() && isOutsidePeriod(day()),
                               );
@@ -1483,7 +1496,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                             (s) =>
                                               s.startCol <= dayCol &&
                                               s.endCol >= dayCol &&
-                                              s.lane >= visibleLanes(),
+                                              s.lane >= dayLanes(),
                                           )
                                           .map((s) => s.event),
                                       );
@@ -1810,7 +1823,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                              space and "+more" sits below them. */}
                                             {Array.from(
                                               {
-                                                length: visibleLanes(),
+                                                length: dayLanes(),
                                               },
                                               () => (
                                                 <div

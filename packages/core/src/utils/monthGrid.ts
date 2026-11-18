@@ -112,6 +112,67 @@ export function layoutMonthWeek<T>(
   return { segments: placed, laneCount: laneEnds.length };
 }
 
+/**
+ * The columns of a week row that show one lane more than the row. A row whose
+ * lanes overflow shows `visibleLanes` of them and folds each day's rest into a
+ * "+N more" label. A day whose only hidden event sits on lane `visibleLanes` draws
+ * that event in the label's place instead, so no cell reads "+1 more". Call it
+ * only when a bar on lane `visibleLanes` fits in the cell.
+ */
+export function monthExtraLaneColumns<T>(
+  layout: MonthWeekEvents<T>,
+  visibleLanes: number,
+  columnCount: number,
+): boolean[] {
+  const hidden = Array.from({ length: columnCount }, () => 0);
+  const onFirstHiddenLane = Array.from({ length: columnCount }, () => false);
+  for (const segment of layout.segments) {
+    if (segment.lane < visibleLanes) continue;
+    for (let col = segment.startCol; col <= segment.endCol; col++) {
+      hidden[col]++;
+      if (segment.lane === visibleLanes) onFirstHiddenLane[col] = true;
+    }
+  }
+  return hidden.map((count, col) => count === 1 && onFirstHiddenLane[col]);
+}
+
+/**
+ * The bars a week row draws: every segment above `visibleLanes`, plus the parts of
+ * a segment on lane `visibleLanes` that cross `extraLane` columns (see
+ * {@link monthExtraLaneColumns}), one bar per run of such columns. A bar cut short
+ * by a column that hides the event is marked as continuing past that edge.
+ */
+export function monthVisibleBars<T>(
+  layout: MonthWeekEvents<T>,
+  visibleLanes: number,
+  extraLane: readonly boolean[],
+): MonthEventSegment<T>[] {
+  const bars: MonthEventSegment<T>[] = [];
+  for (const segment of layout.segments) {
+    if (segment.lane < visibleLanes) {
+      bars.push(segment);
+      continue;
+    }
+    if (segment.lane !== visibleLanes) continue;
+    let runStart = -1;
+    for (let col = segment.startCol; col <= segment.endCol + 1; col++) {
+      const shown = col <= segment.endCol && extraLane[col] === true;
+      if (shown && runStart === -1) runStart = col;
+      if (!shown && runStart !== -1) {
+        bars.push({
+          ...segment,
+          startCol: runStart,
+          endCol: col - 1,
+          continuesBefore: segment.continuesBefore || runStart > segment.startCol,
+          continuesAfter: segment.continuesAfter || col - 1 < segment.endCol,
+        });
+        runStart = -1;
+      }
+    }
+  }
+  return bars;
+}
+
 /** A single day in the grid, with all the state a custom cell needs to render. */
 export interface MonthGridDay {
   /** The day this cell represents. */

@@ -152,7 +152,8 @@ TypeScript types for exact signatures.
   date and its state words. Pass the resolved labels to `eventAccessibilityLabel`
   to localize a custom renderer's event label the same way.
 - **Month overflow** — `monthEventCapacity` + `monthVisibleCount` decide how many
-  chips fit before a "+N more" row.
+  chips fit before a "+N more" row. `monthExtraLaneColumns` finds the days whose one
+  hidden event can take that row, and `monthVisibleBars` returns the bars to draw.
 - **Business hours** — `closedHourBands(day, businessHours, minHour?, maxHour?)`
   returns the hour spans to shade.
 - **Presentation** — `rangeBandKind`, `bandRounding`, `dayBadgeKind` map a day's
