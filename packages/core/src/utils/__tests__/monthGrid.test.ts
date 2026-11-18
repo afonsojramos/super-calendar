@@ -1,10 +1,13 @@
 import type { CalendarEvent } from "../../types";
 import {
   buildMonthGrid,
+  keepMonthDraftVisible,
   layoutMonthWeek,
   monthExtraLaneColumns,
   monthVisibleBars,
+  withDraftEventDays,
 } from "../monthGrid";
+import { compareDayEvents, groupEventsByDay } from "../layout";
 
 describe("layoutMonthWeek", () => {
   // A Sun-Sat week: 21-27 June 2026.
@@ -258,5 +261,90 @@ describe("per-day month overflow", () => {
       continuesBefore: true,
       continuesAfter: false,
     });
+  });
+});
+
+describe("month create draft placement", () => {
+  // A Sun-Sat week: 21-27 June 2026.
+  const days = Array.from({ length: 7 }, (_, i) => new Date(2026, 5, 21 + i));
+  const allDay = (title: string, first: number, last = first): CalendarEvent => ({
+    title,
+    start: new Date(2026, 5, first),
+    end: new Date(2026, 5, last + 1),
+    allDay: true,
+  });
+  const timed = (title: string, day: number, hour: number): CalendarEvent => ({
+    title,
+    start: new Date(2026, 5, day, hour),
+    end: new Date(2026, 5, day, hour + 1),
+  });
+  const rowOf = (map: ReadonlyMap<string, CalendarEvent[]>) => {
+    const seen = new Set<CalendarEvent>();
+    for (const day of days) for (const event of map.get(day.toISOString()) ?? []) seen.add(event);
+    return [...seen];
+  };
+  const sortedDays = (events: CalendarEvent[]) => {
+    const map = groupEventsByDay(events);
+    for (const list of map.values()) list.sort(compareDayEvents);
+    return map;
+  };
+
+  it("adds the draft to each day it covers where an appended event would go", () => {
+    const morning = timed("Morning", 23, 9);
+    const holiday = allDay("Holiday", 23);
+    const draft = allDay("", 23, 24);
+    const base = sortedDays([morning, holiday]);
+    const sorted = withDraftEventDays(base, draft);
+    expect(sorted.get(new Date(2026, 5, 23).toISOString())).toEqual([holiday, draft, morning]);
+    expect(sorted.get(new Date(2026, 5, 24).toISOString())).toEqual([draft]);
+    expect(withDraftEventDays(base, draft, false).get(new Date(2026, 5, 23).toISOString())).toEqual(
+      [holiday, morning, draft],
+    );
+    // The original map is left alone.
+    expect(base.get(new Date(2026, 5, 23).toISOString())).toEqual([holiday, morning]);
+  });
+
+  it("lays the draft out on the lane the created event will take", () => {
+    // Trip starts earlier and keeps lane 0; Lunch starts with the draft but is
+    // shorter, so it moves below it, exactly as after the event is created.
+    const trip = allDay("Trip", 22, 24);
+    const lunch = timed("Lunch", 23, 12);
+    const draft = allDay("", 23, 25);
+    const placed = layoutMonthWeek(
+      days,
+      rowOf(withDraftEventDays(sortedDays([trip, lunch]), draft)),
+    );
+    const created = layoutMonthWeek(days, rowOf(sortedDays([trip, lunch, { ...draft }])));
+    expect(placed.segments.map((s) => [s.event.title, s.lane])).toEqual([
+      ["Trip", 0],
+      ["", 1],
+      ["Lunch", 2],
+    ]);
+    expect(created.segments.map((s) => [s.event.title, s.lane])).toEqual(
+      placed.segments.map((s) => [s.event.title, s.lane]),
+    );
+  });
+
+  it("moves the draft to lane 0 only when its lane would be hidden", () => {
+    const a = allDay("A", 22, 24);
+    const b = allDay("B", 22, 24);
+    const draft = allDay("", 23);
+    const withDraft = layoutMonthWeek(days, rowOf(withDraftEventDays(sortedDays([a, b]), draft)));
+    const without = layoutMonthWeek(days, rowOf(sortedDays([a, b])));
+    expect(withDraft.segments.find((s) => s.event === draft)?.lane).toBe(2);
+    // Three lanes fit: the draft keeps the lane it will land on.
+    expect(keepMonthDraftVisible(withDraft, without, draft, (count) => Math.min(count, 3))).toBe(
+      withDraft,
+    );
+    // Two lanes fit: the draft takes lane 0 and A and B move down.
+    const kept = keepMonthDraftVisible(withDraft, without, draft, (count) => Math.min(count, 2));
+    expect(kept.laneCount).toBe(3);
+    expect(kept.segments.map((s) => [s.event.title, s.lane, s.startCol, s.endCol])).toEqual([
+      ["", 0, 2, 2],
+      ["A", 1, 1, 3],
+      ["B", 2, 1, 3],
+    ]);
+    // A row the draft misses is returned as is.
+    expect(keepMonthDraftVisible(without, without, draft, () => 1)).toBe(without);
   });
 });

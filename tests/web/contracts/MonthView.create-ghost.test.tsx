@@ -56,6 +56,67 @@ describe(rendererName, () => {
       },
     );
 
+    it("puts the preview on the lane the created event takes, moving bars aside", () => {
+      // Trip starts on Monday and keeps lane 0. Lunch starts with the sweep but is
+      // shorter, so it moves below the preview, as it will once the event exists.
+      const trip = {
+        title: "Trip",
+        start: new Date(2026, 6, 13),
+        end: new Date(2026, 6, 16),
+        allDay: true,
+      };
+      const lunch = {
+        title: "Lunch",
+        start: new Date(2026, 6, 15, 12),
+        end: new Date(2026, 6, 15, 13),
+      };
+      const view = render(MonthView, {
+        date,
+        events: [trip, lunch],
+        weekStartsOn: 1,
+        onCreateEvent: vi.fn(),
+        renderCreateGhost: Draft,
+      });
+      const top = (element: HTMLElement) => Number.parseFloat(element.style.top);
+      const bar = (name: string) => view.getByLabelText(name);
+      const tripTop = top(bar("Trip, 13 July"));
+      const lunchTop = top(bar("Lunch, 15 July"));
+      down(view.container, "2026-07-15");
+      move(view.container, "2026-07-16");
+      const [preview] = previews(view.container);
+      expect(top(preview)).toBeGreaterThan(tripTop);
+      expect(top(preview)).toBe(lunchTop);
+      expect(top(bar("Trip, 13 July"))).toBe(tripTop);
+      expect(top(bar("Lunch, 15 July"))).toBeGreaterThan(top(preview));
+      up();
+    });
+
+    it("keeps the preview on lane 0 when its own lane would be hidden", () => {
+      // A, B and C fill lanes 0-2 from Monday; a sweep on Wednesday would land on
+      // lane 3, past the two lanes a cap of three shows beside "+more".
+      const allDay = (title: string) => ({
+        title,
+        start: new Date(2026, 6, 13),
+        end: new Date(2026, 6, 16),
+        allDay: true,
+      });
+      const view = render(MonthView, {
+        date,
+        events: [allDay("A"), allDay("B"), allDay("C")],
+        weekStartsOn: 1,
+        maxVisibleEventCount: 3,
+        onCreateEvent: vi.fn(),
+        renderCreateGhost: Draft,
+      });
+      const top = (element: HTMLElement) => Number.parseFloat(element.style.top);
+      const laneZero = top(view.getByLabelText("A, 13 July"));
+      down(view.container, "2026-07-15");
+      const [preview] = previews(view.container);
+      expect(top(preview)).toBe(laneZero);
+      expect(top(view.getByLabelText("A, 13 July"))).toBeGreaterThan(laneZero);
+      up();
+    });
+
     it("allows a preview in an empty month without an events prop", () => {
       const view = render(MonthView, { date, onCreateEvent: vi.fn(), renderCreateGhost: Draft });
       down(view.container, "2026-07-15");

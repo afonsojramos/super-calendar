@@ -2,6 +2,7 @@ import { format, type Locale, isSameMonth, startOfDay } from "date-fns";
 import type { CalendarEvent, WeekStartsOn } from "../types";
 import { type DateRange, type DateSelectionConstraints, daySelectionState } from "./dateRange";
 import { buildMonthWeeks, getIsToday, isWeekend } from "./dates";
+import { compareDayEvents, eventDayKeys } from "./layout";
 
 /**
  * One event's placement within a single week row of the month grid: the column
@@ -171,6 +172,51 @@ export function monthVisibleBars<T>(
     }
   }
   return bars;
+}
+
+/**
+ * `eventsByDay` with a create draft added to every day it covers, where an event
+ * appended to the calendar's events would go: last in each day, or among the
+ * day's events in `compareDayEvents` order when `sorted`. Lay a week row out
+ * from the result to place the draft where the created event will land.
+ */
+export function withDraftEventDays<T>(
+  eventsByDay: ReadonlyMap<string, CalendarEvent<T>[]>,
+  draft: CalendarEvent<T>,
+  sorted = true,
+): Map<string, CalendarEvent<T>[]> {
+  const days = new Map(eventsByDay);
+  for (const key of eventDayKeys(draft)) {
+    const list = [...(days.get(key) ?? []), draft];
+    // Array sort is stable, so the draft stays after the events it ties with.
+    if (sorted) list.sort(compareDayEvents);
+    days.set(key, list);
+  }
+  return days;
+}
+
+/**
+ * A week row's layout with a create draft kept in view. `withDraft` lays the row
+ * out with the draft where the created event will land. When that lane is one the
+ * row hides (`lane >= visibleLanes(laneCount)`), the draft moves to lane 0 instead
+ * and the row's other bars (`withoutDraft`) move down one lane. A row the draft
+ * misses comes back as `withDraft`.
+ */
+export function keepMonthDraftVisible<T>(
+  withDraft: MonthWeekEvents<T>,
+  withoutDraft: MonthWeekEvents<T>,
+  draft: CalendarEvent<T>,
+  visibleLanes: (laneCount: number) => number,
+): MonthWeekEvents<T> {
+  const segment = withDraft.segments.find((s) => s.event === draft);
+  if (!segment || segment.lane < visibleLanes(withDraft.laneCount)) return withDraft;
+  return {
+    segments: [
+      { ...segment, lane: 0 },
+      ...withoutDraft.segments.map((s) => ({ ...s, lane: s.lane + 1 })),
+    ],
+    laneCount: withoutDraft.laneCount + 1,
+  };
 }
 
 /** A single day in the grid, with all the state a custom cell needs to render. */

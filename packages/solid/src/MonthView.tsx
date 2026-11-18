@@ -16,12 +16,14 @@ import {
   groupEventsByDay,
   isAllDayEvent,
   isBackgroundEvent,
+  keepMonthDraftVisible,
   layoutMonthWeek,
   monthCreateRange,
   monthDropBounds,
   monthExtraLaneColumns,
   type MonthGridWeekday,
   monthVisibleBars,
+  withDraftEventDays,
   type MultiWeekGridDay,
   overlapsOtherEvents,
   rangeBandKind,
@@ -894,6 +896,35 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
     },
     { equals: (a, b) => a === b || (!!a && !!b && +a.start === +b.start && +a.end === +b.end) },
   );
+  // Lanes a week row shows: all of them, or one fewer than the cap plus "+more".
+  const visibleLanesFor = (laneCount: number) =>
+    laneCount > props.maxVisibleEventCount
+      ? Math.max(props.maxVisibleEventCount - 1, 1)
+      : laneCount;
+  // While a create sweep draws its content, lay the rows it covers out with the
+  // draft as an all-day event, so it takes the lane the created event will land on
+  // and the other bars move aside the same way.
+  const draftEvent = createMemo(() => {
+    const range = createRange();
+    return range
+      ? ({ title: "", start: range.start, end: range.end, allDay: true } as CalendarEvent<T>)
+      : null;
+  });
+  const rowLayouts = createMemo(() => {
+    const draft = draftEvent();
+    const base = weekLayouts();
+    if (!draft) return base;
+    const days = withDraftEventDays(eventsByDay(), draft);
+    return _grid().weeks.map((week, index) => {
+      const row = base[index] ?? EMPTY_LAYOUT;
+      if (!week.days.some((d) => d.date >= draft.start && d.date < draft.end)) return row;
+      const placed = layoutMonthWeek(
+        week.days.map((d) => d.date),
+        collectRowEvents(week, days),
+      );
+      return keepMonthDraftVisible(placed, row, draft, visibleLanesFor);
+    });
+  });
   const dragRef: ElementRef<MonthDrag<T> | null> = { current: null };
   const applyDrag = (value: MonthDrag<T> | null) => {
     dragRef.current = value;
@@ -1302,15 +1333,10 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
               // inside its start-column cell (valid grid content that reads with that day)
               // and overflows right across the days it spans. The cells reserve the lane
               // rows so "+more" sits below the bars.
-              const rowLayout = createMemo(() => weekLayouts()[weekIndex] ?? EMPTY_LAYOUT);
+              const rowLayout = createMemo(() => rowLayouts()[weekIndex] ?? EMPTY_LAYOUT);
               // When lanes overflow, keep the last row for "+more" but always show at
               // least one bar, so a day never collapses to only the overflow row.
-              const overflowing = createMemo(
-                () => rowLayout().laneCount > props.maxVisibleEventCount,
-              );
-              const visibleLanes = createMemo(() =>
-                overflowing() ? Math.max(props.maxVisibleEventCount - 1, 1) : rowLayout().laneCount,
-              );
+              const visibleLanes = createMemo(() => visibleLanesFor(rowLayout().laneCount));
               // With adjacent months hidden, clamp bars to the current-month columns so
               // none draw over the blank leading/trailing cells.
               const cols = createMemo(() => week().days.length);
@@ -1337,25 +1363,23 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                   last,
                 };
               });
-              const draftColumns = createMemo(() => {
-                const range = createRange();
-                return range
-                  ? week().days.flatMap((day, index) =>
-                      (!showAdjacentMonths() && isOutsidePeriod(day)) ||
-                      day.date < range.start ||
-                      day.date >= range.end
-                        ? []
-                        : [index],
-                    )
-                  : [];
+              // The draft's own lane and columns, clamped like the bars.
+              const draftSpan = createMemo(() => {
+                const draft = draftEvent();
+                const segment = draft
+                  ? rowLayout().segments.find((s) => s.event === draft)
+                  : undefined;
+                if (!segment) return null;
+                const start = Math.max(segment.startCol, columns().first);
+                const end = Math.min(segment.endCol, columns().last);
+                return start <= end ? { start, end, lane: segment.lane } : null;
               });
               const draftTop = createMemo(
                 () =>
                   CELL_PAD +
                   DATE_ROW +
                   props.chipGap +
-                  Math.min(visibleLanes(), Math.max(0, props.maxVisibleEventCount - 1)) *
-                    (props.chipHeight + props.chipGap),
+                  (draftSpan()?.lane ?? 0) * (props.chipHeight + props.chipGap),
               );
               const draftHeight = createMemo(() =>
                 Math.min(props.chipHeight, Math.max(0, eventRowHeight() - draftTop())),
@@ -1365,6 +1389,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                   {(() => {
                     const barSegs = createMemo(() =>
                       monthVisibleBars(rowLayout(), visibleLanes(), extraLane())
+                        .filter((s) => s.event !== draftEvent())
                         .map((s) => {
                           const startCol = Math.max(s.startCol, columns().first);
                           const endCol = Math.min(s.endCol, columns().last);
@@ -1496,7 +1521,8 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                             (s) =>
                                               s.startCol <= dayCol &&
                                               s.endCol >= dayCol &&
-                                              s.lane >= dayLanes(),
+                                              s.lane >= dayLanes() &&
+                                              s.event !== draftEvent(),
                                           )
                                           .map((s) => s.event),
                                       );
@@ -1659,7 +1685,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                             when={
                                               props.renderCreateGhost &&
                                               createRange() &&
-                                              draftColumns()[0] === dayCol &&
+                                              draftSpan()?.start === dayCol &&
                                               draftHeight() > 0
                                             }
                                           >
@@ -1668,7 +1694,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                 base: {
                                                   position: "absolute",
                                                   left: 2,
-                                                  width: `calc(${(draftColumns().at(-1)! - dayCol + 1) * 100}% - 4px)`,
+                                                  width: `calc(${(draftSpan()!.end - dayCol + 1) * 100}% - 4px)`,
                                                   top: draftTop(),
                                                   height: draftHeight(),
                                                   boxSizing: "border-box",

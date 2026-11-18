@@ -154,6 +154,10 @@ TypeScript types for exact signatures.
 - **Month overflow** — `monthEventCapacity` + `monthVisibleCount` decide how many
   chips fit before a "+N more" row. `monthExtraLaneColumns` finds the days whose one
   hidden event can take that row, and `monthVisibleBars` returns the bars to draw.
+- **Month create drafts** — `withDraftEventDays` adds a create draft to the per-day
+  event map where a new event would go, so `layoutMonthWeek` places it on the lane
+  the created event will take; `keepMonthDraftVisible` moves it to lane 0 when that
+  lane would be hidden.
 - **Business hours** — `closedHourBands(day, businessHours, minHour?, maxHour?)`
   returns the hour spans to shade.
 - **Presentation** — `rangeBandKind`, `bandRounding`, `dayBadgeKind` map a day's

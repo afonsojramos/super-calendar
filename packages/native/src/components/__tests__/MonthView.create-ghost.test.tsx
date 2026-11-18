@@ -1,6 +1,6 @@
 import type { CreateGhostArgs } from "@super-calendar/core";
 import { act, fireEvent, render } from "@testing-library/react-native";
-import { Text } from "react-native";
+import { StyleSheet, Text, type ViewStyle } from "react-native";
 import * as gestureHandlerMock from "react-native-gesture-handler";
 import { vi } from "vitest";
 import type { CalendarEvent } from "../../types";
@@ -60,6 +60,48 @@ describe("native month creation content", () => {
       expect(view.queryByTestId("month-create-ghost", hidden)).toBeNull();
     },
   );
+
+  it("puts the preview on the lane the created event takes, moving bars aside", async () => {
+    // Trip starts on Sunday and keeps lane 0. Lunch starts with the sweep but is
+    // shorter, so it moves below the preview, as it will once the event exists.
+    const trip = {
+      title: "Trip",
+      start: new Date(2026, 5, 14),
+      end: new Date(2026, 5, 17),
+      allDay: true,
+    };
+    const lunch = {
+      title: "Lunch",
+      start: new Date(2026, 5, 16, 12),
+      end: new Date(2026, 5, 16, 13),
+    };
+    const view = await render(
+      <MonthView
+        {...baseProps}
+        events={[trip, lunch]}
+        chipHeight={20}
+        onCreateEvent={vi.fn()}
+        renderCreateGhost={Draft}
+      />,
+    );
+    await layout(view);
+    // The absolutely placed wrapper a bar is drawn in.
+    const barTop = (title: string) => {
+      let node: { parent: unknown; props: { style?: unknown } } | null = view.getByText(title);
+      while (node && StyleSheet.flatten(node.props.style as ViewStyle)?.position !== "absolute") {
+        node = node.parent as typeof node;
+      }
+      return StyleSheet.flatten(node?.props.style as ViewStyle)?.top;
+    };
+    expect(barTop("Lunch")).toBe(52);
+    const handlers = lastGesture();
+    await act(() => handlers.onStart(point(2, 2)));
+    await act(() => handlers.onUpdate(point(3, 2)));
+    // Lanes start 30pt into the row, 22pt apart: Trip 0, the preview 1, Lunch 2.
+    expect(view.getByTestId("month-create-ghost", hidden)).toHaveStyle({ top: 52 });
+    expect(barTop("Trip")).toBe(30);
+    expect(barTop("Lunch")).toBe(74);
+  });
 
   it("keeps range Dates stable within one day and commits a stationary hold", async () => {
     const seen: CreateGhostArgs[] = [];

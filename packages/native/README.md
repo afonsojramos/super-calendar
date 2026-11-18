@@ -155,9 +155,9 @@ A cancelled gesture clears the preview without calling `onCreateEvent`.
 all-day range, with an exclusive end, and render one copy per covered week row.
 Use date labels rather than times for this content. The preview updates when
 the sweep reaches another day, uses `chipHeight`, `chipGap`, and the
-`createGhost` slot, and overlays a visible event lane without changing the row
-height. Content is clipped, ignores pointer input, and is hidden from screen
-readers. On React Native Web, it also stays out of the tab order. Both the renderer and `onCreateEvent` are required; together they also
+`createGhost` slot, and sits on the lane the created all-day event will take,
+moving the row's other bars aside without changing the row height. Content is
+clipped, ignores pointer input, and is hidden from screen readers. On React Native Web, it also stays out of the tab order. Both the renderer and `onCreateEvent` are required; together they also
 show the event-grid layout in an empty month. Omitting the renderer preserves
 the existing day highlight.
 

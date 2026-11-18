@@ -34,12 +34,14 @@ import {
   groupEventsByDay,
   isBackgroundEvent,
   isAllDayEvent,
+  keepMonthDraftVisible,
   layoutMonthWeek,
   monthCreateRange,
   monthDropBounds,
   monthExtraLaneColumns,
   type MonthGridWeekday,
   monthVisibleBars,
+  withDraftEventDays,
   type MultiWeekGridDay,
   overlapsOtherEvents,
   rangeBandKind,
@@ -883,6 +885,42 @@ export function DateRows<T = unknown>({
         : null,
     [createContentEnabled, createStart, createEnd],
   );
+  // Lanes a week row shows: all of them, or one fewer than the cap plus "+more".
+  const visibleLanesFor = useCallback(
+    (laneCount: number) =>
+      laneCount > maxVisibleEventCount ? Math.max(maxVisibleEventCount - 1, 1) : laneCount,
+    [maxVisibleEventCount],
+  );
+  // While a create sweep draws its content, lay the rows it covers out with the
+  // draft as an all-day event, so it takes the lane the created event will land on
+  // and the other bars move aside the same way.
+  const draftEvent = useMemo(
+    () =>
+      createRange
+        ? ({
+            title: "",
+            start: createRange.start,
+            end: createRange.end,
+            allDay: true,
+          } as CalendarEvent<T>)
+        : null,
+    [createRange],
+  );
+  const rowLayouts = useMemo(() => {
+    if (!draftEvent) return weekLayouts;
+    const days = withDraftEventDays(eventsByDay, draftEvent);
+    return weeks.map((week, index) => {
+      const base = weekLayouts[index] ?? EMPTY_LAYOUT;
+      if (!week.days.some((d) => d.date >= draftEvent.start && d.date < draftEvent.end)) {
+        return base;
+      }
+      const placed = layoutMonthWeek(
+        week.days.map((d) => d.date),
+        collectRowEvents(week, days),
+      );
+      return keepMonthDraftVisible(placed, base, draftEvent, visibleLanesFor);
+    });
+  }, [draftEvent, weekLayouts, eventsByDay, weeks, visibleLanesFor]);
   const movedRef = useRef(false);
   // Set when a drag commits, so the click the browser fires next is swallowed (it
   // must not also open the day, or the event the drag landed on). A drag that ends
@@ -1222,13 +1260,10 @@ export function DateRows<T = unknown>({
           // inside its start-column cell (valid grid content that reads with that day)
           // and overflows right across the days it spans. The cells reserve the lane
           // rows so "+more" sits below the bars.
-          const rowLayout = weekLayouts[weekIndex] ?? EMPTY_LAYOUT;
+          const rowLayout = rowLayouts[weekIndex] ?? EMPTY_LAYOUT;
           // When lanes overflow, keep the last row for "+more" but always show at
           // least one bar, so a day never collapses to only the overflow row.
-          const overflowing = rowLayout.laneCount > maxVisibleEventCount;
-          const visibleLanes = overflowing
-            ? Math.max(maxVisibleEventCount - 1, 1)
-            : rowLayout.laneCount;
+          const visibleLanes = visibleLanesFor(rowLayout.laneCount);
           const cols = week.days.length;
           // A day whose only hidden event sits on the "+more" row's lane draws that
           // event there instead of "+1 more".
@@ -1249,6 +1284,7 @@ export function DateRows<T = unknown>({
             }
           }
           const barSegs = monthVisibleBars(rowLayout, visibleLanes, extraLane)
+            .filter((s) => s.event !== draftEvent)
             .map((s) => {
               const startCol = Math.max(s.startCol, firstVisCol);
               const endCol = Math.min(s.endCol, lastVisCol);
@@ -1261,22 +1297,12 @@ export function DateRows<T = unknown>({
               };
             })
             .filter((b) => b.startCol <= b.endCol);
-          const draftColumns = createRange
-            ? week.days.flatMap((day, index) =>
-                (!showAdjacentMonths && isOutsidePeriod(day)) ||
-                day.date < createRange.start ||
-                day.date >= createRange.end
-                  ? []
-                  : [index],
-              )
-            : [];
-          const draftStart = draftColumns[0];
-          const draftEnd = draftColumns.at(-1);
+          // The draft's own lane and columns, clamped like the bars.
+          const draftSegment = rowLayout.segments.find((s) => s.event === draftEvent);
+          const draftStart = draftSegment ? Math.max(draftSegment.startCol, firstVisCol) : -1;
+          const draftEnd = draftSegment ? Math.min(draftSegment.endCol, lastVisCol) : -1;
           const draftTop =
-            CELL_PAD +
-            DATE_ROW +
-            chipGap +
-            Math.min(visibleLanes, Math.max(0, maxVisibleEventCount - 1)) * (chipHeight + chipGap);
+            CELL_PAD + DATE_ROW + chipGap + (draftSegment?.lane ?? 0) * (chipHeight + chipGap);
           const draftHeight = Math.min(chipHeight, Math.max(0, eventRowHeight - draftTop));
           const barChipButton = slot("chipButton", chipButtonDefault);
           const barChip = slot("chip", chipDefault(theme, chipHeight));
@@ -1336,7 +1362,13 @@ export function DateRows<T = unknown>({
                   // row doesn't show) collapse into "+N more"; the popover lists the
                   // whole day.
                   const hiddenEvents = rowLayout.segments
-                    .filter((s) => s.startCol <= dayCol && s.endCol >= dayCol && s.lane >= dayLanes)
+                    .filter(
+                      (s) =>
+                        s.startCol <= dayCol &&
+                        s.endCol >= dayCol &&
+                        s.lane >= dayLanes &&
+                        s.event !== draftEvent,
+                    )
                     .map((s) => s.event);
                   const dayLabel = format(day.date, "d MMMM", locale ? { locale } : undefined);
                   const dayCellProps = slot(
@@ -1517,7 +1549,7 @@ export function DateRows<T = unknown>({
                       {RenderCreateGhost &&
                       createRange &&
                       draftStart === dayCol &&
-                      draftEnd !== undefined &&
+                      draftEnd >= draftStart &&
                       draftHeight > 0 ? (
                         <InertDiv
                           {...slot("createGhost", {
