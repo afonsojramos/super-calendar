@@ -5,24 +5,29 @@
 // and let that delegate create the window and start React Native.
 const { withAppDelegate, withInfoPlist } = require("expo/config-plugins");
 
-const PROVIDER = "ExpoReactNativeFactoryProvider";
 const CLASS_LINE = "class AppDelegate: ExpoAppDelegate {";
+const PROVIDER_LINE = "class AppDelegate: ExpoAppDelegate, ExpoReactNativeFactoryProvider {";
 const WINDOW_START =
   /\n#if os\(iOS\) \|\| os\(tvOS\)\n {4}window = UIWindow\(frame: UIScreen\.main\.bounds\)\n {4}factory\.startReactNative\([\s\S]*?\n#endif\n/;
+const SCENE_NOTE = "    // The scene delegate creates the window and starts React Native.";
 
+function drift() {
+  return new Error(
+    "with-scene-lifecycle: AppDelegate.swift no longer matches the Expo 57 template; update the plugin.",
+  );
+}
+
+// Applies each half of the migration on its own, so a file left half-migrated
+// is finished rather than skipped. An already migrated file comes back unchanged.
 function adoptSceneDelegate(contents) {
-  if (contents.includes(`ExpoAppDelegate, ${PROVIDER}`)) return contents;
-  if (!contents.includes(CLASS_LINE) || !WINDOW_START.test(contents)) {
-    throw new Error(
-      "with-scene-lifecycle: AppDelegate.swift no longer matches the Expo 57 template; update the plugin.",
-    );
+  let next = contents;
+  if (!next.includes(PROVIDER_LINE)) {
+    if (!next.includes(CLASS_LINE)) throw drift();
+    next = next.replace(CLASS_LINE, PROVIDER_LINE);
   }
-  return contents
-    .replace(CLASS_LINE, `class AppDelegate: ExpoAppDelegate, ${PROVIDER} {`)
-    .replace(
-      WINDOW_START,
-      "\n    // The scene delegate creates the window and starts React Native.\n",
-    );
+  if (WINDOW_START.test(next)) return next.replace(WINDOW_START, `\n${SCENE_NOTE}\n`);
+  if (!next.includes(SCENE_NOTE)) throw drift();
+  return next;
 }
 
 module.exports = function withSceneLifecycle(config) {
@@ -48,3 +53,4 @@ module.exports = function withSceneLifecycle(config) {
     return mod;
   });
 };
+module.exports.adoptSceneDelegate = adoptSceneDelegate;
