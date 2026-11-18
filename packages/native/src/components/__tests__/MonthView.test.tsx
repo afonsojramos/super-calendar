@@ -3,7 +3,7 @@ import { vi } from "vitest";
 import { act, fireEvent, render, within } from "@testing-library/react-native";
 import { StyleSheet, Text, type ViewStyle } from "react-native";
 import { CalendarThemeProvider, defaultTheme, mergeTheme } from "../../theme";
-import type { CalendarEvent } from "../../types";
+import type { CalendarEvent, MonthDateInfo } from "../../types";
 import { DefaultEvent } from "../DefaultEvent";
 import { MonthView } from "../MonthView";
 
@@ -121,6 +121,40 @@ describe("MonthView renderCustomDateForMonth", () => {
     expect(getByText("day-15")).toBeTruthy();
     // The default bare day number is gone (replaced by the custom label).
     expect(queryByText("15")).toBeNull();
+  });
+
+  it("passes each day's month, today, selection and disabled state", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 5, 20, 12));
+    try {
+      const renderDate = vi.fn((day: Date, _info: MonthDateInfo) => (
+        <Text>{`day-${day.getMonth()}-${day.getDate()}`}</Text>
+      ));
+      await render(
+        <MonthView
+          {...baseProps}
+          selectedDates={[new Date(2026, 5, 10)]}
+          minDate={new Date(2026, 5, 3)}
+          // Highlighted like today, but `isToday` still reports the real today.
+          activeDate={new Date(2026, 5, 15)}
+          renderCustomDateForMonth={renderDate}
+        />,
+      );
+      const infoFor = (month: number, date: number) =>
+        renderDate.mock.calls.findLast(
+          ([day]) => day.getMonth() === month && day.getDate() === date,
+        )?.[1];
+      const plain = { isCurrentMonth: true, isToday: false, isSelected: false, isDisabled: false };
+      // The grid opens on Sunday 31 May, a day of the previous month.
+      expect(infoFor(4, 31)).toEqual({ ...plain, isCurrentMonth: false, isDisabled: true });
+      expect(infoFor(5, 2)).toEqual({ ...plain, isDisabled: true });
+      expect(infoFor(5, 10)).toEqual({ ...plain, isSelected: true });
+      expect(infoFor(5, 20)).toEqual({ ...plain, isToday: true });
+      expect(infoFor(5, 15)).toEqual(plain);
+      expect(infoFor(6, 1)).toEqual({ ...plain, isCurrentMonth: false });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

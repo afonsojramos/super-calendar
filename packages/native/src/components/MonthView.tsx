@@ -39,6 +39,7 @@ import type {
   EventDragHandler,
   EventDragStartHandler,
   EventKeyExtractor,
+  MonthDateInfo,
   RenderEvent,
   WeekStartsOn,
 } from "../types";
@@ -297,10 +298,11 @@ export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
   /** Reject a drop that would overlap another event (default true = allowed). */
   eventOverlap?: boolean;
   /**
-   * Replace the default date badge in each day cell. Receives the day; return
-   * your own date label. Event chips and the "+N more" label still render below.
+   * Replace the default date badge in each day cell. Receives the day and its
+   * state (`isCurrentMonth`, `isToday`, `isSelected`, `isDisabled`); return your
+   * own date label. Event chips and the "+N more" label still render below.
    */
-  renderCustomDateForMonth?: (date: Date) => React.ReactNode;
+  renderCustomDateForMonth?: (date: Date, info: MonthDateInfo) => React.ReactNode;
 };
 
 /**
@@ -1034,7 +1036,7 @@ function DateRowsInner<T>({
           />
         ) : null}
         {renderCustomDateForMonth ? (
-          renderCustomDateForMonth(day)
+          renderCustomDateForMonth(day, { isCurrentMonth, isToday, isSelected, isDisabled })
         ) : (
           <View
             {...slot("dayBadge", {
