@@ -983,6 +983,37 @@ describe("TimeGrid hour column", () => {
     expect(scroller.getAllByLabelText(/Standup/)).toHaveLength(1);
   });
 
+  it.each([
+    [-48, 0],
+    [0, 0],
+    [80, 80],
+  ])("pins the header and all-day row at scroll offset %i", async (offset, translation) => {
+    const grid = (ampm: boolean) => (
+      <TimeGrid
+        {...gridProps()}
+        showWeekNumber
+        showAllDayLabel
+        scrollOffsetMinutes={60}
+        ampm={ampm}
+      />
+    );
+    const { container, getByTestId, rerender } = await render(grid(false));
+    const [scrollView] = container.queryAll((node) => node.props.scrollEventThrottle === 16);
+    await fireEvent.scroll(scrollView, { nativeEvent: { contentOffset: { x: 0, y: offset } } });
+    // The test renderer evaluates animated styles during render.
+    await rerender(grid(true));
+
+    const gutter = within(getByTestId("hour-gutter"));
+    for (const pinned of [
+      getByTestId("paged-header"),
+      getByTestId("all-day-band"),
+      gutter.getByText("W2").parent!,
+      gutter.getByText("all-day").parent!,
+    ]) {
+      expect(flat(pinned).transform).toEqual([{ translateY: translation }]);
+    }
+  });
+
   it("scrolls to a changed scrollOffsetMinutes at the live zoom, keeping contentOffset at mount", async () => {
     const scrollToCalls = () =>
       (globalThis as { __scrollToCalls?: { y: number }[] }).__scrollToCalls ?? [];

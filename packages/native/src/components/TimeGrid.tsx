@@ -1391,7 +1391,12 @@ const HourGutterInner = ({
   // re-applied every time it runs, so keeping the offset apart means a swipe
   // (which only moves the band's height) sends nothing to the view.
   const laneCellHeightStyle = useAnimatedStyle(() => ({ height: laneHeight.value }));
-  const pinStyle = useAnimatedStyle(() => ({ transform: [{ translateY: scrollY.value }] }));
+  // Pinned to the viewport top only for real offsets. During the iOS top bounce the offset goes
+  // negative, which lifted the pinned header and all-day band out of view while the hours slid
+  // down; clamped at 0 they ride down with the hours instead, like a sticky header.
+  const pinStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: Math.max(0, scrollY.value) }],
+  }));
   const rowsStyle = useAnimatedStyle(
     () => ({
       top: headerHeight + laneHeight.value + HOUR_LABEL_TOP_INSET,
@@ -1871,7 +1876,12 @@ function TimetablePageInner<T>({
     height: Math.max(LANE_BAND_FLOOR, laneHeight.value),
     borderBottomWidth: laneHeight.value >= LANE_BAND_FLOOR ? StyleSheet.hairlineWidth : 0,
   }));
-  const pinStyle = useAnimatedStyle(() => ({ transform: [{ translateY: scrollY.value }] }));
+  // Pinned to the viewport top only for real offsets. During the iOS top bounce the offset goes
+  // negative, which lifted the pinned header and all-day band out of view while the hours slid
+  // down; clamped at 0 they ride down with the hours instead, like a sticky header.
+  const pinStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: Math.max(0, scrollY.value) }],
+  }));
   const reportLaneLayout = useCallback(
     (event: LayoutChangeEvent) => {
       onLaneLayout(pageIndex, event.nativeEvent.layout.height);
