@@ -48,10 +48,11 @@ theme-derived height and 2 px gaps when you omit the options. Choose a smaller
 
 Each week row stacks its events into lanes (a multi-day bar keeps its lane across
 the days it spans) and shows as many lanes as the cell height allows, collapsing
-the rest of a day's events into a `+N more` label. When the one event a day would
-hide sits on the first hidden lane, the day draws it in the label's row instead, so
-no cell reads `+1 more`. On native this needs the auto-fit layout; a fixed
-`maxVisibleEventCount` keeps the label.
+the rest of a day's events into a `+N more` label. When a day would hide only one
+event, that event sits on the first hidden lane, and the label's row has room for
+it, the day draws the event there instead of `+1 more`. A day whose one hidden
+event sits on a lower lane keeps the label. On native the row has room only in the
+auto-fit layout, so a fixed `maxVisibleEventCount` keeps the label.
 
 ```tsx
 <Calendar mode="month" /* ... */ />                            // auto-fit (default)

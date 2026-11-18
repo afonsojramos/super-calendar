@@ -1315,7 +1315,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
               // none draw over the blank leading/trailing cells.
               const cols = createMemo(() => week().days.length);
               // A day whose only hidden event sits on the "+more" row's lane draws that
-              // event there instead, so no cell reads "+1 more".
+              // event there instead of "+1 more".
               const extraLane = createMemo(() =>
                 visibleLanes() < props.maxVisibleEventCount
                   ? monthExtraLaneColumns(rowLayout(), visibleLanes(), cols())

@@ -116,8 +116,8 @@ export function layoutMonthWeek<T>(
  * The columns of a week row that show one lane more than the row. A row whose
  * lanes overflow shows `visibleLanes` of them and folds each day's rest into a
  * "+N more" label. A day whose only hidden event sits on lane `visibleLanes` draws
- * that event in the label's place instead, so no cell reads "+1 more". Call it
- * only when a bar on lane `visibleLanes` fits in the cell.
+ * that event in the label's place instead of "+1 more". Call it only when
+ * a bar on lane `visibleLanes` fits in the cell.
  */
 export function monthExtraLaneColumns<T>(
   layout: MonthWeekEvents<T>,
