@@ -1481,19 +1481,10 @@ function DateRowsInner<T>({
               testID={multiWeek ? "multiweek-grid" : "month-grid"}
               accessibilityLabel={multiWeek ? title : undefined}
               {...slot("grid", {
-                base: [
-                  // With fixed-height rows the grid takes no `flex` and no height: it
-                  // sizes to the rows as drawn, so its measured height still divides
-                  // evenly into them when a row style adds a minimum. Yoga gives any
-                  // `flex` box a zero basis that ignores `height`, and React Native Web
-                  // does the same for `flex: 0`.
-                  multiWeekRowHeight
-                    ? undefined
-                    : [
-                        styles.container,
-                        multiWeek && { minHeight: minimumRowHeight * weeks.length },
-                      ],
-                ],
+                // Let the grid grow with the rows when a week has a minimum height.
+                base: multiWeekRowHeight
+                  ? undefined
+                  : [styles.container, multiWeek && { minHeight: minimumRowHeight * weeks.length }],
               })}
               onLayout={handleLayout}
               {...(isWeb && dragEnabled
@@ -1540,8 +1531,9 @@ function DateRowsInner<T>({
                 return (
                   <View
                     {...slot("week", {
+                      // Share any extra grid height without resetting the row's flex basis.
                       base: multiWeekRowHeight
-                        ? [styles.weekRowFixed, { height: multiWeekRowHeight }]
+                        ? [styles.weekRowFixed, { height: multiWeekRowHeight, flexGrow: 1 }]
                         : styles.weekRow,
                       themed: theme.containers.weekRow,
                     })}

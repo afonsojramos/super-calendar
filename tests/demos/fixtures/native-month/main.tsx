@@ -32,10 +32,10 @@ const busyDays: CalendarEvent[] = [
   })),
 ];
 
-function StyledWeeks({ classes }: { classes: boolean }) {
+function StyledWeeks({ classes, tallGrid }: { classes: boolean; tallGrid: boolean }) {
   const [action, setAction] = useState("");
   return (
-    <View style={{ width: 700, height: 150 }}>
+    <View style={{ width: 700, height: tallGrid ? 300 : 150 }}>
       <MultiWeekView
         date={date}
         numberOfWeeks={3}
@@ -56,6 +56,7 @@ function StyledWeeks({ classes }: { classes: boolean }) {
           classes
             ? undefined
             : {
+                grid: tallGrid ? { minHeight: 600 } : undefined,
                 week: { paddingTop: 18, paddingBottom: 7, borderTopWidth: 2, marginVertical: 3 },
                 day: { justifyContent: "flex-end", gap: 10, paddingBottom: 5 },
               }
@@ -88,7 +89,10 @@ export default function App() {
   if (window.location.search.startsWith("?multiweek")) {
     return (
       <GestureHandlerRootView>
-        <StyledWeeks classes={window.location.search.includes("classes")} />
+        <StyledWeeks
+          classes={window.location.search.includes("classes")}
+          tallGrid={window.location.search.includes("grid-minimum")}
+        />
       </GestureHandlerRootView>
     );
   }

@@ -137,6 +137,33 @@ it.each(["styles", "classes"])(
   },
 );
 
+it("shares a grid minimum across weeks and creates in the drawn second week", async () => {
+  const page = await browser.newPage({ viewport: { width: 1000, height: 850 } });
+  try {
+    await page.goto(server.url + "?multiweek=grid-minimum");
+    const grid = page.getByTestId("multiweek-grid");
+    const monday = grid.getByRole("cell", { name: /Monday,? 22 June/ });
+    await monday.scrollIntoViewIfNeeded();
+    const bounds = await monday.boundingBox();
+    if (!bounds) throw new Error("Missing second week");
+    const x = bounds.x + bounds.width / 2;
+    const y = bounds.y + 8;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + bounds.width, y);
+    await page.mouse.up();
+    await expect.poll(() => page.locator("output").textContent()).toBe("Create 22");
+    const rows = grid.locator(":scope > *");
+    const heights = await rows.evaluateAll((items) =>
+      items.map((item) => item.getBoundingClientRect().height),
+    );
+    // Each 200px allocation includes the week's two 3px margins.
+    expect(heights).toEqual([194, 194, 194]);
+  } finally {
+    await page.close();
+  }
+});
+
 it("hides native-web creation content and prevents focus", async () => {
   const page = await browser.newPage({ viewport: { width: 1000, height: 850 } });
   const errors: string[] = [];

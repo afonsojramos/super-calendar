@@ -121,15 +121,16 @@ describe("native MultiWeekView", () => {
     const heights = () => rowHeights(view);
     await layoutViewport(view, 600);
     expect(heights()).toEqual([200, 200, 200]);
-    // Fixed rows carry no flex, which would override their height on Yoga (a zero
-    // basis) or on react-native-web (`flex: 0`); the grid sizes to them.
+    // Rows grow from their common height when the grid has extra space. A zero
+    // flex basis would discard that height on Yoga.
     const flexKeys = ["flex", "flexGrow", "flexShrink", "flexBasis", "height"];
     const grid = StyleSheet.flatten(view.getByTestId("multiweek-grid").props.style) ?? {};
     for (const key of flexKeys) expect(grid).not.toHaveProperty(key);
     for (const row of view.getByTestId("multiweek-grid").children) {
       const style =
         StyleSheet.flatten((row as { props: { style?: StyleProp<ViewStyle> } }).props.style) ?? {};
-      for (const key of flexKeys.slice(0, 4)) expect(style).not.toHaveProperty(key);
+      expect(style.flexGrow).toBe(1);
+      for (const key of ["flex", "flexShrink", "flexBasis"]) expect(style).not.toHaveProperty(key);
     }
     // A short viewport keeps each row at its minimum height and scrolls instead.
     await layoutViewport(view, 90);
