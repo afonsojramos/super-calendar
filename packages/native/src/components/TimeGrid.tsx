@@ -1324,6 +1324,12 @@ const HourLines = memo(function HourLines({ hours, timeslots }: HourLinesProps) 
   );
 });
 
+function getNowPosition(time: Date, days: Date[], minHour: number, maxHour: number) {
+  const hours = getHours(time) + getMinutes(time) / MINUTES_PER_HOUR;
+  const dayIndex = days.findIndex((day) => isSameCalendarDay(day, time));
+  return dayIndex >= 0 && hours >= minHour && hours <= maxHour ? { time, hours, dayIndex } : null;
+}
+
 type HourGutterProps = {
   width: number;
   minHour: number;
@@ -1348,10 +1354,7 @@ type HourGutterProps = {
   hourComponent?: HourRenderer;
   /** Draws the current time in the hour column, level with the now line. */
   renderNowLabel?: (now: Date) => React.ReactNode;
-  /** Fixed instant for the now label, as on the pages. */
-  now?: Date;
-  /** Time zone for the now label, as on the pages. */
-  timeZone?: string;
+  nowPosition: ReturnType<typeof getNowPosition>;
 };
 
 // How close, in hours, an hour label may sit to the now label before it is left out.
@@ -1377,15 +1380,13 @@ const HourGutterInner = ({
   ampm,
   hourComponent,
   renderNowLabel,
-  now: nowProp,
-  timeZone,
+  nowPosition,
 }: HourGutterProps) => {
   const theme = useCalendarTheme();
   const slot = useSlots<TimeGridSlot>();
   const hours = useMemo(() => hourRange(minHour, maxHour), [minHour, maxHour]);
-  const now = useNow(renderNowLabel != null, { now: nowProp, timeZone });
-  const nowHours = (getHours(now) * MINUTES_PER_HOUR + getMinutes(now)) / MINUTES_PER_HOUR;
-  const showNowLabel = renderNowLabel != null && nowHours >= minHour && nowHours <= maxHour;
+  const label = nowPosition && renderNowLabel?.(nowPosition.time);
+  const labelHours = label == null || typeof label === "boolean" ? undefined : nowPosition?.hours;
   // Height and offset are separate styles: a style that returns a transform is
   // re-applied every time it runs, so keeping the offset apart means a swipe
   // (which only moves the band's height) sends nothing to the view.
@@ -1457,21 +1458,23 @@ const HourGutterInner = ({
                 label={formatHour(hour, { ampm })}
                 ampm={ampm}
                 hourComponent={hourComponent}
-                hidden={showNowLabel && Math.abs(hour - nowHours) < NOW_LABEL_CLEARANCE_HOURS}
+                hidden={
+                  labelHours != null && Math.abs(hour - labelHours) < NOW_LABEL_CLEARANCE_HOURS
+                }
               />
             </View>
           </View>
         ))}
-        {showNowLabel ? (
+        {labelHours != null ? (
           // A percentage of the rows' height, so it follows the zoom without a worklet.
           <View
             style={[
               styles.nowLabel,
               styles.nonInteractive,
-              { width, top: `${((nowHours - minHour) / (maxHour - minHour)) * 100}%` },
+              { width, top: `${((labelHours - minHour) / (maxHour - minHour)) * 100}%` },
             ]}
           >
-            {renderNowLabel(now)}
+            {label}
           </View>
         ) : null}
       </Animated.View>
@@ -1837,15 +1840,10 @@ function TimetablePageInner<T>({
 
   const hoursRange = useMemo(() => hourRange(minHour, maxHour), [minHour, maxHour]);
 
-  const now = useNow(showNowIndicator && isActive, { now: nowProp, timeZone: nowTimeZone });
-  // The day the header marks as today: the indicator's clock while it runs, so
-  // the two can't disagree.
-  const today = showNowIndicator && isActive ? now : nowInTimeZone(nowProp, nowTimeZone);
-  // "Today" follows the (possibly zone-shifted or overridden) now, so the line
-  // lands in the column the events are displayed in.
-  const nowDayIndex = days.findIndex((day) => isSameCalendarDay(day, now));
-  const nowHours = (getHours(now) * MINUTES_PER_HOUR + getMinutes(now)) / MINUTES_PER_HOUR;
-  const nowInWindow = nowHours >= minHour && nowHours <= maxHour;
+  const tickOnPage = showNowIndicator && isActive && nowProp == null;
+  const pageClock = useNow(tickOnPage, { now: nowProp, timeZone: nowTimeZone });
+  const today = tickOnPage ? pageClock : nowInTimeZone(nowProp, nowTimeZone);
+  const nowPosition = showNowIndicator ? getNowPosition(today, days, minHour, maxHour) : null;
 
   const fullHeightStyle = useAnimatedStyle(
     () => ({ height: (maxHour - minHour) * heightSource.value }),
@@ -2472,12 +2470,12 @@ function TimetablePageInner<T>({
           />
         ) : null}
 
-        {showNowIndicator && nowDayIndex >= 0 && nowInWindow ? (
+        {nowPosition ? (
           <NowIndicator
             cellHeight={heightSource}
-            nowHours={nowHours}
+            nowHours={nowPosition.hours}
             minHour={minHour}
-            left={dayLeft(nowDayIndex)}
+            left={dayLeft(nowPosition.dayIndex)}
             width={dayWidth}
             color={theme.colors.nowIndicator}
           />
@@ -2694,9 +2692,8 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   /** Optional header above the grid (e.g. weekday labels). Rendered full-width. */
   renderHeader?: (days: Date[]) => React.ReactNode;
   /**
-   * Draws the current time in the hour column, level with the now line, the
-   * way calendar apps show "10:42" beside the red line. Hour labels within 15
-   * minutes of it are left out so the two never overlap. Omit for no label.
+   * Draw a label in the hour column when the current-time line is visible.
+   * A custom label replaces hour labels less than 15 minutes away.
    */
   renderNowLabel?: (now: Date) => React.ReactNode;
 };
@@ -2746,7 +2743,7 @@ function TimeGridInner<T>(
     verticalScrollEnabled = true,
     weekNumberPrefix = "W",
     hiddenDays,
-    now,
+    now: nowProp,
     timeZone,
     hourComponent,
     activeDate,
@@ -2778,6 +2775,10 @@ function TimeGridInner<T>(
   const clampedMaxHour = Math.max(clampedMinHour + 1, Math.min(maxHour, HOURS_PER_DAY));
   // Collapse the hour gutter to zero when hours are hidden.
   const hourColumnWidth = hideHours ? 0 : hourColumnWidthProp;
+  // A custom gutter label and its line must tick on the same minute, including after paging.
+  const hasNowLabel = showNowIndicator && renderNowLabel != null && hourColumnWidth > 0;
+  const labelClock = useNow(hasNowLabel, { now: nowProp });
+  const now = nowProp ?? (hasNowLabel ? labelClock : undefined);
   const labels = useMemo(() => resolveCalendarLabels(labelsProp), [labelsProp]);
   const todayLabel = labels.today;
   // The built-in day header pages with the columns (rendered inside each page). A
@@ -3192,19 +3193,16 @@ function TimeGridInner<T>(
 
   // Header days track the active page (page-aligned), so they always match the
   // columns below and a swipe never flashes another day's label.
+  const activePageDate = pageDates[activeIndex] ?? date;
   const headerDays = useMemo(
     () =>
-      getViewDays(
-        mode,
-        pageDates[activeIndex] ?? date,
-        weekStartsOn,
-        numberOfDays,
-        isRTL,
-        weekEndsOn,
-        hiddenDays,
-      ),
-    [mode, pageDates, activeIndex, date, weekStartsOn, numberOfDays, isRTL, weekEndsOn, hiddenDays],
+      getViewDays(mode, activePageDate, weekStartsOn, numberOfDays, isRTL, weekEndsOn, hiddenDays),
+    [mode, activePageDate, weekStartsOn, numberOfDays, isRTL, weekEndsOn, hiddenDays],
   );
+
+  const gutterNow = hasNowLabel
+    ? getNowPosition(nowInTimeZone(now, timeZone), headerDays, clampedMinHour, clampedMaxHour)
+    : null;
 
   // Keep the cross-week drop's page columns + handler current without changing the
   // identity-stable EdgePaging callbacks (see dropRef).
@@ -3588,7 +3586,7 @@ function TimeGridInner<T>(
   // `columnsWidth` resizes the mounted pages when the grid is re-measured.
   // `showDragHandle` refreshes grips without requiring an event-data change, and
   // `renderCreateGhost` swaps the preview content of mounted pages.
-  // `now` and `timeZone` move the today highlight and the now line.
+  // Refresh mounted pages when the clock, visible days, or indicator setting changes.
   const nowTime = now?.getTime();
   const listExtraData = useMemo(
     () => ({
@@ -3601,6 +3599,8 @@ function TimeGridInner<T>(
       dragStepMinutes,
       minHour,
       maxHour,
+      headerDays,
+      showNowIndicator,
       nowTime,
       timeZone,
     }),
@@ -3614,6 +3614,8 @@ function TimeGridInner<T>(
       dragStepMinutes,
       minHour,
       maxHour,
+      headerDays,
+      showNowIndicator,
       nowTime,
       timeZone,
     ],
@@ -3672,8 +3674,7 @@ function TimeGridInner<T>(
                         ampm={ampm}
                         hourComponent={hourComponent}
                         renderNowLabel={renderNowLabel}
-                        now={now}
-                        timeZone={timeZone}
+                        nowPosition={gutterNow}
                       />
                     ) : null}
                     <View

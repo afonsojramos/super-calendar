@@ -127,10 +127,11 @@ by default so the lane can come and go without a stranded label; set
 ## Now line and business hours
 
 The red current-time line follows the wall clock (`showNowIndicator`, on by
-default). On React Native, `renderNowLabel` also draws the current time in the
-hour column, level with the line, and leaves out the hour labels within 15
-minutes of it so the two never overlap. It follows `now` and `timeZone` like the
-line does:
+default). On React Native, use `renderNowLabel` to show a label beside the line.
+The label appears when the visible columns include today and the current time
+falls inside the displayed hours. It follows `now`, `timeZone`, and
+`showNowIndicator`. A custom label replaces hour labels less than 15 minutes
+away. Return `null` to keep the ordinary hour labels.
 
 ```tsx
 <Calendar

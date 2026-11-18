@@ -1960,6 +1960,101 @@ describe("TimeGrid now label", () => {
     expect(within(getByTestId("hour-gutter")).getByText("10:00")).toBeTruthy();
   });
 
+  it("restores the hour label when the indicator is disabled on a mounted page", async () => {
+    const props = base();
+    const grid = (showNowIndicator: boolean) => (
+      <TimeGrid
+        {...props}
+        now={new Date(2026, 0, 6, 10, 5)}
+        showNowIndicator={showNowIndicator}
+        classNames={{ nowIndicator: "now-line" }}
+        renderNowLabel={() => <Text>Current time</Text>}
+      />
+    );
+    const { container, getByTestId, rerender } = await render(grid(true));
+    const extraData = lastListProps()?.extraData;
+    const lines = () => container.queryAll((node) => node.props.className === "now-line");
+    expect(lines()).toHaveLength(1);
+    await rerender(grid(false));
+    expect(lastListProps()?.extraData).not.toBe(extraData);
+    expect(lines()).toHaveLength(0);
+    const gutter = within(getByTestId("hour-gutter"));
+    expect(gutter.queryByText("Current time")).toBeNull();
+    expect(gutter.getByText("10:00")).toBeTruthy();
+  });
+
+  it("shows the label only when the visible columns include today in the calendar time zone", async () => {
+    const props = base();
+    const now = new Date("2026-01-06T23:05:00Z"); // Wednesday 08:05 in Tokyo.
+    const grid = (mode: "week" | "day", hiddenDays?: number[]) => (
+      <TimeGrid
+        {...props}
+        mode={mode}
+        hiddenDays={hiddenDays}
+        now={now}
+        timeZone="Asia/Tokyo"
+        classNames={{ nowIndicator: "now-line" }}
+        renderNowLabel={(time) => <Text>{`Current hour ${time.getHours()}`}</Text>}
+      />
+    );
+    const { container, getByTestId, rerender } = await render(grid("week"));
+    const gutter = () => within(getByTestId("hour-gutter"));
+    const extraData = lastListProps()?.extraData;
+    expect(gutter().getByText("Current hour 8")).toBeTruthy();
+    expect(gutter().queryByText("08:00")).toBeNull();
+    await rerender(grid("week", [3]));
+    expect(lastListProps()?.extraData).not.toBe(extraData);
+    expect(container.queryAll((node) => node.props.className === "now-line")).toHaveLength(0);
+    expect(gutter().queryByText("Current hour 8")).toBeNull();
+    expect(gutter().getByText("08:00")).toBeTruthy();
+    await rerender(grid("day"));
+    expect(gutter().queryByText("Current hour 8")).toBeNull();
+    expect(gutter().getByText("08:00")).toBeTruthy();
+  });
+
+  it("keeps the hour label when the custom renderer returns null", async () => {
+    const { getByTestId } = await render(
+      <TimeGrid {...base()} now={new Date(2026, 0, 6, 10, 5)} renderNowLabel={() => null} />,
+    );
+    expect(within(getByTestId("hour-gutter")).getByText("10:00")).toBeTruthy();
+  });
+
+  it("keeps the line and label on the same minute when the label is enabled later", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(new Date(2026, 0, 6, 10, 0));
+    try {
+      const props = base();
+      const label = (time: Date) => <Text>{`Minute ${time.getMinutes()}`}</Text>;
+      const grid = (enabled: boolean) => (
+        <TimeGrid
+          {...props}
+          cellHeight={{ value: 60 } as never}
+          classNames={{ nowIndicator: "now-line" }}
+          renderNowLabel={enabled ? label : undefined}
+        />
+      );
+      const { container, getByTestId, rerender } = await render(grid(false));
+      const lineMinute = () => {
+        const [line] = container.queryAll((node) => node.props.className === "now-line");
+        return Math.round(StyleSheet.flatten(line.props.style).top);
+      };
+      const advanceHalfMinute = () =>
+        act(() => {
+          vi.advanceTimersByTime(30_000);
+        });
+      await advanceHalfMinute();
+      await rerender(grid(true));
+      await advanceHalfMinute();
+      const gutter = within(getByTestId("hour-gutter"));
+      expect(gutter.getByText(`Minute ${lineMinute() % 60}`)).toBeTruthy();
+      await advanceHalfMinute();
+      expect(lineMinute()).toBe(601);
+      expect(gutter.getByText("Minute 1")).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("draws nothing when now is outside the hour window", async () => {
     const { getByTestId } = await render(
       <TimeGrid
