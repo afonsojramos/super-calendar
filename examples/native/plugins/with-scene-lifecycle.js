@@ -7,8 +7,17 @@ const { withAppDelegate, withInfoPlist } = require("expo/config-plugins");
 
 const CLASS_LINE = "class AppDelegate: ExpoAppDelegate {";
 const PROVIDER_LINE = "class AppDelegate: ExpoAppDelegate, ExpoReactNativeFactoryProvider {";
-const WINDOW_START =
-  /\n#if os\(iOS\) \|\| os\(tvOS\)\n {4}window = UIWindow\(frame: UIScreen\.main\.bounds\)\n {4}factory\.startReactNative\([\s\S]*?\n#endif\n/;
+// The exact block the template uses to start React Native. Anything else in its
+// place counts as drift, so changed startup code is rejected rather than deleted.
+const WINDOW_START = `
+#if os(iOS) || os(tvOS)
+    window = UIWindow(frame: UIScreen.main.bounds)
+    factory.startReactNative(
+      withModuleName: "main",
+      in: window,
+      launchOptions: launchOptions)
+#endif
+`;
 const SCENE_NOTE = "    // The scene delegate creates the window and starts React Native.";
 
 function drift() {
@@ -25,7 +34,7 @@ function adoptSceneDelegate(contents) {
     if (!next.includes(CLASS_LINE)) throw drift();
     next = next.replace(CLASS_LINE, PROVIDER_LINE);
   }
-  if (WINDOW_START.test(next)) return next.replace(WINDOW_START, `\n${SCENE_NOTE}\n`);
+  if (next.includes(WINDOW_START)) return next.replace(WINDOW_START, `\n${SCENE_NOTE}\n`);
   if (!next.includes(SCENE_NOTE)) throw drift();
   return next;
 }

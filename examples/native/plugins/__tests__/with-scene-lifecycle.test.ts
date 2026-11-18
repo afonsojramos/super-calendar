@@ -5,7 +5,8 @@ const { adoptSceneDelegate } = require("../with-scene-lifecycle.js") as {
   adoptSceneDelegate: (contents: string) => string;
 };
 
-// The didFinishLaunching part of the AppDelegate Expo 57's prebuild generates.
+// The parts of the AppDelegate Expo 57's prebuild generates that the plugin reads,
+// including a second conditional block the window match must not reach.
 const template = `@main
 class AppDelegate: ExpoAppDelegate {
   var window: UIWindow?
@@ -27,6 +28,16 @@ class AppDelegate: ExpoAppDelegate {
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }
+
+class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
+  override func bundleURL() -> URL? {
+#if DEBUG
+    return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
+#else
+    return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+#endif
+  }
+}
 `;
 
 const migrated = `@main
@@ -42,6 +53,16 @@ class AppDelegate: ExpoAppDelegate, ExpoReactNativeFactoryProvider {
     // The scene delegate creates the window and starts React Native.
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+}
+
+class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
+  override func bundleURL() -> URL? {
+#if DEBUG
+    return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
+#else
+    return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+#endif
   }
 }
 `;
@@ -74,6 +95,18 @@ describe("with-scene-lifecycle", () => {
     ).toThrow(/no longer matches/);
     expect(() =>
       adoptSceneDelegate(template.replace(": ExpoAppDelegate {", ": AppDelegateBase {")),
+    ).toThrow(/no longer matches/);
+    // Changed or added startup code is rejected, never deleted.
+    expect(() =>
+      adoptSceneDelegate(template.replace('withModuleName: "main"', 'withModuleName: "other"')),
+    ).toThrow(/no longer matches/);
+    expect(() =>
+      adoptSceneDelegate(
+        template.replace(
+          "      launchOptions: launchOptions)\n",
+          "      launchOptions: launchOptions)\n    setUpAnalytics()\n",
+        ),
+      ),
     ).toThrow(/no longer matches/);
   });
 });
