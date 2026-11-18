@@ -24,6 +24,10 @@ readable. On React DOM and Solid it widens once the pointer moves, so a click
 keeps the event in its shared column. On native it widens when the long-press
 picks it up. A resize always keeps the event in its shared column.
 
+On native, a long press picks the event up wherever it lands, grips included,
+so you can move a short event whose grips cover most of it. Drag a grip without
+pausing to resize instead.
+
 While you move or resize an event on React DOM and Solid, its renderer receives
 `event` with the `start` and `end` that `onDragEvent` would report if you
 released there, so the built-in time label and a custom renderer (`renderTimeEvent` on
