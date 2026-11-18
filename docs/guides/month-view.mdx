@@ -107,6 +107,27 @@ Replace parts of the cell with `renderCustomDateForMonth` (the date badge) or a
 custom `renderEvent` (see [Custom events](/guides/events)); restyle everything
 else through the [theme](/guides/theming) or per-slot [classes](/guides/styling).
 
+`renderCustomDateForMonth` receives the day and a `MonthDateInfo` with
+`isCurrentMonth`, `isToday`, `isSelected` and `isDisabled`, so your badge can dim
+adjacent-month days and mark today the way the built-in badge does. With
+`showAdjacentMonths`, each page of the pager passes its own month, so the flag is
+right on every page. A `MultiWeekView` has no page month, so there
+`isCurrentMonth` is always `true`.
+
+```tsx
+<Calendar
+  mode="month"
+  date={date}
+  events={events}
+  showAdjacentMonths
+  renderCustomDateForMonth={(day, { isCurrentMonth, isToday }) => (
+    <Text style={{ opacity: isCurrentMonth ? 1 : 0.4, fontWeight: isToday ? "700" : "400" }}>
+      {day.getDate()}
+    </Text>
+  )}
+/>
+```
+
 ## Dragging
 
 Month cells and chips are draggable too: pass `onCreateEvent` to sweep out an

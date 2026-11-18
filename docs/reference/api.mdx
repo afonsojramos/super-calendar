@@ -54,7 +54,7 @@ in-view dragging without edge paging. Other navigation remains available.
 | `renderEvent`              | `RenderEvent<T>`                   | Render events your way, every mode.        |
 | `eventAccessibilityLabel`  | `(event, ctx) => string`           | Override an event's screen-reader label.   |
 | `labels`                   | `Partial<CalendarLabels>`          | Translate screen-reader words and actions. |
-| `renderCustomDateForMonth` | `(date) => ReactNode`              | Month: replace the day-cell date badge.    |
+| `renderCustomDateForMonth` | `(date, info) => ReactNode`        | Month: replace the day-cell date badge.    |
 | `eventCellStyle`           | `style \| (event) => style`        | Tweak the built-in box.                    |
 | `calendarCellStyle`        | `(date) => style`                  | Per-date column/cell shading.              |
 | `businessHours`            | `(date) => { start, end } \| null` | Shade closed hours.                        |
@@ -230,7 +230,7 @@ Changing either dimension updates already mounted list and pager months.
     `CalendarEvent`, `CalendarMode`, `RenderEventArgs`, `RecurrenceRule`, `BusinessHours`,
     `EventDragHandler`, `CalendarTheme`, `PositionedEvent`, `DateRange`, `MonthGrid`,
     `MonthEventSegment`, `MonthWeekEvents`, `MonthListProps`, `CalendarSlot`, `SlotStyleProps`,
-    `CalendarLabels`, `CalendarHandle`, `ScrollToTimeOptions`, `CreateGhostArgs`
+    `CalendarLabels`, `CalendarHandle`, `ScrollToTimeOptions`, `CreateGhostArgs`, `MonthDateInfo`
   </Card>
 </CardGroup>
 

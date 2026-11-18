@@ -112,3 +112,21 @@ export type RenderEventArgs<T = unknown> = {
  * (`flex: 1`); the calendar positions and sizes the wrapping box for you.
  */
 export type RenderEvent<T = unknown> = ComponentType<RenderEventArgs<T>>;
+
+/**
+ * The state of a month day cell, passed to `renderCustomDateForMonth` so a custom
+ * date badge can style the day the way the built-in badge does.
+ */
+export type MonthDateInfo = {
+  /**
+   * False for a day from the previous or next month, shown with
+   * `showAdjacentMonths`. Always true in `MultiWeekView`.
+   */
+  isCurrentMonth: boolean;
+  /** The day is today. */
+  isToday: boolean;
+  /** The day is in `selectedDates` or is an endpoint of `selectedRange`. */
+  isSelected: boolean;
+  /** The day fails `minDate`, `maxDate` or `isDateDisabled`. */
+  isDisabled: boolean;
+};
