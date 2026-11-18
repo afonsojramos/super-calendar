@@ -23,6 +23,45 @@ export interface MonthCellGeometry {
 type ProbeView = ComponentRef<typeof View>;
 type Part = "frame" | "row" | "cell" | "date" | "lane" | "overlay";
 const MARKER_HEIGHT = 1;
+const hiddenProbeProps = {
+  pointerEvents: "none",
+  accessible: false,
+  accessibilityElementsHidden: true,
+  importantForAccessibility: "no-hide-descendants",
+  ...(Platform.OS === "web" ? { "aria-hidden": true, inert: "inert" } : {}),
+} as const;
+
+// Zero-height weeks leave only the grid's padding, borders and gaps. The outer
+// box also includes its margins. Neither measurement depends on the drawn rows.
+export const MonthGridSpacingProbe = memo(function MonthGridSpacingProbe({
+  grid,
+  weeks,
+  onInnerHeight,
+  onOuterHeight,
+}: {
+  grid: ResolvedSlot<ViewStyle>;
+  weeks: number;
+  onInnerHeight: (height: number) => void;
+  onOuterHeight: (height: number) => void;
+}) {
+  return (
+    <View
+      {...hiddenProbeProps}
+      style={styles.frame}
+      onLayout={(e) => onOuterHeight(e.nativeEvent.layout.height)}
+    >
+      <View
+        {...grid}
+        style={[grid.style, styles.gridSpacing]}
+        onLayout={(e) => onInnerHeight(e.nativeEvent.layout.height)}
+      >
+        {Array.from({ length: weeks }, (_, index) => (
+          <View key={index} style={styles.emptyWeek} />
+        ))}
+      </View>
+    </View>
+  );
+});
 
 // The two markers take the place of the date and the first event. Their natural
 // positions include spacing applied by a class, including on the enclosing week.
@@ -109,16 +148,7 @@ export const MonthCellProbe = memo(function MonthCellProbe({
     };
   }
   return (
-    <View
-      {...observe("frame")}
-      style={styles.frame}
-      collapsable={false}
-      pointerEvents="none"
-      accessible={false}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      {...(Platform.OS === "web" ? { "aria-hidden": true, inert: "inert" } : {})}
-    >
+    <View {...observe("frame")} style={styles.frame} collapsable={false} {...hiddenProbeProps}>
       <View
         {...observe("row")}
         {...week}
@@ -142,6 +172,8 @@ export const MonthCellProbe = memo(function MonthCellProbe({
 
 const styles = StyleSheet.create({
   frame: { position: "absolute", top: 0, left: 0, right: 0, opacity: 0 },
+  gridSpacing: { height: "auto", minHeight: 0, maxHeight: "auto", flex: 0 },
+  emptyWeek: { height: 0 },
   intrinsic: { height: "auto", minHeight: 0 },
   stacked: { justifyContent: "flex-start", alignSelf: "stretch" },
   marker: { height: MARKER_HEIGHT },

@@ -205,6 +205,32 @@ it.each(["grid-height", "grid-below-content", "week-minimum"])(
   },
 );
 
+it.each(["grid-spacing", "grid-spacing-class"])(
+  "fits week rows inside a padded %s",
+  async (layout) => {
+    const page = await browser.newPage({ viewport: { width: 1000, height: 850 } });
+    try {
+      await page.goto(server.url + "?multiweek=" + layout);
+      const viewport = page.getByTestId("multiweek-viewport");
+      const grid = page.getByTestId("multiweek-grid");
+      await grid.getByRole("cell", { name: /Friday,? 19 June/ }).waitFor();
+      await expect
+        .poll(() => viewport.evaluate((node) => node.scrollHeight - node.clientHeight))
+        .toBe(0);
+      const rows = await grid
+        .locator(":scope > *")
+        .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().height));
+      const bounds = await viewport.boundingBox();
+      if (!bounds) throw new Error("Missing scroll viewport");
+      if (layout === "grid-spacing-class") expect((await grid.boundingBox())?.width).toBe(420);
+      const gridSpacing = layout === "grid-spacing-class" ? 214 : 200;
+      for (const row of rows) expect(row).toBeCloseTo((bounds.height - gridSpacing) / 3, 0);
+    } finally {
+      await page.close();
+    }
+  },
+);
+
 it("hides native-web creation content and prevents focus", async () => {
   const page = await browser.newPage({ viewport: { width: 1000, height: 850 } });
   const errors: string[] = [];

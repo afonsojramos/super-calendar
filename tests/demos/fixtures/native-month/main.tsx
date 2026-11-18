@@ -32,9 +32,11 @@ const busyDays: CalendarEvent[] = [
   })),
 ];
 
-const constrainedWeeks = new Map<string, { grid: ViewStyle; week?: ViewStyle }>([
+const constrainedWeeks = new Map<string, { grid?: ViewStyle; week?: ViewStyle }>([
   ["grid-height", { grid: { height: 300 } }],
   ["grid-below-content", { grid: { height: 120 } }],
+  ["grid-spacing", { grid: { paddingVertical: 60, rowGap: 40 } }],
+  ["grid-spacing-class", {}],
   ["week-minimum", { grid: { height: 300, paddingTop: 12, rowGap: 10 }, week: { minHeight: 140 } }],
 ]);
 
@@ -54,12 +56,14 @@ function StyledWeeks({ layout }: { layout: string }) {
         chipHeight={20}
         maxVisibleEventCount={1}
         classNames={
-          classes
-            ? {
-                week: "pt-[18px] pb-[7px] border-t-2 my-[3px]",
-                day: "justify-end gap-y-[18px] pb-[5px]",
-              }
-            : undefined
+          layout === "grid-spacing-class"
+            ? { grid: "py-[60px] gap-y-[40px] w-[420px] my-[5px] border-t-2 border-b-2" }
+            : classes
+              ? {
+                  week: "pt-[18px] pb-[7px] border-t-2 my-[3px]",
+                  day: "justify-end gap-y-[18px] pb-[5px]",
+                }
+              : undefined
         }
         styles={
           shortGrid ??

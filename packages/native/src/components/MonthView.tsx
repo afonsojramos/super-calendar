@@ -34,7 +34,7 @@ const isWeb = Platform.OS === "web";
 // React 18 forwards the canonical string; React 19 treats it as a boolean attribute.
 const webPreviewProps = isWeb ? { "aria-hidden": true, inert: "inert" } : {};
 import { useCalendarTheme } from "../theme";
-import { MonthCellProbe, type MonthCellGeometry } from "./MonthCellProbe";
+import { MonthCellProbe, MonthGridSpacingProbe, type MonthCellGeometry } from "./MonthCellProbe";
 import type {
   CalendarEvent,
   EventDragHandler,
@@ -646,9 +646,16 @@ function DateRowsInner<T>({
   // In a scroll view, rows with an automatic basis can grow with their events.
   // Start each week at the same height and let the grid share the available space.
   const [viewportHeight, setViewportHeight] = useState(0);
+  const gridProbe = useMemo(
+    () => (multiWeek && (classNames?.grid || styleOverrides?.grid) ? slot("grid") : null),
+    [multiWeek, classNames?.grid, styleOverrides?.grid, slot],
+  );
+  const [gridInnerSpacing, setGridInnerSpacing] = useState(0);
+  const [gridOuterSpacing, setGridOuterSpacing] = useState(0);
+  const heightForWeeks = viewportHeight - (gridProbe ? gridOuterSpacing : 0);
   const multiWeekRowHeight =
     multiWeek && viewportHeight > 0
-      ? Math.max(minimumRowHeight, viewportHeight / weeks.length) - cellGeometry.weekMargin
+      ? Math.max(minimumRowHeight, heightForWeeks / weeks.length) - cellGeometry.weekMargin
       : undefined;
   const rowHeight =
     multiWeek && drawnWeekHeight > 0
@@ -1409,6 +1416,14 @@ function DateRowsInner<T>({
             </Text>
           </View>
         ) : null}
+        {gridProbe && (
+          <MonthGridSpacingProbe
+            grid={gridProbe}
+            weeks={weeks.length}
+            onInnerHeight={setGridInnerSpacing}
+            onOuterHeight={setGridOuterSpacing}
+          />
+        )}
         {Array.from(cellStyles.probes, ([id, cellStyle]) => (
           <MonthCellProbe
             key={id}
@@ -1509,7 +1524,9 @@ function DateRowsInner<T>({
               {...slot("grid", {
                 base: [
                   !multiWeekRowHeight && styles.container,
-                  multiWeek && { minHeight: minimumRowHeight * weeks.length },
+                  multiWeek && {
+                    minHeight: minimumRowHeight * weeks.length + (gridProbe ? gridInnerSpacing : 0),
+                  },
                 ],
               })}
               onLayout={handleLayout}
