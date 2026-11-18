@@ -1892,3 +1892,53 @@ describe("TimeGrid background events", () => {
     expect(getByText("<-")).toBeTruthy(); // Jan 7 carries the tail
   });
 });
+
+describe("TimeGrid now label", () => {
+  const date = new Date(2026, 0, 6, 12, 0, 0);
+  const base = () => ({
+    mode: "day" as const,
+    date,
+    events: [event],
+    cellHeight: { value: 48 } as never,
+    weekStartsOn: 1 as const,
+    renderEvent: DefaultEvent,
+    keyExtractor: (_e: CalendarEvent<WithId>, i: number) => String(i),
+    onChangeDate: noop,
+    onPressEvent: noop,
+  });
+
+  it("draws the label in the hour column and hides the hour label it would cover", async () => {
+    const now = new Date(2026, 0, 6, 10, 5);
+    const { getByTestId } = await render(
+      <TimeGrid
+        {...base()}
+        now={now}
+        renderNowLabel={(time) => <Text>{`now ${time.getHours()}:${time.getMinutes()}`}</Text>}
+      />,
+    );
+    const gutter = within(getByTestId("hour-gutter"));
+    expect(gutter.getByText("now 10:5")).toBeTruthy();
+    expect(gutter.queryByText("10:00")).toBeNull();
+    expect(gutter.getByText("11:00")).toBeTruthy();
+  });
+
+  it("draws nothing without renderNowLabel", async () => {
+    const { getByTestId } = await render(
+      <TimeGrid {...base()} now={new Date(2026, 0, 6, 10, 5)} />,
+    );
+    expect(within(getByTestId("hour-gutter")).getByText("10:00")).toBeTruthy();
+  });
+
+  it("draws nothing when now is outside the hour window", async () => {
+    const { getByTestId } = await render(
+      <TimeGrid
+        {...base()}
+        minHour={7}
+        maxHour={20}
+        now={new Date(2026, 0, 6, 22, 0)}
+        renderNowLabel={() => <Text>now</Text>}
+      />,
+    );
+    expect(within(getByTestId("hour-gutter")).queryByText("now")).toBeNull();
+  });
+});

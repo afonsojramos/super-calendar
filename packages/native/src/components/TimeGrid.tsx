@@ -1255,12 +1255,15 @@ type HourLabelProps = {
   label: string;
   ampm: boolean;
   hourComponent?: HourRenderer;
+  /** Leave the label out, because the now label sits on top of it. */
+  hidden?: boolean;
 };
 
 // The hour-axis label: the consumer's `hourComponent`, or the themed text.
-const HourLabel = ({ hour, width, label, ampm, hourComponent }: HourLabelProps) => {
+const HourLabel = ({ hour, width, label, ampm, hourComponent, hidden }: HourLabelProps) => {
   const theme = useCalendarTheme();
   const slot = useSlots<TimeGridSlot>();
+  if (hidden) return null;
   return hourComponent ? (
     <View style={{ width }}>{hourComponent(hour, ampm)}</View>
   ) : (
@@ -1333,7 +1336,16 @@ type HourGutterProps = {
   weekNumber: string | null;
   ampm: boolean;
   hourComponent?: HourRenderer;
+  /** Draws the current time in the hour column, level with the now line. */
+  renderNowLabel?: (now: Date) => React.ReactNode;
+  /** Fixed instant for the now label, as on the pages. */
+  now?: Date;
+  /** Time zone for the now label, as on the pages. */
+  timeZone?: string;
 };
+
+// How close, in hours, an hour label may sit to the now label before it is left out.
+const NOW_LABEL_CLEARANCE_HOURS = 0.25;
 
 // The hour-axis column beside the pager. It is part of the grid's one vertical
 // scroll content, so it scrolls and zooms with the pages and holds still while
@@ -1354,10 +1366,16 @@ const HourGutterInner = ({
   weekNumber,
   ampm,
   hourComponent,
+  renderNowLabel,
+  now: nowProp,
+  timeZone,
 }: HourGutterProps) => {
   const theme = useCalendarTheme();
   const slot = useSlots<TimeGridSlot>();
   const hours = useMemo(() => hourRange(minHour, maxHour), [minHour, maxHour]);
+  const now = useNow(renderNowLabel != null, { now: nowProp, timeZone });
+  const nowHours = (getHours(now) * MINUTES_PER_HOUR + getMinutes(now)) / MINUTES_PER_HOUR;
+  const showNowLabel = renderNowLabel != null && nowHours >= minHour && nowHours <= maxHour;
   // Height and offset are separate styles: a style that returns a transform is
   // re-applied every time it runs, so keeping the offset apart means a swipe
   // (which only moves the band's height) sends nothing to the view.
@@ -1429,10 +1447,23 @@ const HourGutterInner = ({
                 label={formatHour(hour, { ampm })}
                 ampm={ampm}
                 hourComponent={hourComponent}
+                hidden={showNowLabel && Math.abs(hour - nowHours) < NOW_LABEL_CLEARANCE_HOURS}
               />
             </View>
           </View>
         ))}
+        {showNowLabel ? (
+          // A percentage of the rows' height, so it follows the zoom without a worklet.
+          <View
+            style={[
+              styles.nowLabel,
+              styles.nonInteractive,
+              { width, top: `${((nowHours - minHour) / (maxHour - minHour)) * 100}%` },
+            ]}
+          >
+            {renderNowLabel(now)}
+          </View>
+        ) : null}
       </Animated.View>
     </View>
   );
@@ -2652,6 +2683,12 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   onChangeDate: (date: Date) => void;
   /** Optional header above the grid (e.g. weekday labels). Rendered full-width. */
   renderHeader?: (days: Date[]) => React.ReactNode;
+  /**
+   * Draws the current time in the hour column, level with the now line, the
+   * way calendar apps show "10:42" beside the red line. Hour labels within 15
+   * minutes of it are left out so the two never overlap. Omit for no label.
+   */
+  renderNowLabel?: (now: Date) => React.ReactNode;
 };
 
 function TimeGridInner<T>(
@@ -2720,6 +2757,7 @@ function TimeGridInner<T>(
     onPressDateHeader,
     onChangeDate,
     renderHeader,
+    renderNowLabel,
     classNames,
     styles: styleOverrides,
   }: TimeGridProps<T>,
@@ -3623,6 +3661,9 @@ function TimeGridInner<T>(
                         weekNumber={weekNumber}
                         ampm={ampm}
                         hourComponent={hourComponent}
+                        renderNowLabel={renderNowLabel}
+                        now={now}
+                        timeZone={timeZone}
                       />
                     ) : null}
                     <View
@@ -4014,6 +4055,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: "right",
     paddingRight: 6,
+  },
+  nowLabel: {
+    position: "absolute",
+    left: 0,
+    marginTop: -HOUR_LABEL_NUDGE,
   },
   gutterRows: {
     position: "absolute",

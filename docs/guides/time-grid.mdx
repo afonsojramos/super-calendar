@@ -127,7 +127,20 @@ by default so the lane can come and go without a stranded label; set
 ## Now line and business hours
 
 The red current-time line follows the wall clock (`showNowIndicator`, on by
-default). `businessHours` shades the closed hours per day; return `null` for a
+default). On React Native, `renderNowLabel` also draws the current time in the
+hour column, level with the line, and leaves out the hour labels within 15
+minutes of it so the two never overlap. It follows `now` and `timeZone` like the
+line does:
+
+```tsx
+<Calendar
+  mode="day"
+  events={events}
+  renderNowLabel={(now) => <Text style={{ color: "red" }}>{format(now, "HH:mm")}</Text>}
+/>
+```
+
+`businessHours` shades the closed hours per day; return `null` for a
 fully closed day (see [Theming](/guides/theming) for the shade colour). Return an
 array of windows to leave a closed gap between them, such as a lunch break:
 
