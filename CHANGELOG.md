@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.20.0](https://github.com/afonsojramos/super-calendar/compare/v2.19.0...v2.20.0) (2026-11-18)
+
+
+### Features
+
+* **native:** add bottom padding, scroll events and bounce control to the time grid's vertical scroll ([#165](https://github.com/afonsojramos/super-calendar/issues/165)) ([35b1fd4](https://github.com/afonsojramos/super-calendar/commit/35b1fd4dc89e900d0b0c3d58d265bfef4997e32f))
+* **native:** draw the current time in the time grid's hour column with renderNowLabel ([#166](https://github.com/afonsojramos/super-calendar/issues/166)) ([789a422](https://github.com/afonsojramos/super-calendar/commit/789a422b37ce63d674210e8bbdb9e237dbd0c8a7))
+
+
+### Bug Fixes
+
+* **native:** keep the time grid's pinned header and all-day band in view during the iOS top bounce ([#164](https://github.com/afonsojramos/super-calendar/issues/164)) ([3c64e72](https://github.com/afonsojramos/super-calendar/commit/3c64e72c0dbd00fd0e8ba212806a9bab4dacdcd7))
+
 ## [2.19.0](https://github.com/afonsojramos/super-calendar/compare/v2.18.0...v2.19.0) (2026-11-18)
 
 
