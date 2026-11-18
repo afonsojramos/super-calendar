@@ -135,6 +135,8 @@ describe("MonthView renderCustomDateForMonth", () => {
           {...baseProps}
           selectedDates={[new Date(2026, 5, 10)]}
           minDate={new Date(2026, 5, 3)}
+          // Highlighted like today, but `isToday` still reports the real today.
+          activeDate={new Date(2026, 5, 15)}
           renderCustomDateForMonth={renderDate}
         />,
       );
