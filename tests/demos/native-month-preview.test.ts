@@ -76,10 +76,10 @@ afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
-it.each(["styles", "classes"])(
+it.each(["styles", "classes", "scaled-classes"])(
   "keeps multi-week dates, bars, overflow buttons and hit targets aligned with %s",
   async (source) => {
-    const gap = source === "classes" ? 18 : 14;
+    const gap = source === "styles" ? 14 : 18;
     const page = await browser.newPage({ viewport: { width: 1000, height: 850 } });
     page.setDefaultTimeout(5000);
     try {
@@ -95,6 +95,12 @@ it.each(["styles", "classes"])(
         if (!bounds) throw new Error("Missing multi-week layout");
         return bounds;
       };
+      if (source === "scaled-classes") {
+        await expect.poll(async () => (await box(day(16))).height).toBe(19);
+        await page.getByTestId("weeks-fixture").evaluate((node) => {
+          node.style.transform = "none";
+        });
+      }
       await expect
         .poll(async () => {
           const dateBox = await box(day(16));
@@ -296,6 +302,42 @@ it.each(["day-aspect", "day-aspect-spaced"])(
     }
   },
 );
+
+it("keeps square weeks stable at the classic scrollbar threshold", async () => {
+  const classic = await launchBrowser("chromium", {
+    ignoreDefaultArgs: ["--hide-scrollbars"],
+    args: ["--disable-features=OverlayScrollbar"],
+  });
+  try {
+    const page = await classic.newPage({ viewport: { width: 845, height: 760 } });
+    await page.goto(server.url + "?multiweek=day-aspect");
+    await page.addStyleTag({
+      content: '[data-testid="multiweek-viewport"]::-webkit-scrollbar { width: 15px; }',
+    });
+    const viewport = page.getByTestId("multiweek-viewport");
+    await page.getByRole("cell", { name: /Tuesday,? 16 June/ }).waitFor();
+    const gutter = await viewport.evaluate((node) => {
+      const previous = node.style.overflowY;
+      node.style.overflowY = "scroll";
+      const width = node.getBoundingClientRect().width - node.clientWidth;
+      node.style.overflowY = previous;
+      return width;
+    });
+    expect(gutter).toBe(15);
+    const frames = await viewport.evaluate(async (node) => {
+      const widths: number[] = [];
+      for (let i = 0; i < 45; i++) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        widths.push(node.clientWidth);
+      }
+      return widths.slice(-30);
+    });
+    expect([...new Set(frames)]).toEqual([830]);
+    expect(await viewport.evaluate((node) => node.scrollHeight - node.clientHeight)).toBe(0);
+  } finally {
+    await classic.close();
+  }
+});
 
 it("hides native-web creation content and prevents focus", async () => {
   const page = await browser.newPage({ viewport: { width: 1000, height: 850 } });

@@ -1758,7 +1758,7 @@ function DateRowsViewport({
   return scrollable ? (
     <ScrollView
       testID="multiweek-viewport"
-      style={styles.container}
+      style={styles.multiWeekViewport}
       contentContainerStyle={{ flexGrow: 1 }}
       onLayout={(event) => onHeight(event.nativeEvent.layout.height)}
     >
@@ -1831,6 +1831,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  // A classic scrollbar must not change the column widths that determine the row heights.
+  multiWeekViewport: { flex: 1, ...(isWeb && { scrollbarGutter: "stable" }) },
   // react-native-web needs registered styles to expand the child rules for box-none.
   childrenOnlyPointerEvents: { pointerEvents: "box-none" },
   noPointerEvents: { pointerEvents: "none" },

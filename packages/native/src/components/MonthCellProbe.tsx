@@ -110,27 +110,30 @@ export const MonthCellProbe = memo(function MonthCellProbe({
   );
 
   // React Native Web's onLayout observes resizing. Changing padding can move both
-  // markers without resizing either one, so read their current positions together.
+  // markers without resizing them. Read their layout offsets before ancestor transforms.
   const readWeb = useCallback(() => {
-    if (Platform.OS !== "web" || typeof Element === "undefined") return false;
-    const rect = (part: Part) => {
+    if (Platform.OS !== "web" || typeof HTMLElement === "undefined") return false;
+    const frame = nodes.current.frame;
+    if (!(frame instanceof HTMLElement)) return false;
+    const layout = (part: Part) => {
       const node = nodes.current[part];
-      return node instanceof Element ? node.getBoundingClientRect() : undefined;
+      if (!(node instanceof HTMLElement)) return;
+      let y = 0;
+      let current: HTMLElement = node;
+      while (current !== frame) {
+        const parent = current.offsetParent;
+        if (!(parent instanceof HTMLElement)) return;
+        y += current.offsetTop + parent.clientTop;
+        current = parent;
+      }
+      return { y, height: node.offsetHeight };
     };
-    const frame = rect("frame"),
-      row = rect("row"),
-      date = rect("date"),
-      lane = rect("lane"),
-      overlay = rect("overlay");
-    if (!frame || !row || !date || !lane || !overlay) return false;
-    report(
-      frame.height,
-      { y: row.top - frame.top, height: row.height },
-      date.top - frame.top,
-      lane.top - frame.top,
-      lane.height,
-      overlay.top - frame.top,
-    );
+    const row = layout("row"),
+      date = layout("date"),
+      lane = layout("lane"),
+      overlay = layout("overlay");
+    if (!row || !date || !lane || !overlay) return false;
+    report(frame.offsetHeight, row, date.y, lane.y, lane.height, overlay.y);
     return true;
   }, [report]);
 

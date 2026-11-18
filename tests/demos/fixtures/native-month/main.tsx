@@ -60,7 +60,8 @@ const constrainedWeeks = new Map<string, { grid?: ViewStyle; week?: ViewStyle; d
 
 function StyledWeeks({ layout }: { layout: string }) {
   const [action, setAction] = useState("");
-  const classes = layout === "classes";
+  const scaled = layout === "scaled-classes";
+  const classes = layout === "classes" || scaled;
   const shortGrid = constrainedWeeks.get(layout);
   const tallDay = layout.startsWith("day-");
   const squareDays = layout.startsWith("day-aspect");
@@ -75,7 +76,14 @@ function StyledWeeks({ layout }: { layout: string }) {
         ? 600
         : 150;
   return (
-    <View style={{ width: squareDays ? "100%" : 700, height: viewportHeight }}>
+    <View
+      testID="weeks-fixture"
+      style={{
+        width: squareDays ? "100%" : 700,
+        height: viewportHeight,
+        transform: scaled ? [{ scale: 0.5 }] : undefined,
+      }}
+    >
       <MultiWeekView
         date={date}
         numberOfWeeks={3}
