@@ -10,16 +10,15 @@ runtime. Solid 1 is not supported.
 Try it in the [live demo](/demo).
 
 <Note>
-  This package targets `solid-js@2.0.0-rc.20` and `@solidjs/web@2.0.0-rc.20`. Keep both peers on
-  these exact versions. The package shares the calendar's release version and uses the `latest` npm
-  tag.
+  This package targets Solid 2: `solid-js@^2.0.0` and `@solidjs/web@^2.0.0`. The package shares the
+  calendar's release version and uses the `latest` npm tag.
 </Note>
 
 ## Install the package
 
 ```bash
-pnpm add @super-calendar/solid solid-js@2.0.0-rc.20 @solidjs/web@2.0.0-rc.20 date-fns
-pnpm add -D @solidjs/vite-plugin@3.0.0-next.55 vite@^8
+pnpm add @super-calendar/solid solid-js@^2 @solidjs/web@^2 date-fns
+pnpm add -D @solidjs/vite-plugin@^3 vite@^8
 ```
 
 Use the Solid 2 Vite plugin:
@@ -299,8 +298,8 @@ with `pnpm --filter @super-calendar/example-solid dev` after `pnpm build`.
 
 ### JSX compilation or missing exports
 
-Check that `solid-js` and `@solidjs/web` both resolve to `2.0.0-rc.20`.
-Use `@solidjs/vite-plugin@3.0.0-next.55`, `jsx: "preserve"`, and
+Check that `solid-js` and `@solidjs/web` both resolve to the same 2.x version.
+Use `@solidjs/vite-plugin@^3`, `jsx: "preserve"`, and
 `jsxImportSource: "@solidjs/web"`. Remove React JSX transforms from the Solid app.
 Import calendar components from `@super-calendar/solid`; use
 `@super-calendar/core/vanilla` for shared logic without React.

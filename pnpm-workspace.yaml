@@ -5,7 +5,19 @@ packages:
 allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
-  - "@solidjs/vite-plugin@3.0.0-next.55"
+  # Solid 2.0.0 and its compiler, published 2026-11-17.
+  - "@solidjs/babel-plugin@2.0.0"
+  - "@solidjs/compiler@2.0.0"
+  - "@solidjs/compiler-darwin-arm64@2.0.0"
+  - "@solidjs/compiler-darwin-x64@2.0.0"
+  - "@solidjs/compiler-linux-arm64-gnu@2.0.0"
+  - "@solidjs/compiler-linux-x64-gnu@2.0.0"
+  - "@solidjs/compiler-wasm32-wasi@2.0.0"
+  - "@solidjs/compiler-win32-x64-msvc@2.0.0"
+  - "@solidjs/signals@2.0.0"
+  - "@solidjs/vite-plugin@3.0.1"
+  - "@solidjs/web@2.0.0"
+  - solid-js@2.0.0
   - "@vitest/mocker@5.1.0"
   - "@vitest/spy@5.1.0"
   - vitest@5.1.0

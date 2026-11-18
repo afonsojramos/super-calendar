@@ -28,6 +28,16 @@ try {
     tarballs[pkg.name] =
       `file:${join(temp, `${pkg.name.replace(/^@/, "").replace("/", "-")}-${pkg.version}.tgz`)}`;
   }
+  // Apply the workspace's release-age exclusions, so the fixture installs the same
+  // recently published dependencies the repository pins.
+  const releaseAgeExclude = [
+    ...(await readFile(join(root, "pnpm-workspace.yaml"), "utf8")).matchAll(
+      /^minimumReleaseAgeExclude:\n((?:  (?:-|#).*\n)+)/gm,
+    ),
+  ]
+    .flatMap((match) => match[1].split("\n"))
+    .map((line) => line.match(/^  - "?([^"]+?)"?$/)?.[1])
+    .filter(Boolean);
   const peers = JSON.parse(
     await readFile(join(root, "packages/solid/package.json"), "utf8"),
   ).peerDependencies;
@@ -51,6 +61,7 @@ try {
       join(fixture, "pnpm-workspace.yaml"),
       JSON.stringify({
         overrides: { "@super-calendar/core": tarballs["@super-calendar/core"] },
+        minimumReleaseAgeExclude: releaseAgeExclude,
       }),
     );
     run("pnpm", ["install", "--ignore-scripts"], fixture);
