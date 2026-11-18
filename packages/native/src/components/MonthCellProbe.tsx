@@ -12,6 +12,7 @@ import {
 import type { ResolvedSlot } from "../utils/slots";
 
 export interface MonthCellGeometry {
+  minimumHeight: number;
   top: number;
   bottom: number;
   gap: number;
@@ -87,13 +88,15 @@ export const MonthCellProbe = memo(function MonthCellProbe({
       row: Pick<LayoutRectangle, "y" | "height">,
       top: number,
       laneTop: number,
+      laneHeight: number,
       overlayTop: number,
     ) => {
       if (height > 0)
         onMeasure(id, {
+          minimumHeight: height,
           top,
           gap: Math.max(0, laneTop - top - MARKER_HEIGHT),
-          bottom: height - laneTop - MARKER_HEIGHT,
+          bottom: height - laneTop - laneHeight,
           overlayTop,
           weekMargin: height - row.height,
           weekMarginTop: row.y,
@@ -121,6 +124,7 @@ export const MonthCellProbe = memo(function MonthCellProbe({
       { y: row.top - frame.top, height: row.height },
       date.top - frame.top,
       lane.top - frame.top,
+      lane.height,
       overlay.top - frame.top,
     );
     return true;
@@ -143,7 +147,14 @@ export const MonthCellProbe = memo(function MonthCellProbe({
         const { frame, row, cell, date, lane, overlay } = layouts.current;
         if (!frame || !row || !cell || !date || !lane || !overlay) return;
         const cellTop = row.y + cell.y;
-        report(frame.height, row, cellTop + date.y, cellTop + lane.y, row.y + overlay.y);
+        report(
+          frame.height,
+          row,
+          cellTop + date.y,
+          cellTop + lane.y,
+          lane.height,
+          row.y + overlay.y,
+        );
       },
     };
   }
@@ -157,12 +168,12 @@ export const MonthCellProbe = memo(function MonthCellProbe({
       >
         <TouchableOpacity
           {...day}
-          style={[day.style, cellStyle, styles.intrinsic, styles.stacked]}
+          style={[day.style, cellStyle, styles.stacked]}
           disabled
           onLayout={observe("cell").onLayout}
         >
           <View {...observe("date")} style={styles.marker} collapsable={false} />
-          <View {...observe("lane")} style={styles.marker} collapsable={false} />
+          <View {...observe("lane")} style={styles.laneMarker} collapsable={false} />
         </TouchableOpacity>
         <View {...observe("overlay")} style={StyleSheet.absoluteFill} collapsable={false} />
       </View>
@@ -177,4 +188,6 @@ const styles = StyleSheet.create({
   intrinsic: { height: "auto", minHeight: 0 },
   stacked: { justifyContent: "flex-start", alignSelf: "stretch" },
   marker: { height: MARKER_HEIGHT },
+  // Fill space reserved by the day height so it does not count as bottom padding.
+  laneMarker: { height: MARKER_HEIGHT, flexGrow: 1 },
 });

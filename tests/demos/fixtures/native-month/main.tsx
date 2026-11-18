@@ -32,11 +32,20 @@ const busyDays: CalendarEvent[] = [
   })),
 ];
 
-const constrainedWeeks = new Map<string, { grid?: ViewStyle; week?: ViewStyle }>([
+const fiveEvents = Array.from({ length: 5 }, (_, i) => ({
+  title: `Meeting ${i + 1}`,
+  start: new Date(2026, 5, 16, 8 + i),
+  end: new Date(2026, 5, 16, 9 + i),
+}));
+const paddedWeek = { paddingVertical: 3, marginVertical: 2 };
+const constrainedWeeks = new Map<string, { grid?: ViewStyle; week?: ViewStyle; day?: ViewStyle }>([
   ["grid-height", { grid: { height: 300 } }],
   ["grid-below-content", { grid: { height: 120 } }],
   ["grid-spacing", { grid: { paddingVertical: 60, rowGap: 40 } }],
   ["grid-spacing-class", {}],
+  ["day-minimum", { week: paddedWeek, day: { minHeight: 200 } }],
+  ["day-minimum-class", { week: paddedWeek }],
+  ["day-height", { week: paddedWeek }],
   ["week-minimum", { grid: { height: 300, paddingTop: 12, rowGap: 10 }, week: { minHeight: 140 } }],
 ]);
 
@@ -44,26 +53,29 @@ function StyledWeeks({ layout }: { layout: string }) {
   const [action, setAction] = useState("");
   const classes = layout === "classes";
   const shortGrid = constrainedWeeks.get(layout);
-  const viewportHeight = shortGrid ? 600 : layout === "grid-minimum" ? 300 : 150;
+  const tallDay = layout.startsWith("day-");
+  const viewportHeight = tallDay || layout === "grid-minimum" ? 300 : shortGrid ? 600 : 150;
   return (
     <View style={{ width: 700, height: viewportHeight }}>
       <MultiWeekView
         date={date}
         numberOfWeeks={3}
-        events={busyDays}
+        events={tallDay ? fiveEvents : busyDays}
         showTitle={false}
         showWeekdays={false}
         chipHeight={20}
-        maxVisibleEventCount={1}
+        maxVisibleEventCount={tallDay ? undefined : 1}
         classNames={
           layout === "grid-spacing-class"
             ? { grid: "py-[60px] gap-y-[40px] w-[420px] my-[5px] border-t-2 border-b-2" }
-            : classes
-              ? {
-                  week: "pt-[18px] pb-[7px] border-t-2 my-[3px]",
-                  day: "justify-end gap-y-[18px] pb-[5px]",
-                }
-              : undefined
+            : layout === "day-minimum-class"
+              ? { day: "min-h-[200px]" }
+              : classes
+                ? {
+                    week: "pt-[18px] pb-[7px] border-t-2 my-[3px]",
+                    day: "justify-end gap-y-[18px] pb-[5px]",
+                  }
+                : undefined
         }
         styles={
           shortGrid ??
@@ -76,9 +88,11 @@ function StyledWeeks({ layout }: { layout: string }) {
               })
         }
         calendarCellStyle={(day) =>
-          !shortGrid && day.getDate() === 16
-            ? { paddingTop: 14, marginTop: 3, ...(!classes && { rowGap: 14 }) }
-            : undefined
+          layout === "day-height" && day.getDate() === 16
+            ? { height: 200 }
+            : !shortGrid && day.getDate() === 16
+              ? { paddingTop: 14, marginTop: 3, ...(!classes && { rowGap: 14 }) }
+              : undefined
         }
         renderCustomDateForMonth={(day) => (
           <Text testID={`date-${day.getDate()}`} style={{ height: day.getDate() === 16 ? 38 : 24 }}>

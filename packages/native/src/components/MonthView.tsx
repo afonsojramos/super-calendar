@@ -587,6 +587,7 @@ function DateRowsInner<T>({
         const old = previous[id];
         if (
           old &&
+          old.minimumHeight === measured.minimumHeight &&
           old.top === measured.top &&
           old.bottom === measured.bottom &&
           old.gap === measured.gap &&
@@ -606,6 +607,7 @@ function DateRowsInner<T>({
   );
   const estimatedCell = useMemo(
     () => ({
+      minimumHeight: 0,
       top: defaultCellSpacing
         ? DAY_CELL_PADDING_TOP + (multiWeek ? StyleSheet.hairlineWidth : 0)
         : 0,
@@ -623,6 +625,7 @@ function DateRowsInner<T>({
       const cell = measuredCells[id] ?? estimatedCell;
       if (!common) common = { ...cell };
       else {
+        common.minimumHeight = Math.max(common.minimumHeight, cell.minimumHeight);
         common.top = Math.max(common.top, cell.top);
         common.bottom = Math.max(common.bottom, cell.bottom);
         common.gap = Math.max(common.gap, cell.gap);
@@ -636,13 +639,14 @@ function DateRowsInner<T>({
   const cellLaneHeight = laneChipHeight + cellGeometry.gap;
   const laneTop = dateArea + cellGeometry.gap;
   const barTop = laneTop - cellGeometry.overlayTop;
-  const minimumRowHeight =
+  const contentHeight =
     dateArea +
     cellGeometry.gap +
     cellGeometry.bottom +
     (maxVisibleEventCount != null
       ? Math.max(1, maxVisibleEventCount) * cellLaneHeight + moreLabelArea
       : Math.max(FALLBACK_VISIBLE_COUNT * cellLaneHeight, cellLaneHeight + moreLabelArea));
+  const minimumRowHeight = Math.max(contentHeight, cellGeometry.minimumHeight);
   // In a scroll view, rows with an automatic basis can grow with their events.
   // Start each week at the same height and let the grid share the available space.
   const [viewportHeight, setViewportHeight] = useState(0);

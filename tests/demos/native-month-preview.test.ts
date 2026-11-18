@@ -231,6 +231,33 @@ it.each(["grid-spacing", "grid-spacing-class"])(
   },
 );
 
+it.each(["day-minimum", "day-minimum-class", "day-height"])(
+  "fits a styled day and all five event lanes with %s",
+  async (layout) => {
+    const page = await browser.newPage();
+    try {
+      await page.goto(server.url + "?multiweek=" + layout);
+      const grid = page.getByTestId("multiweek-grid");
+      const viewport = page.getByTestId("multiweek-viewport");
+      const rows = grid.locator(":scope > *");
+      const day = grid.getByRole("cell", { name: /Tuesday,? 16 June/ });
+      await day.waitFor();
+      // The 200px day sits inside 6px of week padding and 4px of outer margin.
+      await expect
+        .poll(() =>
+          rows.evaluateAll((items) => items.map((row) => row.getBoundingClientRect().height)),
+        )
+        .toEqual([206, 206, 206]);
+      expect((await day.boundingBox())?.height).toBe(200);
+      expect(await viewport.evaluate((node) => node.scrollHeight)).toBe(630);
+      expect(await grid.getByText(/^Meeting [1-5]$/).count()).toBe(5);
+      expect(await grid.getByRole("button", { name: /more events/i }).count()).toBe(0);
+    } finally {
+      await page.close();
+    }
+  },
+);
+
 it("hides native-web creation content and prevents focus", async () => {
   const page = await browser.newPage({ viewport: { width: 1000, height: 850 } });
   const errors: string[] = [];
