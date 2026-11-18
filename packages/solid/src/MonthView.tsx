@@ -1743,16 +1743,15 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                 return (
                                                   <button
                                                     type="button"
-                                                    onPointerDown={
-                                                      canMove(b().seg.event)
-                                                        ? (e) => {
-                                                            e.stopPropagation();
-                                                            const event = b().seg.event;
-                                                            const date = day().date;
-                                                            pressRow(e, date, event);
-                                                          }
-                                                        : undefined
-                                                    }
+                                                    onPointerDown={(e) => {
+                                                      // A press on an event never starts a
+                                                      // create sweep on its day, so the row
+                                                      // stays put under the click.
+                                                      e.stopPropagation();
+                                                      const event = b().seg.event;
+                                                      if (!canMove(event)) return;
+                                                      pressRow(e, day().date, event);
+                                                    }}
                                                     onClick={(e) => {
                                                       e.stopPropagation();
                                                       if (consumeSuppressedClick(e.detail)) return;

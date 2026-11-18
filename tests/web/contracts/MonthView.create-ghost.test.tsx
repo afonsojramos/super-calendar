@@ -144,6 +144,31 @@ describe(rendererName, () => {
       up();
     });
 
+    it("starts no preview from a press on an event that cannot move", () => {
+      const onPressEvent = vi.fn();
+      const onCreateEvent = vi.fn();
+      const planning = {
+        title: "Planning",
+        start: new Date(2026, 6, 15, 9),
+        end: new Date(2026, 6, 15, 10),
+      };
+      const view = render(MonthView, {
+        date,
+        events: [planning],
+        weekStartsOn: 1,
+        onPressEvent,
+        onCreateEvent,
+        renderCreateGhost: Draft,
+      });
+      const chip = view.getByLabelText("Planning, 15 July");
+      fireEvent.pointerDown(chip, { pointerId: 1, button: 0 });
+      expect(previews(view.container)).toHaveLength(0);
+      up();
+      fireEvent.click(chip);
+      expect(onCreateEvent).not.toHaveBeenCalled();
+      expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(planning);
+    });
+
     it("allows a preview in an empty month without an events prop", () => {
       const view = render(MonthView, { date, onCreateEvent: vi.fn(), renderCreateGhost: Draft });
       down(view.container, "2026-07-15");

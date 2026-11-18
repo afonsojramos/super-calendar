@@ -103,4 +103,12 @@ describe(rendererName, () => {
     await page.mouse.up();
     expect(await page.getByLabel("Calls").textContent()).toBe('["17:0:0-23:0:0"]');
   });
+
+  it.each(views)("presses an event in the $0 grid without starting a draft", async (view) => {
+    // Planning has no move handler, so a click on it must stay a press.
+    await open(view);
+    await page.getByTitle("Planning", { exact: true }).click();
+    expect(await ghost().count()).toBe(0);
+    expect(await page.getByLabel("Calls").textContent()).toBe('["press:Planning"]');
+  });
 });

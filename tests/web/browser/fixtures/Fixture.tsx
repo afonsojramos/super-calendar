@@ -353,6 +353,7 @@ export function Fixture() {
           maxVisibleEventCount={3}
           renderCreateGhost={view.endsWith("focus") ? FocusingDraft : Draft}
           classNames={view.endsWith("custom") ? { createGhost: "fixture-ghost" } : undefined}
+          onPressEvent={(event) => record(`press:${event.title}`)}
           onCreateEvent={(start, end) => {
             record(`${clock(start)}-${clock(end)}`);
             setEvents((current) => [

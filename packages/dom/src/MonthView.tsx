@@ -1479,15 +1479,13 @@ export function DateRows<T = unknown>({
                             <button
                               key={`bar-${b.seg.event.start.toISOString()}:${b.seg.event.title}:${b.seg.lane}:${b.startCol}`}
                               type="button"
-                              onPointerDown={
-                                canMove(b.seg.event)
-                                  ? (e) => {
-                                      if (e.button !== 0) return;
-                                      e.stopPropagation();
-                                      pressRow(e, day.date, b.seg.event);
-                                    }
-                                  : undefined
-                              }
+                              onPointerDown={(e) => {
+                                // A press on an event never starts a create sweep on
+                                // its day, so the row stays put under the click.
+                                e.stopPropagation();
+                                if (e.button !== 0 || !canMove(b.seg.event)) return;
+                                pressRow(e, day.date, b.seg.event);
+                              }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (consumeSuppressedClick(e.detail)) return;
