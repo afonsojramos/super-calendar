@@ -67,6 +67,7 @@ import {
   type HourRenderer,
   TimeGrid,
   type TimeGridSlot,
+  type VerticalScrollEvent,
 } from "./TimeGrid";
 
 /**
@@ -372,6 +373,12 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   freeSwipe?: boolean;
   /** Custom header above the week/day grid. Receives the visible days. */
   renderTimeGridHeader?: (days: Date[]) => React.ReactNode;
+  /** Week/day grid: extra scrollable space below the last hour (e.g. for a floating tab bar). Default 0. */
+  timeGridContentPaddingBottom?: number;
+  /** Week/day grid: the vertical scroll view's scroll events, on the JS thread. */
+  onTimeGridScroll?: (event: VerticalScrollEvent) => void;
+  /** Week/day grid: `false` turns off overscroll on the hours (iOS bounce, Android stretch). Default true. */
+  timeGridBounces?: boolean;
   /** Replace the weekday-label header above the month grid. Return `null` to hide it. */
   renderHeaderForMonthView?: (weekDays: Date[]) => React.ReactNode;
   /**
@@ -588,6 +595,9 @@ function CalendarInner<T>(
     isRTL,
     freeSwipe,
     renderTimeGridHeader,
+    timeGridContentPaddingBottom,
+    onTimeGridScroll,
+    timeGridBounces,
     renderHeaderForMonthView,
     renderCustomDateForMonth,
     itemSeparatorComponent,
@@ -972,6 +982,9 @@ function CalendarInner<T>(
             onPressDateHeader={onPressDateHeader}
             onChangeDate={handleChangeDate}
             renderHeader={renderTimeGridHeader}
+            contentPaddingBottom={timeGridContentPaddingBottom}
+            onVerticalScroll={onTimeGridScroll}
+            verticalBounces={timeGridBounces}
             classNames={classNames}
             styles={styleOverrides}
           />

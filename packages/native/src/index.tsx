@@ -35,6 +35,7 @@ export {
   type EventDragHandler,
   type EventDragStartHandler,
   type HourRenderer,
+  type VerticalScrollEvent,
   DEFAULT_HOUR_HEIGHT,
 } from "./components/TimeGrid";
 export { DefaultEvent } from "./components/DefaultEvent";

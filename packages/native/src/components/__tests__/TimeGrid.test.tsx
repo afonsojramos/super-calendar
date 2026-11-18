@@ -1892,3 +1892,47 @@ describe("TimeGrid background events", () => {
     expect(getByText("<-")).toBeTruthy(); // Jan 7 carries the tail
   });
 });
+
+describe("TimeGrid vertical scroll view props", () => {
+  const date = new Date(2026, 0, 6, 12, 0, 0);
+  const base = () => ({
+    mode: "day" as const,
+    date,
+    events: [event],
+    cellHeight: { value: 48 } as never,
+    weekStartsOn: 1 as const,
+    renderEvent: DefaultEvent,
+    keyExtractor: (_e: CalendarEvent<WithId>, i: number) => String(i),
+    onChangeDate: noop,
+    onPressEvent: noop,
+  });
+  // The scroll view that holds the hours.
+  const scrollViewOf = (hours: { parent: unknown }) => {
+    let node = hours as { parent: unknown; props: Record<string, unknown> } | null;
+    while (node && node.props.contentOffset === undefined) {
+      node = node.parent as typeof node;
+    }
+    if (!node) throw new Error("scroll view not found");
+    return node;
+  };
+
+  it("adds bottom padding and turns off overscroll when asked", async () => {
+    const { getByTestId } = await render(
+      <TimeGrid {...base()} contentPaddingBottom={80} verticalBounces={false} />,
+    );
+    const scroll = scrollViewOf(getByTestId("time-grid-hours"));
+    expect(StyleSheet.flatten(scroll.props.contentContainerStyle as never)).toMatchObject({
+      paddingBottom: 80,
+    });
+    expect(scroll.props.bounces).toBe(false);
+    expect(scroll.props.overScrollMode).toBe("never");
+  });
+
+  it("keeps the defaults: no padding and overscroll on", async () => {
+    const { getByTestId } = await render(<TimeGrid {...base()} />);
+    const scroll = scrollViewOf(getByTestId("time-grid-hours"));
+    expect(scroll.props.contentContainerStyle).toBeUndefined();
+    expect(scroll.props.bounces).toBe(true);
+    expect(scroll.props.overScrollMode).toBeUndefined();
+  });
+});

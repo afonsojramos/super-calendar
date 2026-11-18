@@ -113,6 +113,33 @@ pull is only reachable with the grid scrolled to its very top, which the default
 catches a page swipe with a downward component while sitting at the top, so it
 refreshes instead of paging.
 
+## Scroll space and scroll events (React Native)
+
+Three `Calendar` props tune the grid's vertical scroll view on React Native.
+
+- `timeGridContentPaddingBottom` adds scrollable space below the last hour,
+  inside the scroll view. Use it when something floats over the bottom of the
+  grid, such as a tab bar or a button, so the end of the day can scroll clear of
+  it.
+- `onTimeGridScroll` receives the scroll view's scroll events on the JS thread,
+  shaped like React Native's (`nativeEvent.contentOffset`, `contentSize` and
+  `layoutMeasurement`). Use it to react to the hours scrolling, such as
+  collapsing a toolbar.
+- `timeGridBounces={false}` stops the hours at their ends: no bounce on iOS, no
+  stretch on Android.
+
+```tsx
+<Calendar
+  mode="day"
+  events={events}
+  timeGridContentPaddingBottom={tabBarHeight}
+  onTimeGridScroll={(event) => setScrolled(event.nativeEvent.contentOffset.y > 0)}
+/>
+```
+
+`TimeGrid` takes the same three as `contentPaddingBottom`, `onVerticalScroll`
+and `verticalBounces`.
+
 ## The all-day lane
 
 All-day events (flagged `allDay`, or spanning midnight-to-midnight) leave the

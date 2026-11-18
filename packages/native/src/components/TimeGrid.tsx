@@ -2652,6 +2652,31 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   onChangeDate: (date: Date) => void;
   /** Optional header above the grid (e.g. weekday labels). Rendered full-width. */
   renderHeader?: (days: Date[]) => React.ReactNode;
+  /**
+   * Extra scrollable space below the last hour, inside the vertical scroll view,
+   * so the end of the day can scroll clear of something floating over the grid
+   * (a tab bar, a button). Default 0.
+   */
+  contentPaddingBottom?: number;
+  /**
+   * The vertical scroll view's scroll events, on the JS thread. Use it to react
+   * to the hours scrolling, such as collapsing a toolbar.
+   */
+  onVerticalScroll?: (event: VerticalScrollEvent) => void;
+  /**
+   * Overscroll on the hours: iOS `bounces`, Android `overScrollMode`. Set
+   * `false` to stop the grid at its ends. Default true.
+   */
+  verticalBounces?: boolean;
+};
+
+/** The scroll event `onVerticalScroll` receives, shaped like React Native's scroll event. */
+export type VerticalScrollEvent = {
+  nativeEvent: {
+    contentOffset: { x: number; y: number };
+    contentSize: { width: number; height: number };
+    layoutMeasurement: { width: number; height: number };
+  };
 };
 
 function TimeGridInner<T>(
@@ -2720,6 +2745,9 @@ function TimeGridInner<T>(
     onPressDateHeader,
     onChangeDate,
     renderHeader,
+    contentPaddingBottom = 0,
+    onVerticalScroll,
+    verticalBounces = true,
     classNames,
     styles: styleOverrides,
   }: TimeGridProps<T>,
@@ -2801,12 +2829,27 @@ function TimeGridInner<T>(
   // scrolls with the content, so a finger's window position maps into the grid
   // through it.
   const scrollY = useSharedValue(seedDefaultY);
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-      scrollY.value = event.contentOffset.y;
+  const scrollHandler = useAnimatedScrollHandler(
+    {
+      onScroll: (event) => {
+        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+        scrollY.value = event.contentOffset.y;
+        if (onVerticalScroll) {
+          runOnJS(onVerticalScroll)({
+            nativeEvent: {
+              contentOffset: { x: event.contentOffset.x, y: event.contentOffset.y },
+              contentSize: { width: event.contentSize.width, height: event.contentSize.height },
+              layoutMeasurement: {
+                width: event.layoutMeasurement.width,
+                height: event.layoutMeasurement.height,
+              },
+            },
+          });
+        }
+      },
     },
-  });
+    [onVerticalScroll],
+  );
   // The scroll view's `contentOffset` holds the mount offset; a later
   // `scrollOffsetMinutes` is scrolled to by the effect further down.
   const [mountOffsetY] = useState(seedDefaultY);
@@ -3606,6 +3649,11 @@ function TimeGridInner<T>(
                   scrollEventThrottle={16}
                   refreshControl={verticalScrollEnabled ? refreshControl : undefined}
                   contentOffset={{ x: 0, y: mountOffsetY }}
+                  contentContainerStyle={
+                    contentPaddingBottom > 0 ? { paddingBottom: contentPaddingBottom } : undefined
+                  }
+                  bounces={verticalBounces}
+                  overScrollMode={verticalBounces ? undefined : "never"}
                 >
                   <Animated.View testID="time-grid-hours" style={[styles.gridRow, gridHeightStyle]}>
                     {hourColumnWidth > 0 ? (
