@@ -102,7 +102,9 @@ export function MultiWeekCalendar() {
 `MultiWeekView` exposes a standalone window with the month grid's event bars,
 overflow, selection, drag interactions, and styling. Pass expanded events to it;
 `Calendar` handles recurrence and time zones. Custom event renderers receive
-`mode: "multiweek"`. Rows scroll vertically when the container is too short.
+`mode: "multiweek"`. Week rows share the available height and scroll vertically
+when their contents need more room. Dates align at the top of each cell so bars
+and overflow labels line up across days.
 Counts must be positive safe integers whose date span is representable; invalid
 counts or dates throw `RangeError`. Rows are materialized, so larger counts need
 more space. `MonthView` and `MonthPager` retain their month-only behavior.

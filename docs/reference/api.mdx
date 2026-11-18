@@ -244,6 +244,10 @@ selection, drag interactions, and styling. `renderMonthEvent` on web `Calendar`,
 and native `renderHeaderForMonthView`/`renderCustomDateForMonth`, also apply here.
 Custom event callbacks receive `mode: "multiweek"`.
 
+On native, all week rows share a height. Dates align at the top of their cells,
+and event bars start below the tallest date. Rows scroll when the dates, event
+lanes and overflow labels need more space than the viewport provides.
+
 Held web moves track event object identity. With `Calendar` recurrence or
 `timeZone`, replacing the `events` array rebuilds displayed events and cancels
 the move. The native `keyExtractor` does not preserve gesture identity across replacements.

@@ -34,6 +34,7 @@ const isWeb = Platform.OS === "web";
 // React 18 forwards the canonical string; React 19 treats it as a boolean attribute.
 const webPreviewProps = isWeb ? { "aria-hidden": true, inert: "inert" } : {};
 import { useCalendarTheme } from "../theme";
+import { MonthCellProbe, type MonthCellGeometry } from "./MonthCellProbe";
 import type {
   CalendarEvent,
   EventDragHandler,
@@ -94,6 +95,7 @@ const DATE_BADGE_HEIGHT = 24;
 const BAND_CENTER_Y = DAY_CELL_PADDING_TOP + DATE_BADGE_HEIGHT / 2;
 const CELL_ROW_GAP = 2;
 const CHIP_PADDING_V = 2;
+const MORE_LABEL_MARGIN_TOP = 2;
 // Stable empty layout for the events-free picker (avoids a fresh object per render).
 const EMPTY_LAYOUT = { segments: [], laneCount: 0 } as const;
 // Horizontal inset of a chip within its cell (mirrors `styles.monthEvent`).
@@ -347,7 +349,7 @@ function DateRowsInner<T>({
   events,
   maxVisibleEventCount,
   chipHeight,
-  chipGap = CELL_ROW_GAP,
+  chipGap: chipGapProp,
   weekStartsOn,
   hiddenDays,
   weekdayFormat = "short",
@@ -394,12 +396,19 @@ function DateRowsInner<T>({
 }: DateRowsProps<T>): ReactElement {
   const { date } = source;
   const multiWeek = source.kind === "multiweek";
+  const chipGap = chipGapProp ?? CELL_ROW_GAP;
+  const defaultCellSpacing = !multiWeek || !classNames?.day;
+  // A custom create preview needs lanes even before the first event exists.
+  const createContentEnabled = onCreateEvent != null && RenderCreateGhost != null;
+  const showGrid = multiWeek || events.length > 0 || createContentEnabled;
   const showAdjacentMonths = source.kind === "month" ? source.showAdjacentMonths : true;
   const showSixWeeks = source.kind === "month" ? source.showSixWeeks : false;
   const numberOfWeeks = source.kind === "multiweek" ? source.numberOfWeeks : undefined;
   const theme = useCalendarTheme();
-  const badgeArea = DAY_CELL_PADDING_TOP + DATE_BADGE_HEIGHT + chipGap;
-  const slot = createSlots<MonthViewSlot>({ classNames, styles: styleOverrides });
+  const slot = useMemo(
+    () => createSlots<MonthViewSlot>({ classNames, styles: styleOverrides }),
+    [classNames, styleOverrides],
+  );
   const labels = useMemo(() => resolveCalendarLabels(labelsProp), [labelsProp]);
   // Selection comes from context (so cached pages still repaint), but explicit
   // props win for direct/standalone use of MonthView.
@@ -460,18 +469,185 @@ function DateRowsInner<T>({
     return isRTL ? days.reverse() : days;
   }, [date, weekStartsOn, isRTL, hiddenDays]);
 
-  // The built-in chip's height and per-row stride, from the theme's title type.
-  // Shared by the capacity estimate and the spanning-bar overlay so the bars line
-  // up exactly with the rows the cells reserve for them.
-  const chipMetrics = useMemo(() => {
+  // The built-in chip's height, from the theme's title type. Shared by the
+  // capacity estimate, the cells' lane spacers and the spanning-bar overlay so the
+  // bars line up exactly with the rows the cells reserve for them.
+  const laneChipHeight = useMemo(() => {
     const fontSize = numericStyle(theme.text.eventTitle.fontSize, 12);
     const lineHeight = numericStyle(theme.text.eventTitle.lineHeight, Math.ceil(fontSize * 1.3));
-    const height = chipHeight ?? lineHeight + CHIP_PADDING_V * 2;
-    return { chipHeight: height, chipRowHeight: height + chipGap };
-  }, [theme, chipHeight, chipGap]);
+    return chipHeight ?? lineHeight + CHIP_PADDING_V * 2;
+  }, [theme, chipHeight]);
+  // The one-line "+N more" label, resolved once so the cells draw it with the same
+  // style the row height is measured from: theme, chip height and `styles.more`.
+  const moreSlot = slot<TextStyle>("more", {
+    base: [styles.moreLabel, chipHeight != null && { height: chipHeight }],
+    themed: [theme.text.more, { color: theme.colors.textMuted }],
+  });
+  // The label's vertical extent below the last lane, margins included. A hidden
+  // copy of the label is measured once laid out (see `moreProbe`), which covers
+  // borders, minimum heights and class names; until then, estimate it from the
+  // style: margins, then a set height, else one line plus padding.
+  const [measuredMoreArea, setMeasuredMoreArea] = useState(0);
+  const moreLabelArea =
+    measuredMoreArea ||
+    (() => {
+      const style = StyleSheet.flatten(moreSlot.style) ?? {};
+      const edge = (value: unknown) => (typeof value === "number" ? value : 0);
+      const margin =
+        edge(style.marginTop ?? style.marginVertical ?? style.margin) +
+        edge(style.marginBottom ?? style.marginVertical ?? style.margin);
+      const padding =
+        edge(style.paddingTop ?? style.paddingVertical ?? style.padding) +
+        edge(style.paddingBottom ?? style.paddingVertical ?? style.padding);
+      const line = numericStyle(
+        style.lineHeight,
+        Math.ceil(numericStyle(style.fontSize, 11) * 1.3),
+      );
+      return margin + (typeof style.height === "number" ? style.height : line + padding);
+    })();
+  // A row draws its date, then each lane with the gap after it, then the label when
+  // events overflow. A fixed cap shows all its lanes and the label; the auto-fit
+  // capacity gives up lanes for the label but always keeps one.
+  // The tallest date (built-in badge or custom) among the shown days, measured as
+  // multi-week cells lay out, so a fixed row never clips a date restyled or
+  // rendered taller than the 24pt badge. Kept per day and read for the shown days
+  // only, so it shrinks when a date does or leaves the view.
+  const [dateHeights, setDateHeights] = useState<Record<string, number>>({});
+  const shownDayKeys = useMemo(
+    () => new Set(weeks.flat().map((day) => day.toISOString())),
+    [weeks],
+  );
+  const recordDateHeight = (dayKey: string, height: number) =>
+    setDateHeights((previous) => {
+      if (previous[dayKey] === height) return previous;
+      const next: Record<string, number> = { [dayKey]: height };
+      for (const key in previous) {
+        if (key !== dayKey && shownDayKeys.has(key)) next[key] = previous[key];
+      }
+      return next;
+    });
+  const dateHeight = useMemo(() => {
+    if (!multiWeek) return DATE_BADGE_HEIGHT;
+    let tallest = DATE_BADGE_HEIGHT;
+    for (const key of shownDayKeys) tallest = Math.max(tallest, dateHeights[key] ?? 0);
+    return tallest;
+  }, [multiWeek, dateHeights, shownDayKeys]);
+  const dayCellBase = useMemo(
+    () => [
+      styles.dayCell,
+      defaultCellSpacing && styles.dayCellPadding,
+      (defaultCellSpacing || chipGapProp != null) && { gap: chipGap },
+      showGrid && styles.dayCellEvents,
+    ],
+    [defaultCellSpacing, chipGapProp, chipGap, showGrid],
+  );
+  const dayCellLines = useMemo(
+    () =>
+      showGrid && {
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderRightWidth: StyleSheet.hairlineWidth,
+        borderColor: theme.colors.gridLine,
+      },
+    [showGrid, theme.colors.gridLine],
+  );
+  const probeDay = useMemo(
+    () => slot("day", { base: dayCellBase, themed: [dayCellLines, theme.containers.dayCell] }),
+    [slot, dayCellBase, dayCellLines, theme.containers.dayCell],
+  );
+  const probeWeek = useMemo(
+    () => slot("week", { base: styles.weekRowFixed, themed: theme.containers.weekRow }),
+    [slot, theme.containers.weekRow],
+  );
+  const cellStyles = useMemo(() => {
+    const probes = new Map<string, StyleProp<ViewStyle>>();
+    const byDay = new Map<string, string>();
+    if (multiWeek && calendarCellStyle) {
+      const ids = new Map<StyleProp<ViewStyle>, string>();
+      for (const week of weeks) {
+        for (const day of week) {
+          const dayKey = day.toISOString();
+          const style = calendarCellStyle(day) ?? undefined;
+          const id = ids.get(style) ?? (style ? dayKey : "default");
+          ids.set(style, id);
+          probes.set(id, style);
+          byDay.set(dayKey, id);
+        }
+      }
+    } else if (multiWeek) {
+      probes.set("default", undefined);
+    }
+    return { probes, byDay };
+  }, [multiWeek, weeks, calendarCellStyle]);
+  const [measuredCells, setMeasuredCells] = useState<Record<string, MonthCellGeometry>>({});
+  const recordCell = useCallback(
+    (id: string, measured: MonthCellGeometry) => {
+      setMeasuredCells((previous) => {
+        const old = previous[id];
+        if (
+          old &&
+          old.top === measured.top &&
+          old.bottom === measured.bottom &&
+          old.gap === measured.gap &&
+          old.overlayTop === measured.overlayTop &&
+          old.weekMargin === measured.weekMargin
+        )
+          return previous;
+        const next: Record<string, MonthCellGeometry> = { [id]: measured };
+        for (const key of cellStyles.probes.keys()) {
+          if (key !== id && previous[key]) next[key] = previous[key];
+        }
+        return next;
+      });
+    },
+    [cellStyles],
+  );
+  const estimatedCell = useMemo(
+    () => ({
+      top: defaultCellSpacing
+        ? DAY_CELL_PADDING_TOP + (multiWeek ? StyleSheet.hairlineWidth : 0)
+        : 0,
+      bottom: 0,
+      gap: defaultCellSpacing ? chipGap : (chipGapProp ?? 0),
+      overlayTop: 0,
+      weekMargin: 0,
+    }),
+    [multiWeek, defaultCellSpacing, chipGap, chipGapProp],
+  );
+  const cellGeometry = useMemo(() => {
+    let common: MonthCellGeometry | undefined;
+    for (const id of cellStyles.probes.keys()) {
+      const cell = measuredCells[id] ?? estimatedCell;
+      if (!common) common = { ...cell };
+      else {
+        common.top = Math.max(common.top, cell.top);
+        common.bottom = Math.max(common.bottom, cell.bottom);
+        common.gap = Math.max(common.gap, cell.gap);
+      }
+    }
+    return common ?? estimatedCell;
+  }, [cellStyles, measuredCells, estimatedCell]);
+  // Hit testing uses the top of the row including its margin. The overlay
+  // positions bars from inside the row's border instead.
+  const dateArea = cellGeometry.top + dateHeight;
+  const cellLaneHeight = laneChipHeight + cellGeometry.gap;
+  const laneTop = dateArea + cellGeometry.gap;
+  const barTop = laneTop - cellGeometry.overlayTop;
   const minimumRowHeight =
-    badgeArea +
-    Math.max(1, maxVisibleEventCount ?? FALLBACK_VISIBLE_COUNT) * chipMetrics.chipRowHeight;
+    dateArea +
+    cellGeometry.gap +
+    cellGeometry.bottom +
+    (maxVisibleEventCount != null
+      ? Math.max(1, maxVisibleEventCount) * cellLaneHeight + moreLabelArea
+      : Math.max(FALLBACK_VISIBLE_COUNT * cellLaneHeight, cellLaneHeight + moreLabelArea));
+  // Multi-week rows scroll, so the grid has no fixed height and flexed rows would
+  // grow with their own events. Give every row the same height instead: an even
+  // share of the viewport, but no less than the minimum. The hit test and the chip
+  // capacity divide the grid height evenly, so they then match the drawn rows.
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const multiWeekRowHeight =
+    multiWeek && viewportHeight > 0
+      ? Math.max(minimumRowHeight, viewportHeight / weeks.length) - cellGeometry.weekMargin
+      : undefined;
 
   // How many chips fit per cell: a fixed cap when `maxVisibleEventCount` is set,
   // else derived from the measured cell height and the (default) chip metrics.
@@ -483,11 +659,19 @@ function DateRowsInner<T>({
       return { full: FALLBACK_VISIBLE_COUNT, withMore: FALLBACK_VISIBLE_COUNT };
     }
     const rowHeight = gridHeight / weeks.length;
-    const moreFontSize = numericStyle(theme.text.more.fontSize, 11);
-    const moreRowHeight = (chipHeight ?? Math.ceil(moreFontSize * 1.3)) + chipGap;
-    const available = rowHeight - DAY_CELL_PADDING_TOP - DATE_BADGE_HEIGHT;
-    return monthEventCapacity(available, chipMetrics.chipRowHeight, moreRowHeight);
-  }, [maxVisibleEventCount, gridHeight, weeks.length, theme, chipMetrics, chipHeight, chipGap]);
+    // Lanes start below the date (the built-in badge, or a taller custom date) and
+    // end above the cell's bottom inset.
+    const available = rowHeight - dateArea - cellGeometry.bottom;
+    return monthEventCapacity(available, cellLaneHeight, moreLabelArea + cellGeometry.gap);
+  }, [
+    maxVisibleEventCount,
+    gridHeight,
+    weeks.length,
+    dateArea,
+    cellGeometry,
+    cellLaneHeight,
+    moreLabelArea,
+  ]);
 
   // The lanes a week row shows. When the auto-fit capacity leaves room for one lane
   // more than the row shows, a day whose only hidden event sits on that lane draws
@@ -517,11 +701,6 @@ function DateRowsInner<T>({
     }
     return map;
   }, [events, sortedMonthView]);
-
-  // Custom drafts need event lanes before the first event exists. Keep the
-  // events-free picker layout when no creation content is requested.
-  const createContentEnabled = onCreateEvent != null && RenderCreateGhost != null;
-  const showGrid = multiWeek || events.length > 0 || createContentEnabled;
 
   // Lay out each week row's spanning bars once per data change, not per render.
   const weekLayouts = useMemo(
@@ -672,10 +851,12 @@ function DateRowsInner<T>({
       if (!isDateSelectable(day, { minDate, maxDate, isDateDisabled })) return null;
       // Which lane row the point lands on, mirroring the bar overlay's geometry.
       const rowLayout = weekLayouts[row] ?? EMPTY_LAYOUT;
-      const lane = Math.floor((y - row * rowHeight - badgeArea) / chipMetrics.chipRowHeight);
+      const laneOffset = y - row * rowHeight - laneTop;
+      const lane = Math.floor(laneOffset / cellLaneHeight);
+      const insideBar = !multiWeek || laneOffset - lane * cellLaneHeight < laneChipHeight;
       const { visibleLanes, extraLane } = rowLanes(rowLayout, cols);
       const segment =
-        lane >= 0 && lane < visibleLanes + (extraLane[col] ? 1 : 0)
+        insideBar && lane >= 0 && lane < visibleLanes + (extraLane[col] ? 1 : 0)
           ? rowLayout.segments.find((s) => s.lane === lane && s.startCol <= col && s.endCol >= col)
           : undefined;
       return { day, event: segment?.event ?? null };
@@ -685,8 +866,10 @@ function DateRowsInner<T>({
       weeks,
       weekLayouts,
       rowLanes,
-      chipMetrics,
-      badgeArea,
+      multiWeek,
+      laneChipHeight,
+      laneTop,
+      cellLaneHeight,
       showAdjacentMonths,
       date,
       minDate,
@@ -897,7 +1080,7 @@ function DateRowsInner<T>({
         <View
           key={day.toISOString()}
           {...slot("day", {
-            base: [styles.dayCell, { gap: chipGap }],
+            base: [styles.dayCell, styles.dayCellPadding, { gap: chipGap }],
             themed: [
               showGrid && {
                 borderTopWidth: StyleSheet.hairlineWidth,
@@ -944,6 +1127,12 @@ function DateRowsInner<T>({
     const hasBand =
       rangeBandKind({ isInRange, isRangeStart, isRangeEnd }, fillCellOnSelection) !== "none";
     const dayKey = day.toISOString();
+    const probeId = cellStyles.byDay.get(dayKey) ?? "default";
+    const cellStyle = multiWeek ? cellStyles.probes.get(probeId) : calendarCellStyle?.(day);
+    const cell = measuredCells[probeId] ?? estimatedCell;
+    // Reserve the common lane stack beneath this date. The next child starts
+    // after the cell's own gap, which may differ from its neighbor's.
+    const dateMargin = laneTop - cell.top - (dateHeights[dayKey] ?? DATE_BADGE_HEIGHT) - cell.gap;
     // Tint the days a drag is currently over: every day of a create sweep, or the
     // one an event would land on.
     const isDragPreview =
@@ -991,17 +1180,49 @@ function DateRowsInner<T>({
       labels,
     });
 
+    const dateElement = renderCustomDateForMonth ? (
+      renderCustomDateForMonth(day, { isCurrentMonth, isToday, isSelected, isDisabled })
+    ) : (
+      <View
+        {...slot("dayBadge", {
+          base: [
+            styles.dateBadge,
+            showGrid && styles.dateBadgeEvents,
+            // Tap feedback lives on the badge, not the cell (picker only);
+            // kept even under a class so the press still reads.
+            !showGrid && pressedKey === dayKey && { opacity: 0.2 },
+          ],
+          themed: [
+            isFilledBadge && {
+              backgroundColor: isHighlighted
+                ? theme.colors.todayBackground
+                : theme.colors.selectedBackground,
+              borderRadius: theme.todayBadgeRadius,
+            },
+            isHovered &&
+              !isFilledBadge && {
+                backgroundColor: theme.colors.hoverBackground,
+                borderRadius: theme.todayBadgeRadius,
+              },
+            theme.containers.dayBadge,
+          ],
+        })}
+      >
+        <Text
+          {...slot<TextStyle>("dayBadgeText", {
+            themed: [theme.text.dateCell, { color: dateColor }],
+          })}
+          allowFontScaling={false}
+        >
+          {format(day, "d")}
+        </Text>
+      </View>
+    );
+
     const daySlot = slot("day", {
-      // Events mode mirrors the dom renderer: left-aligned cell content with
-      // the date badge in the top-right. The picker (no grid) stays centered
-      // so the selection range band lines up with the centered badge.
-      base: [styles.dayCell, { gap: chipGap }, showGrid && styles.dayCellEvents],
+      base: dayCellBase,
       themed: [
-        showGrid && {
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderRightWidth: StyleSheet.hairlineWidth,
-          borderColor: theme.colors.gridLine,
-        },
+        dayCellLines,
         highlightWeekends && isWeekend(day) && { backgroundColor: theme.colors.weekendBackground },
         // The drag preview sits on top of the weekend tint: the span being swept
         // out, or the day an event is about to land on.
@@ -1014,9 +1235,8 @@ function DateRowsInner<T>({
       <TouchableOpacity
         key={day.toISOString()}
         {...daySlot}
-        // The consumer's per-date style is an explicit override, so it merges
-        // after the slot (and survives a `day` class).
-        style={[daySlot.style, calendarCellStyle?.(day)]}
+        // Multi-week dates stay above the bars even when the day slot uses flex-end.
+        style={[daySlot.style, cellStyle, multiWeek && styles.dayCellStacked]}
         // In the picker, don't dim the whole cell on press: the tap should show on
         // the badge (the circle) only, not the cell background. `onPressIn/Out` drive
         // the badge's own opacity below. The events calendar keeps the default
@@ -1092,59 +1312,31 @@ function DateRowsInner<T>({
             })}
           />
         ) : null}
-        {renderCustomDateForMonth ? (
-          renderCustomDateForMonth(day, { isCurrentMonth, isToday, isSelected, isDisabled })
-        ) : (
+        {multiWeek ? (
           <View
-            {...slot("dayBadge", {
-              base: [
-                styles.dateBadge,
-                showGrid && styles.dateBadgeEvents,
-                // Tap feedback lives on the badge, not the cell (picker only);
-                // kept even under a class so the press still reads.
-                !showGrid && pressedKey === dayKey && { opacity: 0.2 },
-              ],
-              themed: [
-                isFilledBadge && {
-                  backgroundColor: isHighlighted
-                    ? theme.colors.todayBackground
-                    : theme.colors.selectedBackground,
-                  borderRadius: theme.todayBadgeRadius,
-                },
-                isHovered &&
-                  !isFilledBadge && {
-                    backgroundColor: theme.colors.hoverBackground,
-                    borderRadius: theme.todayBadgeRadius,
-                  },
-                theme.containers.dayBadge,
-              ],
-            })}
+            style={[
+              renderCustomDateForMonth ? undefined : styles.dateWrapperStretch,
+              hiddenCount > 0 && {
+                marginBottom: Math.max(0, dateMargin) + dayLanes * cellLaneHeight,
+              },
+            ]}
+            onLayout={(event) => recordDateHeight(dayKey, event.nativeEvent.layout.height)}
           >
-            <Text
-              {...slot<TextStyle>("dayBadgeText", {
-                themed: [theme.text.dateCell, { color: dateColor }],
-              })}
-              allowFontScaling={false}
-            >
-              {format(day, "d")}
-            </Text>
+            {dateElement}
           </View>
+        ) : (
+          dateElement
         )}
         {/* Reserve one row per visible lane so the overlay bars have space and
             "+more" sits below them; the bars themselves render in the row overlay
             (they span cells). */}
-        {Array.from({ length: dayLanes }, (_, i) => (
-          <View
-            key={`lane-${i}`}
-            style={{ height: chipMetrics.chipHeight, pointerEvents: "none" }}
-          />
-        ))}
+        {!multiWeek &&
+          Array.from({ length: dayLanes }, (_, i) => (
+            <View key={`lane-${i}`} style={{ height: laneChipHeight, pointerEvents: "none" }} />
+          ))}
         {hiddenCount > 0 ? (
           <Text
-            {...slot<TextStyle>("more", {
-              base: [styles.moreLabel, chipHeight != null && { height: chipHeight }],
-              themed: [theme.text.more, { color: theme.colors.textMuted }],
-            })}
+            {...moreSlot}
             onPress={
               onPressMore
                 ? () => onPressMore(dayEvents, day)
@@ -1153,6 +1345,7 @@ function DateRowsInner<T>({
             accessibilityRole="button"
             accessibilityLabel={`${labels.moreEvents(hiddenCount)}, ${format(day, "d MMMM", { locale })}`}
             allowFontScaling={false}
+            numberOfLines={1}
           >
             {moreLabel.replace("{moreCount}", String(hiddenCount))}
           </Text>
@@ -1171,6 +1364,35 @@ function DateRowsInner<T>({
   return (
     <CalendarLabelsContext.Provider value={labels}>
       <View style={styles.root}>
+        {showGrid ? (
+          <View
+            testID="month-more-probe"
+            style={styles.moreProbe}
+            {...webPreviewProps}
+            pointerEvents="none"
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            onLayout={(event) => {
+              const { height } = event.nativeEvent.layout;
+              setMeasuredMoreArea((previous) => (previous === height ? previous : height));
+            }}
+          >
+            <Text {...moreSlot} allowFontScaling={false} numberOfLines={1}>
+              {moreLabel.replace("{moreCount}", "99")}
+            </Text>
+          </View>
+        ) : null}
+        {Array.from(cellStyles.probes, ([id, cellStyle]) => (
+          <MonthCellProbe
+            key={id}
+            id={id}
+            week={probeWeek}
+            day={probeDay}
+            cellStyle={cellStyle}
+            onMeasure={recordCell}
+          />
+        ))}
         {showTitle ? (
           <Text
             {...slot<TextStyle>("title", {
@@ -1252,7 +1474,7 @@ function DateRowsInner<T>({
             </Pressable>
           </Modal>
         ) : null}
-        <DateRowsViewport scrollable={multiWeek}>
+        <DateRowsViewport scrollable={multiWeek} onHeight={setViewportHeight}>
           <MonthGridSurface gesture={dragGesture}>
             <View
               ref={gridRef}
@@ -1260,8 +1482,17 @@ function DateRowsInner<T>({
               accessibilityLabel={multiWeek ? title : undefined}
               {...slot("grid", {
                 base: [
-                  styles.container,
-                  multiWeek ? { minHeight: minimumRowHeight * weeks.length } : undefined,
+                  // With fixed-height rows the grid takes no `flex` and no height: it
+                  // sizes to the rows as drawn, so its measured height still divides
+                  // evenly into them when a row style adds a minimum. Yoga gives any
+                  // `flex` box a zero basis that ignores `height`, and React Native Web
+                  // does the same for `flex: 0`.
+                  multiWeekRowHeight
+                    ? undefined
+                    : [
+                        styles.container,
+                        multiWeek && { minHeight: minimumRowHeight * weeks.length },
+                      ],
                 ],
               })}
               onLayout={handleLayout}
@@ -1301,14 +1532,19 @@ function DateRowsInner<T>({
                 const draftSegment = rowLayout.segments.find((s) => s.event === draftEvent);
                 const draftStart = draftSegment ? Math.max(draftSegment.startCol, firstVisCol) : -1;
                 const draftEnd = draftSegment ? Math.min(draftSegment.endCol, lastVisCol) : -1;
-                const draftTop = badgeArea + (draftSegment?.lane ?? 0) * chipMetrics.chipRowHeight;
+                const draftTop = barTop + (draftSegment?.lane ?? 0) * cellLaneHeight;
                 const draftHeight = Math.min(
-                  chipMetrics.chipHeight,
+                  laneChipHeight,
                   Math.max(0, gridHeight / weeks.length - draftTop),
                 );
                 return (
                   <View
-                    {...slot("week", { base: styles.weekRow, themed: theme.containers.weekRow })}
+                    {...slot("week", {
+                      base: multiWeekRowHeight
+                        ? [styles.weekRowFixed, { height: multiWeekRowHeight }]
+                        : styles.weekRow,
+                      themed: theme.containers.weekRow,
+                    })}
                     key={multiWeekGrid?.weeks[weekIndex].id ?? week[0].toISOString()}
                   >
                     {week.map((day, dayCol) =>
@@ -1340,8 +1576,8 @@ function DateRowsInner<T>({
                                     position: "absolute",
                                     left: pct((startCol / cols) * 100),
                                     width: pct(((endCol - startCol + 1) / cols) * 100),
-                                    top: badgeArea + seg.lane * chipMetrics.chipRowHeight,
-                                    height: chipMetrics.chipHeight,
+                                    top: barTop + seg.lane * cellLaneHeight,
+                                    height: laneChipHeight,
                                     paddingHorizontal: CHIP_INSET_H,
                                     // Let a sweep in progress reach the cells underneath.
                                     opacity: isDragged ? DRAGGED_BAR_OPACITY : 1,
@@ -1423,13 +1659,20 @@ function DateRowsInner<T>({
 
 function DateRowsViewport({
   scrollable,
+  onHeight,
   children,
 }: {
   scrollable: boolean;
+  onHeight: (height: number) => void;
   children: ReactElement;
 }): ReactElement {
   return scrollable ? (
-    <ScrollView style={styles.container} contentContainerStyle={{ flexGrow: 1 }}>
+    <ScrollView
+      testID="multiweek-viewport"
+      style={styles.container}
+      contentContainerStyle={{ flexGrow: 1 }}
+      onLayout={(event) => onHeight(event.nativeEvent.layout.height)}
+    >
       {children}
     </ScrollView>
   ) : (
@@ -1475,6 +1718,10 @@ export const MonthView = memo(MonthViewInner) as typeof MonthViewInner;
 export const DateRows = memo(DateRowsInner) as typeof DateRowsInner;
 
 const styles = StyleSheet.create({
+  // Invisible, out of the flow: lays out one "+N more" label to measure its height.
+  moreProbe: { position: "absolute", left: 0, top: 0, opacity: 0 },
+  dateWrapperStretch: { alignSelf: "stretch" },
+  dayCellStacked: { justifyContent: "flex-start", alignSelf: "stretch" },
   root: {
     flex: 1,
   },
@@ -1502,13 +1749,16 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
   },
+  // A multi-week row at a set height: no `flex`, which would override the height.
+  weekRowFixed: {
+    flexDirection: "row",
+  },
   dayCell: {
     flex: 1,
     alignItems: "center",
-    paddingTop: 4,
-    gap: 2,
     overflow: "hidden",
   },
+  dayCellPadding: { paddingTop: DAY_CELL_PADDING_TOP },
   dayCellEvents: {
     alignItems: "stretch",
   },
@@ -1531,7 +1781,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   moreLabel: {
-    marginTop: 2,
+    marginTop: MORE_LABEL_MARGIN_TOP,
     marginHorizontal: 4,
   },
   // The built-in "+N more" popover card.
