@@ -111,4 +111,15 @@ describe(rendererName, () => {
     expect(await ghost().count()).toBe(0);
     expect(await page.getByLabel("Calls").textContent()).toBe('["press:Planning"]');
   });
+
+  it.each(views)("presses an event in the $0 grid right after a sweep", async (view) => {
+    // The sweep's trailing click lands on a common ancestor and leaves its guard
+    // armed; the next press on an event starts a fresh interaction.
+    const target = await start(view);
+    await page.mouse.move(target.x + target.width / 2, target.y + 10, { steps: 8 });
+    await page.mouse.up();
+    await expect.poll(() => ghost().count()).toBe(0);
+    await page.getByTitle("Planning", { exact: true }).click();
+    expect(await page.getByLabel("Calls").textContent()).toBe('["17:0:0-23:0:0","press:Planning"]');
+  });
 });

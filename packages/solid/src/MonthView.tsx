@@ -76,6 +76,9 @@ export type MonthViewSlot =
   | "morePopover";
 
 // Stable empty layout for rows with no events (avoids a fresh object per render).
+// Whether a pointer press began on an event chip inside a day cell.
+const pressedEvent = (event: Event) =>
+  event.target instanceof Element && event.target.closest('[data-slot="chipButton"]') !== null;
 const EMPTY_LAYOUT = {
   segments: [],
   laneCount: 0,
@@ -1040,6 +1043,10 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
     moving?: CalendarEvent<T>,
   ) => {
     if (event.button !== 0 || heldTouch || !beginPress(event)) return;
+    // A press on an event that can't move starts a fresh interaction but no
+    // sweep: a sweep starts from a day, and its preview would move the row
+    // under the click.
+    if (!moving && pressedEvent(event)) return;
     const start = (armed: boolean) => {
       if (moving) beginMove(moving, day, event.pointerId, armed);
       else beginCreate(day, event.pointerId, armed);
@@ -1743,15 +1750,16 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                 return (
                                                   <button
                                                     type="button"
-                                                    onPointerDown={(e) => {
-                                                      // A press on an event never starts a
-                                                      // create sweep on its day, so the row
-                                                      // stays put under the click.
-                                                      e.stopPropagation();
-                                                      const event = b().seg.event;
-                                                      if (!canMove(event)) return;
-                                                      pressRow(e, day().date, event);
-                                                    }}
+                                                    onPointerDown={
+                                                      canMove(b().seg.event)
+                                                        ? (e) => {
+                                                            e.stopPropagation();
+                                                            const event = b().seg.event;
+                                                            const date = day().date;
+                                                            pressRow(e, date, event);
+                                                          }
+                                                        : undefined
+                                                    }
                                                     onClick={(e) => {
                                                       e.stopPropagation();
                                                       if (consumeSuppressedClick(e.detail)) return;
