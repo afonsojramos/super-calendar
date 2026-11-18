@@ -36,6 +36,7 @@
     "tests/web/browser",
     "tests/demos",
     "tests/performance",
+    "examples/native/plugins",
     "vitest.config.mts",
     "vitest.browser.config.mts",
     "vitest.react18.config.mts",

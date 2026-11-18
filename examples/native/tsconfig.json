@@ -12,5 +12,6 @@
       "@super-calendar/example-shared/events": ["../shared/src/events.ts"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx"]
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "plugins/__tests__"]
 }

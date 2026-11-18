@@ -61,6 +61,11 @@ describe("with-scene-lifecycle", () => {
       "class AppDelegate: ExpoAppDelegate, ExpoReactNativeFactoryProvider {",
     );
     expect(adoptSceneDelegate(providerOnly)).toBe(migrated);
+    const windowOnly = migrated.replace(
+      "class AppDelegate: ExpoAppDelegate, ExpoReactNativeFactoryProvider {",
+      "class AppDelegate: ExpoAppDelegate {",
+    );
+    expect(adoptSceneDelegate(windowOnly)).toBe(migrated);
   });
 
   it("fails when the template no longer matches", () => {
