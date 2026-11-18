@@ -113,6 +113,17 @@ Keep `events` stable during unrelated UI updates. With recurrence or `timeZone`,
 replacing the array rebuilds displayed events and cancels a held move on web. See
 [keep event data stable](https://super-calendar.afonsojramos.me/guides/events#keep-event-data-stable).
 
+## Vertical scrolling
+
+In a day or week grid, set `timeGridContentPaddingBottom` to leave scrollable
+space below the last hour. Set `timeGridBounces={false}` to turn off overscroll.
+Use `onTimeGridScroll` to read `contentOffset`, `contentSize`, and
+`layoutMeasurement` from `event.nativeEvent` on the JavaScript thread.
+
+On the standalone `TimeGrid`, the same props are `contentPaddingBottom`,
+`verticalBounces`, and `onVerticalScroll`. Both callbacks receive a
+`VerticalScrollEvent`.
+
 ## Moving events
 
 Pass `onDragEvent` and update your event state with the returned `start` and `end`.

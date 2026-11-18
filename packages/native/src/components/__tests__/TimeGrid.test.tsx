@@ -25,7 +25,7 @@ vi.mock("@legendapp/list/react-native", () => ({
 
 import { Calendar } from "../Calendar";
 import { DefaultEvent } from "../DefaultEvent";
-import { TimeGrid } from "../TimeGrid";
+import { TimeGrid, type VerticalScrollEvent } from "../TimeGrid";
 import { CalendarThemeProvider, mergeTheme } from "../../theme";
 
 type WithId = { id: string };
@@ -1921,6 +1921,85 @@ describe("TimeGrid background events", () => {
     expect(getByText("->")).toBeTruthy(); // Jan 5 runs on into Jan 6
     expect(getByText("<>")).toBeTruthy(); // Jan 6 is covered end to end
     expect(getByText("<-")).toBeTruthy(); // Jan 7 carries the tail
+  });
+});
+
+describe("TimeGrid vertical scroll view props", () => {
+  const date = new Date(2026, 0, 6, 12, 0, 0);
+  const base = () => ({
+    mode: "day" as const,
+    date,
+    events: [event],
+    cellHeight: { value: 48 } as never,
+    weekStartsOn: 1 as const,
+    renderEvent: DefaultEvent,
+    keyExtractor: (_e: CalendarEvent<WithId>, i: number) => String(i),
+    onChangeDate: noop,
+    onPressEvent: noop,
+  });
+  // The scroll view that holds the hours.
+  const scrollViewOf = (hours: { parent: unknown }) => {
+    let node = hours as { parent: unknown; props: Record<string, unknown> } | null;
+    while (node && node.props.contentOffset === undefined) {
+      node = node.parent as typeof node;
+    }
+    if (!node) throw new Error("scroll view not found");
+    return node;
+  };
+
+  it("adds bottom padding and turns off overscroll when asked", async () => {
+    const { getByTestId } = await render(
+      <TimeGrid {...base()} contentPaddingBottom={80} verticalBounces={false} />,
+    );
+    const scroll = scrollViewOf(getByTestId("time-grid-hours"));
+    expect(StyleSheet.flatten(scroll.props.contentContainerStyle as never)).toMatchObject({
+      paddingBottom: 80,
+    });
+    expect(scroll.props.bounces).toBe(false);
+    expect(scroll.props.overScrollMode).toBe("never");
+  });
+
+  it("keeps the defaults: no padding and overscroll on", async () => {
+    const { getByTestId } = await render(<TimeGrid {...base()} />);
+    const scroll = scrollViewOf(getByTestId("time-grid-hours"));
+    expect(scroll.props.contentContainerStyle).toBeUndefined();
+    expect(scroll.props.bounces).toBe(true);
+    expect(scroll.props.overScrollMode).toBeUndefined();
+  });
+
+  it("delivers scroll dimensions to the current Calendar callback", async () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const calendar = (onTimeGridScroll?: (event: VerticalScrollEvent) => void) => (
+      <Calendar
+        mode="day"
+        date={date}
+        events={[event]}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        onTimeGridScroll={onTimeGridScroll}
+      />
+    );
+    const { container, rerender } = await render(calendar(first));
+    const nativeEvent = {
+      contentOffset: { x: 0, y: 75 },
+      contentSize: { width: 390, height: 1400 },
+      layoutMeasurement: { width: 390, height: 600 },
+    };
+    const scroll = () => {
+      const [scrollView] = container.queryAll((node) => node.props.scrollEventThrottle === 16);
+      return fireEvent.scroll(scrollView, { nativeEvent });
+    };
+
+    await scroll();
+    expect(first).toHaveBeenCalledExactlyOnceWith({ nativeEvent });
+    await rerender(calendar(second));
+    await scroll();
+    expect(second).toHaveBeenCalledExactlyOnceWith({ nativeEvent });
+    await rerender(calendar());
+    await scroll();
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
   });
 });
 
