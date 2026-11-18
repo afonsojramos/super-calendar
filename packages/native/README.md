@@ -128,6 +128,13 @@ Set an event's `dragHandleColor` to colour its resize grips in `TimeGrid` and
 `showDragHandle={false}` still hides the time-grid grips.
 You can toggle it after mounting without replacing the `events` array.
 
+## Current-time label
+
+Pass `renderNowLabel` to `Calendar` or `TimeGrid` to show a label beside the
+current-time line. The callback receives the time in the calendar's `timeZone`.
+When the line is visible, a custom label replaces hour labels less than
+15 minutes away. Return `null` to keep the ordinary hour labels.
+
 ## Creating events
 
 Pass `onCreateEvent` to long-press and sweep out a new event. To show a draft in
