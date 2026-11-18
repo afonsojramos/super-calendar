@@ -374,6 +374,8 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   freeSwipe?: boolean;
   /** Custom header above the week/day grid. Receives the visible days. */
   renderTimeGridHeader?: (days: Date[]) => React.ReactNode;
+  /** Draw a label in the hour column when the current-time line is visible. */
+  renderNowLabel?: (now: Date) => React.ReactNode;
   /** Week/day grid: extra scrollable space below the last hour (e.g. for a floating tab bar). Default 0. */
   timeGridContentPaddingBottom?: number;
   /** Week/day grid: the vertical scroll view's scroll events, on the JS thread. */
@@ -597,6 +599,7 @@ function CalendarInner<T>(
     isRTL,
     freeSwipe,
     renderTimeGridHeader,
+    renderNowLabel,
     timeGridContentPaddingBottom,
     onTimeGridScroll,
     timeGridBounces,
@@ -984,6 +987,7 @@ function CalendarInner<T>(
             onPressDateHeader={onPressDateHeader}
             onChangeDate={handleChangeDate}
             renderHeader={renderTimeGridHeader}
+            renderNowLabel={renderNowLabel}
             contentPaddingBottom={timeGridContentPaddingBottom}
             onVerticalScroll={onTimeGridScroll}
             verticalBounces={timeGridBounces}

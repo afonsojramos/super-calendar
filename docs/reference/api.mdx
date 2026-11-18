@@ -49,21 +49,22 @@ in-view dragging without edge paging. Other navigation remains available.
 
 ## Events & rendering
 
-| Prop                       | Type                               | Notes                                      |
-| -------------------------- | ---------------------------------- | ------------------------------------------ |
-| `renderEvent`              | `RenderEvent<T>`                   | Render events your way, every mode.        |
-| `eventAccessibilityLabel`  | `(event, ctx) => string`           | Override an event's screen-reader label.   |
-| `labels`                   | `Partial<CalendarLabels>`          | Translate screen-reader words and actions. |
-| `renderCustomDateForMonth` | `(date, info) => ReactNode`        | Month: replace the day-cell date badge.    |
-| `eventCellStyle`           | `style \| (event) => style`        | Tweak the built-in box.                    |
-| `calendarCellStyle`        | `(date) => style`                  | Per-date column/cell shading.              |
-| `businessHours`            | `(date) => { start, end } \| null` | Shade closed hours.                        |
-| `renderBusinessHours`      | `(band) => ReactNode`              | Render closed-hours bands yourself.        |
-| `renderBackgroundEvent`    | `RenderEvent`                      | Custom, pressable background bands.        |
-| `renderTimeGridHeader`     | `(days) => ReactNode`              | Replace the week/day day-header row.       |
-| `renderHeaderForMonthView` | `(weekDays) => ReactNode`          | Replace the month weekday header.          |
-| `headerComponent`          | `ReactNode`                        | Extra element between header and grid.     |
-| `keyExtractor`             | `(event, index) => string`         | Stable event keys.                         |
+| Prop                       | Type                               | Notes                                                     |
+| -------------------------- | ---------------------------------- | --------------------------------------------------------- |
+| `renderEvent`              | `RenderEvent<T>`                   | Render events your way, every mode.                       |
+| `eventAccessibilityLabel`  | `(event, ctx) => string`           | Override an event's screen-reader label.                  |
+| `labels`                   | `Partial<CalendarLabels>`          | Translate screen-reader words and actions.                |
+| `renderCustomDateForMonth` | `(date, info) => ReactNode`        | Month: replace the day-cell date badge.                   |
+| `eventCellStyle`           | `style \| (event) => style`        | Tweak the built-in box.                                   |
+| `calendarCellStyle`        | `(date) => style`                  | Per-date column/cell shading.                             |
+| `businessHours`            | `(date) => { start, end } \| null` | Shade closed hours.                                       |
+| `renderBusinessHours`      | `(band) => ReactNode`              | Render closed-hours bands yourself.                       |
+| `renderBackgroundEvent`    | `RenderEvent`                      | Custom, pressable background bands.                       |
+| `renderTimeGridHeader`     | `(days) => ReactNode`              | Replace the week/day day-header row.                      |
+| `renderNowLabel`           | `(now: Date) => ReactNode`         | React Native: label beside the visible current-time line. |
+| `renderHeaderForMonthView` | `(weekDays) => ReactNode`          | Replace the month weekday header.                         |
+| `headerComponent`          | `ReactNode`                        | Extra element between header and grid.                    |
+| `keyExtractor`             | `(event, index) => string`         | Stable event keys.                                        |
 
 ## Interactions
 
