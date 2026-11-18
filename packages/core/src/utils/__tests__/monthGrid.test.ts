@@ -1,5 +1,13 @@
 import type { CalendarEvent } from "../../types";
-import { buildMonthGrid, layoutMonthWeek } from "../monthGrid";
+import {
+  buildMonthGrid,
+  keepMonthDraftVisible,
+  layoutMonthWeek,
+  monthExtraLaneColumns,
+  monthVisibleBars,
+  withDraftEventDays,
+} from "../monthGrid";
+import { compareDayEvents, groupEventsByDay } from "../layout";
 
 describe("layoutMonthWeek", () => {
   // A Sun-Sat week: 21-27 June 2026.
@@ -139,5 +147,232 @@ describe("buildMonthGrid today", () => {
 
   it("flags nothing when the given day is outside the grid", () => {
     expect(flagged(new Date(2030, 0, 1))).toEqual([]);
+  });
+});
+
+describe("per-day month overflow", () => {
+  // A Sun-Sat week: 21-27 June 2026, showing two lanes before "+N more".
+  const days = Array.from({ length: 7 }, (_, i) => new Date(2026, 5, 21 + i));
+  const ev = (title: string, first: number, last = first): CalendarEvent => ({
+    title,
+    start: new Date(2026, 5, first),
+    end: new Date(2026, 5, last + 1),
+    allDay: true,
+  });
+  const visibleLanes = 2;
+
+  it("gives the extra lane to days whose only hidden event is on the first hidden lane", () => {
+    // Monday holds four events (two hidden); Tuesday and Wednesday three (one hidden).
+    const layout = layoutMonthWeek(days, [
+      ev("A", 22, 24),
+      ev("B", 22, 24),
+      ev("C", 22, 24),
+      ev("D", 22),
+    ]);
+    expect(layout.segments.map((s) => [s.event.title, s.lane])).toEqual([
+      ["A", 0],
+      ["B", 1],
+      ["C", 2],
+      ["D", 3],
+    ]);
+    expect(monthExtraLaneColumns(layout, visibleLanes, 7)).toEqual([
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it("keeps the label when the one hidden event sits on a lower lane", () => {
+    // A, B and C fill Sunday and Monday, so D starts on Monday on lane 3. On
+    // Tuesday and Wednesday D is the only hidden event, but lane 2 is empty there.
+    const layout = layoutMonthWeek(days, [
+      ev("A", 21, 22),
+      ev("B", 21, 22),
+      ev("C", 21, 22),
+      ev("D", 22, 24),
+    ]);
+    expect(layout.segments.find((s) => s.event.title === "D")?.lane).toBe(3);
+    // Only Sunday, whose one hidden event (C) is on lane 2, gets the extra lane.
+    expect(monthExtraLaneColumns(layout, visibleLanes, 7)).toEqual([
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it("returns no extra lanes when nothing is hidden", () => {
+    const layout = layoutMonthWeek(days, [ev("A", 22), ev("B", 22)]);
+    expect(monthExtraLaneColumns(layout, visibleLanes, 7)).toEqual(Array(7).fill(false));
+  });
+
+  it("draws a first-hidden-lane bar only over extra-lane columns, split into runs", () => {
+    // "Long" sits on lane 2 from Monday to Friday. Monday and Thursday hide a
+    // second event, so it shows on Tuesday-Wednesday and on Friday only.
+    const layout = layoutMonthWeek(days, [
+      ev("Long", 22, 26),
+      ev("A", 22, 26),
+      ev("B", 22, 26),
+      ev("Mon", 22),
+      ev("Thu", 25),
+    ]);
+    expect(layout.segments.find((s) => s.event.title === "B")?.lane).toBe(2);
+    const extra = monthExtraLaneColumns(layout, visibleLanes, 7);
+    expect(extra).toEqual([false, false, true, true, false, true, false]);
+    const bars = monthVisibleBars(layout, visibleLanes, extra);
+    expect(
+      bars.map((b) => [
+        b.event.title,
+        b.lane,
+        b.startCol,
+        b.endCol,
+        b.continuesBefore,
+        b.continuesAfter,
+      ]),
+    ).toEqual([
+      ["Long", 0, 1, 5, false, false],
+      ["A", 1, 1, 5, false, false],
+      ["B", 2, 2, 3, true, true],
+      ["B", 2, 5, 5, true, false],
+    ]);
+  });
+
+  it("keeps a bar's own continuation when the cut leaves its edge alone", () => {
+    const layout = layoutMonthWeek(days, [ev("A", 18, 21), ev("B", 18, 21), ev("Edge", 18, 21)]);
+    const bars = monthVisibleBars(layout, visibleLanes, [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+    expect(bars.find((b) => b.event.title === "Edge")).toMatchObject({
+      startCol: 0,
+      endCol: 0,
+      continuesBefore: true,
+      continuesAfter: false,
+    });
+  });
+});
+
+describe("month create draft placement", () => {
+  // A Sun-Sat week: 21-27 June 2026.
+  const days = Array.from({ length: 7 }, (_, i) => new Date(2026, 5, 21 + i));
+  const allDay = (title: string, first: number, last = first): CalendarEvent => ({
+    title,
+    start: new Date(2026, 5, first),
+    end: new Date(2026, 5, last + 1),
+    allDay: true,
+  });
+  const timed = (title: string, day: number, hour: number): CalendarEvent => ({
+    title,
+    start: new Date(2026, 5, day, hour),
+    end: new Date(2026, 5, day, hour + 1),
+  });
+  const rowOf = (map: ReadonlyMap<string, CalendarEvent[]>) => {
+    const seen = new Set<CalendarEvent>();
+    for (const day of days) for (const event of map.get(day.toISOString()) ?? []) seen.add(event);
+    return [...seen];
+  };
+  const sortedDays = (events: CalendarEvent[]) => {
+    const map = groupEventsByDay(events);
+    for (const list of map.values()) list.sort(compareDayEvents);
+    return map;
+  };
+
+  it("adds the draft to each day it covers where an appended event would go", () => {
+    const morning = timed("Morning", 23, 9);
+    const holiday = allDay("Holiday", 23);
+    const draft = allDay("", 23, 24);
+    const base = sortedDays([morning, holiday]);
+    const sorted = withDraftEventDays(base, draft);
+    expect(sorted.get(new Date(2026, 5, 23).toISOString())).toEqual([holiday, draft, morning]);
+    expect(sorted.get(new Date(2026, 5, 24).toISOString())).toEqual([draft]);
+    expect(withDraftEventDays(base, draft, false).get(new Date(2026, 5, 23).toISOString())).toEqual(
+      [holiday, morning, draft],
+    );
+    // The original map is left alone.
+    expect(base.get(new Date(2026, 5, 23).toISOString())).toEqual([holiday, morning]);
+  });
+
+  it("lays the draft out on the lane the created event will take", () => {
+    // Trip starts earlier and keeps lane 0; Lunch starts with the draft but is
+    // shorter, so it moves below it, exactly as after the event is created.
+    const trip = allDay("Trip", 22, 24);
+    const lunch = timed("Lunch", 23, 12);
+    const draft = allDay("", 23, 25);
+    const placed = layoutMonthWeek(
+      days,
+      rowOf(withDraftEventDays(sortedDays([trip, lunch]), draft)),
+    );
+    const created = layoutMonthWeek(days, rowOf(sortedDays([trip, lunch, { ...draft }])));
+    expect(placed.segments.map((s) => [s.event.title, s.lane])).toEqual([
+      ["Trip", 0],
+      ["", 1],
+      ["Lunch", 2],
+    ]);
+    expect(created.segments.map((s) => [s.event.title, s.lane])).toEqual(
+      placed.segments.map((s) => [s.event.title, s.lane]),
+    );
+  });
+
+  it("moves the draft to lane 0 only when its lane would be hidden", () => {
+    const a = allDay("A", 22, 24);
+    const b = allDay("B", 22, 24);
+    const draft = allDay("", 23);
+    const withDraft = layoutMonthWeek(days, rowOf(withDraftEventDays(sortedDays([a, b]), draft)));
+    const without = layoutMonthWeek(days, rowOf(sortedDays([a, b])));
+    expect(withDraft.segments.find((s) => s.event === draft)?.lane).toBe(2);
+    // Three lanes fit: the draft keeps the lane it will land on.
+    expect(
+      keepMonthDraftVisible(withDraft, without, draft, {
+        visibleLanes: (count) => Math.min(count, 3),
+      }),
+    ).toBe(withDraft);
+    // Two lanes fit: the draft takes lane 0 and A and B move down.
+    const kept = keepMonthDraftVisible(withDraft, without, draft, {
+      visibleLanes: (count) => Math.min(count, 2),
+    });
+    expect(kept.laneCount).toBe(3);
+    expect(kept.segments.map((s) => [s.event.title, s.lane, s.startCol, s.endCol])).toEqual([
+      ["", 0, 2, 2],
+      ["A", 1, 1, 3],
+      ["B", 2, 1, 3],
+    ]);
+    // A row the draft misses is returned as is.
+    expect(keepMonthDraftVisible(without, without, draft, { visibleLanes: () => 1 })).toBe(without);
+  });
+
+  it("keeps a draft on the first hidden lane where each day draws that lane", () => {
+    // A and B cover Monday to Thursday, C and D Monday only. A Thursday draft lands
+    // on lane 2, which a cap of three hides, but it is Thursday's only hidden
+    // event, so Thursday draws it in place of its label, as it will once created.
+    const events = [allDay("A", 22, 25), allDay("B", 22, 25), allDay("C", 22), allDay("D", 22)];
+    const draft = allDay("", 25);
+    const withDraft = layoutMonthWeek(days, rowOf(withDraftEventDays(sortedDays(events), draft)));
+    const without = layoutMonthWeek(days, rowOf(sortedDays(events)));
+    expect(withDraft.segments.find((s) => s.event === draft)?.lane).toBe(2);
+    const visibleLanes = (count: number) => (count > 3 ? 2 : count);
+    expect(
+      keepMonthDraftVisible(withDraft, without, draft, {
+        visibleLanes,
+        extraLaneFits: (shown) => shown < 3,
+      }),
+    ).toBe(withDraft);
+    // Without the per-day lane, the draft moves to lane 0.
+    expect(
+      keepMonthDraftVisible(withDraft, without, draft, { visibleLanes }).segments.find(
+        (s) => s.event === draft,
+      )?.lane,
+    ).toBe(0);
   });
 });

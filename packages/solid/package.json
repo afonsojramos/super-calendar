@@ -1,6 +1,6 @@
 {
   "name": "@super-calendar/solid",
-  "version": "2.18.0",
+  "version": "2.19.0",
   "description": "Solid 2 calendar and date picker with virtualized views, keyboard navigation, and pointer gestures.",
   "keywords": [
     "calendar",
@@ -50,13 +50,13 @@
     "csstype": "^3.1.0"
   },
   "devDependencies": {
-    "@solidjs/babel-plugin": "2.0.0-rc.20",
-    "@solidjs/web": "2.0.0-rc.20",
-    "solid-js": "2.0.0-rc.20"
+    "@solidjs/babel-plugin": "2.0.0",
+    "@solidjs/web": "2.0.0",
+    "solid-js": "2.0.0"
   },
   "peerDependencies": {
-    "@solidjs/web": "2.0.0-rc.20",
+    "@solidjs/web": "^2.0.0",
     "date-fns": ">=3",
-    "solid-js": "2.0.0-rc.20"
+    "solid-js": "^2.0.0"
   }
 }

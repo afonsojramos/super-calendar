@@ -56,6 +56,180 @@ describe(rendererName, () => {
       },
     );
 
+    it("puts the preview on the lane the created event takes, moving bars aside", () => {
+      // Trip starts on Monday and keeps lane 0. Lunch starts with the sweep but is
+      // shorter, so it moves below the preview, as it will once the event exists.
+      const trip = {
+        title: "Trip",
+        start: new Date(2026, 6, 13),
+        end: new Date(2026, 6, 16),
+        allDay: true,
+      };
+      const lunch = {
+        title: "Lunch",
+        start: new Date(2026, 6, 15, 12),
+        end: new Date(2026, 6, 15, 13),
+      };
+      const view = render(MonthView, {
+        date,
+        events: [trip, lunch],
+        weekStartsOn: 1,
+        onCreateEvent: vi.fn(),
+        renderCreateGhost: Draft,
+      });
+      const top = (element: HTMLElement) => Number.parseFloat(element.style.top);
+      const bar = (name: string) => view.getByLabelText(name);
+      const tripTop = top(bar("Trip, 13 July"));
+      const lunchTop = top(bar("Lunch, 15 July"));
+      down(view.container, "2026-07-15");
+      move(view.container, "2026-07-16");
+      const [preview] = previews(view.container);
+      expect(top(preview)).toBeGreaterThan(tripTop);
+      expect(top(preview)).toBe(lunchTop);
+      expect(top(bar("Trip, 13 July"))).toBe(tripTop);
+      expect(top(bar("Lunch, 15 July"))).toBeGreaterThan(top(preview));
+      up();
+    });
+
+    it("keeps the preview on lane 0 when its own lane would be hidden", () => {
+      // A, B and C fill lanes 0-2 from Monday; a sweep on Wednesday would land on
+      // lane 3, past the two lanes a cap of three shows beside "+more".
+      const allDay = (title: string) => ({
+        title,
+        start: new Date(2026, 6, 13),
+        end: new Date(2026, 6, 16),
+        allDay: true,
+      });
+      const view = render(MonthView, {
+        date,
+        events: [allDay("A"), allDay("B"), allDay("C")],
+        weekStartsOn: 1,
+        maxVisibleEventCount: 3,
+        onCreateEvent: vi.fn(),
+        renderCreateGhost: Draft,
+      });
+      const top = (element: HTMLElement) => Number.parseFloat(element.style.top);
+      const laneZero = top(view.getByLabelText("A, 13 July"));
+      down(view.container, "2026-07-15");
+      const [preview] = previews(view.container);
+      expect(top(preview)).toBe(laneZero);
+      expect(top(view.getByLabelText("A, 13 July"))).toBeGreaterThan(laneZero);
+      up();
+    });
+
+    it("keeps the preview on the hidden lane a day draws in place of its label", () => {
+      // A and B cover Monday to Thursday, C and D Monday only. A Thursday sweep
+      // lands on lane 2, Thursday's only hidden lane, which Thursday draws.
+      const allDay = (title: string, last: number) => ({
+        title,
+        start: new Date(2026, 6, 13),
+        end: new Date(2026, 6, last + 1),
+        allDay: true,
+      });
+      const view = render(MonthView, {
+        date,
+        events: [allDay("A", 16), allDay("B", 16), allDay("C", 13), allDay("D", 13)],
+        weekStartsOn: 1,
+        maxVisibleEventCount: 3,
+        onCreateEvent: vi.fn(),
+        renderCreateGhost: Draft,
+      });
+      const top = (element: HTMLElement) => Number.parseFloat(element.style.top);
+      const laneZero = top(view.getByLabelText("A, 13 July"));
+      const laneOne = top(view.getByLabelText("B, 13 July"));
+      down(view.container, "2026-07-16");
+      const [preview] = previews(view.container);
+      expect(top(preview)).toBe(laneOne + (laneOne - laneZero));
+      expect(top(view.getByLabelText("A, 13 July"))).toBe(laneZero);
+      up();
+    });
+
+    it("starts no preview from a press on an event that cannot move", () => {
+      const onPressEvent = vi.fn();
+      const onCreateEvent = vi.fn();
+      const planning = {
+        title: "Planning",
+        start: new Date(2026, 6, 15, 9),
+        end: new Date(2026, 6, 15, 10),
+      };
+      const view = render(MonthView, {
+        date,
+        events: [planning],
+        weekStartsOn: 1,
+        onPressEvent,
+        onCreateEvent,
+        renderCreateGhost: Draft,
+      });
+      const chip = view.getByLabelText("Planning, 15 July");
+      fireEvent.pointerDown(chip, { pointerId: 1, button: 0 });
+      expect(previews(view.container)).toHaveLength(0);
+      up();
+      fireEvent.click(chip);
+      expect(onCreateEvent).not.toHaveBeenCalled();
+      expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(planning);
+    });
+
+    it("closes the built-in popover when another day's event is pressed", () => {
+      const onPressEvent = vi.fn();
+      const busy = Array.from({ length: 4 }, (_, i) => ({
+        title: `Busy ${i}`,
+        start: new Date(2026, 6, 14, 9 + i),
+        end: new Date(2026, 6, 14, 10 + i),
+      }));
+      const planning = {
+        title: "Planning",
+        start: new Date(2026, 6, 16, 9),
+        end: new Date(2026, 6, 16, 10),
+      };
+      const view = render(MonthView, {
+        date,
+        events: [...busy, planning],
+        weekStartsOn: 1,
+        maxVisibleEventCount: 2,
+        onPressEvent,
+        onCreateEvent: vi.fn(),
+        renderCreateGhost: Draft,
+      });
+      fireEvent.click(view.getByText(/More/));
+      expect(view.queryByRole("dialog")).not.toBeNull();
+      const chip = view.getByLabelText("Planning, 16 July");
+      fireEvent.pointerDown(chip, { pointerId: 1, button: 0 });
+      expect(view.queryByRole("dialog")).toBeNull();
+      expect(previews(view.container)).toHaveLength(0);
+      up();
+      fireEvent.click(chip);
+      expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(planning);
+    });
+
+    it("presses an unmovable event after a sweep whose click went elsewhere", () => {
+      const onPressEvent = vi.fn();
+      const onCreateEvent = vi.fn();
+      const planning = {
+        title: "Planning",
+        start: new Date(2026, 6, 15, 9),
+        end: new Date(2026, 6, 15, 10),
+      };
+      const view = render(MonthView, {
+        date,
+        events: [planning],
+        weekStartsOn: 1,
+        onPressEvent,
+        onCreateEvent,
+        renderCreateGhost: Draft,
+      });
+      // A sweep across days arms the guard for its trailing click, which the
+      // browser sends to a common ancestor, so no cell consumes it.
+      down(view.container, "2026-07-17");
+      move(view.container, "2026-07-20");
+      up();
+      expect(onCreateEvent).toHaveBeenCalledTimes(1);
+      const chip = view.getByLabelText("Planning, 15 July");
+      fireEvent.pointerDown(chip, { pointerId: 2, button: 0 });
+      fireEvent.pointerUp(window, { pointerId: 2, button: 0 });
+      fireEvent.click(chip, { detail: 1 });
+      expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(planning);
+    });
+
     it("allows a preview in an empty month without an events prop", () => {
       const view = render(MonthView, { date, onCreateEvent: vi.fn(), renderCreateGhost: Draft });
       down(view.container, "2026-07-15");

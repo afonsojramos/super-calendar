@@ -1626,7 +1626,8 @@ describe("TimeGrid cross-week drop", () => {
     expect(geometry()).toEqual(slices);
   });
 
-  it("keeps an event in its slice when a hold on its resize handle picks it up", async () => {
+  it("moves an event picked up by a hold on its resize handle, and skips the resize", async () => {
+    const onDragEvent = vi.fn(() => true);
     const grid = () => (
       <TimeGrid<WithId>
         mode="week"
@@ -1641,45 +1642,75 @@ describe("TimeGrid cross-week drop", () => {
         keyExtractor={(item) => item.id}
         onChangeDate={noop}
         onPressEvent={noop}
-        onDragEvent={vi.fn()}
+        onDragEvent={onDragEvent}
       />
     );
     const { container, rerender } = await render(grid());
+    const columnWidth = Dimensions.get("window").width / 7;
     const geometry = () =>
       container
         .queryAll((node) => node.props.className === "event-slot")
         .map((box) => {
           const style = StyleSheet.flatten(box.props.style);
-          return [style.left, style.width, style.top];
+          return [style.left, style.width];
         });
-    const resting = geometry();
     const { __gestures } = gestureHandlerMock as unknown as {
-      __gestures: Array<{ handlers: Record<string, ((...args: unknown[]) => void) | undefined> }>;
+      __gestures: Array<{
+        calls: Record<string, unknown[]>;
+        handlers: Record<string, ((...args: unknown[]) => void) | undefined>;
+      }>;
     };
-    // Each event has a bottom and a top handle pan; the second event's bottom one.
-    const handle = __gestures.filter((gesture) => gesture.handlers.onBegin)[2]?.handlers;
+    // Each event builds a bottom and a top resize pan; take the second event's bottom one.
+    const resizePans = __gestures.filter(
+      (gesture) =>
+        gesture.calls.enabled && !gesture.calls.activateAfterLongPress && gesture.handlers.onUpdate,
+    );
+    const handle = resizePans[2]?.handlers;
     if (!handle) throw new Error("resize handle gesture not found");
     const move = moveGestureHarness(1);
-    // The finger rests on the handle long enough for the move to pick the event up,
-    // then starts to drift before the resize activates.
+    // A finger held on the handle lets the long press pick the event up: it floats
+    // across the day column like any other move.
+    // The grip's pan begins on touch-down, before the long press fires.
     await act(() => {
-      handle.onBegin?.();
-      move.onStart?.({ x: 10, y: 50, absoluteX: 200, absoluteY: 350 });
-      move.onUpdate?.({ translationX: 0, translationY: 4, absoluteX: 200, absoluteY: 354 });
+      handle.onBegin?.({});
+      move.onStart?.({ x: 10, y: 20, absoluteX: 200, absoluteY: 350 });
     });
     await rerender(grid());
-    expect(geometry().map(([left, width]) => [left, width])).toEqual(
-      resting.map(([left, width]) => [left, width]),
+    expect(geometry()[1]).toEqual([columnWidth, columnWidth]);
+    // The resize pan then activates as the finger moves, but stands aside.
+    await act(() => {
+      handle.onStart?.({});
+      handle.onUpdate?.({ translationY: 48 });
+      move.onUpdate?.({ translationX: 0, translationY: 24, absoluteX: 200, absoluteY: 374 });
+      handle.onEnd?.({ translationY: 48 }, true);
+      handle.onFinalize?.({}, true);
+    });
+    // Still floating while the finger carries it.
+    await rerender(grid());
+    expect(geometry()[1]).toEqual([columnWidth, columnWidth]);
+    await act(() => {
+      move.onEnd?.({ translationX: 0, translationY: 24 }, true);
+      move.onFinalize?.({}, true);
+    });
+    expect(onDragEvent).toHaveBeenCalledTimes(1);
+    expect(onDragEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: "1" }),
+      new Date(2026, 0, 6, 9, 30),
+      new Date(2026, 0, 6, 10, 30),
     );
-    // The resize takes over, cancelling the active move (Gesture Handler calls
-    // onEnd, then onFinalize, both unsuccessful); nothing it previewed sticks.
+    // A quick drag on the handle, with no move under way, still resizes.
     await act(() => {
-      move.onEnd?.({ translationX: 0, translationY: 4 }, false);
-      move.onFinalize?.({}, false);
-      handle.onFinalize?.();
+      handle.onStart?.({});
+      handle.onUpdate?.({ translationY: 48 });
+      handle.onEnd?.({ translationY: 48 }, true);
+      handle.onFinalize?.({}, true);
     });
-    await rerender(grid());
-    expect(geometry()).toEqual(resting);
+    expect(onDragEvent).toHaveBeenCalledTimes(2);
+    expect(onDragEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: "1" }),
+      new Date(2026, 0, 6, 9, 0),
+      new Date(2026, 0, 6, 11, 0),
+    );
   });
 });
 
