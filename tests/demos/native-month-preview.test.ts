@@ -258,6 +258,45 @@ it.each(["day-minimum", "day-minimum-class", "day-height"])(
   },
 );
 
+it.each(["day-aspect", "day-aspect-spaced"])(
+  "measures square days at their rendered width on resize with %s",
+  async (layout) => {
+    const page = await browser.newPage({ viewport: { width: 840, height: 760 } });
+    try {
+      await page.goto(server.url + "?multiweek=" + layout);
+      const viewport = page.getByTestId("multiweek-viewport");
+      const grid = page.getByTestId("multiweek-grid");
+      const day = grid.getByRole("cell", { name: /Tuesday,? 16 June/ });
+      await day.waitFor();
+      for (const width of [840, 1190, 840]) {
+        await page.setViewportSize({ width, height: 760 });
+        const expected = layout === "day-aspect" ? width / 7 : (0.8 * width - 52) / 5;
+        await expect
+          .poll(async () => {
+            const days = await day.boundingBox();
+            const rows = await grid
+              .locator(":scope > *")
+              .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
+            return [days?.width, ...rows];
+          })
+          .toEqual(Array(4).fill(expect.closeTo(expected, 0)));
+        expect(await viewport.evaluate((node) => node.scrollHeight)).toBeCloseTo(expected * 3, 0);
+        const meetings = grid.getByText(/^Meeting [1-5]$/);
+        if (width === 840) {
+          await expect.poll(() => meetings.count()).toBeLessThan(5);
+          await expect
+            .poll(() => grid.getByRole("button", { name: /more events/i }).count())
+            .toBe(1);
+        } else {
+          await expect.poll(() => meetings.count()).toBe(5);
+        }
+      }
+    } finally {
+      await page.close();
+    }
+  },
+);
+
 it("hides native-web creation content and prevents focus", async () => {
   const page = await browser.newPage({ viewport: { width: 1000, height: 850 } });
   const errors: string[] = [];

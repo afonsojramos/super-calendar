@@ -428,7 +428,7 @@ function DateRowsInner<T>({
   const [gridSize, setGridSize] = useState({ width: 0, height: 0 });
   const gridHeight = gridSize.height;
   const weekTops = useRef<number[]>([]);
-  const [drawnWeekHeight, setDrawnWeekHeight] = useState(0);
+  const [drawnWeek, setDrawnWeek] = useState({ width: 0, height: 0 });
   // Web-only hover highlight on the day badge (mouse pointers); stays null on
   // touch/native, so it never re-renders there. Mirrors the dom renderer.
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
@@ -514,15 +514,17 @@ function DateRowsInner<T>({
   // multi-week cells lay out, so a fixed row never clips a date restyled or
   // rendered taller than the 24pt badge. Kept per day and read for the shown days
   // only, so it shrinks when a date does or leaves the view.
-  const [dateHeights, setDateHeights] = useState<Record<string, number>>({});
+  const [daySizes, setDaySizes] = useState<Record<string, { width?: number; dateHeight?: number }>>(
+    {},
+  );
   const shownDayKeys = useMemo(
     () => new Set(weeks.flat().map((day) => day.toISOString())),
     [weeks],
   );
-  const recordDateHeight = (dayKey: string, height: number) =>
-    setDateHeights((previous) => {
-      if (previous[dayKey] === height) return previous;
-      const next: Record<string, number> = { [dayKey]: height };
+  const recordDaySize = (dayKey: string, dimension: "width" | "dateHeight", size: number) =>
+    setDaySizes((previous) => {
+      if (previous[dayKey]?.[dimension] === size) return previous;
+      const next: typeof previous = { [dayKey]: { ...previous[dayKey], [dimension]: size } };
       for (const key in previous) {
         if (key !== dayKey && shownDayKeys.has(key)) next[key] = previous[key];
       }
@@ -531,9 +533,9 @@ function DateRowsInner<T>({
   const dateHeight = useMemo(() => {
     if (!multiWeek) return DATE_BADGE_HEIGHT;
     let tallest = DATE_BADGE_HEIGHT;
-    for (const key of shownDayKeys) tallest = Math.max(tallest, dateHeights[key] ?? 0);
+    for (const key of shownDayKeys) tallest = Math.max(tallest, daySizes[key]?.dateHeight ?? 0);
     return tallest;
-  }, [multiWeek, dateHeights, shownDayKeys]);
+  }, [multiWeek, daySizes, shownDayKeys]);
   const dayCellBase = useMemo(
     () => [
       styles.dayCell,
@@ -561,25 +563,25 @@ function DateRowsInner<T>({
     [slot, theme.containers.weekRow],
   );
   const cellStyles = useMemo(() => {
-    const probes = new Map<string, StyleProp<ViewStyle>>();
+    const probes = new Map<string, { style: StyleProp<ViewStyle>; width: number }>();
     const byDay = new Map<string, string>();
-    if (multiWeek && calendarCellStyle) {
+    if (multiWeek) {
       const ids = new Map<StyleProp<ViewStyle>, string>();
       for (const week of weeks) {
         for (const day of week) {
           const dayKey = day.toISOString();
-          const style = calendarCellStyle(day) ?? undefined;
-          const id = ids.get(style) ?? (style ? dayKey : "default");
-          ids.set(style, id);
-          probes.set(id, style);
+          const style = calendarCellStyle?.(day) ?? undefined;
+          const styleId = ids.get(style) ?? (style ? dayKey : "default");
+          ids.set(style, styleId);
+          const width = daySizes[dayKey]?.width ?? 0;
+          const id = `${styleId}:${width}`;
+          probes.set(id, { style, width });
           byDay.set(dayKey, id);
         }
       }
-    } else if (multiWeek) {
-      probes.set("default", undefined);
     }
     return { probes, byDay };
-  }, [multiWeek, weeks, calendarCellStyle]);
+  }, [multiWeek, weeks, calendarCellStyle, daySizes]);
   const [measuredCells, setMeasuredCells] = useState<Record<string, MonthCellGeometry>>({});
   const recordCell = useCallback(
     (id: string, measured: MonthCellGeometry) => {
@@ -662,8 +664,8 @@ function DateRowsInner<T>({
       ? Math.max(minimumRowHeight, heightForWeeks / weeks.length) - cellGeometry.weekMargin
       : undefined;
   const rowHeight =
-    multiWeek && drawnWeekHeight > 0
-      ? drawnWeekHeight + cellGeometry.weekMargin
+    multiWeek && drawnWeek.height > 0
+      ? drawnWeek.height + cellGeometry.weekMargin
       : gridHeight / weeks.length;
 
   // How many chips fit per cell: a fixed cap when `maxVisibleEventCount` is set,
@@ -1165,11 +1167,12 @@ function DateRowsInner<T>({
       rangeBandKind({ isInRange, isRangeStart, isRangeEnd }, fillCellOnSelection) !== "none";
     const dayKey = day.toISOString();
     const probeId = cellStyles.byDay.get(dayKey) ?? "default";
-    const cellStyle = multiWeek ? cellStyles.probes.get(probeId) : calendarCellStyle?.(day);
+    const cellStyle = multiWeek ? cellStyles.probes.get(probeId)?.style : calendarCellStyle?.(day);
     const cell = measuredCells[probeId] ?? estimatedCell;
     // Reserve the common lane stack beneath this date. The next child starts
     // after the cell's own gap, which may differ from its neighbor's.
-    const dateMargin = laneTop - cell.top - (dateHeights[dayKey] ?? DATE_BADGE_HEIGHT) - cell.gap;
+    const dateMargin =
+      laneTop - cell.top - (daySizes[dayKey]?.dateHeight ?? DATE_BADGE_HEIGHT) - cell.gap;
     // Tint the days a drag is currently over: every day of a create sweep, or the
     // one an event would land on.
     const isDragPreview =
@@ -1274,6 +1277,11 @@ function DateRowsInner<T>({
         {...daySlot}
         // Multi-week dates stay above the bars even when the day slot uses flex-end.
         style={[daySlot.style, cellStyle, multiWeek && styles.dayCellStacked]}
+        onLayout={
+          multiWeek
+            ? (event) => recordDaySize(dayKey, "width", event.nativeEvent.layout.width)
+            : undefined
+        }
         // In the picker, don't dim the whole cell on press: the tap should show on
         // the badge (the circle) only, not the cell background. `onPressIn/Out` drive
         // the badge's own opacity below. The events calendar keeps the default
@@ -1357,7 +1365,9 @@ function DateRowsInner<T>({
                 marginBottom: Math.max(0, dateMargin) + dayLanes * cellLaneHeight,
               },
             ]}
-            onLayout={(event) => recordDateHeight(dayKey, event.nativeEvent.layout.height)}
+            onLayout={(event) =>
+              recordDaySize(dayKey, "dateHeight", event.nativeEvent.layout.height)
+            }
           >
             {dateElement}
           </View>
@@ -1428,16 +1438,23 @@ function DateRowsInner<T>({
             onOuterHeight={setGridOuterSpacing}
           />
         )}
-        {Array.from(cellStyles.probes, ([id, cellStyle]) => (
-          <MonthCellProbe
-            key={id}
-            id={id}
-            week={probeWeek}
-            day={probeDay}
-            cellStyle={cellStyle}
-            onMeasure={recordCell}
-          />
-        ))}
+        {Array.from(
+          cellStyles.probes,
+          ([id, cell]) =>
+            cell.width > 0 &&
+            drawnWeek.width > 0 && (
+              <MonthCellProbe
+                key={id}
+                id={id}
+                week={probeWeek}
+                day={probeDay}
+                cellStyle={cell.style}
+                dayWidth={cell.width}
+                weekWidth={drawnWeek.width}
+                onMeasure={recordCell}
+              />
+            ),
+        )}
         {showTitle ? (
           <Text
             {...slot<TextStyle>("title", {
@@ -1594,9 +1611,14 @@ function DateRowsInner<T>({
                     onLayout={
                       multiWeek
                         ? (event) => {
-                            const { y, height } = event.nativeEvent.layout;
+                            const { y, height, width } = event.nativeEvent.layout;
                             weekTops.current[weekIndex] = y;
-                            if (weekIndex === 0) setDrawnWeekHeight(height);
+                            if (weekIndex === 0)
+                              setDrawnWeek((previous) =>
+                                previous.width === width && previous.height === height
+                                  ? previous
+                                  : { width, height },
+                              );
                           }
                         : undefined
                     }

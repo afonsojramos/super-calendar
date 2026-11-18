@@ -72,12 +72,16 @@ export const MonthCellProbe = memo(function MonthCellProbe({
   week,
   day,
   cellStyle,
+  dayWidth,
+  weekWidth,
   onMeasure,
 }: {
   id: string;
   week: ResolvedSlot<ViewStyle>;
   day: ResolvedSlot<ViewStyle>;
   cellStyle: StyleProp<ViewStyle>;
+  dayWidth: number;
+  weekWidth: number;
   onMeasure: (id: string, geometry: MonthCellGeometry) => void;
 }) {
   const layouts = useRef<Partial<Record<Part, LayoutRectangle>>>({});
@@ -132,7 +136,7 @@ export const MonthCellProbe = memo(function MonthCellProbe({
 
   useLayoutEffect(() => {
     readWeb();
-  }, [readWeb, week, day, cellStyle]);
+  }, [readWeb, week, day, cellStyle, dayWidth, weekWidth]);
 
   function observe(part: Part) {
     return {
@@ -163,12 +167,12 @@ export const MonthCellProbe = memo(function MonthCellProbe({
       <View
         {...observe("row")}
         {...week}
-        style={[week.style, styles.intrinsic]}
+        style={[week.style, styles.intrinsic, { width: weekWidth }]}
         collapsable={false}
       >
         <TouchableOpacity
           {...day}
-          style={[day.style, cellStyle, styles.stacked]}
+          style={[day.style, cellStyle, styles.measuredDay, { width: dayWidth }]}
           disabled
           onLayout={observe("cell").onLayout}
         >
@@ -186,7 +190,8 @@ const styles = StyleSheet.create({
   gridSpacing: { height: "auto", minHeight: 0, maxHeight: "auto", flex: 0 },
   emptyWeek: { height: 0 },
   intrinsic: { height: "auto", minHeight: 0 },
-  stacked: { justifyContent: "flex-start", alignSelf: "stretch" },
+  // The visible cell supplies the width, including changes from gaps and hidden days.
+  measuredDay: { justifyContent: "flex-start", alignSelf: "stretch", flex: 0, flexBasis: "auto" },
   marker: { height: MARKER_HEIGHT },
   // Fill space reserved by the day height so it does not count as bottom padding.
   laneMarker: { height: MARKER_HEIGHT, flexGrow: 1 },

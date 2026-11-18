@@ -46,6 +46,15 @@ const constrainedWeeks = new Map<string, { grid?: ViewStyle; week?: ViewStyle; d
   ["day-minimum", { week: paddedWeek, day: { minHeight: 200 } }],
   ["day-minimum-class", { week: paddedWeek }],
   ["day-height", { week: paddedWeek }],
+  ["day-aspect", { day: { aspectRatio: 1 } }],
+  [
+    "day-aspect-spaced",
+    {
+      grid: { width: "80%" },
+      week: { paddingHorizontal: 10, columnGap: 8 },
+      day: { aspectRatio: 1 },
+    },
+  ],
   ["week-minimum", { grid: { height: 300, paddingTop: 12, rowGap: 10 }, week: { minHeight: 140 } }],
 ]);
 
@@ -54,12 +63,23 @@ function StyledWeeks({ layout }: { layout: string }) {
   const classes = layout === "classes";
   const shortGrid = constrainedWeeks.get(layout);
   const tallDay = layout.startsWith("day-");
-  const viewportHeight = tallDay || layout === "grid-minimum" ? 300 : shortGrid ? 600 : 150;
+  const squareDays = layout.startsWith("day-aspect");
+  const spacedDays = layout === "day-aspect-spaced";
+  const viewportHeight = squareDays
+    ? spacedDays
+      ? 372
+      : 360
+    : tallDay || layout === "grid-minimum"
+      ? 300
+      : shortGrid
+        ? 600
+        : 150;
   return (
-    <View style={{ width: 700, height: viewportHeight }}>
+    <View style={{ width: squareDays ? "100%" : 700, height: viewportHeight }}>
       <MultiWeekView
         date={date}
         numberOfWeeks={3}
+        hiddenDays={spacedDays ? [0, 6] : undefined}
         events={tallDay ? fiveEvents : busyDays}
         showTitle={false}
         showWeekdays={false}
