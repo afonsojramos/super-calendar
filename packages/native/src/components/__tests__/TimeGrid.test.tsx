@@ -25,7 +25,7 @@ vi.mock("@legendapp/list/react-native", () => ({
 
 import { Calendar } from "../Calendar";
 import { DefaultEvent } from "../DefaultEvent";
-import { TimeGrid } from "../TimeGrid";
+import { TimeGrid, type VerticalScrollEvent } from "../TimeGrid";
 import { CalendarThemeProvider, mergeTheme } from "../../theme";
 
 type WithId = { id: string };
@@ -1965,5 +1965,40 @@ describe("TimeGrid vertical scroll view props", () => {
     expect(scroll.props.contentContainerStyle).toBeUndefined();
     expect(scroll.props.bounces).toBe(true);
     expect(scroll.props.overScrollMode).toBeUndefined();
+  });
+
+  it("delivers scroll dimensions to the current Calendar callback", async () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const calendar = (onTimeGridScroll?: (event: VerticalScrollEvent) => void) => (
+      <Calendar
+        mode="day"
+        date={date}
+        events={[event]}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        onTimeGridScroll={onTimeGridScroll}
+      />
+    );
+    const { container, rerender } = await render(calendar(first));
+    const nativeEvent = {
+      contentOffset: { x: 0, y: 75 },
+      contentSize: { width: 390, height: 1400 },
+      layoutMeasurement: { width: 390, height: 600 },
+    };
+    const scroll = () => {
+      const [scrollView] = container.queryAll((node) => node.props.scrollEventThrottle === 16);
+      return fireEvent.scroll(scrollView, { nativeEvent });
+    };
+
+    await scroll();
+    expect(first).toHaveBeenCalledExactlyOnceWith({ nativeEvent });
+    await rerender(calendar(second));
+    await scroll();
+    expect(second).toHaveBeenCalledExactlyOnceWith({ nativeEvent });
+    await rerender(calendar());
+    await scroll();
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
   });
 });

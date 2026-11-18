@@ -112,7 +112,10 @@ vi.mock("react-native-reanimated", async () => {
         reactionRef.current.react = react;
       }
     },
-    useAnimatedScrollHandler: () => () => {},
+    useAnimatedScrollHandler:
+      ({ onScroll }) =>
+      ({ nativeEvent }) =>
+        onScroll(nativeEvent),
     useReducedMotion: () => false,
     runOnJS:
       (fn) =>
