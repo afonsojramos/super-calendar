@@ -117,6 +117,33 @@ describe(rendererName, () => {
       up();
     });
 
+    it("keeps the preview on the hidden lane a day draws in place of its label", () => {
+      // A and B cover Monday to Thursday, C and D Monday only. A Thursday sweep
+      // lands on lane 2, Thursday's only hidden lane, which Thursday draws.
+      const allDay = (title: string, last: number) => ({
+        title,
+        start: new Date(2026, 6, 13),
+        end: new Date(2026, 6, last + 1),
+        allDay: true,
+      });
+      const view = render(MonthView, {
+        date,
+        events: [allDay("A", 16), allDay("B", 16), allDay("C", 13), allDay("D", 13)],
+        weekStartsOn: 1,
+        maxVisibleEventCount: 3,
+        onCreateEvent: vi.fn(),
+        renderCreateGhost: Draft,
+      });
+      const top = (element: HTMLElement) => Number.parseFloat(element.style.top);
+      const laneZero = top(view.getByLabelText("A, 13 July"));
+      const laneOne = top(view.getByLabelText("B, 13 July"));
+      down(view.container, "2026-07-16");
+      const [preview] = previews(view.container);
+      expect(top(preview)).toBe(laneOne + (laneOne - laneZero));
+      expect(top(view.getByLabelText("A, 13 July"))).toBe(laneZero);
+      up();
+    });
+
     it("allows a preview in an empty month without an events prop", () => {
       const view = render(MonthView, { date, onCreateEvent: vi.fn(), renderCreateGhost: Draft });
       down(view.container, "2026-07-15");

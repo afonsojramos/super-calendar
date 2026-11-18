@@ -918,9 +918,12 @@ export function DateRows<T = unknown>({
         week.days.map((d) => d.date),
         collectRowEvents(week, days),
       );
-      return keepMonthDraftVisible(placed, base, draftEvent, visibleLanesFor);
+      return keepMonthDraftVisible(placed, base, draftEvent, {
+        visibleLanes: visibleLanesFor,
+        extraLaneFits: (visibleLanes) => visibleLanes < maxVisibleEventCount,
+      });
     });
-  }, [draftEvent, weekLayouts, eventsByDay, weeks, visibleLanesFor]);
+  }, [draftEvent, weekLayouts, eventsByDay, weeks, visibleLanesFor, maxVisibleEventCount]);
   const movedRef = useRef(false);
   // Set when a drag commits, so the click the browser fires next is swallowed (it
   // must not also open the day, or the event the drag landed on). A drag that ends

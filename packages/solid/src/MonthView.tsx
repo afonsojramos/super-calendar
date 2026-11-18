@@ -922,7 +922,10 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
         week.days.map((d) => d.date),
         collectRowEvents(week, days),
       );
-      return keepMonthDraftVisible(placed, row, draft, visibleLanesFor);
+      return keepMonthDraftVisible(placed, row, draft, {
+        visibleLanes: visibleLanesFor,
+        extraLaneFits: (visibleLanes) => visibleLanes < props.maxVisibleEventCount,
+      });
     });
   });
   const dragRef: ElementRef<MonthDrag<T> | null> = { current: null };

@@ -573,7 +573,10 @@ function DateRowsInner<T>({
         layoutMonthWeek(week, collectRowEvents(week, days)),
         base,
         draftEvent,
-        (laneCount) => monthVisibleCount(laneCount, capacity),
+        {
+          visibleLanes: (laneCount) => monthVisibleCount(laneCount, capacity),
+          extraLaneFits: (visibleLanes) => capacity.full > visibleLanes,
+        },
       );
     });
   }, [draftEvent, weekLayouts, eventsByDay, sortedMonthView, weeks, capacity]);

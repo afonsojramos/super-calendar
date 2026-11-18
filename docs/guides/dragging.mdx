@@ -486,8 +486,7 @@ function MonthDraft(props: CreateGhostArgs) {
 </CodeGroup>
 
 The preview uses `chipHeight`, `chipGap`, and the `createGhost` styling slot.
-It occupies the next available visible lane, or overlays the last lane when
-the row is full, without moving existing events. Its content is clipped,
+It sits on the lane described above. Its content is clipped,
 ignores pointer input, and is hidden from screen readers. On web, it also stays out of the tab order. It updates as the
 sweep reaches another day and clears on release or cancellation.
 
