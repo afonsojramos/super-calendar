@@ -1,9 +1,9 @@
 import { existsSync } from "node:fs";
-import { chromium, firefox, webkit } from "playwright";
+import { chromium, firefox, webkit, type LaunchOptions } from "playwright";
 
 export type BrowserEngine = "chromium" | "firefox" | "webkit";
 
-export function launchBrowser(engine: BrowserEngine = "chromium") {
+export function launchBrowser(engine: BrowserEngine = "chromium", options: LaunchOptions = {}) {
   const executablePath =
     engine === "chromium"
       ? (process.env.CHROME ??
@@ -16,5 +16,9 @@ export function launchBrowser(engine: BrowserEngine = "chromium") {
               "/usr/bin/chromium-browser",
             ].find(existsSync)))
       : undefined;
-  return { chromium, firefox, webkit }[engine].launch({ headless: true, executablePath });
+  return { chromium, firefox, webkit }[engine].launch({
+    headless: true,
+    executablePath,
+    ...options,
+  });
 }

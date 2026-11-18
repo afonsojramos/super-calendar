@@ -1,13 +1,14 @@
 import { buildMultiWeekGrid } from "@super-calendar/core";
 import { useMemo } from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
-import { StyleSheet } from "react-native";
+import { type StyleProp, StyleSheet, Text, type ViewStyle } from "react-native";
 import * as gestureHandlerMock from "react-native-gesture-handler";
 import { addDays, addWeeks, differenceInCalendarDays, format, startOfMonth } from "date-fns";
 import { vi } from "vitest";
 import type { CalendarEvent } from "../../types";
 import { DefaultEvent } from "../DefaultEvent";
 import { MultiWeekView } from "../MultiWeekView";
+import { CalendarThemeProvider, mergeTheme } from "../../theme";
 
 const list = vi.hoisted(() => ({ props: null as any, scroll: vi.fn() }));
 vi.mock("@legendapp/list/react-native", () => ({
@@ -60,6 +61,34 @@ const settle = async (props: any, index: number) => {
   );
 };
 
+type RenderedGrid = Awaited<ReturnType<typeof render>>;
+
+const rowHeights = (view: RenderedGrid) =>
+  view.getByTestId("multiweek-grid").children.map((row) => {
+    if (typeof row === "string") throw new Error("Expected a week row");
+    return StyleSheet.flatten(row.props.style as StyleProp<ViewStyle>)?.height;
+  });
+
+const layoutViewport = (view: RenderedGrid, height: number) =>
+  fireEvent(view.getByTestId("multiweek-viewport"), "layout", {
+    nativeEvent: { layout: { width: 700, height, x: 0, y: 0 } },
+  });
+
+const busyEvents = (count: number) =>
+  Array.from({ length: count }, (_, i) => ({
+    title: `Busy ${i}`,
+    start: new Date(2030, 11, 31, 9 + i),
+    end: new Date(2030, 11, 31, 10 + i),
+  }));
+
+// Fixed multi-week rows also hold the day cell's hairline top border.
+const expectRows = (heights: unknown[], count: number, height: number) => {
+  expect(heights).toHaveLength(count);
+  for (const rowHeight of heights) {
+    expect(rowHeight).toBeCloseTo(height + StyleSheet.hairlineWidth);
+  }
+};
+
 beforeEach(() => list.scroll.mockClear());
 
 describe("native MultiWeekView", () => {
@@ -70,7 +99,9 @@ describe("native MultiWeekView", () => {
         <MultiWeekView {...base} numberOfWeeks={numberOfWeeks} chipHeight={20} chipGap={2} />,
       );
       const grid = view.getByTestId("multiweek-grid");
-      expect(StyleSheet.flatten(grid.props.style).minHeight).toBe(96 * numberOfWeeks);
+      expect(StyleSheet.flatten(grid.props.style).minHeight).toBeCloseTo(
+        (96 + StyleSheet.hairlineWidth) * numberOfWeeks,
+      );
       expect(view.getAllByLabelText(/, 0 events$/)).toHaveLength(numberOfWeeks * 7);
       expect(view.getByLabelText(/23 December 2030, 0 events$/)).toBeTruthy();
       expect(view.getByLabelText(/ 1 January 2031, 0 events$/)).toBeTruthy();
@@ -80,6 +111,255 @@ describe("native MultiWeekView", () => {
       ).toBeGreaterThan(0);
     },
   );
+
+  it("gives every week row the same height, however many events it holds", async () => {
+    // The first week holds four events; the others hold none. In the scroll
+    // viewport, flexed rows grew with their events, so rows drew at different
+    // heights while the hit test and chip capacity divided the grid evenly.
+    const busy = busyEvents(4);
+    const view = await render(<MultiWeekView {...base} events={busy} numberOfWeeks={3} />);
+    const heights = () => rowHeights(view);
+    await layoutViewport(view, 600);
+    expect(heights()).toEqual([200, 200, 200]);
+    // Rows grow from their common height when the grid has extra space. A zero
+    // flex basis would discard that height on Yoga.
+    const flexKeys = ["flex", "flexGrow", "flexShrink", "flexBasis", "height"];
+    const grid = StyleSheet.flatten(view.getByTestId("multiweek-grid").props.style) ?? {};
+    for (const key of flexKeys) expect(grid).not.toHaveProperty(key);
+    for (const row of view.getByTestId("multiweek-grid").children) {
+      const style =
+        StyleSheet.flatten((row as { props: { style?: StyleProp<ViewStyle> } }).props.style) ?? {};
+      expect(style.flexGrow).toBe(1);
+      expect(style.flexShrink).toBe(1);
+      for (const key of ["flex", "flexBasis"]) expect(style).not.toHaveProperty(key);
+    }
+    // A short viewport keeps each row at its minimum height and scrolls instead.
+    await layoutViewport(view, 90);
+    const [first, ...rest] = heights() as number[];
+    expect(first).toBeGreaterThan(30);
+    expect(rest).toEqual([first, first]);
+  });
+
+  it("keeps room for the overflow label under a fixed cap in a short viewport", async () => {
+    // One 20pt lane plus "+N more" under a 30pt date area: 30 + 22 + 22.
+    const busy = busyEvents(2);
+    const view = await render(
+      <MultiWeekView
+        {...base}
+        events={busy}
+        numberOfWeeks={3}
+        chipHeight={20}
+        chipGap={2}
+        maxVisibleEventCount={1}
+      />,
+    );
+    await layoutViewport(view, 90);
+    expectRows(rowHeights(view), 3, 74);
+    expect(view.getByText(/More/)).toBeTruthy();
+  });
+
+  it("fits a themed overflow line height under a fixed cap", async () => {
+    // Default 20pt chips and a 40pt overflow line: 30 + 22 + (40 + 2).
+    const busy = busyEvents(2);
+    const view = await render(
+      <CalendarThemeProvider
+        value={mergeTheme({ text: { more: { fontSize: 11, lineHeight: 40 } } })}
+      >
+        <MultiWeekView {...base} events={busy} numberOfWeeks={3} maxVisibleEventCount={1} />
+      </CalendarThemeProvider>,
+    );
+    await layoutViewport(view, 90);
+    expectRows(rowHeights(view), 3, 94);
+  });
+
+  it.each([
+    // No gap: 28 date area + 20 lane + 2 label margin + 20 label.
+    {
+      label: "a capped row without gaps",
+      props: { chipHeight: 20, chipGap: 0, maxVisibleEventCount: 1 },
+      theme: {},
+      height: 70,
+    },
+    // Auto-fit keeps one lane beside the label: 30 + 22 + 2 + 60, more than three lanes.
+    {
+      label: "an auto-fit row with a tall label",
+      props: {},
+      theme: { more: { fontSize: 11, lineHeight: 60 } },
+      height: 114,
+    },
+    {
+      // A consumer's `styles.more` wins over the theme: 30 + 22 + 2 + 40.
+      label: "a capped row with a restyled label",
+      props: { maxVisibleEventCount: 1, styles: { more: { lineHeight: 40 } } },
+      theme: {},
+      height: 94,
+    },
+  ])("fits the overflow label in $label", async ({ props, theme, height }) => {
+    const busy = busyEvents(4);
+    const view = await render(
+      <CalendarThemeProvider value={mergeTheme({ text: theme })}>
+        <MultiWeekView {...base} {...props} events={busy} numberOfWeeks={3} />
+      </CalendarThemeProvider>,
+    );
+    await layoutViewport(view, 90);
+    expectRows(rowHeights(view), 3, height);
+    expect(view.getByText(/More/).props.numberOfLines).toBe(1);
+  });
+
+  it("sizes rows from the measured overflow label", async () => {
+    // Borders, minimum heights and class names only show in the laid-out label, so
+    // its measured height (60pt here) wins over the estimate: 30 + 22 + 60.
+    const busy = busyEvents(2);
+    const view = await render(
+      <MultiWeekView
+        {...base}
+        events={busy}
+        numberOfWeeks={3}
+        maxVisibleEventCount={1}
+        styles={{ more: { minHeight: 58 } }}
+      />,
+    );
+    await fireEvent(
+      view.getByTestId("month-more-probe", { includeHiddenElements: true }),
+      "layout",
+      {
+        nativeEvent: { layout: { width: 60, height: 60, x: 0, y: 0 } },
+      },
+    );
+    await layoutViewport(view, 90);
+    expectRows(rowHeights(view), 3, 112);
+  });
+
+  it("keeps room for a custom date taller than the built-in badge", async () => {
+    // A 120pt custom date adds 96pt over the 24pt badge: 30 + 96 + three 22pt lanes.
+    const view = await render(
+      <MultiWeekView
+        {...base}
+        numberOfWeeks={3}
+        renderCustomDateForMonth={(day) => <Text>{`date ${day.getDate()}`}</Text>}
+      />,
+    );
+    const custom = view.getByText("date 31").parent;
+    if (!custom) throw new Error("custom date wrapper not found");
+    await fireEvent(custom, "layout", {
+      nativeEvent: { layout: { width: 40, height: 120, x: 0, y: 4 } },
+    });
+    await layoutViewport(view, 90);
+    expectRows(rowHeights(view), 3, 192);
+  });
+
+  it("counts a tall custom date when fitting lanes above the overflow label", async () => {
+    // 404pt over three weeks gives 134.67pt rows. Below a 60pt custom date, 70.67pt
+    // fits two 22pt lanes plus the 17pt "+N more" label, so five events show two.
+    const busy = busyEvents(5);
+    const view = await render(
+      <MultiWeekView
+        {...base}
+        events={busy}
+        numberOfWeeks={3}
+        renderCustomDateForMonth={(day) => <Text>{`date ${day.getDate()}`}</Text>}
+      />,
+    );
+    const custom = view.getByText("date 31").parent;
+    if (!custom) throw new Error("custom date wrapper not found");
+    await fireEvent(custom, "layout", {
+      nativeEvent: { layout: { width: 40, height: 60, x: 0, y: 4 } },
+    });
+    await layoutViewport(view, 404);
+    await fireEvent(view.getByTestId("multiweek-grid"), "layout", {
+      nativeEvent: { layout: { width: 700, height: 404, x: 0, y: 0 } },
+    });
+    expect(view.getByLabelText("3 more events, 31 December")).toBeTruthy();
+  });
+
+  it("keeps room for a restyled built-in date badge, and gives it back", async () => {
+    // The date wrapper around the built-in badge, which holds the day number.
+    const dateArea = (view: Awaited<ReturnType<typeof render>>) => {
+      const wrapper = view.getByText("31").parent?.parent;
+      if (!wrapper) throw new Error("date wrapper not found");
+      return wrapper;
+    };
+    const tall = (
+      <MultiWeekView {...base} numberOfWeeks={3} styles={{ dayBadge: { height: 120 } }} />
+    );
+    const view = await render(tall);
+    await layoutViewport(view, 90);
+    // A 120pt badge adds 96pt over the 24pt default: 30 + 96 + three 22pt lanes.
+    await fireEvent(dateArea(view), "layout", {
+      nativeEvent: { layout: { width: 40, height: 120, x: 0, y: 4 } },
+    });
+    expectRows(rowHeights(view), 3, 192);
+    // Back to the plain badge, the reserve shrinks to the 96pt minimum again.
+    await view.rerender(<MultiWeekView {...base} numberOfWeeks={3} />);
+    await fireEvent(dateArea(view), "layout", {
+      nativeEvent: { layout: { width: 40, height: 24, x: 0, y: 4 } },
+    });
+    expectRows(rowHeights(view), 3, 96);
+  });
+
+  describe("fixed rows and day-cell styles", () => {
+    it("keeps rows at the minimum when the cell aligns its content to the bottom", async () => {
+      // A bottom-aligned date sits lower in a taller row. Its position must not
+      // feed the row height, or each layout would grow the row again.
+      const view = await render(
+        <MultiWeekView
+          {...base}
+          numberOfWeeks={3}
+          styles={{ day: { justifyContent: "flex-end" } }}
+        />,
+      );
+      await layoutViewport(view, 90);
+      for (let pass = 0; pass < 3; pass++) {
+        const rowHeight = rowHeights(view)[0] as number;
+        const dateArea = view.getByText("31").parent?.parent;
+        if (!dateArea) throw new Error("date wrapper not found");
+        await fireEvent(dateArea, "layout", {
+          nativeEvent: { layout: { width: 40, height: 24, x: 0, y: rowHeight - 24 } },
+        });
+      }
+      expectRows(rowHeights(view), 3, 96);
+    });
+
+    it("forgets a tall date once its week leaves the view", async () => {
+      // 8 January sits in the third week. Dropping that week must not keep its
+      // 120pt date, though the remaining dates never lay out again.
+      const tallDate = (day: Date) => <Text>{`date ${day.getDate()}`}</Text>;
+      const view = await render(
+        <MultiWeekView {...base} numberOfWeeks={3} renderCustomDateForMonth={tallDate} />,
+      );
+      await layoutViewport(view, 90);
+      const custom = view.getByText("date 8").parent;
+      if (!custom) throw new Error("custom date wrapper not found");
+      await fireEvent(custom, "layout", {
+        nativeEvent: { layout: { width: 40, height: 120, x: 0, y: 4 } },
+      });
+      expectRows(rowHeights(view), 3, 192);
+      await view.rerender(
+        <MultiWeekView {...base} numberOfWeeks={2} renderCustomDateForMonth={tallDate} />,
+      );
+      expect(view.queryByText("date 8")).toBeNull();
+      expectRows(rowHeights(view), 2, 96);
+    });
+
+    it("keeps the built-in badge at the cell's end whatever the cell's alignment", async () => {
+      const view = await render(
+        <MultiWeekView {...base} numberOfWeeks={3} styles={{ day: { alignItems: "center" } }} />,
+      );
+      const dateArea = view.getByText("31").parent?.parent;
+      if (!dateArea) throw new Error("date wrapper not found");
+      expect(StyleSheet.flatten(dateArea.props.style)?.alignSelf).toBe("stretch");
+
+      const custom = await render(
+        <MultiWeekView
+          {...base}
+          numberOfWeeks={3}
+          renderCustomDateForMonth={(day) => <Text>{`date ${day.getDate()}`}</Text>}
+        />,
+      );
+      const customArea = custom.getByText("date 31").parent;
+      expect(StyleSheet.flatten(customArea?.props.style)?.alignSelf).toBeUndefined();
+    });
+  });
 
   it("creates across a year and row boundary with an exclusive end", async () => {
     const create = vi.fn();

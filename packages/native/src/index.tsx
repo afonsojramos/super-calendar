@@ -66,6 +66,7 @@ export type {
   EventAccessibilityLabeler,
   EventKeyExtractor,
   ICalendarEvent,
+  MonthDateInfo,
   RecurrenceFrequency,
   RecurrenceRule,
   RenderEvent,

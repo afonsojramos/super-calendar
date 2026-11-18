@@ -191,10 +191,10 @@ agenda, resource timeline, and date pickers as Solid components. It uses Solid
 signals and the React-free `@super-calendar/core/vanilla` entry.
 
 ```sh
-pnpm add @super-calendar/solid solid-js@2.0.0-rc.20 @solidjs/web@2.0.0-rc.20 date-fns
+pnpm add @super-calendar/solid solid-js@^2 @solidjs/web@^2 date-fns
 ```
 
-Keep both Solid peers on these exact release-candidate versions. Solid 1 is not
+The package needs Solid 2 (`solid-js` and `@solidjs/web` 2.x). Solid 1 is not
 supported. Use `createDateRange`, `createMonthGrid`, and `createNow` for reactive
 state, and `darkSolidTheme` or partial theme tokens for styling. See the
 [Solid package README](packages/solid/README.md) for compiler setup, examples, and

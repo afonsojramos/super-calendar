@@ -54,7 +54,7 @@ in-view dragging without edge paging. Other navigation remains available.
 | `renderEvent`              | `RenderEvent<T>`                   | Render events your way, every mode.        |
 | `eventAccessibilityLabel`  | `(event, ctx) => string`           | Override an event's screen-reader label.   |
 | `labels`                   | `Partial<CalendarLabels>`          | Translate screen-reader words and actions. |
-| `renderCustomDateForMonth` | `(date) => ReactNode`              | Month: replace the day-cell date badge.    |
+| `renderCustomDateForMonth` | `(date, info) => ReactNode`        | Month: replace the day-cell date badge.    |
 | `eventCellStyle`           | `style \| (event) => style`        | Tweak the built-in box.                    |
 | `calendarCellStyle`        | `(date) => style`                  | Per-date column/cell shading.              |
 | `businessHours`            | `(date) => { start, end } \| null` | Shade closed hours.                        |
@@ -233,7 +233,7 @@ Changing either dimension updates already mounted list and pager months.
     `CalendarEvent`, `CalendarMode`, `RenderEventArgs`, `RecurrenceRule`, `BusinessHours`,
     `EventDragHandler`, `CalendarTheme`, `PositionedEvent`, `DateRange`, `MonthGrid`,
     `MonthEventSegment`, `MonthWeekEvents`, `MonthListProps`, `CalendarSlot`, `SlotStyleProps`,
-    `CalendarLabels`, `CalendarHandle`, `ScrollToTimeOptions`, `CreateGhostArgs`
+    `CalendarLabels`, `CalendarHandle`, `ScrollToTimeOptions`, `CreateGhostArgs`, `MonthDateInfo`
   </Card>
 </CardGroup>
 
@@ -246,6 +246,10 @@ window in each renderer. Its `date` belongs to the first displayed week;
 selection, drag interactions, and styling. `renderMonthEvent` on web `Calendar`,
 and native `renderHeaderForMonthView`/`renderCustomDateForMonth`, also apply here.
 Custom event callbacks receive `mode: "multiweek"`.
+
+On native, all week rows share a height. Dates align at the top of their cells,
+and event bars start below the tallest date. Rows scroll when the dates, event
+lanes and overflow labels need more space than the viewport provides.
 
 Held web moves track event object identity. With `Calendar` recurrence or
 `timeZone`, replacing the `events` array rebuilds displayed events and cancels
@@ -363,8 +367,8 @@ the calendar page. See [Move and resize actions](/guides/accessibility#move-and-
 
 ## Solid exports
 
-`@super-calendar/solid` is an ESM package for `solid-js@2.0.0-rc.20` and
-`@solidjs/web@2.0.0-rc.20`. Its version matches the other calendar packages, and it
+`@super-calendar/solid` is an ESM package for Solid 2 (`solid-js@^2.0.0` and
+`@solidjs/web@^2.0.0`). Its version matches the other calendar packages, and it
 uses the `latest` npm tag. It does not support Solid 1. The
 [Solid guide](/guides/solid) covers compiler setup and hydration.
 

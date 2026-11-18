@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.19.0](https://github.com/afonsojramos/super-calendar/compare/v2.18.0...v2.19.0) (2026-11-18)
+
+
+### Features
+
+* **native:** pass the day's state to renderCustomDateForMonth ([#158](https://github.com/afonsojramos/super-calendar/issues/158)) ([468db9c](https://github.com/afonsojramos/super-calendar/commit/468db9cace0eaf606f0a235d8b5b0f003dfaa03c))
+* place the month create draft on the lane its event will take ([#163](https://github.com/afonsojramos/super-calendar/issues/163)) ([3c815b5](https://github.com/afonsojramos/super-calendar/commit/3c815b5e0ae17f35e1425692e6db1a889941b60b))
+* show a day's one hidden month event instead of a +1 label ([#160](https://github.com/afonsojramos/super-calendar/issues/160)) ([37674c8](https://github.com/afonsojramos/super-calendar/commit/37674c8a937cac0af4dd11ea9746c6a5909e81ef))
+* **solid:** support the Solid 2.0 release ([#162](https://github.com/afonsojramos/super-calendar/issues/162)) ([655631f](https://github.com/afonsojramos/super-calendar/commit/655631fe474318d5a539bf9f91274e49e36c10e9))
+
+
+### Bug Fixes
+
+* **example:** adopt the scene life cycle so the native example launches on iOS 27 ([#159](https://github.com/afonsojramos/super-calendar/issues/159)) ([9ce45b2](https://github.com/afonsojramos/super-calendar/commit/9ce45b20823292a6943698753e1a36a946fb1f11))
+* **native:** align multi-week rows and event hit targets ([#168](https://github.com/afonsojramos/super-calendar/issues/168)) ([d19952f](https://github.com/afonsojramos/super-calendar/commit/d19952f6a9741a0f0068dd705ade45b60659b84f))
+* **native:** move an event picked up by a hold on its resize grip ([#161](https://github.com/afonsojramos/super-calendar/issues/161)) ([25709e4](https://github.com/afonsojramos/super-calendar/commit/25709e4805eb5766785e40db00bedb9121d90bed))
+
 ## [2.18.0](https://github.com/afonsojramos/super-calendar/compare/v2.17.0...v2.18.0) (2026-11-17)
 
 

@@ -33,6 +33,7 @@ import type {
   CalendarMode,
   CreateGhostArgs,
   EventKeyExtractor,
+  MonthDateInfo,
   RenderEvent,
   RenderEventArgs,
   WeekStartsOn,
@@ -383,10 +384,11 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   renderHeaderForMonthView?: (weekDays: Date[]) => React.ReactNode;
   /**
    * Month mode only: replace the default date badge in each day cell. Receives
-   * the day; return your own date label (e.g. a number with a dot or badge).
+   * the day and its state (`isCurrentMonth`, `isToday`, `isSelected`,
+   * `isDisabled`); return your own date label (e.g. a number with a dot or badge).
    * Event chips and the "+N more" label still render below it.
    */
-  renderCustomDateForMonth?: (date: Date) => React.ReactNode;
+  renderCustomDateForMonth?: (date: Date, info: MonthDateInfo) => React.ReactNode;
   /** Drawn between rows of the `schedule` (agenda) list. */
   itemSeparatorComponent?: React.ComponentType<unknown> | null;
 };
