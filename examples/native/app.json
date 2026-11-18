@@ -8,6 +8,7 @@
     "scheme": "rnbc-example",
     "userInterfaceStyle": "light",
     "plugins": [
+      "./plugins/with-scene-lifecycle",
       [
         "expo-splash-screen",
         {

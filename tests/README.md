@@ -18,6 +18,7 @@ verifies:
 | `types/`                       | Test-only ambient type declarations.                                                       |
 | `packages/*/src/**/__tests__/` | Core logic and framework-specific behavior beside the source they exercise.                |
 | `examples/*/src/**/__tests__/` | Example integration behavior, including deployment paths.                                  |
+| `examples/native/plugins/`     | The native example's Expo config plugins and their unit tests.                             |
 
 Read the [shared web test guide](web/README.md) before adding a React DOM/Solid
 contract. Keep assertions in test files and reusable harness code in adapters or

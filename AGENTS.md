@@ -50,7 +50,7 @@ Use pnpm or nub, not npm/npx; both install correctly from the shared `pnpm-lock.
 
 ## Tests
 
-Vitest has five projects: `node` (core logic + native non-component tests), `dom` (React DOM in jsdom), `solid` (Solid in jsdom), `solid-server` (Solid SSR), and `native` (React Native through vitest-native's native engine). Native tests use Testing Library 14 and query host elements. The native setup retains the recording gesture and animation harness; device tests verify actual gestures and layout.
+Vitest has five projects: `node` (core logic, native non-component tests, and the native example's config plugins), `dom` (React DOM in jsdom), `solid` (Solid in jsdom), `solid-server` (Solid SSR), and `native` (React Native through vitest-native's native engine). Native tests use Testing Library 14 and query host elements. The native setup retains the recording gesture and animation harness; device tests verify actual gestures and layout.
 
 Write shared React DOM/Solid behavior in `tests/web/contracts`; read the [shared web test guide](tests/web/README.md) before adding cases. Both projects compile the same JSX for their framework and use the real calendar components. Keep framework-specific tests beside the source under `packages/*/src/**`; use the [test directory guide](tests/README.md) for repository checks, setup, and reusable helpers. Tests resolve core imports to source, so no build is needed. Use `vi` from `vitest` for mocks and timers. The forks pool isolates process state; DST fixtures use `tests/support/timezone.ts` to select and restore their time zone.
 
