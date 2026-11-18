@@ -338,6 +338,51 @@ describe("MonthView built-in more popover", () => {
   });
 });
 
+describe("MonthView per-day overflow", () => {
+  // Monday 15 June holds four events and Tuesday 16 June three.
+  const at = (title: string, day: number, hour: number): CalendarEvent => ({
+    title,
+    start: new Date(2026, 5, day, hour),
+    end: new Date(2026, 5, day, hour + 1),
+  });
+  const events = [
+    at("Mon A", 15, 9),
+    at("Mon B", 15, 10),
+    at("Mon C", 15, 11),
+    at("Mon D", 15, 12),
+    at("Tue A", 16, 9),
+    at("Tue B", 16, 10),
+    at("Tue C", 16, 11),
+  ];
+
+  // Five 100pt week rows with 20pt chips fit three lanes, or two plus "+N more".
+  const mount = async (props: Partial<React.ComponentProps<typeof MonthView>> = {}) => {
+    const view = await render(
+      <MonthView {...baseProps} events={events} chipHeight={20} {...props} />,
+    );
+    await fireEvent(view.getByTestId("month-grid"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 700, height: 500 } },
+    });
+    return view;
+  };
+
+  it("draws a day's one hidden event instead of a +1 label when its lane fits", async () => {
+    const { getByLabelText, queryByLabelText, getByText, queryByText } = await mount();
+    // Monday's fourth event pushes the row to two lanes plus "+N more".
+    expect(getByLabelText("2 more events, 15 June")).toBeTruthy();
+    expect(queryByText("Mon C")).toBeNull();
+    // Tuesday hides only its third event, so it draws it in the label's row.
+    expect(getByText("Tue C")).toBeTruthy();
+    expect(queryByLabelText(/more events?, 16 June/)).toBeNull();
+  });
+
+  it("keeps the label under a fixed maxVisibleEventCount", async () => {
+    const { getByLabelText, queryByText } = await mount({ maxVisibleEventCount: 2 });
+    expect(getByLabelText("1 more events, 16 June")).toBeTruthy();
+    expect(queryByText("Tue C")).toBeNull();
+  });
+});
+
 describe("MonthView labels", () => {
   const manyEvents: CalendarEvent[] = Array.from({ length: 6 }, (_, i) => ({
     title: `Event ${i + 1}`,
@@ -604,6 +649,32 @@ describe("MonthView drag", () => {
   });
 
   describe("to reschedule", () => {
+    it("grabs a bar drawn in a day's overflow row", async () => {
+      // 20pt chips fit four lanes in a 120pt row, or three plus "+N more". A, B, C
+      // and Span cover Mon-Tue on lanes 0-3 and Solo takes lane 4, so Monday hides
+      // two events and Tuesday draws Span, its one hidden event, on lane 3.
+      const span = (title: string, last: number): CalendarEvent => ({
+        title,
+        start: new Date(2026, 5, 15),
+        end: new Date(2026, 5, last + 1),
+        allDay: true,
+      });
+      const Span = span("Span", 16);
+      const onDragEvent = vi.fn();
+      const { getAllByText } = await mount(
+        <MonthView
+          {...baseProps}
+          events={[span("A", 16), span("B", 16), span("C", 16), Span, span("Solo", 15)]}
+          chipHeight={20}
+          onDragEvent={onDragEvent}
+        />,
+      );
+      expect(getAllByText("Span")).toHaveLength(1);
+      // Lane 3 starts 30 + 3 * 22 = 96pt into the row; drop on Wednesday.
+      await drag({ x: colX(2), y: rowY(2, 106) }, { x: colX(3), y: rowY(2, 106) });
+      expect(onDragEvent).toHaveBeenCalledWith(Span, new Date(2026, 5, 16), new Date(2026, 5, 18));
+    });
+
     it("fires onDragEvent with both ends shifted by the days dragged", async () => {
       const onDragEvent = vi.fn();
       const onDragStart = vi.fn();

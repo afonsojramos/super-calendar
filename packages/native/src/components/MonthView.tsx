@@ -71,6 +71,8 @@ import {
   isWeekend,
   monthEventCapacity,
   monthVisibleCount,
+  monthExtraLaneColumns,
+  monthVisibleBars,
   layoutMonthWeek,
   type MonthWeekEvents,
   monthCreateRange,
@@ -485,6 +487,21 @@ function DateRowsInner<T>({
     return monthEventCapacity(available, chipMetrics.chipRowHeight, moreRowHeight);
   }, [maxVisibleEventCount, gridHeight, weeks.length, theme, chipMetrics, chipHeight, chipGap]);
 
+  // The lanes a week row shows. When the auto-fit capacity leaves room for one lane
+  // more than the row shows, a day whose only hidden event sits on that lane draws
+  // it in place of a "+1 more" label (see monthExtraLaneColumns).
+  const rowLanes = useCallback(
+    (rowLayout: MonthWeekEvents<T>, columns: number) => {
+      const visibleLanes = monthVisibleCount(rowLayout.laneCount, capacity);
+      const extraLane =
+        capacity.full > visibleLanes
+          ? monthExtraLaneColumns(rowLayout, visibleLanes, columns)
+          : Array.from({ length: columns }, () => false);
+      return { visibleLanes, extraLane };
+    },
+    [capacity],
+  );
+
   // Group events by calendar day once per `events` change (shared with the dom
   // renderer via core's `groupEventsByDay`), rather than scanning the whole list
   // inside every one of the (up to) 42 day cells on each render. Multi-day events
@@ -622,9 +639,9 @@ function DateRowsInner<T>({
       // Which lane row the point lands on, mirroring the bar overlay's geometry.
       const rowLayout = weekLayouts[row] ?? EMPTY_LAYOUT;
       const lane = Math.floor((y - row * rowHeight - badgeArea) / chipMetrics.chipRowHeight);
-      const visibleLanes = monthVisibleCount(rowLayout.laneCount, capacity);
+      const { visibleLanes, extraLane } = rowLanes(rowLayout, cols);
       const segment =
-        lane >= 0 && lane < visibleLanes
+        lane >= 0 && lane < visibleLanes + (extraLane[col] ? 1 : 0)
           ? rowLayout.segments.find((s) => s.lane === lane && s.startCol <= col && s.endCol >= col)
           : undefined;
       return { day, event: segment?.event ?? null };
@@ -633,7 +650,7 @@ function DateRowsInner<T>({
       gridSize,
       weeks,
       weekLayouts,
-      capacity,
+      rowLanes,
       chipMetrics,
       badgeArea,
       showAdjacentMonths,
@@ -836,7 +853,7 @@ function DateRowsInner<T>({
     day: Date,
     dayCol: number,
     rowLayout: MonthWeekEvents<T>,
-    visibleLanes: number,
+    dayLanes: number,
   ) => {
     const isCurrentMonth = multiWeek || isSameMonth(day, date);
 
@@ -876,7 +893,7 @@ function DateRowsInner<T>({
     // Events past the visible lanes (this day's segments the row can't show)
     // collapse into "+N more"; the popover still lists the whole day.
     const hiddenEvents = rowLayout.segments
-      .filter((s) => s.startCol <= dayCol && s.endCol >= dayCol && s.lane >= visibleLanes)
+      .filter((s) => s.startCol <= dayCol && s.endCol >= dayCol && s.lane >= dayLanes)
       .map((s) => s.event);
     const hiddenCount = hiddenEvents.length;
 
@@ -1076,7 +1093,7 @@ function DateRowsInner<T>({
         {/* Reserve one row per visible lane so the overlay bars have space and
             "+more" sits below them; the bars themselves render in the row overlay
             (they span cells). */}
-        {Array.from({ length: visibleLanes }, (_, i) => (
+        {Array.from({ length: dayLanes }, (_, i) => (
           <View
             key={`lane-${i}`}
             style={{ height: chipMetrics.chipHeight, pointerEvents: "none" }}
@@ -1226,8 +1243,8 @@ function DateRowsInner<T>({
                 // in an overlay so they can span cells, and the cells reserve the lane rows
                 // so "+more" sits below them. `visibleLanes` mirrors the per-day cap.
                 const rowLayout = weekLayouts[weekIndex] ?? EMPTY_LAYOUT;
-                const visibleLanes = monthVisibleCount(rowLayout.laneCount, capacity);
                 const cols = week.length;
+                const { visibleLanes, extraLane } = rowLanes(rowLayout, cols);
                 // With adjacent months hidden, clamp bars to the current-month columns so
                 // none draw over the blank leading/trailing cells.
                 let firstVisCol = 0;
@@ -1263,7 +1280,9 @@ function DateRowsInner<T>({
                     {...slot("week", { base: styles.weekRow, themed: theme.containers.weekRow })}
                     key={multiWeekGrid?.weeks[weekIndex].id ?? week[0].toISOString()}
                   >
-                    {week.map((day, dayCol) => renderDay(day, dayCol, rowLayout, visibleLanes))}
+                    {week.map((day, dayCol) =>
+                      renderDay(day, dayCol, rowLayout, visibleLanes + (extraLane[dayCol] ? 1 : 0)),
+                    )}
                     {showGrid ? (
                       <View
                         style={[
@@ -1273,57 +1292,55 @@ function DateRowsInner<T>({
                             : { pointerEvents: "box-none" },
                         ]}
                       >
-                        {rowLayout.segments
-                          .filter((seg) => seg.lane < visibleLanes)
-                          .map((seg) => {
-                            const startCol = Math.max(seg.startCol, firstVisCol);
-                            const endCol = Math.min(seg.endCol, lastVisCol);
-                            if (startCol > endCol) return null;
-                            // Fade the bar being carried, so the tinted drop target reads
-                            // as where it is going and this as where it came from.
-                            const isDragged = drag?.kind === "move" && drag.event === seg.event;
-                            return (
-                              <View
-                                key={`bar-${seg.event.start.toISOString()}:${seg.event.title}:${seg.lane}`}
-                                style={[
-                                  {
-                                    position: "absolute",
-                                    left: pct((startCol / cols) * 100),
-                                    width: pct(((endCol - startCol + 1) / cols) * 100),
-                                    top: badgeArea + seg.lane * chipMetrics.chipRowHeight,
-                                    height: chipMetrics.chipHeight,
-                                    paddingHorizontal: CHIP_INSET_H,
-                                    // Let a sweep in progress reach the cells underneath.
-                                    opacity: isDragged ? DRAGGED_BAR_OPACITY : 1,
-                                  },
-                                  multiWeek
-                                    ? drag
-                                      ? styles.noPointerEvents
-                                      : styles.childrenOnlyPointerEvents
-                                    : { pointerEvents: drag ? "none" : "box-none" },
-                                ]}
-                              >
-                                <RenderEventComponent
-                                  event={seg.event}
-                                  mode={multiWeek ? "multiweek" : "month"}
-                                  isAllDay={isAllDayEvent(seg.event)}
-                                  onPress={
-                                    disableMonthEventCellPress
-                                      ? () => {}
-                                      : () => {
-                                          if (consumeSuppressedPress()) return;
-                                          onPressEvent(seg.event);
-                                        }
-                                  }
-                                  onLongPress={
-                                    disableMonthEventCellPress || !onLongPressEvent
-                                      ? undefined
-                                      : () => onLongPressEvent(seg.event)
-                                  }
-                                />
-                              </View>
-                            );
-                          })}
+                        {monthVisibleBars(rowLayout, visibleLanes, extraLane).map((seg) => {
+                          const startCol = Math.max(seg.startCol, firstVisCol);
+                          const endCol = Math.min(seg.endCol, lastVisCol);
+                          if (startCol > endCol) return null;
+                          // Fade the bar being carried, so the tinted drop target reads
+                          // as where it is going and this as where it came from.
+                          const isDragged = drag?.kind === "move" && drag.event === seg.event;
+                          return (
+                            <View
+                              key={`bar-${seg.event.start.toISOString()}:${seg.event.title}:${seg.lane}:${seg.startCol}`}
+                              style={[
+                                {
+                                  position: "absolute",
+                                  left: pct((startCol / cols) * 100),
+                                  width: pct(((endCol - startCol + 1) / cols) * 100),
+                                  top: badgeArea + seg.lane * chipMetrics.chipRowHeight,
+                                  height: chipMetrics.chipHeight,
+                                  paddingHorizontal: CHIP_INSET_H,
+                                  // Let a sweep in progress reach the cells underneath.
+                                  opacity: isDragged ? DRAGGED_BAR_OPACITY : 1,
+                                },
+                                multiWeek
+                                  ? drag
+                                    ? styles.noPointerEvents
+                                    : styles.childrenOnlyPointerEvents
+                                  : { pointerEvents: drag ? "none" : "box-none" },
+                              ]}
+                            >
+                              <RenderEventComponent
+                                event={seg.event}
+                                mode={multiWeek ? "multiweek" : "month"}
+                                isAllDay={isAllDayEvent(seg.event)}
+                                onPress={
+                                  disableMonthEventCellPress
+                                    ? () => {}
+                                    : () => {
+                                        if (consumeSuppressedPress()) return;
+                                        onPressEvent(seg.event);
+                                      }
+                                }
+                                onLongPress={
+                                  disableMonthEventCellPress || !onLongPressEvent
+                                    ? undefined
+                                    : () => onLongPressEvent(seg.event)
+                                }
+                              />
+                            </View>
+                          );
+                        })}
                         {RenderCreateGhost &&
                         createRange &&
                         draftStart !== undefined &&

@@ -50,6 +50,22 @@ const allDayEvents: FixtureEvent[] = [
 const recurringEvents: FixtureEvent[] = [
   { ...initialEvents[0], recurrence: { freq: "daily", count: 1 } },
 ];
+// A, B and Span cover Wednesday and Thursday on lanes 0-2; Solo adds a fourth
+// Wednesday event, so Wednesday hides two events and Thursday only Span.
+const overflowEvents: FixtureEvent[] = (
+  [
+    ["A", 17],
+    ["B", 17],
+    ["Span", 17],
+    ["Solo", 16],
+  ] as const
+).map(([title, end], id) => ({
+  id,
+  title,
+  start: new Date(2026, 6, 15),
+  end: new Date(2026, 6, end),
+  allDay: true,
+}));
 const denseEvents: FixtureEvent[] = Array.from({ length: 1000 }, (_, index) => {
   const start = new Date(
     2026,
@@ -216,21 +232,23 @@ export function Fixture() {
       ? view.startsWith("all-day-repack")
         ? [allDayEvents[0]]
         : allDayEvents
-      : view === "multiweek-transformed"
-        ? recurringEvents
-        : view === "dense"
-          ? denseEvents
-          : view === "edit-clipped"
-            ? clippedEvents
-            : view === "edit-overnight"
-              ? overnightEvents
-              : view === "edit-crowded"
-                ? crowdedEvents
-                : view === "edit-many" || (view.startsWith("multiweek") && view.endsWith("dense"))
-                  ? manyEvents
-                  : view === "edit"
-                    ? editEvents
-                    : initialEvents,
+      : view === "month-overflow"
+        ? overflowEvents
+        : view === "multiweek-transformed"
+          ? recurringEvents
+          : view === "dense"
+            ? denseEvents
+            : view === "edit-clipped"
+              ? clippedEvents
+              : view === "edit-overnight"
+                ? overnightEvents
+                : view === "edit-crowded"
+                  ? crowdedEvents
+                  : view === "edit-many" || (view.startsWith("multiweek") && view.endsWith("dense"))
+                    ? manyEvents
+                    : view === "edit"
+                      ? editEvents
+                      : initialEvents,
   );
   const [boardEvents, setBoardEvents] = useFixtureState(
     view.endsWith("crowded")
@@ -367,6 +385,16 @@ export function Fixture() {
               ? { allDayColumn: "all-day-cell", allDayEvent: "all-day-event" }
               : undefined
           }
+          onPressEvent={(event) => record(`press:${event.title}`)}
+        />
+      ) : view === "month-overflow" ? (
+        <Calendar
+          mode="month"
+          date={anchor}
+          events={events()}
+          weekStartsOn={1}
+          chipHeight={20}
+          maxVisibleEventCount={3}
           onPressEvent={(event) => record(`press:${event.title}`)}
         />
       ) : view.startsWith("multiweek") || view === "month-drag" ? (

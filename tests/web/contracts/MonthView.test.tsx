@@ -221,6 +221,33 @@ describe(rendererName, () => {
         expect(getByText("1 More")).toBeTruthy();
       });
 
+      it("draws a day's one hidden event in its overflow row instead of '1 More'", () => {
+        // A, B and Span cover Wednesday and Thursday on lanes 0-2; Solo adds a
+        // fourth Wednesday event. Wednesday hides two events, Thursday only Span.
+        const allDay = (title: string, first: number, last: number): CalendarEvent => ({
+          title,
+          start: new Date(2026, 6, first),
+          end: new Date(2026, 6, last + 1),
+          allDay: true,
+        });
+        const { getByText, queryByText, getByLabelText } = render(MonthView, {
+          date: new Date(2026, 6, 1),
+          weekStartsOn: 1,
+          events: [
+            allDay("A", 15, 16),
+            allDay("B", 15, 16),
+            allDay("Span", 15, 16),
+            allDay("Solo", 15, 15),
+          ],
+          maxVisibleEventCount: 3,
+        });
+        expect(getByText("2 More")).toBeTruthy();
+        expect(queryByText("1 More")).toBeNull();
+        expect(queryByText("Solo")).toBeNull();
+        // Span shows only where it is Thursday's one hidden event.
+        expect(getByLabelText("Span, 16 July")).toBe(getByText("Span").closest("button"));
+      });
+
       it("renders chips from a prebuilt eventsByDay map (the internal MonthList path)", () => {
         // MonthList builds the index once and passes it; the lookup key must match.
         const map = groupEventsByDay(events);

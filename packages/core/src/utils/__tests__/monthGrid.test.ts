@@ -1,5 +1,10 @@
 import type { CalendarEvent } from "../../types";
-import { buildMonthGrid, layoutMonthWeek } from "../monthGrid";
+import {
+  buildMonthGrid,
+  layoutMonthWeek,
+  monthExtraLaneColumns,
+  monthVisibleBars,
+} from "../monthGrid";
 
 describe("layoutMonthWeek", () => {
   // A Sun-Sat week: 21-27 June 2026.
@@ -139,5 +144,119 @@ describe("buildMonthGrid today", () => {
 
   it("flags nothing when the given day is outside the grid", () => {
     expect(flagged(new Date(2030, 0, 1))).toEqual([]);
+  });
+});
+
+describe("per-day month overflow", () => {
+  // A Sun-Sat week: 21-27 June 2026, showing two lanes before "+N more".
+  const days = Array.from({ length: 7 }, (_, i) => new Date(2026, 5, 21 + i));
+  const ev = (title: string, first: number, last = first): CalendarEvent => ({
+    title,
+    start: new Date(2026, 5, first),
+    end: new Date(2026, 5, last + 1),
+    allDay: true,
+  });
+  const visibleLanes = 2;
+
+  it("gives the extra lane to days whose only hidden event is on the first hidden lane", () => {
+    // Monday holds four events (two hidden); Tuesday and Wednesday three (one hidden).
+    const layout = layoutMonthWeek(days, [
+      ev("A", 22, 24),
+      ev("B", 22, 24),
+      ev("C", 22, 24),
+      ev("D", 22),
+    ]);
+    expect(layout.segments.map((s) => [s.event.title, s.lane])).toEqual([
+      ["A", 0],
+      ["B", 1],
+      ["C", 2],
+      ["D", 3],
+    ]);
+    expect(monthExtraLaneColumns(layout, visibleLanes, 7)).toEqual([
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it("keeps the label when the one hidden event sits on a lower lane", () => {
+    // A, B and C fill Sunday and Monday, so D starts on Monday on lane 3. On
+    // Tuesday and Wednesday D is the only hidden event, but lane 2 is empty there.
+    const layout = layoutMonthWeek(days, [
+      ev("A", 21, 22),
+      ev("B", 21, 22),
+      ev("C", 21, 22),
+      ev("D", 22, 24),
+    ]);
+    expect(layout.segments.find((s) => s.event.title === "D")?.lane).toBe(3);
+    // Only Sunday, whose one hidden event (C) is on lane 2, gets the extra lane.
+    expect(monthExtraLaneColumns(layout, visibleLanes, 7)).toEqual([
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it("returns no extra lanes when nothing is hidden", () => {
+    const layout = layoutMonthWeek(days, [ev("A", 22), ev("B", 22)]);
+    expect(monthExtraLaneColumns(layout, visibleLanes, 7)).toEqual(Array(7).fill(false));
+  });
+
+  it("draws a first-hidden-lane bar only over extra-lane columns, split into runs", () => {
+    // "Long" sits on lane 2 from Monday to Friday. Monday and Thursday hide a
+    // second event, so it shows on Tuesday-Wednesday and on Friday only.
+    const layout = layoutMonthWeek(days, [
+      ev("Long", 22, 26),
+      ev("A", 22, 26),
+      ev("B", 22, 26),
+      ev("Mon", 22),
+      ev("Thu", 25),
+    ]);
+    expect(layout.segments.find((s) => s.event.title === "B")?.lane).toBe(2);
+    const extra = monthExtraLaneColumns(layout, visibleLanes, 7);
+    expect(extra).toEqual([false, false, true, true, false, true, false]);
+    const bars = monthVisibleBars(layout, visibleLanes, extra);
+    expect(
+      bars.map((b) => [
+        b.event.title,
+        b.lane,
+        b.startCol,
+        b.endCol,
+        b.continuesBefore,
+        b.continuesAfter,
+      ]),
+    ).toEqual([
+      ["Long", 0, 1, 5, false, false],
+      ["A", 1, 1, 5, false, false],
+      ["B", 2, 2, 3, true, true],
+      ["B", 2, 5, 5, true, false],
+    ]);
+  });
+
+  it("keeps a bar's own continuation when the cut leaves its edge alone", () => {
+    const layout = layoutMonthWeek(days, [ev("A", 18, 21), ev("B", 18, 21), ev("Edge", 18, 21)]);
+    const bars = monthVisibleBars(layout, visibleLanes, [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+    expect(bars.find((b) => b.event.title === "Edge")).toMatchObject({
+      startCol: 0,
+      endCol: 0,
+      continuesBefore: true,
+      continuesAfter: false,
+    });
   });
 });

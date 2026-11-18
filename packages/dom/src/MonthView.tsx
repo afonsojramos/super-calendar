@@ -37,7 +37,9 @@ import {
   layoutMonthWeek,
   monthCreateRange,
   monthDropBounds,
+  monthExtraLaneColumns,
   type MonthGridWeekday,
+  monthVisibleBars,
   type MultiWeekGridDay,
   overlapsOtherEvents,
   rangeBandKind,
@@ -1227,9 +1229,15 @@ export function DateRows<T = unknown>({
           const visibleLanes = overflowing
             ? Math.max(maxVisibleEventCount - 1, 1)
             : rowLayout.laneCount;
+          const cols = week.days.length;
+          // A day whose only hidden event sits on the "+more" row's lane draws that
+          // event there instead of "+1 more".
+          const extraLane =
+            visibleLanes < maxVisibleEventCount
+              ? monthExtraLaneColumns(rowLayout, visibleLanes, cols)
+              : week.days.map(() => false);
           // With adjacent months hidden, clamp bars to the current-month columns so
           // none draw over the blank leading/trailing cells.
-          const cols = week.days.length;
           let firstVisCol = 0;
           let lastVisCol = cols - 1;
           if (eventsMode && !showAdjacentMonths) {
@@ -1240,8 +1248,7 @@ export function DateRows<T = unknown>({
               lastVisCol = cols - 1 - lastFromEnd;
             }
           }
-          const barSegs = rowLayout.segments
-            .filter((s) => s.lane < visibleLanes)
+          const barSegs = monthVisibleBars(rowLayout, visibleLanes, extraLane)
             .map((s) => {
               const startCol = Math.max(s.startCol, firstVisCol);
               const endCol = Math.min(s.endCol, lastVisCol);
@@ -1285,6 +1292,9 @@ export function DateRows<T = unknown>({
               })}
             >
               {week.days.map((day, dayCol) => {
+                // Lanes this day shows: the row's, plus the "+more" row's when it holds
+                // the day's only hidden event.
+                const dayLanes = visibleLanes + (extraLane[dayCol] ? 1 : 0);
                 const hidden = !showAdjacentMonths && isOutsidePeriod(day);
                 const cellHeight = eventsMode ? eventRowHeight : theme.cellHeight;
                 if (hidden) {
@@ -1326,9 +1336,7 @@ export function DateRows<T = unknown>({
                   // row doesn't show) collapse into "+N more"; the popover lists the
                   // whole day.
                   const hiddenEvents = rowLayout.segments
-                    .filter(
-                      (s) => s.startCol <= dayCol && s.endCol >= dayCol && s.lane >= visibleLanes,
-                    )
+                    .filter((s) => s.startCol <= dayCol && s.endCol >= dayCol && s.lane >= dayLanes)
                     .map((s) => s.event);
                   const dayLabel = format(day.date, "d MMMM", locale ? { locale } : undefined);
                   const dayCellProps = slot(
@@ -1434,7 +1442,7 @@ export function DateRows<T = unknown>({
                             dragArmed && drag?.kind === "move" && drag.event === b.seg.event;
                           return (
                             <button
-                              key={`bar-${b.seg.event.start.toISOString()}:${b.seg.event.title}:${b.seg.lane}`}
+                              key={`bar-${b.seg.event.start.toISOString()}:${b.seg.event.title}:${b.seg.lane}:${b.startCol}`}
                               type="button"
                               onPointerDown={
                                 canMove(b.seg.event)
@@ -1545,7 +1553,7 @@ export function DateRows<T = unknown>({
                       >
                         {/* Reserve one row per visible lane so the absolute bars have
                           space and "+more" sits below them. */}
-                        {Array.from({ length: visibleLanes }, (_, i) => (
+                        {Array.from({ length: dayLanes }, (_, i) => (
                           <div key={`lane-${i}`} aria-hidden style={{ height: chipHeight }} />
                         ))}
                         {hiddenEvents.length > 0 ? (
