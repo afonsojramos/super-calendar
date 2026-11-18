@@ -1670,7 +1670,11 @@ describe("TimeGrid cross-week drop", () => {
     const move = moveGestureHarness(1);
     // A finger held on the handle lets the long press pick the event up: it floats
     // across the day column like any other move.
-    await act(() => move.onStart?.({ x: 10, y: 20, absoluteX: 200, absoluteY: 350 }));
+    // The grip's pan begins on touch-down, before the long press fires.
+    await act(() => {
+      handle.onBegin?.({});
+      move.onStart?.({ x: 10, y: 20, absoluteX: 200, absoluteY: 350 });
+    });
     await rerender(grid());
     expect(geometry()[1]).toEqual([columnWidth, columnWidth]);
     // The resize pan then activates as the finger moves, but stands aside.
@@ -1680,6 +1684,11 @@ describe("TimeGrid cross-week drop", () => {
       move.onUpdate?.({ translationX: 0, translationY: 24, absoluteX: 200, absoluteY: 374 });
       handle.onEnd?.({ translationY: 48 }, true);
       handle.onFinalize?.({}, true);
+    });
+    // Still floating while the finger carries it.
+    await rerender(grid());
+    expect(geometry()[1]).toEqual([columnWidth, columnWidth]);
+    await act(() => {
       move.onEnd?.({ translationX: 0, translationY: 24 }, true);
       move.onFinalize?.({}, true);
     });
