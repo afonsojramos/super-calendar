@@ -42,6 +42,7 @@ import type {
   EventDragHandler,
   EventDragStartHandler,
   EventKeyExtractor,
+  MonthDateInfo,
   RenderEvent,
   WeekStartsOn,
 } from "../types";
@@ -143,8 +144,8 @@ export type MonthPagerProps<T> = {
   activeDate?: Date;
   /** Replace the weekday-label header above the month grid. Receives the week's days. */
   renderHeaderForMonthView?: (weekDays: Date[]) => React.ReactNode;
-  /** Replace the default date badge in each day cell. Receives the day. */
-  renderCustomDateForMonth?: (date: Date) => React.ReactNode;
+  /** Replace the default date badge in each day cell. Receives the day and its state. */
+  renderCustomDateForMonth?: (date: Date, info: MonthDateInfo) => React.ReactNode;
 } & SlotStyleProps<MonthViewSlot>;
 
 /**

@@ -2,6 +2,7 @@ import { format, type Locale, isSameMonth, startOfDay } from "date-fns";
 import type { CalendarEvent, WeekStartsOn } from "../types";
 import { type DateRange, type DateSelectionConstraints, daySelectionState } from "./dateRange";
 import { buildMonthWeeks, getIsToday, isWeekend } from "./dates";
+import { compareDayEvents, eventDayKeys } from "./layout";
 
 /**
  * One event's placement within a single week row of the month grid: the column
@@ -110,6 +111,133 @@ export function layoutMonthWeek<T>(
   }
 
   return { segments: placed, laneCount: laneEnds.length };
+}
+
+/**
+ * The columns of a week row that show one lane more than the row. A row whose
+ * lanes overflow shows `visibleLanes` of them and folds each day's rest into a
+ * "+N more" label. A day whose only hidden event sits on lane `visibleLanes` draws
+ * that event in the label's place instead of "+1 more". Call it only when
+ * a bar on lane `visibleLanes` fits in the cell.
+ */
+export function monthExtraLaneColumns<T>(
+  layout: MonthWeekEvents<T>,
+  visibleLanes: number,
+  columnCount: number,
+): boolean[] {
+  const hidden = Array.from({ length: columnCount }, () => 0);
+  const onFirstHiddenLane = Array.from({ length: columnCount }, () => false);
+  for (const segment of layout.segments) {
+    if (segment.lane < visibleLanes) continue;
+    for (let col = segment.startCol; col <= segment.endCol; col++) {
+      hidden[col]++;
+      if (segment.lane === visibleLanes) onFirstHiddenLane[col] = true;
+    }
+  }
+  return hidden.map((count, col) => count === 1 && onFirstHiddenLane[col]);
+}
+
+/**
+ * The bars a week row draws: every segment above `visibleLanes`, plus the parts of
+ * a segment on lane `visibleLanes` that cross `extraLane` columns (see
+ * {@link monthExtraLaneColumns}), one bar per run of such columns. A bar cut short
+ * by a column that hides the event is marked as continuing past that edge.
+ */
+export function monthVisibleBars<T>(
+  layout: MonthWeekEvents<T>,
+  visibleLanes: number,
+  extraLane: readonly boolean[],
+): MonthEventSegment<T>[] {
+  const bars: MonthEventSegment<T>[] = [];
+  for (const segment of layout.segments) {
+    if (segment.lane < visibleLanes) {
+      bars.push(segment);
+      continue;
+    }
+    if (segment.lane !== visibleLanes) continue;
+    let runStart = -1;
+    for (let col = segment.startCol; col <= segment.endCol + 1; col++) {
+      const shown = col <= segment.endCol && extraLane[col] === true;
+      if (shown && runStart === -1) runStart = col;
+      if (!shown && runStart !== -1) {
+        bars.push({
+          ...segment,
+          startCol: runStart,
+          endCol: col - 1,
+          continuesBefore: segment.continuesBefore || runStart > segment.startCol,
+          continuesAfter: segment.continuesAfter || col - 1 < segment.endCol,
+        });
+        runStart = -1;
+      }
+    }
+  }
+  return bars;
+}
+
+/**
+ * `eventsByDay` with a create draft added to every day it covers, where an event
+ * appended to the calendar's events would go: last in each day, or among the
+ * day's events in `compareDayEvents` order when `sorted`. Lay a week row out
+ * from the result to place the draft where the created event will land.
+ */
+export function withDraftEventDays<T>(
+  eventsByDay: ReadonlyMap<string, CalendarEvent<T>[]>,
+  draft: CalendarEvent<T>,
+  sorted = true,
+): Map<string, CalendarEvent<T>[]> {
+  const days = new Map(eventsByDay);
+  for (const key of eventDayKeys(draft)) {
+    const list = [...(days.get(key) ?? []), draft];
+    // Array sort is stable, so the draft stays after the events it ties with.
+    if (sorted) list.sort(compareDayEvents);
+    days.set(key, list);
+  }
+  return days;
+}
+
+/** How a renderer shows a week row's lanes, for {@link keepMonthDraftVisible}. */
+export interface MonthRowLanes {
+  /** Lanes every day of a row with `laneCount` lanes shows. */
+  visibleLanes: (laneCount: number) => number;
+  /**
+   * Whether a day may draw lane `visibleLanes` in place of its "+N more" label
+   * (see {@link monthExtraLaneColumns}). Omit when the renderer never does.
+   */
+  extraLaneFits?: (visibleLanes: number) => boolean;
+}
+
+/**
+ * A week row's layout with a create draft kept in view. `withDraft` lays the row
+ * out with the draft where the created event will land. When the row would hide
+ * that lane, the draft moves to lane 0 instead and the row's other bars
+ * (`withoutDraft`) move down one lane. A draft on the first hidden lane stays put
+ * when every day it covers draws that lane in place of its label. A row the draft
+ * misses comes back as `withDraft`.
+ */
+export function keepMonthDraftVisible<T>(
+  withDraft: MonthWeekEvents<T>,
+  withoutDraft: MonthWeekEvents<T>,
+  draft: CalendarEvent<T>,
+  { visibleLanes, extraLaneFits }: MonthRowLanes,
+): MonthWeekEvents<T> {
+  const segment = withDraft.segments.find((s) => s.event === draft);
+  if (!segment) return withDraft;
+  const shown = visibleLanes(withDraft.laneCount);
+  if (segment.lane < shown) return withDraft;
+  if (segment.lane === shown && extraLaneFits?.(shown)) {
+    const columns = Math.max(...withDraft.segments.map((s) => s.endCol)) + 1;
+    const extraLane = monthExtraLaneColumns(withDraft, shown, columns);
+    let drawn = true;
+    for (let col = segment.startCol; col <= segment.endCol; col++) drawn &&= extraLane[col];
+    if (drawn) return withDraft;
+  }
+  return {
+    segments: [
+      { ...segment, lane: 0 },
+      ...withoutDraft.segments.map((s) => ({ ...s, lane: s.lane + 1 })),
+    ],
+    laneCount: withoutDraft.laneCount + 1,
+  };
 }
 
 /** A single day in the grid, with all the state a custom cell needs to render. */

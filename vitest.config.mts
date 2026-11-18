@@ -78,6 +78,7 @@ export default defineConfig({
             "packages/core/src/**/*.test.ts",
             "packages/native/src/**/*.test.ts",
             "tests/**/*.test.ts",
+            "examples/native/plugins/**/*.test.ts",
           ],
           exclude: ["tests/web/browser/**", "tests/demos/**", "tests/performance/**"],
         },

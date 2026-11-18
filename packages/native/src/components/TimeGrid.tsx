@@ -485,9 +485,10 @@ function AnimatedEventBoxInner<T>({
   // across its day column; the box's own clip is geometric, so it can't disagree
   // with the box during the frames between release and the committed re-render.
   const moving = useSharedValue(0);
-  // 1 while a finger is down on a resize handle. The move gesture wraps the
-  // handles, so a hold on one picks the event up too until the resize takes over.
-  const onHandle = useSharedValue(0);
+  // 1 while a resize pan runs after a long press already picked the event up. The
+  // move gesture wraps the handles, so a hold on one starts a move, and the resize
+  // stands aside until the finger lifts instead of committing as well.
+  const resizeYielded = useSharedValue(0);
   // Edge auto-advance: which side the drag has pushed past the visible columns
   // (-1 left / 0 none / +1 right).
   const edgeDir = useSharedValue(0);
@@ -605,10 +606,8 @@ function AnimatedEventBoxInner<T>({
     // A picked-up event floats across its whole day column, like the multi-day
     // preview and the spill, instead of keeping its slice of an overlap group. It
     // keeps floating while a dropped move holds its offset, so the box doesn't
-    // flash back to its old slice before the committed layout lands. A resize keeps
-    // the slice, even when a hold on its handle picked the event up first.
-    const floating =
-      !onHandle.value && (moving.value || moveOffset.value !== 0 || moveOffsetX.value !== 0);
+    // flash back to its old slice before the committed layout lands.
+    const floating = moving.value || moveOffset.value !== 0 || moveOffsetX.value !== 0;
     return {
       left: floating ? dayLeftPx : left,
       width: floating ? dayWidth : width,
@@ -1000,21 +999,25 @@ function AnimatedEventBoxInner<T>({
   // A plain tap on a resize handle is a press on the event. The two handles cover
   // almost all of a box at the minimum height, so without this a 5- to 30-minute
   // event has next to no tappable surface. A drag from a handle still resizes:
-  // the pan wins the race as soon as the finger moves.
+  // the pan wins the race as soon as the finger moves. A long press on a handle
+  // picks the event up for a move instead, as it does anywhere on the box.
   const resizeGesture = useMemo(() => {
     const pan = Gesture.Pan()
       .enabled(resizable)
-      .onBegin(() => {
-        onHandle.value = 1;
-      })
       .onStart(() => {
+        if (moving.value) {
+          resizeYielded.value = 1;
+          return;
+        }
         dragZ.value = DRAG_EVENT_Z;
         runOnJS(notifyDragStart)();
       })
       .onUpdate((event) => {
+        if (resizeYielded.value) return;
         resizeDelta.value = event.translationY;
       })
       .onEnd((event) => {
+        if (resizeYielded.value) return;
         const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
         if (delta === 0) {
           resizeDelta.value = 0;
@@ -1024,8 +1027,9 @@ function AnimatedEventBoxInner<T>({
         runOnJS(commitDrag)(0, delta);
       })
       .onFinalize(() => {
-        dragZ.value = 0;
-        onHandle.value = 0;
+        // A yielded resize leaves the moving box raised.
+        if (!resizeYielded.value) dragZ.value = 0;
+        resizeYielded.value = 0;
       });
     const tap = Gesture.Tap()
       .runOnJS(true)
@@ -1043,7 +1047,8 @@ function AnimatedEventBoxInner<T>({
     resizable,
     snapMinutes,
     cellHeight,
-    onHandle,
+    moving,
+    resizeYielded,
     resizeDelta,
     dragZ,
     commitDrag,
@@ -1058,17 +1063,20 @@ function AnimatedEventBoxInner<T>({
   const resizeStartGesture = useMemo(() => {
     const pan = Gesture.Pan()
       .enabled(resizableFromStart)
-      .onBegin(() => {
-        onHandle.value = 1;
-      })
       .onStart(() => {
+        if (moving.value) {
+          resizeYielded.value = 1;
+          return;
+        }
         dragZ.value = DRAG_EVENT_Z;
         runOnJS(notifyDragStart)();
       })
       .onUpdate((event) => {
+        if (resizeYielded.value) return;
         resizeStartDelta.value = event.translationY;
       })
       .onEnd((event) => {
+        if (resizeYielded.value) return;
         const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
         if (delta === 0) {
           resizeStartDelta.value = 0;
@@ -1078,8 +1086,9 @@ function AnimatedEventBoxInner<T>({
         runOnJS(commitDrag)(delta, 0);
       })
       .onFinalize(() => {
-        dragZ.value = 0;
-        onHandle.value = 0;
+        // A yielded resize leaves the moving box raised.
+        if (!resizeYielded.value) dragZ.value = 0;
+        resizeYielded.value = 0;
       });
     const tap = Gesture.Tap()
       .runOnJS(true)
@@ -1097,7 +1106,8 @@ function AnimatedEventBoxInner<T>({
     resizableFromStart,
     snapMinutes,
     cellHeight,
-    onHandle,
+    moving,
+    resizeYielded,
     resizeStartDelta,
     dragZ,
     commitDrag,

@@ -24,6 +24,10 @@ readable. On React DOM and Solid it widens once the pointer moves, so a click
 keeps the event in its shared column. On native it widens when the long-press
 picks it up. A resize always keeps the event in its shared column.
 
+On native, a long press picks the event up wherever it lands, grips included,
+so you can move a short event whose grips cover most of it. Drag a grip without
+pausing to resize instead.
+
 While you move or resize an event on React DOM and Solid, its renderer receives
 `event` with the `start` and `end` that `onDragEvent` would report if you
 released there, so the built-in time label and a custom renderer (`renderTimeEvent` on
@@ -436,6 +440,13 @@ It receives the full all-day `start` and exclusive `end` that `onCreateEvent`
 would receive on release. Each week row crossed by the sweep renders one copy
 with the same range, including when you drag backward.
 
+The draft sits on the lane an all-day event with that range would take once
+created, and the other bars in the row move aside to make room, so nothing jumps
+when you release. If that lane is hidden under `+N more`, the draft takes the top
+lane instead and the bars move down one lane.
+A sweep starts from a day, not from an event: pressing an event that can't move
+stays a press.
+
 <CodeGroup>
 
 ```tsx React DOM
@@ -477,8 +488,7 @@ function MonthDraft(props: CreateGhostArgs) {
 </CodeGroup>
 
 The preview uses `chipHeight`, `chipGap`, and the `createGhost` styling slot.
-It occupies the next available visible lane, or overlays the last lane when
-the row is full, without moving existing events. Its content is clipped,
+It sits on the lane described above. Its content is clipped,
 ignores pointer input, and is hidden from screen readers. On web, it also stays out of the tab order. It updates as the
 sweep reaches another day and clears on release or cancellation.
 

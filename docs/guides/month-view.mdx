@@ -48,7 +48,11 @@ theme-derived height and 2 px gaps when you omit the options. Choose a smaller
 
 Each week row stacks its events into lanes (a multi-day bar keeps its lane across
 the days it spans) and shows as many lanes as the cell height allows, collapsing
-the rest of a day's events into a `+N more` label.
+the rest of a day's events into a `+N more` label. When a day would hide only one
+event, that event sits on the first hidden lane, and the label's row has room for
+it, the day draws the event there instead of `+1 more`. A day whose one hidden
+event sits on a lower lane keeps the label. On native the row has room only in the
+auto-fit layout, so a fixed `maxVisibleEventCount` keeps the label.
 
 ```tsx
 <Calendar mode="month" /* ... */ />                            // auto-fit (default)
@@ -106,6 +110,27 @@ works unchanged in month mode:
 Replace parts of the cell with `renderCustomDateForMonth` (the date badge) or a
 custom `renderEvent` (see [Custom events](/guides/events)); restyle everything
 else through the [theme](/guides/theming) or per-slot [classes](/guides/styling).
+
+`renderCustomDateForMonth` receives the day and a `MonthDateInfo` with
+`isCurrentMonth`, `isToday`, `isSelected` and `isDisabled`, so your badge can dim
+adjacent-month days and mark today the way the built-in badge does. With
+`showAdjacentMonths`, each page of the pager passes its own month, so the flag is
+right on every page. A `MultiWeekView` has no page month, so there
+`isCurrentMonth` is always `true`.
+
+```tsx
+<Calendar
+  mode="month"
+  date={date}
+  events={events}
+  showAdjacentMonths
+  renderCustomDateForMonth={(day, { isCurrentMonth, isToday }) => (
+    <Text style={{ opacity: isCurrentMonth ? 1 : 0.4, fontWeight: isToday ? "700" : "400" }}>
+      {day.getDate()}
+    </Text>
+  )}
+/>
+```
 
 ## Dragging
 

@@ -80,6 +80,10 @@ hourly columns, including when `numberOfDays` exceeds seven.
   days, and Home/End stay within the displayed range. PageUp/PageDown change the
   window when `onChangeDate` is provided. Native supports swipe paging, and
   react-native-web uses left/right keys.
+- Native gives each week the same height. Dates stack from the top of each cell,
+  so multi-day bars and overflow labels line up across days with different
+  badges or spacing. If you supply `classNames.day`, set the cell padding and
+  vertical gap in that class.
 - Rows keep space for their content and scroll vertically when the view is too
   short. Set `height` on web `Calendar`, or a constrained `style` on web
   `MultiWeekView`. Native views fill their parent. Larger counts need more space;
