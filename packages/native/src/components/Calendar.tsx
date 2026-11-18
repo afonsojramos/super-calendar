@@ -373,6 +373,8 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   freeSwipe?: boolean;
   /** Custom header above the week/day grid. Receives the visible days. */
   renderTimeGridHeader?: (days: Date[]) => React.ReactNode;
+  /** Draw a label in the hour column when the current-time line is visible. */
+  renderNowLabel?: (now: Date) => React.ReactNode;
   /** Replace the weekday-label header above the month grid. Return `null` to hide it. */
   renderHeaderForMonthView?: (weekDays: Date[]) => React.ReactNode;
   /**
@@ -590,6 +592,7 @@ function CalendarInner<T>(
     isRTL,
     freeSwipe,
     renderTimeGridHeader,
+    renderNowLabel,
     renderHeaderForMonthView,
     renderCustomDateForMonth,
     itemSeparatorComponent,
@@ -974,6 +977,7 @@ function CalendarInner<T>(
             onPressDateHeader={onPressDateHeader}
             onChangeDate={handleChangeDate}
             renderHeader={renderTimeGridHeader}
+            renderNowLabel={renderNowLabel}
             classNames={classNames}
             styles={styleOverrides}
           />
