@@ -164,6 +164,47 @@ it("shares a grid minimum across weeks and creates in the drawn second week", as
   }
 });
 
+it.each(["grid-height", "grid-below-content", "week-minimum"])(
+  "keeps week hit targets aligned with a constrained %s",
+  async (layout) => {
+    const page = await browser.newPage({ viewport: { width: 1000, height: 850 } });
+    try {
+      await page.goto(server.url + "?multiweek=" + layout);
+      const grid = page.getByTestId("multiweek-grid");
+      const first = grid.getByRole("cell", { name: /Friday,? 19 June/ });
+      await first.waitFor();
+      const bounds = await first.boundingBox();
+      if (!bounds) throw new Error("Missing first week");
+      const x = bounds.x + bounds.width / 2;
+      const y = bounds.y + bounds.height - 4;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      await page.mouse.move(x + bounds.width, y);
+      await page.mouse.up();
+      await expect.poll(() => page.locator("output").textContent()).toBe("Create 19");
+      const rows = await grid
+        .locator(":scope > *")
+        .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().height));
+      const height = (await grid.boundingBox())?.height;
+      if (!height) throw new Error("Missing grid height");
+      if (layout === "week-minimum") {
+        for (const row of rows) expect(row).toBe(140);
+        return;
+      }
+      for (const row of rows) expect(row).toBeCloseTo(height / 3, 0);
+      if (layout === "grid-height") expect(height).toBe(300);
+      else {
+        expect(height).toBeGreaterThan(120);
+        const more = grid.getByRole("button", { name: "1 more events, 16 June" });
+        await more.click();
+        expect(await page.locator("output").textContent()).toBe("More 16");
+      }
+    } finally {
+      await page.close();
+    }
+  },
+);
+
 it("hides native-web creation content and prevents focus", async () => {
   const page = await browser.newPage({ viewport: { width: 1000, height: 850 } });
   const errors: string[] = [];

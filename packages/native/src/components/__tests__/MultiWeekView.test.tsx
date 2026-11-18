@@ -130,7 +130,8 @@ describe("native MultiWeekView", () => {
       const style =
         StyleSheet.flatten((row as { props: { style?: StyleProp<ViewStyle> } }).props.style) ?? {};
       expect(style.flexGrow).toBe(1);
-      for (const key of ["flex", "flexShrink", "flexBasis"]) expect(style).not.toHaveProperty(key);
+      expect(style.flexShrink).toBe(1);
+      for (const key of ["flex", "flexBasis"]) expect(style).not.toHaveProperty(key);
     }
     // A short viewport keeps each row at its minimum height and scrolls instead.
     await layoutViewport(view, 90);

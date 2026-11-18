@@ -427,6 +427,8 @@ function DateRowsInner<T>({
   // dimensions map a drag's position onto a day cell.
   const [gridSize, setGridSize] = useState({ width: 0, height: 0 });
   const gridHeight = gridSize.height;
+  const weekTops = useRef<number[]>([]);
+  const [drawnWeekHeight, setDrawnWeekHeight] = useState(0);
   // Web-only hover highlight on the day badge (mouse pointers); stays null on
   // touch/native, so it never re-renders there. Mirrors the dom renderer.
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
@@ -589,7 +591,8 @@ function DateRowsInner<T>({
           old.bottom === measured.bottom &&
           old.gap === measured.gap &&
           old.overlayTop === measured.overlayTop &&
-          old.weekMargin === measured.weekMargin
+          old.weekMargin === measured.weekMargin &&
+          old.weekMarginTop === measured.weekMarginTop
         )
           return previous;
         const next: Record<string, MonthCellGeometry> = { [id]: measured };
@@ -610,6 +613,7 @@ function DateRowsInner<T>({
       gap: defaultCellSpacing ? chipGap : (chipGapProp ?? 0),
       overlayTop: 0,
       weekMargin: 0,
+      weekMarginTop: 0,
     }),
     [multiWeek, defaultCellSpacing, chipGap, chipGapProp],
   );
@@ -639,15 +643,17 @@ function DateRowsInner<T>({
     (maxVisibleEventCount != null
       ? Math.max(1, maxVisibleEventCount) * cellLaneHeight + moreLabelArea
       : Math.max(FALLBACK_VISIBLE_COUNT * cellLaneHeight, cellLaneHeight + moreLabelArea));
-  // Multi-week rows scroll, so the grid has no fixed height and flexed rows would
-  // grow with their own events. Give every row the same height instead: an even
-  // share of the viewport, but no less than the minimum. The hit test and the chip
-  // capacity divide the grid height evenly, so they then match the drawn rows.
+  // In a scroll view, rows with an automatic basis can grow with their events.
+  // Start each week at the same height and let the grid share the available space.
   const [viewportHeight, setViewportHeight] = useState(0);
   const multiWeekRowHeight =
     multiWeek && viewportHeight > 0
       ? Math.max(minimumRowHeight, viewportHeight / weeks.length) - cellGeometry.weekMargin
       : undefined;
+  const rowHeight =
+    multiWeek && drawnWeekHeight > 0
+      ? drawnWeekHeight + cellGeometry.weekMargin
+      : gridHeight / weeks.length;
 
   // How many chips fit per cell: a fixed cap when `maxVisibleEventCount` is set,
   // else derived from the measured cell height and the (default) chip metrics.
@@ -658,7 +664,6 @@ function DateRowsInner<T>({
     if (gridHeight <= 0 || weeks.length === 0) {
       return { full: FALLBACK_VISIBLE_COUNT, withMore: FALLBACK_VISIBLE_COUNT };
     }
-    const rowHeight = gridHeight / weeks.length;
     // Lanes start below the date (the built-in badge, or a taller custom date) and
     // end above the cell's bottom inset.
     const available = rowHeight - dateArea - cellGeometry.bottom;
@@ -667,6 +672,7 @@ function DateRowsInner<T>({
     maxVisibleEventCount,
     gridHeight,
     weeks.length,
+    rowHeight,
     dateArea,
     cellGeometry,
     cellLaneHeight,
@@ -841,8 +847,26 @@ function DateRowsInner<T>({
     (x: number, y: number): { day: Date; event: CalendarEvent<T> | null } | null => {
       const { width, height } = gridSize;
       if (width <= 0 || height <= 0 || weeks.length === 0) return null;
-      const rowHeight = height / weeks.length;
-      const row = Math.min(weeks.length - 1, Math.max(0, Math.floor(y / rowHeight)));
+      let row = Math.min(weeks.length - 1, Math.max(0, Math.floor(y / rowHeight)));
+      let rowTop = row * rowHeight;
+      if (multiWeek) {
+        // A styled grid can have padding, space between weeks, or overflowing rows.
+        // Web layout notifications can miss a move that does not resize the row.
+        const grid =
+          isWeb && typeof Element !== "undefined" && gridRef.current instanceof Element
+            ? gridRef.current
+            : null;
+        const gridTop = grid?.getBoundingClientRect().top ?? 0;
+        const topOf = (index: number) => {
+          const node = grid?.children[index];
+          const borderTop = node
+            ? node.getBoundingClientRect().top - gridTop
+            : weekTops.current[index];
+          return borderTop == null ? index * rowHeight : borderTop - cellGeometry.weekMarginTop;
+        };
+        row = weekAtOffset(y, weeks.length, topOf);
+        rowTop = topOf(row);
+      }
       const cols = weeks[row].length;
       const col = Math.min(cols - 1, Math.max(0, Math.floor(x / (width / cols))));
       const day = weeks[row][col];
@@ -851,7 +875,7 @@ function DateRowsInner<T>({
       if (!isDateSelectable(day, { minDate, maxDate, isDateDisabled })) return null;
       // Which lane row the point lands on, mirroring the bar overlay's geometry.
       const rowLayout = weekLayouts[row] ?? EMPTY_LAYOUT;
-      const laneOffset = y - row * rowHeight - laneTop;
+      const laneOffset = y - rowTop - laneTop;
       const lane = Math.floor(laneOffset / cellLaneHeight);
       const insideBar = !multiWeek || laneOffset - lane * cellLaneHeight < laneChipHeight;
       const { visibleLanes, extraLane } = rowLanes(rowLayout, cols);
@@ -867,6 +891,8 @@ function DateRowsInner<T>({
       weekLayouts,
       rowLanes,
       multiWeek,
+      rowHeight,
+      cellGeometry.weekMarginTop,
       laneChipHeight,
       laneTop,
       cellLaneHeight,
@@ -1481,10 +1507,10 @@ function DateRowsInner<T>({
               testID={multiWeek ? "multiweek-grid" : "month-grid"}
               accessibilityLabel={multiWeek ? title : undefined}
               {...slot("grid", {
-                // Let the grid grow with the rows when a week has a minimum height.
-                base: multiWeekRowHeight
-                  ? undefined
-                  : [styles.container, multiWeek && { minHeight: minimumRowHeight * weeks.length }],
+                base: [
+                  !multiWeekRowHeight && styles.container,
+                  multiWeek && { minHeight: minimumRowHeight * weeks.length },
+                ],
               })}
               onLayout={handleLayout}
               {...(isWeb && dragEnabled
@@ -1524,20 +1550,35 @@ function DateRowsInner<T>({
                 const draftStart = draftSegment ? Math.max(draftSegment.startCol, firstVisCol) : -1;
                 const draftEnd = draftSegment ? Math.min(draftSegment.endCol, lastVisCol) : -1;
                 const draftTop = barTop + (draftSegment?.lane ?? 0) * cellLaneHeight;
-                const draftHeight = Math.min(
-                  laneChipHeight,
-                  Math.max(0, gridHeight / weeks.length - draftTop),
-                );
+                const draftHeight = Math.min(laneChipHeight, Math.max(0, rowHeight - draftTop));
                 return (
                   <View
                     {...slot("week", {
-                      // Share any extra grid height without resetting the row's flex basis.
+                      // The grid slot can be larger or smaller than the viewport.
+                      // Size from the same basis, stopping where the contents fit.
                       base: multiWeekRowHeight
-                        ? [styles.weekRowFixed, { height: multiWeekRowHeight, flexGrow: 1 }]
+                        ? [
+                            styles.weekRowFixed,
+                            {
+                              height: multiWeekRowHeight,
+                              minHeight: minimumRowHeight - cellGeometry.weekMargin,
+                              flexGrow: 1,
+                              flexShrink: 1,
+                            },
+                          ]
                         : styles.weekRow,
                       themed: theme.containers.weekRow,
                     })}
                     key={multiWeekGrid?.weeks[weekIndex].id ?? week[0].toISOString()}
+                    onLayout={
+                      multiWeek
+                        ? (event) => {
+                            const { y, height } = event.nativeEvent.layout;
+                            weekTops.current[weekIndex] = y;
+                            if (weekIndex === 0) setDrawnWeekHeight(height);
+                          }
+                        : undefined
+                    }
                   >
                     {week.map((day, dayCol) =>
                       renderDay(day, dayCol, rowLayout, visibleLanes + (extraLane[dayCol] ? 1 : 0)),
@@ -1647,6 +1688,19 @@ function DateRowsInner<T>({
       </View>
     </CalendarLabelsContext.Provider>
   );
+}
+
+// Find the last week whose top is at or above the pointer, clamping to the first
+// or last week when a drag crosses the grid boundary.
+function weekAtOffset(y: number, count: number, topOf: (index: number) => number): number {
+  let first = 0;
+  let end = count;
+  while (first + 1 < end) {
+    const middle = Math.floor((first + end) / 2);
+    if (topOf(middle) <= y) first = middle;
+    else end = middle;
+  }
+  return first;
 }
 
 function DateRowsViewport({

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Text, TextInput, View } from "react-native";
+import { Text, TextInput, View, type ViewStyle } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import type { CreateGhostArgs, CalendarEvent } from "@super-calendar/core";
 import { MonthView } from "../../../../packages/native/src/components/MonthView";
@@ -32,10 +32,19 @@ const busyDays: CalendarEvent[] = [
   })),
 ];
 
-function StyledWeeks({ classes, tallGrid }: { classes: boolean; tallGrid: boolean }) {
+const constrainedWeeks = new Map<string, { grid: ViewStyle; week?: ViewStyle }>([
+  ["grid-height", { grid: { height: 300 } }],
+  ["grid-below-content", { grid: { height: 120 } }],
+  ["week-minimum", { grid: { height: 300, paddingTop: 12, rowGap: 10 }, week: { minHeight: 140 } }],
+]);
+
+function StyledWeeks({ layout }: { layout: string }) {
   const [action, setAction] = useState("");
+  const classes = layout === "classes";
+  const shortGrid = constrainedWeeks.get(layout);
+  const viewportHeight = shortGrid ? 600 : layout === "grid-minimum" ? 300 : 150;
   return (
-    <View style={{ width: 700, height: tallGrid ? 300 : 150 }}>
+    <View style={{ width: 700, height: viewportHeight }}>
       <MultiWeekView
         date={date}
         numberOfWeeks={3}
@@ -53,16 +62,17 @@ function StyledWeeks({ classes, tallGrid }: { classes: boolean; tallGrid: boolea
             : undefined
         }
         styles={
-          classes
+          shortGrid ??
+          (classes
             ? undefined
             : {
-                grid: tallGrid ? { minHeight: 600 } : undefined,
+                grid: layout === "grid-minimum" ? { minHeight: 600 } : undefined,
                 week: { paddingTop: 18, paddingBottom: 7, borderTopWidth: 2, marginVertical: 3 },
                 day: { justifyContent: "flex-end", gap: 10, paddingBottom: 5 },
-              }
+              })
         }
         calendarCellStyle={(day) =>
-          day.getDate() === 16
+          !shortGrid && day.getDate() === 16
             ? { paddingTop: 14, marginTop: 3, ...(!classes && { rowGap: 14 }) }
             : undefined
         }
@@ -89,10 +99,7 @@ export default function App() {
   if (window.location.search.startsWith("?multiweek")) {
     return (
       <GestureHandlerRootView>
-        <StyledWeeks
-          classes={window.location.search.includes("classes")}
-          tallGrid={window.location.search.includes("grid-minimum")}
-        />
+        <StyledWeeks layout={new URLSearchParams(window.location.search).get("multiweek") ?? ""} />
       </GestureHandlerRootView>
     );
   }

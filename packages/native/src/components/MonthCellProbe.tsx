@@ -17,6 +17,7 @@ export interface MonthCellGeometry {
   gap: number;
   overlayTop: number;
   weekMargin: number;
+  weekMarginTop: number;
 }
 
 type ProbeView = ComponentRef<typeof View>;
@@ -42,14 +43,21 @@ export const MonthCellProbe = memo(function MonthCellProbe({
   const layouts = useRef<Partial<Record<Part, LayoutRectangle>>>({});
   const nodes = useRef<Partial<Record<Part, ProbeView | null>>>({});
   const report = useCallback(
-    (height: number, rowHeight: number, top: number, laneTop: number, overlayTop: number) => {
+    (
+      height: number,
+      row: Pick<LayoutRectangle, "y" | "height">,
+      top: number,
+      laneTop: number,
+      overlayTop: number,
+    ) => {
       if (height > 0)
         onMeasure(id, {
           top,
           gap: Math.max(0, laneTop - top - MARKER_HEIGHT),
           bottom: height - laneTop - MARKER_HEIGHT,
           overlayTop,
-          weekMargin: height - rowHeight,
+          weekMargin: height - row.height,
+          weekMarginTop: row.y,
         });
     },
     [id, onMeasure],
@@ -71,7 +79,7 @@ export const MonthCellProbe = memo(function MonthCellProbe({
     if (!frame || !row || !date || !lane || !overlay) return false;
     report(
       frame.height,
-      row.height,
+      { y: row.top - frame.top, height: row.height },
       date.top - frame.top,
       lane.top - frame.top,
       overlay.top - frame.top,
@@ -96,7 +104,7 @@ export const MonthCellProbe = memo(function MonthCellProbe({
         const { frame, row, cell, date, lane, overlay } = layouts.current;
         if (!frame || !row || !cell || !date || !lane || !overlay) return;
         const cellTop = row.y + cell.y;
-        report(frame.height, row.height, cellTop + date.y, cellTop + lane.y, row.y + overlay.y);
+        report(frame.height, row, cellTop + date.y, cellTop + lane.y, row.y + overlay.y);
       },
     };
   }
