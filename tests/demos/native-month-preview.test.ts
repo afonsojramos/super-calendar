@@ -274,9 +274,12 @@ it.each(["day-aspect", "day-aspect-spaced"])(
       const grid = page.getByTestId("multiweek-grid");
       const day = grid.getByRole("cell", { name: /Tuesday,? 16 June/ });
       await day.waitFor();
-      for (const width of [840, 1190, 840]) {
-        await page.setViewportSize({ width, height: 760 });
-        const expected = layout === "day-aspect" ? width / 7 : (0.8 * width - 52) / 5;
+      const gutter = await viewport.evaluate(
+        (node) => node.getBoundingClientRect().width - node.clientWidth,
+      );
+      for (const contentWidth of [840, 1190, 840]) {
+        await page.setViewportSize({ width: contentWidth + gutter, height: 760 });
+        const expected = layout === "day-aspect" ? contentWidth / 7 : (0.8 * contentWidth - 52) / 5;
         await expect
           .poll(async () => {
             const days = await day.boundingBox();
@@ -288,7 +291,7 @@ it.each(["day-aspect", "day-aspect-spaced"])(
           .toEqual(Array(4).fill(expect.closeTo(expected, 0)));
         expect(await viewport.evaluate((node) => node.scrollHeight)).toBeCloseTo(expected * 3, 0);
         const meetings = grid.getByText(/^Meeting [1-5]$/);
-        if (width === 840) {
+        if (contentWidth === 840) {
           await expect.poll(() => meetings.count()).toBeLessThan(5);
           await expect
             .poll(() => grid.getByRole("button", { name: /more events/i }).count())
