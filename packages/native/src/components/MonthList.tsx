@@ -224,10 +224,20 @@ function MonthListInner<T>({
   // `events` and `activeDate` (renderItem captures them; without this, events
   // that arrive after mount never paint, same bug as the MonthPager had) plus
   // `firstViewableIndex` (the web `inert` cutoff must stay current). Selection
-  // needs no entry: it reaches MonthView through context.
+  // needs no entry: it reaches MonthView through context. `weekRowHeight` and
+  // `monthHeaderHeight` size each month, and LegendList re-resolves
+  // `getFixedItemSize` only when `extraData` changes.
   const listExtraData = useMemo(
-    () => ({ events, activeDate, firstViewableIndex, chipHeight, chipGap }),
-    [events, activeDate, firstViewableIndex, chipHeight, chipGap],
+    () => ({
+      events,
+      activeDate,
+      firstViewableIndex,
+      chipHeight,
+      chipGap,
+      weekRowHeight,
+      monthHeaderHeight,
+    }),
+    [events, activeDate, firstViewableIndex, chipHeight, chipGap, weekRowHeight, monthHeaderHeight],
   );
 
   // A fixed window of months anchored once, aligned to the month start.
