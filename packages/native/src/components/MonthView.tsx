@@ -858,10 +858,17 @@ function DateRowsInner<T>({
   // day, so neither can be a drag's origin or its drop target.
   const hitTest = useCallback(
     (x: number, y: number): { day: Date; event: CalendarEvent<T> | null } | null => {
-      const { width, height } = gridSize;
+      // On the web `onLayout` reaches state a few frames after the grid gets its
+      // size, so a press right after the pager resizes a page can land on a grid
+      // that was never measured. Its box (the space `gridPoint` maps into) is current.
+      let { width, height } = gridSize;
+      if ((width <= 0 || height <= 0) && isWeb && gridRef.current instanceof Element) {
+        ({ width, height } = gridRef.current.getBoundingClientRect());
+      }
       if (width <= 0 || height <= 0 || weeks.length === 0) return null;
-      let row = Math.min(weeks.length - 1, Math.max(0, Math.floor(y / rowHeight)));
-      let rowTop = row * rowHeight;
+      const pitch = rowHeight > 0 ? rowHeight : height / weeks.length;
+      let row = Math.min(weeks.length - 1, Math.max(0, Math.floor(y / pitch)));
+      let rowTop = row * pitch;
       if (multiWeek) {
         // A styled grid can have padding, space between weeks, or overflowing rows.
         // Web layout notifications can miss a move that does not resize the row.
@@ -875,7 +882,7 @@ function DateRowsInner<T>({
           const borderTop = node
             ? node.getBoundingClientRect().top - gridTop
             : weekTops.current[index];
-          return borderTop == null ? index * rowHeight : borderTop - cellGeometry.weekMarginTop;
+          return borderTop == null ? index * pitch : borderTop - cellGeometry.weekMarginTop;
         };
         row = weekAtOffset(y, weeks.length, topOf);
         rowTop = topOf(row);
