@@ -22,6 +22,7 @@ import {
   type ReactElement,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -355,8 +356,10 @@ function DateRowsPagerInner<T>({
   // A new container width resizes every page (see `listExtraData`), but the
   // native scroll offset stays at the old `index * width`, which now points at a
   // different month or between two. Scroll back to the committed page.
+  // Before paint, so the one frame Android shows between the resize and the scroll
+  // is blank rather than a wrong month.
   const laidOutWidthRef = useRef(containerWidth);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (containerWidth === laidOutWidthRef.current) return;
     laidOutWidthRef.current = containerWidth;
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
@@ -391,12 +394,13 @@ function DateRowsPagerInner<T>({
   // grids as renderItem props, not through the selection context below: toggling
   // a "pick dates" mode on must reach the pages already rendered.
   // `now` and `timeZone` move the today highlight on the pages already rendered.
-  // `containerWidth` resizes them: LegendList re-resolves `getFixedItemSize` only
-  // when `extraData` changes.
+  // `containerWidth` and `pageHeight` resize them: LegendList re-resolves
+  // `getFixedItemSize` only when `extraData` changes.
   const nowTime = now?.getTime();
   const monthExtraData = useMemo(
     () => ({
       containerWidth,
+      pageHeight,
       events,
       activeDate,
       nowTime,
@@ -412,6 +416,7 @@ function DateRowsPagerInner<T>({
     }),
     [
       containerWidth,
+      pageHeight,
       events,
       activeDate,
       nowTime,
@@ -596,10 +601,6 @@ function DateRowsPagerInner<T>({
           }}
         >
           <LegendList
-            // Remount when the measured page height changes so the list adopts the
-            // corrected item height. Without this the list can keep the oversized
-            // initial (window-height) seed and clip the last week row.
-            key={pageHeight}
             ref={listRef}
             style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
             data={monthDates}

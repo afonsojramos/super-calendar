@@ -1,4 +1,4 @@
-import { useImperativeHandle, useMemo } from "react";
+import { useEffect, useImperativeHandle, useMemo } from "react";
 import { vi } from "vitest";
 import { act, fireEvent, render } from "@testing-library/react-native";
 import { Text } from "react-native";
@@ -18,6 +18,9 @@ vi.mock("@legendapp/list/react-native", () => ({
     useImperativeHandle(props.ref, () => ({
       scrollToIndex: (params: unknown) => (globalThis as any).__scrollToIndex?.(params),
     }));
+    useEffect(() => {
+      (globalThis as any).__listMounts = ((globalThis as any).__listMounts ?? 0) + 1;
+    }, []);
     return useMemo(() => {
       const index = props.initialScrollIndex ?? 0;
       const item = props.data?.[index];
@@ -209,12 +212,14 @@ describe("MonthPager container resize", () => {
     nativeEvent: { layout: { x: 0, y: 0, width, height } },
   });
 
+  const listMounts = () => (globalThis as { __listMounts?: number }).__listMounts ?? 0;
+
   afterEach(() => {
     delete (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex;
   });
 
   it.each(["month", "multiweek"] as const)(
-    "resizes the mounted %s page and keeps it in view when the container width changes",
+    "resizes the mounted %s page and keeps it in view when the container size changes",
     async (mode) => {
       const scrollToIndex = vi.fn();
       (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex = scrollToIndex;
@@ -233,6 +238,7 @@ describe("MonthPager container resize", () => {
       await fireEvent(pager, "layout", layout(400, 500));
       expect(page()).toHaveStyle({ width: 400, height: 500 });
       const activeIndex = lastListProps()?.initialScrollIndex;
+      const mounts = listMounts();
       scrollToIndex.mockClear();
 
       // The native scroll offset keeps the old `index * width`, so each resize
@@ -246,6 +252,14 @@ describe("MonthPager container resize", () => {
       await fireEvent(pager, "layout", layout(400, 500));
       expect(page()).toHaveStyle({ width: 400 });
       expect(scrollToIndex).toHaveBeenCalledTimes(2);
+
+      // A height change only re-renders the pages; the scroll offset still holds.
+      await fireEvent(pager, "layout", layout(400, 320));
+      expect(page()).toHaveStyle({ width: 400, height: 320 });
+      expect(scrollToIndex).toHaveBeenCalledTimes(2);
+
+      // Remounting the list would rebuild every page and flash it blank.
+      expect(listMounts()).toBe(mounts);
     },
   );
 });
