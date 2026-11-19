@@ -352,6 +352,16 @@ function DateRowsPagerInner<T>({
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
   }, [activeIndex]);
 
+  // A new container width resizes every page (see `listExtraData`), but the
+  // native scroll offset stays at the old `index * width`, which now points at a
+  // different month or between two. Scroll back to the committed page.
+  const laidOutWidthRef = useRef(containerWidth);
+  useEffect(() => {
+    if (containerWidth === laidOutWidthRef.current) return;
+    laidOutWidthRef.current = containerWidth;
+    void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
+  }, [containerWidth, activeIndex]);
+
   // Web arrow-key paging (swipe is disabled there); the effect above scrolls to
   // the new month once `onChangeDate` updates `date`.
   const goToPage = useCallback(
@@ -381,9 +391,12 @@ function DateRowsPagerInner<T>({
   // grids as renderItem props, not through the selection context below: toggling
   // a "pick dates" mode on must reach the pages already rendered.
   // `now` and `timeZone` move the today highlight on the pages already rendered.
+  // `containerWidth` resizes them: LegendList re-resolves `getFixedItemSize` only
+  // when `extraData` changes.
   const nowTime = now?.getTime();
   const monthExtraData = useMemo(
     () => ({
+      containerWidth,
       events,
       activeDate,
       nowTime,
@@ -398,6 +411,7 @@ function DateRowsPagerInner<T>({
       createGhostStyle: styleOverrides?.createGhost,
     }),
     [
+      containerWidth,
       events,
       activeDate,
       nowTime,
@@ -440,7 +454,7 @@ function DateRowsPagerInner<T>({
   const getFixedItemSize = useCallback(() => containerWidth, [containerWidth]);
   const renderItem = useCallback(
     ({ item }: LegendListRenderItemProps<Date>) => (
-      <View style={{ width: containerWidth, height: pageHeight }}>
+      <View testID="month-pager-page" style={{ width: containerWidth, height: pageHeight }}>
         <DateRows
           source={sourceFor(item)}
           events={events}
@@ -574,6 +588,7 @@ function DateRowsPagerInner<T>({
           />
         )}
         <View
+          testID="month-pager"
           style={styles.pager}
           onLayout={(event) => {
             setPageHeight(event.nativeEvent.layout.height);

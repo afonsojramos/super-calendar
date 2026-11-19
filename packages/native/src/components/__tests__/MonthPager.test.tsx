@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useImperativeHandle, useMemo } from "react";
 import { vi } from "vitest";
 import { act, fireEvent, render } from "@testing-library/react-native";
 import { Text } from "react-native";
@@ -15,6 +15,9 @@ vi.mock("@legendapp/list/react-native", () => ({
   __esModule: true,
   LegendList: (props: any) => {
     (globalThis as any).__listProps = props;
+    useImperativeHandle(props.ref, () => ({
+      scrollToIndex: (params: unknown) => (globalThis as any).__scrollToIndex?.(params),
+    }));
     return useMemo(() => {
       const index = props.initialScrollIndex ?? 0;
       const item = props.data?.[index];
@@ -197,6 +200,52 @@ describe("MonthPager creation preview styling", () => {
         <Calendar {...props} styles={secondStyle} classNames={{ createGhost: "second" }} />,
       );
       expect(ghost().props.className).toBe("second");
+    },
+  );
+});
+
+describe("MonthPager container resize", () => {
+  const layout = (width: number, height: number) => ({
+    nativeEvent: { layout: { x: 0, y: 0, width, height } },
+  });
+
+  afterEach(() => {
+    delete (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex;
+  });
+
+  it.each(["month", "multiweek"] as const)(
+    "resizes the mounted %s page and keeps it in view when the container width changes",
+    async (mode) => {
+      const scrollToIndex = vi.fn();
+      (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex = scrollToIndex;
+      const view = await render(
+        <Calendar
+          mode={mode}
+          date={new Date(2026, 10, 6)}
+          events={[]}
+          onChangeDate={noop}
+          onPressEvent={noop}
+        />,
+      );
+      const pager = view.getByTestId("month-pager");
+      const page = () => view.getByTestId("month-pager-page");
+
+      await fireEvent(pager, "layout", layout(400, 500));
+      expect(page()).toHaveStyle({ width: 400, height: 500 });
+      const activeIndex = lastListProps()?.initialScrollIndex;
+      scrollToIndex.mockClear();
+
+      // The native scroll offset keeps the old `index * width`, so each resize
+      // must scroll back to the committed page.
+      await fireEvent(pager, "layout", layout(240, 500));
+      expect(page()).toHaveStyle({ width: 240 });
+      expect(scrollToIndex).toHaveBeenCalledExactlyOnceWith({
+        index: activeIndex,
+        animated: false,
+      });
+      await fireEvent(pager, "layout", layout(400, 500));
+      expect(page()).toHaveStyle({ width: 400 });
+      expect(scrollToIndex).toHaveBeenCalledTimes(2);
     },
   );
 });
