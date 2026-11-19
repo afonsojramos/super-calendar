@@ -3309,13 +3309,27 @@ function TimeGridInner<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- columnsWidth/pagerOffset are stable per width
   }, [activeIndex]);
 
-  // The list reports its offset only as it scrolls; seed it whenever the list is
-  // (re)laid out at a new width, where it opens on the active page.
-  useEffect(() => {
+  // The list reports its offset only as it scrolls; seed it whenever the pages are
+  // laid out at a new width. A mounted list resizes its pages in place (see
+  // `listExtraData`), but its native offset keeps the old `index * width`, so
+  // scroll back to the active page. Before paint, so Android's one frame between
+  // the resize and the scroll is blank rather than another page.
+  const laidOutWidthRef = useRef<number | null>(null);
+  useLayoutEffect(() => {
     // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
     pagerOffset.value = activeIndex * columnsWidth;
+    // The list unmounts at width 0 and remounts on the active page at the next width.
+    if (!pagerReady) {
+      laidOutWidthRef.current = null;
+      return;
+    }
+    const previous = laidOutWidthRef.current;
+    laidOutWidthRef.current = columnsWidth;
+    // The list mounts on its first measured width and opens on the active page.
+    if (previous == null || previous === columnsWidth) return;
+    void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reseed on width only; scroll events track index changes
-  }, [columnsWidth, pagerOffset]);
+  }, [columnsWidth, pagerOffset, pagerReady]);
 
   // react-native-web ignores `contentOffset`: retry the seed each frame until the
   // scroll view can hold it (the viewport's `onLayout` also tries).
@@ -3372,7 +3386,7 @@ function TimeGridInner<T>(
     };
     const raf = requestAnimationFrame(lockHorizontal);
     return () => cancelAnimationFrame(raf);
-    // Re-run once the list exists at its real size (it remounts per width).
+    // Re-run once the list exists at its measured width, and after each resize.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- containerRef is stable
   }, [columnsWidth]);
 
@@ -3759,9 +3773,7 @@ function TimeGridInner<T>(
                       {pagerReady ? (
                         <AnimatedLegendList
                           // Mounts once the pager has measured, so the fixed item size is
-                          // right from the list's first layout; the key remounts it on a
-                          // later width change (a rotation, a re-measured container).
-                          key={`grid-${columnsWidth}`}
+                          // right from the list's first layout.
                           ref={listRef}
                           style={isWeb ? [styles.pagerList, styles.webNoScroll] : styles.pagerList}
                           data={pageDates}

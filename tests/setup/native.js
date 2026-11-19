@@ -151,6 +151,10 @@ vi.mock("@legendapp/list/reanimated", async () => {
           (globalThis.__scrollToIndexCalls = globalThis.__scrollToIndexCalls || []).push(arg);
         },
       }));
+      // Count mounts so a test can assert the list is resized in place, not remounted.
+      React.useEffect(() => {
+        globalThis.__listMounts = (globalThis.__listMounts || 0) + 1;
+      }, []);
       const index = props.initialScrollIndex ?? 0;
       const item = props.data?.[index];
       return item === undefined ? null : props.renderItem({ item, index });

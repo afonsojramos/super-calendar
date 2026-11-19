@@ -2178,3 +2178,53 @@ describe("TimeGrid now label", () => {
     expect(within(getByTestId("hour-gutter")).queryByText("now")).toBeNull();
   });
 });
+
+describe("TimeGrid pager resize", () => {
+  it("resizes the mounted pages in place and keeps the active page in view", async () => {
+    const calls: { index: number; animated: boolean }[] = [];
+    (globalThis as { __scrollToIndexCalls?: unknown[] }).__scrollToIndexCalls = calls;
+    const { getByTestId } = await render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    const pager = getByTestId("time-grid-pager");
+    const layout = (width: number) => ({
+      nativeEvent: { layout: { x: 0, y: 0, width, height: 600 } },
+    });
+    const listProps = () =>
+      lastListProps() as { getFixedItemSize: () => number; initialScrollIndex: number };
+    const mounts = () => (globalThis as { __listMounts?: number }).__listMounts ?? 0;
+
+    // The list mounts on its first measured width, already on the active page.
+    expect(calls).toEqual([]);
+    const mounted = mounts();
+    const realign = { index: listProps().initialScrollIndex, animated: false };
+
+    // The native offset keeps the old `index * width`, so each resize scrolls back.
+    await fireEvent(pager, "layout", layout(200));
+    expect(listProps().getFixedItemSize()).toBe(200);
+    expect(calls).toEqual([realign]);
+    await fireEvent(pager, "layout", layout(360));
+    expect(listProps().getFixedItemSize()).toBe(360);
+    expect(calls).toEqual([realign, realign]);
+
+    // Remounting the list would rebuild every page and flash it blank.
+    expect(mounts()).toBe(mounted);
+
+    // At width 0 the list unmounts. It remounts on the active page at the next
+    // width, so no realign scroll runs against its initial scroll.
+    await fireEvent(pager, "layout", layout(0));
+    await fireEvent(pager, "layout", layout(280));
+    expect(listProps().getFixedItemSize()).toBe(280);
+    expect(calls).toEqual([realign, realign]);
+  });
+});
