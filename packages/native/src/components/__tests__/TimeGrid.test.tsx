@@ -1196,10 +1196,20 @@ describe("TimeGrid fast-fling repaint", () => {
     });
   };
 
+  type FlingList = {
+    onScrollBeginDrag?: () => void;
+    onMomentumScrollEnd?: (e: unknown) => void;
+  };
+  const momentumEnd = (x: number) =>
+    act(() =>
+      (lastListProps() as FlingList).onMomentumScrollEnd?.({
+        nativeEvent: { contentOffset: { x } },
+      }),
+    );
+  // A user fling: the drag starts, then momentum carries the pager to `x`.
   const settle = async (x: number) => {
-    const onEnd = (lastListProps() as { onMomentumScrollEnd?: (e: unknown) => void })
-      .onMomentumScrollEnd;
-    await act(() => onEnd?.({ nativeEvent: { contentOffset: { x } } }));
+    await act(() => (lastListProps() as FlingList).onScrollBeginDrag?.());
+    await momentumEnd(x);
   };
 
   beforeEach(() => {
@@ -1296,6 +1306,43 @@ describe("TimeGrid fast-fling repaint", () => {
     const list = lastListProps() as { getFixedItemSize: () => number; initialScrollIndex: number };
     await settle(list.initialScrollIndex * list.getFixedItemSize());
     expect(onChangeDate).not.toHaveBeenCalled();
+  });
+
+  // iOS ends momentum for a programmatic, non-animated scroll too, including the
+  // re-anchor below. Settling those re-anchored again every frame, and a stale
+  // one after a date change reported the previous page back as the date.
+  it("ignores a momentum end that no user drag started", async () => {
+    const onChangeDate = vi.fn();
+    await render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={onChangeDate}
+        onPressEvent={noop}
+      />,
+    );
+    const list = lastListProps() as { getFixedItemSize: () => number; initialScrollIndex: number };
+    const calls = () =>
+      (globalThis as { __scrollToIndexCalls?: unknown[] }).__scrollToIndexCalls ?? [];
+    await momentumEnd((list.initialScrollIndex - 1) * list.getFixedItemSize());
+    await flushFrame();
+    expect(onChangeDate).not.toHaveBeenCalled();
+    expect(calls()).toEqual([]);
+
+    // A user fling still settles, once.
+    await settle((list.initialScrollIndex + 1) * list.getFixedItemSize());
+    await flushFrame();
+    expect(onChangeDate).toHaveBeenCalledTimes(1);
+    expect(calls()).toHaveLength(1);
+    // The re-anchor's own momentum end is not a second fling.
+    await momentumEnd((list.initialScrollIndex + 1) * list.getFixedItemSize());
+    await flushFrame();
+    expect(calls()).toHaveLength(1);
   });
 });
 

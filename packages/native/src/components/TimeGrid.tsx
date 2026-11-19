@@ -3440,6 +3440,9 @@ function TimeGridInner<T>(
     [columnsWidth, pageDates, onChangeDate],
   );
 
+  // Set when the user starts dragging the pager and cleared by the settle it leads to.
+  const pagerUserScrollRef = useRef(false);
+
   // A fast fling can outrun the list's on-demand mounting and leave the pager
   // blank until something nudges it. When momentum ends, re-anchor the list on
   // the page the offset landed on: `scrollToIndex` forces it to recompute its
@@ -3449,6 +3452,11 @@ function TimeGridInner<T>(
   const handlePagerSettled = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (columnsWidth <= 0) return;
+      // iOS also ends momentum for a programmatic, non-animated scroll, including
+      // the re-anchor below. Settling those would re-anchor every frame and report
+      // a stale page back as the date, so only settle a scroll the user started.
+      if (!pagerUserScrollRef.current) return;
+      pagerUserScrollRef.current = false;
       // Only a user fling can leave the pager blank; a programmatic scroll
       // (goToPage, realign) sets `pendingScrollIndexRef` and repaints itself, so
       // skip those to avoid a redundant re-anchor during held edge paging.
@@ -3515,6 +3523,7 @@ function TimeGridInner<T>(
   );
   const handlePagerDragStart = useCallback(() => {
     pagerDraggingRef.current = true;
+    pagerUserScrollRef.current = true;
   }, []);
   const handlePagerDragEnd = useCallback(() => {
     pagerDraggingRef.current = false;
@@ -3809,12 +3818,10 @@ function TimeGridInner<T>(
                                 disableIntervalMomentum: !freeSwipe,
                                 scrollEventThrottle: 16,
                                 onMomentumScrollEnd: handlePagerSettled,
+                                onScrollBeginDrag: handlePagerDragStart,
+                                onScrollEndDrag: handlePagerDragEnd,
                                 ...(Platform.OS === "android"
-                                  ? {
-                                      onScroll: handlePagerScroll,
-                                      onScrollBeginDrag: handlePagerDragStart,
-                                      onScrollEndDrag: handlePagerDragEnd,
-                                    }
+                                  ? { onScroll: handlePagerScroll }
                                   : null),
                               })}
                           initialScrollIndex={activeIndex}
