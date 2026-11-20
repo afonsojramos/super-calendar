@@ -64,6 +64,7 @@ import {
   type WeekdayFormat,
   weekdayFormatToken,
   type WeekStartsOn,
+  type DateChangeDetails,
 } from "@super-calendar/core";
 import {
   EventActionsDialog,
@@ -361,8 +362,9 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
    * turns on edge auto-advance: dragging an event to the left/right edge and
    * dwelling briefly pages the view so the event can be dropped on a day in the
    * previous/next period. Controlled, like the native renderer's `onChangeDate`.
+   * `details.reason` is `"event-drag"`.
    */
-  onChangeDate?: (date: Date) => void;
+  onChangeDate?: (date: Date, details: DateChangeDetails) => void;
   /** Class applied to the root element. */
   className?: string;
   /** Inline styles applied to the root element. */
@@ -1035,7 +1037,7 @@ function TimeGridInner<T = unknown>(
     if (side === 0) return;
     const p = pageDepsRef.current;
     const step = pageStepDays(p.mode, p.date, p.weekStartsOn, p.numberOfDays);
-    onChangeDateRef.current?.(addDays(p.date, side * step));
+    onChangeDateRef.current?.(addDays(p.date, side * step), { reason: "event-drag" });
     pagedRef.current = true;
     setPaged(true);
     edgeTimer.current = setTimeout(fireEdge, EDGE_REPEAT_MS);

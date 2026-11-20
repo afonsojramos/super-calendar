@@ -32,6 +32,7 @@ import type {
   CalendarEvent,
   CalendarMode,
   CreateGhostArgs,
+  DateChangeDetails,
   EventKeyExtractor,
   MonthDateInfo,
   RenderEvent,
@@ -89,7 +90,12 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
    * and anchors the previous week.
    */
   date: Date;
-  onChangeDate: (date: Date) => void;
+  /**
+   * Called when the user moves to another date. `details.reason` says how: `"swipe"`,
+   * `"keyboard"` (arrow keys on the web), or `"event-drag"` (an event held at the
+   * grid's edge pages it).
+   */
+  onChangeDate: (date: Date, details: DateChangeDetails) => void;
   /** Fired alongside `onChangeDate` with the `[start, end]` of the newly-visible range. */
   onChangeDateRange?: (range: [Date, Date]) => void;
   onPressEvent: (event: CalendarEvent<T>) => void;
@@ -738,8 +744,8 @@ function CalendarInner<T>(
 
   // Echo every date change and, when asked, the full visible range derived from it.
   const handleChangeDate = useCallback(
-    (next: Date) => {
-      onChangeDate(next);
+    (next: Date, details: DateChangeDetails) => {
+      onChangeDate(next, details);
       onChangeDateRange?.(
         visibleRange(
           mode,

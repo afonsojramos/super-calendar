@@ -52,6 +52,7 @@ import {
   type CreateGhostArgs,
   CalendarSelectionProvider,
   buildMultiWeekGrid,
+  type DateChangeDetails,
   type DateRange,
   type WeekdayFormat,
   filterHiddenDays,
@@ -136,7 +137,8 @@ export type MonthPagerProps<T> = {
   eventStartEditable?: boolean;
   /** Reject a drop that would overlap another event (default true = allowed). */
   eventOverlap?: boolean;
-  onChangeDate: (date: Date) => void;
+  /** Called with the date the user moved to, and why (`details.reason`). */
+  onChangeDate: (date: Date, details: DateChangeDetails) => void;
   freeSwipe?: boolean;
   swipeEnabled?: boolean;
   showSixWeeks?: boolean;
@@ -339,7 +341,7 @@ function DateRowsPagerInner<T>({
       }
       if (settled.index === viewedIndexRef.current) return;
       viewedIndexRef.current = settled.index;
-      if (settled.item) onChangeDate(settled.item);
+      if (settled.item) onChangeDate(settled.item, { reason: "swipe" });
     },
     [onChangeDate],
   );
@@ -370,7 +372,7 @@ function DateRowsPagerInner<T>({
   const goToPage = useCallback(
     (delta: number) => {
       const target = monthDates[activeIndex + delta];
-      if (target) onChangeDate(target);
+      if (target) onChangeDate(target, { reason: "keyboard" });
     },
     [monthDates, activeIndex, onChangeDate],
   );
@@ -695,10 +697,10 @@ function DateRowsPagerRoot<T>(props: DateRowsPagerProps<T>): ReactElement {
     };
   }, [key]);
   const onChangeDate = useCallback(
-    (date: Date) => {
+    (date: Date, details: DateChangeDetails) => {
       // A remounted series can still receive a queued viewability callback from
       // the old list. Never let it change the controlled date.
-      if (generation.current === key) props.onChangeDate(date);
+      if (generation.current === key) props.onChangeDate(date, details);
     },
     [key, props.onChangeDate],
   );

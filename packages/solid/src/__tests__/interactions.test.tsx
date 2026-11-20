@@ -280,7 +280,7 @@ describe("Solid month interactions", () => {
     ));
     expect(view.getAllByText("Planning")).toHaveLength(3);
     key(view.getAllByText("Planning")[0], "PageDown");
-    expect(onChangeDate).toHaveBeenCalledWith(new Date(2026, 6, 22));
+    expect(onChangeDate).toHaveBeenCalledWith(new Date(2026, 6, 22), { reason: "keyboard" });
   });
 });
 

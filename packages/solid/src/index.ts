@@ -25,6 +25,8 @@ export {
   type CalendarLabels,
   type CalendarMode,
   type CreateGhostArgs,
+  type DateChangeDetails,
+  type DateChangeReason,
   type DateRange,
   type DateSelectionConstraints,
   type DaySelectionState,

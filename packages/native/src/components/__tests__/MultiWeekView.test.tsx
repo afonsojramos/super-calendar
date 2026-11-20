@@ -501,7 +501,7 @@ describe("native multiweek pager", () => {
       />,
     );
     await settle(list.props, 61);
-    expect(change).toHaveBeenCalledExactlyOnceWith(new Date(2031, 0, 6));
+    expect(change).toHaveBeenCalledExactlyOnceWith(new Date(2031, 0, 6), { reason: "swipe" });
     expect(range).toHaveBeenCalledExactlyOnceWith([
       new Date(2031, 0, 6),
       new Date(2031, 0, 17, 23, 59, 59, 999),
@@ -526,7 +526,7 @@ describe("native multiweek pager", () => {
     await settle(first, 62);
     expect(change).not.toHaveBeenCalled();
     await settle(list.props, 61);
-    expect(change).toHaveBeenCalledExactlyOnceWith(addWeeks(offPhase, 2));
+    expect(change).toHaveBeenCalledExactlyOnceWith(addWeeks(offPhase, 2), { reason: "swipe" });
   });
 
   it("resets a pending scroll after an external jump outside the window", async () => {

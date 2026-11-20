@@ -44,8 +44,8 @@ export function ControlledTimeGrid(props: TimeGridProps) {
     <TimeGrid
       {...props}
       date={date()}
-      onChangeDate={(next) => {
-        props.onChangeDate?.(next);
+      onChangeDate={(next, details) => {
+        props.onChangeDate?.(next, details);
         setDate(next);
       }}
     />

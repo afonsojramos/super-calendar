@@ -1240,6 +1240,27 @@ describe("TimeGrid fast-fling repaint", () => {
     expect(calls?.at(-1)).toEqual({ index: 5, animated: false });
   });
 
+  it("reports the page a fling settled on as a swipe", async () => {
+    const onChangeDate = vi.fn();
+    await render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={onChangeDate}
+        onPressEvent={noop}
+      />,
+    );
+    const pageWidth = (lastListProps() as { getFixedItemSize: () => number }).getFixedItemSize();
+    const pageDates = (lastListProps() as { data: Date[] }).data;
+    await settle(5 * pageWidth);
+    expect(onChangeDate).toHaveBeenCalledExactlyOnceWith(pageDates[5], { reason: "swipe" });
+  });
+
   it("clamps an overscrolled settle to the page window", async () => {
     await render(
       <TimeGrid
@@ -1599,7 +1620,8 @@ describe("TimeGrid cross-week drop", () => {
         new Date(2026, 0, day, 14),
         new Date(2026, 0, day, 15),
       );
-      if (reject) expect(onChangeDate).toHaveBeenLastCalledWith(event.start);
+      if (reject)
+        expect(onChangeDate).toHaveBeenLastCalledWith(event.start, { reason: "event-drag" });
       else expect(onChangeDate).toHaveBeenCalledTimes(1);
     },
   );
@@ -1633,7 +1655,7 @@ describe("TimeGrid cross-week drop", () => {
     await act(() => {
       vi.advanceTimersByTime(600);
     });
-    expect(onChangeDate).toHaveBeenCalledWith(new Date(2026, 0, 12));
+    expect(onChangeDate).toHaveBeenCalledWith(new Date(2026, 0, 12), { reason: "event-drag" });
     // The pager keeps swiping enabled throughout: toggling it made the list
     // re-apply its initial offset on release and jump back a page.
     expect((lastListProps() as { scrollEnabled?: boolean }).scrollEnabled).toBe(true);

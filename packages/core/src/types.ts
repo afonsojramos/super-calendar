@@ -152,6 +152,18 @@ export type EventKeyExtractor<T = unknown> = (event: CalendarEvent<T>, index: nu
 export type WeekStartsOn = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 /**
+ * What moved the calendar to a new date: `"swipe"` (a page swipe, native only),
+ * `"keyboard"` (arrow-key paging), or `"event-drag"` (an event dragged against
+ * the grid's edge, which pages it).
+ */
+export type DateChangeReason = "swipe" | "keyboard" | "event-drag";
+
+/** The second argument of `onChangeDate`. */
+export type DateChangeDetails = {
+  reason: DateChangeReason;
+};
+
+/**
  * A day's open hours for `businessHours` shading, as hours (fractions allowed,
  * e.g. `9.5`): a single window `{ start, end }`, or an array of windows to leave
  * a closed gap between them (a lunch break: `[{ start: 9, end: 12 }, { start: 13,

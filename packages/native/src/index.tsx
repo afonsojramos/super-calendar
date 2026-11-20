@@ -62,6 +62,8 @@ export type {
   CalendarHandle,
   CalendarMode,
   CreateGhostArgs,
+  DateChangeDetails,
+  DateChangeReason,
   EventAccessibilityLabelContext,
   EventAccessibilityLabeler,
   EventKeyExtractor,

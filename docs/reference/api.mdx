@@ -43,9 +43,20 @@ in-view dragging without edge paging. Other navigation remains available.
 
 | Prop                | Type                            | Notes                                    |
 | ------------------- | ------------------------------- | ---------------------------------------- |
-| `onChangeDate`      | `(date) => void`                | Fires when paging changes the date.      |
+| `onChangeDate`      | `(date, details) => void`       | Fires when paging changes the date.      |
 | `onChangeDateRange` | `(range: [Date, Date]) => void` | The visible window — handy for fetching. |
 | `freeSwipe`         | `boolean`                       | Fling across several pages.              |
+
+`details.reason` says what moved the calendar:
+
+- `"swipe"`: the user swiped to another page (native only).
+- `"keyboard"`: arrow-key paging on native web, or **PageUp** and **PageDown**
+  in the DOM and Solid renderers.
+- `"event-drag"`: the user held a dragged event at the grid's edge. On native,
+  a rejected cross-week drop also pages back to the event's week with this reason.
+
+Your own controls (previous, next, today) set `date` directly, so they never
+call `onChangeDate`.
 
 ## Events & rendering
 
@@ -234,7 +245,8 @@ Changing either dimension updates already mounted list and pager months.
     `CalendarEvent`, `CalendarMode`, `RenderEventArgs`, `RecurrenceRule`, `BusinessHours`,
     `EventDragHandler`, `CalendarTheme`, `PositionedEvent`, `DateRange`, `MonthGrid`,
     `MonthEventSegment`, `MonthWeekEvents`, `MonthListProps`, `CalendarSlot`, `SlotStyleProps`,
-    `CalendarLabels`, `CalendarHandle`, `ScrollToTimeOptions`, `CreateGhostArgs`, `MonthDateInfo`
+    `CalendarLabels`, `CalendarHandle`, `ScrollToTimeOptions`, `CreateGhostArgs`, `MonthDateInfo`,
+    `DateChangeDetails`, `DateChangeReason`
   </Card>
 </CardGroup>
 
