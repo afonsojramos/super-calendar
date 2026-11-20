@@ -85,6 +85,7 @@ describe(rendererName, () => {
         // A keydown from the focused grid bubbles to the paging wrapper.
         fireEvent.keyDown(container.firstElementChild!, { key: "PageDown" });
         expect((onChangeDate.mock.calls[0][0] as Date).getDate()).toBe(22); // +1 week from 15 Jul
+        expect(onChangeDate.mock.calls[0][1]).toEqual({ reason: "keyboard" });
         fireEvent.keyDown(container.firstElementChild!, { key: "PageUp" });
         expect((onChangeDate.mock.calls[1][0] as Date).getDate()).toBe(8); // −1 week
       });

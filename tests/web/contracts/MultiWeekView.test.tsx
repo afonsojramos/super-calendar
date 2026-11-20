@@ -559,8 +559,8 @@ describe(rendererName, () => {
       fireEvent.keyDown(view.getByRole("grid"), { key: "PageDown" });
       fireEvent.keyDown(view.getByRole("grid"), { key: "PageUp" });
       expect(onChangeDate.mock.calls).toEqual([
-        [addWeeks(date, numberOfWeeks)],
-        [addWeeks(date, -numberOfWeeks)],
+        [addWeeks(date, numberOfWeeks), { reason: "keyboard" }],
+        [addWeeks(date, -numberOfWeeks), { reason: "keyboard" }],
       ]);
     });
     it("expands recurrence throughout the full requested period", () => {

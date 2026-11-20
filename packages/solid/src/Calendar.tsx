@@ -7,6 +7,7 @@ import {
   type BusinessHoursBand,
   type CalendarEvent,
   type CalendarMode,
+  type DateChangeDetails,
   type CreateGhostArgs,
   type DateRange,
   type DateSelectionConstraints,
@@ -74,9 +75,10 @@ export interface CalendarProps<T = unknown>
    * Fires with the next/previous period's date when the user pages the focused
    * calendar with **PageDown** / **PageUp** (a month in `month`, a week in
    * `schedule`, else the view's day span). It's controlled, so update `date` in
-   * response. Omit it to leave paging to your own controls.
+   * response. Omit it to leave paging to your own controls. `details.reason` is
+   * `"keyboard"` for PageUp / PageDown and `"event-drag"` for edge paging.
    */
-  onChangeDate?: (date: Date) => void;
+  onChangeDate?: (date: Date, details?: DateChangeDetails) => void;
   /** Your events. */
   events?: CalendarEvent<T>[];
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */
@@ -478,6 +480,7 @@ export function Calendar<T = unknown>(
           props.numberOfDays,
           props.numberOfWeeks,
         ),
+        { reason: "keyboard" },
       );
     else if (e.key === "PageUp")
       props.onChangeDate(
@@ -489,6 +492,7 @@ export function Calendar<T = unknown>(
           props.numberOfDays,
           props.numberOfWeeks,
         ),
+        { reason: "keyboard" },
       );
     else return;
     e.preventDefault();

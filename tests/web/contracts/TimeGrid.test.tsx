@@ -1533,6 +1533,7 @@ describe(rendererName, () => {
         // A week steps 7 days forward.
         const next = onChangeDate.mock.calls[0][0] as Date;
         expect(next.getTime()).toBe(new Date(2026, 6, 3).getTime());
+        expect(onChangeDate.mock.calls[0][1]).toEqual({ reason: "event-drag" });
         fireEvent.pointerUp(box, { clientX: 690, clientY: 300, pointerId: 1 });
       } finally {
         vi.useRealTimers();

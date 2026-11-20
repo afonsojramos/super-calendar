@@ -72,6 +72,8 @@ import type {
   CalendarEvent,
   CalendarMode,
   CreateGhostArgs,
+  DateChangeDetails,
+  DateChangeReason,
   EventDragHandler,
   EventDragStartHandler,
   EventKeyExtractor,
@@ -2698,7 +2700,8 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   renderCreateGhost?: ComponentType<CreateGhostArgs>;
   /** Tap a day's column header (default header only). */
   onPressDateHeader?: (date: Date) => void;
-  onChangeDate: (date: Date) => void;
+  /** Called with the date the user moved to, and why (`details.reason`). */
+  onChangeDate: (date: Date, details?: DateChangeDetails) => void;
   /** Optional header above the grid (e.g. weekday labels). Rendered full-width. */
   renderHeader?: (days: Date[]) => React.ReactNode;
   /**
@@ -3058,7 +3061,7 @@ function TimeGridInner<T>(
       // A rejected drop (handler returned false) leaves the event on its original
       // week, which the drag has paged away from. Page back to it so the reject
       // reads as a visible snap-back instead of the event seeming to vanish.
-      if (onDrag(ev, start, end) === false) onDate(ev.start);
+      if (onDrag(ev, start, end) === false) onDate(ev.start, { reason: "event-drag" });
     },
     [clearLift, cellHeight, laneHeight, ghostW],
   );
@@ -3290,7 +3293,7 @@ function TimeGridInner<T>(
       }
       if (settled.index === viewedIndexRef.current) return;
       viewedIndexRef.current = settled.index;
-      if (settled.item) onChangeDate(settled.item);
+      if (settled.item) onChangeDate(settled.item, { reason: "swipe" });
     },
     [onChangeDate],
   );
@@ -3408,7 +3411,7 @@ function TimeGridInner<T>(
   // report the date, rather than waiting for the reported date to come back
   // through props. The realign effect then finds the list already there.
   const goToPage = useCallback(
-    (delta: number) => {
+    (delta: number, reason: DateChangeReason) => {
       const index = viewedIndexRef.current + delta;
       const target = pageDates[index];
       if (!target) return;
@@ -3417,11 +3420,13 @@ function TimeGridInner<T>(
       // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
       pagerOffset.value = index * columnsWidth;
       void listRef.current?.scrollToIndex({ index, animated: !isWeb && !reduceMotion });
-      onChangeDate(target);
+      onChangeDate(target, { reason });
     },
     [pageDates, reduceMotion, onChangeDate, columnsWidth, pagerOffset],
   );
-  useWebPagerKeys(swipeEnabled, goToPage);
+  const pageByKey = useCallback((delta: number) => goToPage(delta, "keyboard"), [goToPage]);
+  const pageByEdgeDrag = useCallback((delta: number) => goToPage(delta, "event-drag"), [goToPage]);
+  useWebPagerKeys(swipeEnabled, pageByKey);
 
   // Commit the page nearest `offsetX` and return its index. Viewability only
   // reports a page that is nearly all on screen, so a pager that rests between
@@ -3433,7 +3438,7 @@ function TimeGridInner<T>(
       if (index !== viewedIndexRef.current) {
         viewedIndexRef.current = index;
         const target = pageDates[index];
-        if (target) onChangeDate(target);
+        if (target) onChangeDate(target, { reason: "swipe" });
       }
       return index;
     },
@@ -3588,7 +3593,7 @@ function TimeGridInner<T>(
         onLongPressCell={onLongPressCell}
         onCreateEvent={onCreateEvent}
         renderCreateGhost={renderCreateGhost}
-        onEdgeAdvance={goToPage}
+        onEdgeAdvance={pageByEdgeDrag}
         pageIndex={index}
         laneHeight={laneHeight}
         scrollY={scrollY}
@@ -3650,7 +3655,7 @@ function TimeGridInner<T>(
       onLongPressCell,
       onCreateEvent,
       renderCreateGhost,
-      goToPage,
+      pageByEdgeDrag,
       hiddenDays,
       now,
       timeZone,
