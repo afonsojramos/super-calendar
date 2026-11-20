@@ -42,7 +42,9 @@ interface GridRow {
 }
 
 // Month grids clamp to the month: Home/End reach its first/last day, and
-// unavailable days stay reachable.
+// unavailable days stay reachable. The docs do not promise these three; they pin
+// current behaviour, so changing it (week-row Home/End, crossing into the next
+// month, skipping unavailable days) means updating these steps on purpose.
 const monthKeys: Array<[Key, string]> = [
   ["ArrowRight", "2026-07-16"],
   ["ArrowLeft", "2026-07-15"],
@@ -333,5 +335,18 @@ describe(rendererName, () => {
         expect(onChangeDate).toHaveBeenCalledTimes(3);
       },
     );
+
+    it("leaves focus where it is when the month changes after focus left the grid", async () => {
+      // August 2026 has six rows and September five, so the last row's day is removed.
+      const props = { date: new Date(2026, 7, 15), weekStartsOn };
+      const view = render(MonthView, props);
+      act(() => day(view.getByRole("grid"), "2026-08-31").focus());
+      act(() => focused().blur());
+      // The month changes in a later task than the blur, as it would for a user.
+      await Promise.resolve();
+      expect(focused()).toBe(document.body);
+      view.rerender({ ...props, date: new Date(2026, 8, 15) });
+      expect(focused()).toBe(document.body);
+    });
   });
 });

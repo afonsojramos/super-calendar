@@ -834,6 +834,17 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
     current: null,
   };
   const lastDayFocus: ElementRef<HTMLElement | null> = { current: null };
+  // Forget the focused day once focus leaves it. Removal blurs before detaching
+  // the node, so tell it from a manual blur once the DOM update finishes.
+  const forgetDayFocus = (event: FocusEvent) => {
+    if (event.target !== event.currentTarget) return;
+    const previous = event.currentTarget as HTMLElement;
+    if (event.relatedTarget) lastDayFocus.current = null;
+    else
+      queueMicrotask(() => {
+        if (lastDayFocus.current === previous && previous.isConnected) lastDayFocus.current = null;
+      });
+  };
   // Moves DOM focus to the tab stop, only while a day of this grid owns focus.
   const alignDayFocus = (key: string | null) => {
     const active = gridRef.current?.ownerDocument.activeElement;
@@ -1577,22 +1588,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                               setFocusedDate(day().date);
                                             }
                                           }}
-                                          onFocusOut={(event) => {
-                                            if (event.target !== event.currentTarget) return;
-                                            const previous = event.currentTarget;
-                                            if (event.relatedTarget) lastDayFocus.current = null;
-                                            else {
-                                              // Removal blurs before detaching the node. Distinguish
-                                              // it from a manual blur after the DOM update finishes.
-                                              queueMicrotask(() => {
-                                                if (
-                                                  lastDayFocus.current === previous &&
-                                                  previous.isConnected
-                                                )
-                                                  lastDayFocus.current = null;
-                                              });
-                                            }
-                                          }}
+                                          onFocusOut={forgetDayFocus}
                                           {...dayData()}
                                           tabindex={
                                             props.keyboardDayNavigation
@@ -2053,6 +2049,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                             setFocusedDate(day().date);
                                           }
                                         }}
+                                        onFocusOut={forgetDayFocus}
                                         {...dayData()}
                                         tabindex={day().id === focusKey() ? 0 : -1}
                                         aria-disabled={
