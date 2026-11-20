@@ -139,6 +139,15 @@ larger than `2147483647` ms. Other values disable it. Unmounting aborts
 pending URL requests, stops polling, and disables retained `refetch` callbacks.
 Solid consumers use `createEventSource` from `@super-calendar/solid`.
 
+## Docs for coding agents
+
+This package includes its docs as Markdown in `docs/`, matched to the installed
+version. Add a line like this to your project's `AGENTS.md`:
+
+```md
+Read node_modules/@super-calendar/core/docs/llms.txt before writing calendar code.
+```
+
 ## Documentation
 
 See the [full documentation](https://super-calendar.afonsojramos.me) and the [API reference](https://super-calendar.afonsojramos.me/reference/api).

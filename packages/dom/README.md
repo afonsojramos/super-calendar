@@ -234,6 +234,15 @@ can extend past a narrowed `minHour`/`maxHour` window. The content is clipped to
 the preview, non-interactive, and hidden from assistive tech.
 The range follows scrolling and zooming during a held sweep, even without another pointer move.
 
+## Docs for coding agents
+
+This package includes its docs as Markdown in `docs/`, matched to the installed
+version. Add a line like this to your project's `AGENTS.md`:
+
+```md
+Read node_modules/@super-calendar/dom/docs/llms.txt before writing calendar code.
+```
+
 ## Documentation
 
 See the [full documentation](https://super-calendar.afonsojramos.me), the [quickstart](https://super-calendar.afonsojramos.me/quickstart), and the [API reference](https://super-calendar.afonsojramos.me/reference/api).

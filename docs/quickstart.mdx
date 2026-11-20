@@ -144,6 +144,19 @@ For Solid 2, follow the [Solid setup guide](/guides/solid). For React, pick the 
   </Tab>
 </Tabs>
 
+## Point your coding agent at the bundled docs
+
+Each package includes these docs as Markdown in its `docs` folder, matched to
+the installed version. The hosted docs describe the latest release. Add a line like
+this to your project's `AGENTS.md`, with the package you installed:
+
+```md
+Read node_modules/@super-calendar/native/docs/llms.txt before writing calendar code.
+```
+
+`llms.txt` lists the guides bundled with that package, with a one-line
+description of each.
+
 ## Next steps
 
 <CardGroup cols={2}>
