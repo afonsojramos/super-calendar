@@ -1,5 +1,5 @@
 import { buildMultiWeekGrid } from "@super-calendar/core";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { act, fireEvent, render } from "@testing-library/react-native";
 import { type StyleProp, StyleSheet, Text, type ViewStyle } from "react-native";
 import * as gestureHandlerMock from "react-native-gesture-handler";
@@ -510,15 +510,30 @@ describe("native multiweek pager", () => {
 
   it("preserves a series on an ordinary swipe but rebases off-phase jumps and ignores stale callbacks", async () => {
     const change = vi.fn();
-    const view = await render(<Calendar {...calendar} onChangeDate={change} />);
+    // The app accepts each swipe in the same update, as `onChangeDate={setDate}` does.
+    let setDate: (date: Date) => void = () => {};
+    function Controlled() {
+      const [date, set] = useState(calendar.date);
+      setDate = set;
+      return (
+        <Calendar
+          {...calendar}
+          date={date}
+          onChangeDate={(next, details) => {
+            change(next, details);
+            set(next);
+          }}
+        />
+      );
+    }
+    await render(<Controlled />);
     const first = list.props;
     await settle(first, 61);
     const next = first.data[61];
-    await view.rerender(<Calendar {...calendar} date={next} onChangeDate={change} />);
     expect(list.props.data).toBe(first.data);
     expect(list.scroll).not.toHaveBeenCalled();
     const offPhase = addWeeks(next, 1);
-    await view.rerender(<Calendar {...calendar} date={offPhase} onChangeDate={change} />);
+    await act(() => setDate(offPhase));
     expect(list.props.data).not.toBe(first.data);
     expect(list.props.initialScrollIndex).toBe(60);
     expect(list.props.data[60]).toEqual(offPhase);

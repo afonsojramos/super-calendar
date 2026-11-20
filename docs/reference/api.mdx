@@ -62,6 +62,11 @@ optional, so read it as `details?.reason`.
 If you pass a setter that takes its own second argument, such as an options
 object, wrap it so it does not receive `details`: `onChangeDate={(d) => setDate(d)}`.
 
+`date` is controlled. To decline a change, leave `date` as it is: on native, the
+pager pages back to the date you kept. Update `date` in the same update as
+`onChangeDate` (as `onChangeDate={setDate}` does); a date that arrives later,
+after an `await`, shows the page-back first.
+
 ## Events & rendering
 
 | Prop                       | Type                               | Notes                                                     |

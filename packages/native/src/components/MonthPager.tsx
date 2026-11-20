@@ -320,6 +320,9 @@ function DateRowsPagerInner<T>({
   // months it crosses are ignored until it lands, so they can't report a month in
   // between back as the new date — which made jumps land one month short.
   const pendingScrollIndexRef = useRef<number | null>(null);
+  // Bumped after each reported swipe, so the pager re-renders with the `date` the
+  // app chose even when the app kept the old one (no prop changes then).
+  const [swipeReports, setSwipeReports] = useState(0);
 
   const handleViewableItemsChanged = useCallback(
     (info: OnViewableItemsChangedInfo<Date>) => {
@@ -341,7 +344,9 @@ function DateRowsPagerInner<T>({
       }
       if (settled.index === viewedIndexRef.current) return;
       viewedIndexRef.current = settled.index;
-      if (settled.item) onChangeDate(settled.item, { reason: "swipe" });
+      if (!settled.item) return;
+      onChangeDate(settled.item, { reason: "swipe" });
+      setSwipeReports((count) => count + 1);
     },
     [onChangeDate],
   );
@@ -354,6 +359,15 @@ function DateRowsPagerInner<T>({
     pendingScrollIndexRef.current = activeIndex;
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
   }, [activeIndex]);
+
+  // `date` is controlled: when the app keeps the old date after a swipe, page back
+  // to the month it still shows instead of leaving the list on the swiped one.
+  useEffect(() => {
+    if (swipeReports === 0 || activeIndex === viewedIndexRef.current) return;
+    viewedIndexRef.current = activeIndex;
+    pendingScrollIndexRef.current = activeIndex;
+    void listRef.current?.scrollToIndex({ index: activeIndex, animated: true });
+  }, [swipeReports, activeIndex]);
 
   // A new container width resizes every page (see `listExtraData`), but the
   // native scroll offset stays at the old `index * width`, which now points at a

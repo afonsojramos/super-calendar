@@ -2,7 +2,7 @@ import * as reanimatedMock from "react-native-reanimated";
 import * as gestureHandlerMock from "react-native-gesture-handler";
 import { vi } from "vitest";
 import { act, fireEvent, within } from "@testing-library/react-native";
-import { createRef } from "react";
+import { type ComponentProps, createRef, useState } from "react";
 import type { CalendarHandle } from "@super-calendar/core";
 import { Dimensions, Platform, Pressable, StyleSheet, Text } from "react-native";
 import type { CalendarEvent, RenderEventArgs } from "../../types";
@@ -37,6 +37,25 @@ const event: CalendarEvent<WithId> = {
 };
 
 const noop = () => {};
+
+// An app that keeps `date` in state and accepts every page the user moves to.
+function ControlledTimeGrid({
+  date: initialDate,
+  onChangeDate,
+  ...props
+}: ComponentProps<typeof TimeGrid<WithId>>) {
+  const [date, setDate] = useState(initialDate);
+  return (
+    <TimeGrid
+      {...props}
+      date={date}
+      onChangeDate={(next, details) => {
+        onChangeDate(next, details);
+        setDate(next);
+      }}
+    />
+  );
+}
 
 const moveGestureHarness = (index = 0) => {
   const { __gestures } = gestureHandlerMock as unknown as {
@@ -1220,7 +1239,7 @@ describe("TimeGrid fast-fling repaint", () => {
 
   it("re-anchors the list to the page the fling settled on", async () => {
     await render(
-      <TimeGrid
+      <ControlledTimeGrid
         mode="week"
         date={new Date(2026, 0, 6, 12, 0, 0)}
         events={[event]}
@@ -1238,6 +1257,49 @@ describe("TimeGrid fast-fling repaint", () => {
     const calls = (globalThis as { __scrollToIndexCalls?: { index: number }[] })
       .__scrollToIndexCalls;
     expect(calls?.at(-1)).toEqual({ index: 5, animated: false });
+  });
+
+  it("pages back when the app keeps the date after a fling", async () => {
+    await render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    const list = lastListProps() as { getFixedItemSize: () => number; initialScrollIndex: number };
+    await settle((list.initialScrollIndex + 1) * list.getFixedItemSize());
+    await flushFrame();
+    const calls = (globalThis as { __scrollToIndexCalls?: unknown[] }).__scrollToIndexCalls;
+    expect(calls?.at(-1)).toEqual({ index: list.initialScrollIndex, animated: true });
+  });
+
+  it("stays on the page a fling settled on when the app accepts the date", async () => {
+    await render(
+      <ControlledTimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    const list = lastListProps() as { getFixedItemSize: () => number; initialScrollIndex: number };
+    const target = list.initialScrollIndex + 1;
+    await settle(target * list.getFixedItemSize());
+    await flushFrame();
+    const calls = (globalThis as { __scrollToIndexCalls?: unknown[] }).__scrollToIndexCalls;
+    expect(calls).toEqual([{ index: target, animated: false }]);
   });
 
   it("reports the page a fling settled on as a swipe", async () => {
@@ -1263,7 +1325,7 @@ describe("TimeGrid fast-fling repaint", () => {
 
   it("clamps an overscrolled settle to the page window", async () => {
     await render(
-      <TimeGrid
+      <ControlledTimeGrid
         mode="week"
         date={new Date(2026, 0, 6, 12, 0, 0)}
         events={[event]}
@@ -1337,7 +1399,7 @@ describe("TimeGrid fast-fling repaint", () => {
   it("ignores a momentum end that no user drag started", async () => {
     const onChangeDate = vi.fn();
     await render(
-      <TimeGrid
+      <ControlledTimeGrid
         mode="week"
         date={new Date(2026, 0, 6, 12, 0, 0)}
         events={[event]}
@@ -1426,7 +1488,7 @@ describe("TimeGrid pager resting off a page", () => {
       .__scrollToIndexCalls ?? [];
   const renderPager = (onChangeDate: (date: Date) => void = noop) =>
     render(
-      <TimeGrid
+      <ControlledTimeGrid
         mode="day"
         date={new Date(2026, 0, 6, 12, 0, 0)}
         events={[event]}

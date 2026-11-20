@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useMemo } from "react";
+import { useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { vi } from "vitest";
 import { act, fireEvent, render } from "@testing-library/react-native";
 import { Text } from "react-native";
@@ -286,5 +286,61 @@ describe("MonthPager title", () => {
       />,
     );
     expect(queryByText("January 2026")).toBeNull();
+  });
+});
+
+describe("MonthPager controlled swipes", () => {
+  afterEach(() => {
+    delete (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex;
+  });
+
+  const swipeTo = async (index: number) => {
+    const list = lastListProps() as {
+      data: Date[];
+      onViewableItemsChanged: (info: unknown) => void;
+    };
+    await act(() =>
+      list.onViewableItemsChanged({
+        viewableItems: [{ isViewable: true, index, item: list.data[index] }],
+      }),
+    );
+  };
+
+  it.each(["month", "multiweek"] as const)(
+    "pages the %s pager back when the app keeps the date after a swipe",
+    async (mode) => {
+      const scrollToIndex = vi.fn();
+      (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex = scrollToIndex;
+      const onChangeDate = vi.fn();
+      await render(
+        <Calendar
+          mode={mode}
+          date={new Date(2026, 10, 6)}
+          events={[]}
+          onChangeDate={onChangeDate}
+          onPressEvent={noop}
+        />,
+      );
+      const activeIndex = lastListProps()?.initialScrollIndex as number;
+      await swipeTo(activeIndex + 1);
+      expect(onChangeDate).toHaveBeenCalledTimes(1);
+      // The app ignored the change, so the pager must return to the date it shows.
+      expect(scrollToIndex).toHaveBeenLastCalledWith({ index: activeIndex, animated: true });
+    },
+  );
+
+  it("stays on the swiped page when the app accepts the date", async () => {
+    const scrollToIndex = vi.fn();
+    (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex = scrollToIndex;
+    function Controlled() {
+      const [date, setDate] = useState(new Date(2026, 10, 6));
+      return (
+        <Calendar mode="month" date={date} events={[]} onChangeDate={setDate} onPressEvent={noop} />
+      );
+    }
+    await render(<Controlled />);
+    const activeIndex = lastListProps()?.initialScrollIndex as number;
+    await swipeTo(activeIndex + 1);
+    expect(scrollToIndex).not.toHaveBeenCalled();
   });
 });
