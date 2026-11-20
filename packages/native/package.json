@@ -70,7 +70,7 @@
     "@super-calendar/core": "workspace:*"
   },
   "peerDependencies": {
-    "@legendapp/list": ">=3",
+    "@legendapp/list": ">=3.7.1",
     "date-fns": ">=3",
     "react": ">=18",
     "react-native": ">=0.74 <2",

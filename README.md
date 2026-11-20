@@ -786,8 +786,8 @@ or `null` to shade the whole day. The tint colour is the theme's
 ### Web
 
 The calendar runs on [react-native-web](https://necolas.github.io/react-native-web/);
-its dependencies (`@legendapp/list` v3, Reanimated and Gesture Handler) all
-support web. Add the web peers to your app:
+its dependencies (`@legendapp/list` 3.7.1 or later, Reanimated and Gesture
+Handler) all support web. Add the web peers to your app:
 
 ```sh
 npx expo install react-dom react-native-web @expo/metro-runtime
