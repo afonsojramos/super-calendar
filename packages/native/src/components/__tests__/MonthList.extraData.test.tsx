@@ -74,3 +74,28 @@ describe("MonthList event updates", () => {
     expect(getByLabelText(/6 January 2026, 2 events$/)).toHaveStyle({ gap: 6 });
   });
 });
+
+describe("MonthList row size updates", () => {
+  // LegendList re-resolves `getFixedItemSize` and repaints mounted months only
+  // when `extraData` changes, so new row or header heights must reach it there.
+  it("resizes a mounted month when weekRowHeight or monthHeaderHeight changes", async () => {
+    const date = new Date(2026, 0, 6, 12, 0, 0);
+    const props = { date, events: [] as CalendarEvent[], weekStartsOn: 1 as const };
+    // January 2026 spans five Monday-start weeks.
+    const blockHeight = (view: Awaited<ReturnType<typeof render>>) =>
+      view.container.queryAll(
+        (node) =>
+          (node.props.style as { height?: number } | undefined)?.height != null &&
+          !Array.isArray(node.props.style) &&
+          Object.keys(node.props.style as object).length === 1,
+      )[0]?.props.style.height;
+    const view = await render(<MonthList {...props} weekRowHeight={40} monthHeaderHeight={30} />);
+    expect(blockHeight(view)).toBe(30 + 5 * 40);
+
+    await view.rerender(<MonthList {...props} weekRowHeight={60} monthHeaderHeight={30} />);
+    expect(blockHeight(view)).toBe(30 + 5 * 60);
+
+    await view.rerender(<MonthList {...props} weekRowHeight={60} monthHeaderHeight={50} />);
+    expect(blockHeight(view)).toBe(50 + 5 * 60);
+  });
+});
