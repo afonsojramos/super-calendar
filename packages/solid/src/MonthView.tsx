@@ -821,15 +821,6 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       : startOfMonth(props.source.date);
   });
   const [focusedDate, setFocusedDate] = createSignal(untrack(() => initialFocus()));
-  const initialFocusRef = {
-    current: untrack(() => initialFocus()),
-  };
-  createEffect(
-    () => initialFocus(),
-    (value) => {
-      initialFocusRef.current = value;
-    },
-  );
   // The displayed window: the month, or the first week and count of multi-week rows.
   const windowKey = createMemo(() => {
     const period = _grid().period;
@@ -844,7 +835,9 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
     untrack(() => {
       if (key === focusedWindow) return;
       focusedWindow = key;
-      setFocusedDate(initialFocusRef.current);
+      // Read the memo, not an effect-synced copy: effects run in no set order,
+      // so a copy can still hold the previous window's day.
+      setFocusedDate(initialFocus());
     }),
   );
   const [hoveredKey, setHoveredKey] = createSignal<string | null>(null);
