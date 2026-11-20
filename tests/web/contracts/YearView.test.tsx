@@ -50,6 +50,33 @@ describe(rendererName, () => {
       expect(getByLabelText(/16 July 2026/).hasAttribute("data-selected")).toBe(false);
     });
 
+    it("marks the first and last day of a range", () => {
+      const { getByLabelText } = render(YearView, {
+        date: new Date(2026, 6, 20),
+        selectedRange: { start: new Date(2026, 6, 15), end: new Date(2026, 6, 17) },
+      });
+      const start = getByLabelText(/15 July 2026/);
+      const middle = getByLabelText(/16 July 2026/);
+      const end = getByLabelText(/17 July 2026/);
+      expect(start.getAttribute("data-range-start")).toBe("");
+      expect(start.hasAttribute("data-range-end")).toBe(false);
+      expect(end.getAttribute("data-range-end")).toBe("");
+      expect(end.hasAttribute("data-range-start")).toBe(false);
+      expect(middle.hasAttribute("data-range-start")).toBe(false);
+      expect(middle.hasAttribute("data-range-end")).toBe(false);
+    });
+
+    it("leaves the endpoints unmarked until the range has an end", () => {
+      const { getByLabelText } = render(YearView, {
+        date: new Date(2026, 6, 20),
+        selectedRange: { start: new Date(2026, 6, 15), end: null },
+      });
+      const start = getByLabelText(/15 July 2026/);
+      expect(start.getAttribute("data-selected")).toBe("");
+      expect(start.hasAttribute("data-range-start")).toBe(false);
+      expect(start.hasAttribute("data-range-end")).toBe(false);
+    });
+
     it("disables days outside minDate/maxDate", () => {
       const onPressDay = vi.fn();
       const { getByLabelText } = render(YearView, {
