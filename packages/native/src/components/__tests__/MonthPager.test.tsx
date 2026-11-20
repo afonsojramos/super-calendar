@@ -372,6 +372,27 @@ describe("MonthPager controlled swipes", () => {
     expect(scrollToIndex).toHaveBeenLastCalledWith({ index: activeIndex, animated: true });
   });
 
+  it("pages back when a parent view cancels the drag", async () => {
+    const scrollToIndex = vi.fn();
+    (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex = scrollToIndex;
+    await render(
+      <Calendar
+        mode="month"
+        date={new Date(2026, 10, 6)}
+        events={[]}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    const activeIndex = lastListProps()?.initialScrollIndex as number;
+    type Touch = { onScrollBeginDrag: () => void; onTouchCancel: () => void };
+    await act(() => (lastListProps() as Touch).onScrollBeginDrag());
+    await swipeTo(activeIndex + 1);
+    // No drag end arrives for a cancelled gesture, only the touch cancel.
+    await act(() => (lastListProps() as Touch).onTouchCancel());
+    expect(scrollToIndex).toHaveBeenLastCalledWith({ index: activeIndex, animated: true });
+  });
+
   it("does not page back when the app accepts the date in a transition", async () => {
     const scrollToIndex = vi.fn();
     (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex = scrollToIndex;

@@ -3530,6 +3530,13 @@ function TimeGridInner<T>(
   const realignRestingPager = useCallback(
     (offsetX: number) => {
       pagerDraggingRef.current = false;
+      // A page-back held for a drag that never reported its end (a parent view took
+      // the touch): run it now instead of snapping to the page the app refused.
+      if (pageBackHeldRef.current) {
+        pageBackHeldRef.current = false;
+        startTransition(() => setDateReports((count) => count + 1));
+        return;
+      }
       if (columnsWidth <= 0) return;
       const pages = offsetX / columnsWidth;
       const offPagePx = Math.abs(pages - Math.round(pages)) * columnsWidth * PixelRatio.get();

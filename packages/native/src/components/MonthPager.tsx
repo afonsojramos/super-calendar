@@ -666,6 +666,8 @@ function DateRowsPagerInner<T>({
                   snapToIndices: freeSwipe ? snapToIndices : undefined,
                   onScrollBeginDrag: handlePagerDragStart,
                   onScrollEndDrag: handlePagerDragEnd,
+                  // A parent view that takes the touch cancels the drag without a drag end.
+                  onTouchCancel: handlePagerDragEnd,
                 })}
             initialScrollIndex={activeIndex}
             showsHorizontalScrollIndicator={false}
