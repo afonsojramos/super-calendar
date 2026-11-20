@@ -62,6 +62,17 @@ describe(rendererName, () => {
       );
     });
 
+    it("starts the tab stop on the `now` day rather than the device's today", () => {
+      const { container } = render(MonthView, {
+        date: new Date(2030, 0, 1),
+        weekStartsOn: 1,
+        now: new Date(2030, 0, 17, 12),
+      });
+      expect(container.querySelector('[data-day="2030-01-17"]')!.getAttribute("tabindex")).toBe(
+        "0",
+      );
+    });
+
     it("events mode tabs through events only, with no day-cell tab stops by default", () => {
       const events: CalendarEvent[] = [
         { title: "E", start: new Date(2030, 0, 1, 9), end: new Date(2030, 0, 1, 10) },
