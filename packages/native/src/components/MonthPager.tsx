@@ -138,7 +138,7 @@ export type MonthPagerProps<T> = {
   /** Reject a drop that would overlap another event (default true = allowed). */
   eventOverlap?: boolean;
   /** Called with the date the user moved to, and why (`details.reason`). */
-  onChangeDate: (date: Date, details: DateChangeDetails) => void;
+  onChangeDate: (date: Date, details?: DateChangeDetails) => void;
   freeSwipe?: boolean;
   swipeEnabled?: boolean;
   showSixWeeks?: boolean;
@@ -697,7 +697,7 @@ function DateRowsPagerRoot<T>(props: DateRowsPagerProps<T>): ReactElement {
     };
   }, [key]);
   const onChangeDate = useCallback(
-    (date: Date, details: DateChangeDetails) => {
+    (date: Date, details?: DateChangeDetails) => {
       // A remounted series can still receive a queued viewability callback from
       // the old list. Never let it change the controlled date.
       if (generation.current === key) props.onChangeDate(date, details);

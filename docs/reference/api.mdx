@@ -56,7 +56,11 @@ in-view dragging without edge paging. Other navigation remains available.
   a rejected cross-week drop also pages back to the event's week with this reason.
 
 Your own controls (previous, next, today) set `date` directly, so they never
-call `onChangeDate`.
+call `onChangeDate`. The calendar always passes `details`, but the type marks it
+optional, so read it as `details?.reason`.
+
+If you pass a setter that takes its own second argument, such as an options
+object, wrap it so it does not receive `details`: `onChangeDate={(d) => setDate(d)}`.
 
 ## Events & rendering
 

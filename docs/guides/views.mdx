@@ -121,12 +121,12 @@ treat a swipe differently from keyboard paging or an event drag:
 ```tsx
 <Calendar
   date={date}
-  onChangeDate={(next, { reason }) => {
-    if (reason === "swipe") Haptics.selectionAsync();
+  onChangeDate={(next, details) => {
+    if (details?.reason === "swipe") Haptics.selectionAsync();
     setDate(next);
   }}
 />
 ```
 
-`reason` is `"swipe"`, `"keyboard"`, or `"event-drag"`. See
+`details.reason` is `"swipe"`, `"keyboard"`, or `"event-drag"`. See
 [Navigation](/reference/api#navigation) for when each one fires.

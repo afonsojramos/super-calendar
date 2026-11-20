@@ -2701,7 +2701,7 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   /** Tap a day's column header (default header only). */
   onPressDateHeader?: (date: Date) => void;
   /** Called with the date the user moved to, and why (`details.reason`). */
-  onChangeDate: (date: Date, details: DateChangeDetails) => void;
+  onChangeDate: (date: Date, details?: DateChangeDetails) => void;
   /** Optional header above the grid (e.g. weekday labels). Rendered full-width. */
   renderHeader?: (days: Date[]) => React.ReactNode;
   /**

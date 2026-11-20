@@ -153,12 +153,17 @@ export type WeekStartsOn = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 /**
  * What moved the calendar to a new date: `"swipe"` (a page swipe, native only),
- * `"keyboard"` (arrow-key paging), or `"event-drag"` (an event dragged against
- * the grid's edge, which pages it).
+ * `"keyboard"` (arrow keys on react-native-web, PageUp / PageDown in the dom and
+ * Solid renderers), or `"event-drag"` (an event dragged against the grid's edge,
+ * which pages it).
  */
 export type DateChangeReason = "swipe" | "keyboard" | "event-drag";
 
-/** The second argument of `onChangeDate`. */
+/**
+ * The second argument of `onChangeDate`. The calendar always passes it; it is
+ * optional in the callback type so code that calls `onChangeDate` itself can
+ * leave it out.
+ */
 export type DateChangeDetails = {
   reason: DateChangeReason;
 };

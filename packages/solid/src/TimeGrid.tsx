@@ -366,7 +366,7 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
    * previous/next period. Controlled, like the native renderer's `onChangeDate`.
    * `details.reason` is `"event-drag"`.
    */
-  onChangeDate?: (date: Date, details: DateChangeDetails) => void;
+  onChangeDate?: (date: Date, details?: DateChangeDetails) => void;
   /** Class applied to the root element. */
   className?: string;
   /** Inline styles applied to the root element. */

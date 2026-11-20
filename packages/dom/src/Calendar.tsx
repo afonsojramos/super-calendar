@@ -89,7 +89,7 @@ export interface CalendarProps<T = unknown>
    * response. Omit it to leave paging to your own controls. `details.reason` is
    * `"keyboard"` for PageUp / PageDown and `"event-drag"` for edge paging.
    */
-  onChangeDate?: (date: Date, details: DateChangeDetails) => void;
+  onChangeDate?: (date: Date, details?: DateChangeDetails) => void;
   /** Your events. */
   events?: CalendarEvent<T>[];
   /** First day of the week. Sunday = 0 (default) … Saturday = 6. */

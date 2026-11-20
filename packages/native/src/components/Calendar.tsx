@@ -95,7 +95,7 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
    * `"keyboard"` (arrow keys on the web), or `"event-drag"` (an event held at the
    * grid's edge pages it).
    */
-  onChangeDate: (date: Date, details: DateChangeDetails) => void;
+  onChangeDate: (date: Date, details?: DateChangeDetails) => void;
   /** Fired alongside `onChangeDate` with the `[start, end]` of the newly-visible range. */
   onChangeDateRange?: (range: [Date, Date]) => void;
   onPressEvent: (event: CalendarEvent<T>) => void;
@@ -744,7 +744,7 @@ function CalendarInner<T>(
 
   // Echo every date change and, when asked, the full visible range derived from it.
   const handleChangeDate = useCallback(
-    (next: Date, details: DateChangeDetails) => {
+    (next: Date, details?: DateChangeDetails) => {
       onChangeDate(next, details);
       onChangeDateRange?.(
         visibleRange(
