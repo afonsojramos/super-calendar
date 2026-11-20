@@ -807,7 +807,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       if (rendered(rangeStart)) return startOfDay(rangeStart);
       const picked = props.selectedDates?.find(rendered);
       if (picked) return startOfDay(picked);
-      const today = new Date();
+      const today = nowInTimeZone(props.now, props.timeZone);
       if (rendered(today)) return startOfDay(today);
       return days[0] ?? null;
     }
@@ -815,7 +815,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
     if (inMonth(props.selectedRange?.start)) return startOfDay(props.selectedRange!.start);
     const picked = props.selectedDates?.find(inMonth);
     if (picked) return startOfDay(picked);
-    const today = new Date();
+    const today = nowInTimeZone(props.now, props.timeZone);
     return isSameMonth(today, props.source.date)
       ? startOfDay(today)
       : startOfMonth(props.source.date);

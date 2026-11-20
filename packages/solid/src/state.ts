@@ -19,7 +19,7 @@ export interface NowOptions {
 
 /** A clock accessor that follows reactive overrides and stops ticking on disposal. */
 export function createNow(options: Accessor<NowOptions> = () => ({})): Accessor<Date> {
-  const [instant, setInstant] = createSignal(untrack(() => new Date()));
+  const [instant, setInstant] = createSignal(untrack(() => options().now ?? new Date()));
   createEffect(options, (value) => {
     if (value.enabled === false || value.now) return;
     setInstant(new Date());
