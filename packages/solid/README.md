@@ -302,7 +302,9 @@ browser and server entries for tools that use the `browser` or default condition
 
 Use matching initial dates, events, locale, and time zone on both sides. Pass a
 fixed `now` when the clock must match during hydration. The server does not start
-timers or access the DOM.
+timers or access the DOM. With `date` and `now` passed, the server render does
+not read the clock, `Math.random`, or browser globals. `MonthList` has no `now`
+prop, so it marks today from the server's clock.
 
 ## Integration examples and troubleshooting
 

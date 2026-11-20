@@ -287,7 +287,10 @@ server entries are also available through the `browser` and default export
 conditions. Server rendering does not access the DOM or start timers.
 
 Keep the initial dates, events, locale, and time zone equal on server and client.
-Pass a fixed `now` to make the current-time indicator deterministic. Construct
+Pass a fixed `now` to make the current-time indicator deterministic. With `date`
+and `now` passed, the server render does not read the clock, `Math.random`, or
+browser globals such as `window`, `document`, and `navigator`. `MonthList` has no
+`now` prop, so it marks today from the server's clock. Construct
 anchor dates in the same local zone on both sides, as described in
 [time zones](/guides/time-zones#anchor-dates-are-local).
 
