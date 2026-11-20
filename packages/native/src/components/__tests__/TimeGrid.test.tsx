@@ -1196,10 +1196,22 @@ describe("TimeGrid fast-fling repaint", () => {
     });
   };
 
+  type FlingList = {
+    onScrollBeginDrag?: () => void;
+    onScrollEndDrag?: () => void;
+    onMomentumScrollEnd?: (e: unknown) => void;
+  };
+  const momentumEnd = (x: number) =>
+    act(() =>
+      (lastListProps() as FlingList).onMomentumScrollEnd?.({
+        nativeEvent: { contentOffset: { x } },
+      }),
+    );
+  // A user fling: the drag starts and is released, then momentum carries the pager to `x`.
   const settle = async (x: number) => {
-    const onEnd = (lastListProps() as { onMomentumScrollEnd?: (e: unknown) => void })
-      .onMomentumScrollEnd;
-    await act(() => onEnd?.({ nativeEvent: { contentOffset: { x } } }));
+    await act(() => (lastListProps() as FlingList).onScrollBeginDrag?.());
+    await act(() => (lastListProps() as FlingList).onScrollEndDrag?.());
+    await momentumEnd(x);
   };
 
   beforeEach(() => {
@@ -1296,6 +1308,80 @@ describe("TimeGrid fast-fling repaint", () => {
     const list = lastListProps() as { getFixedItemSize: () => number; initialScrollIndex: number };
     await settle(list.initialScrollIndex * list.getFixedItemSize());
     expect(onChangeDate).not.toHaveBeenCalled();
+  });
+
+  // iOS ends momentum for a programmatic, non-animated scroll too, including the
+  // re-anchor below. Settling those re-anchored again every frame, and a stale
+  // one after a date change reported the previous page back as the date.
+  it("ignores a momentum end that no user drag started", async () => {
+    const onChangeDate = vi.fn();
+    await render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={onChangeDate}
+        onPressEvent={noop}
+      />,
+    );
+    const list = lastListProps() as { getFixedItemSize: () => number; initialScrollIndex: number };
+    const calls = () =>
+      (globalThis as { __scrollToIndexCalls?: unknown[] }).__scrollToIndexCalls ?? [];
+    await momentumEnd((list.initialScrollIndex - 1) * list.getFixedItemSize());
+    await flushFrame();
+    expect(onChangeDate).not.toHaveBeenCalled();
+    expect(calls()).toEqual([]);
+
+    // A user fling still settles, once.
+    await settle((list.initialScrollIndex + 1) * list.getFixedItemSize());
+    await flushFrame();
+    expect(onChangeDate).toHaveBeenCalledTimes(1);
+    expect(calls()).toHaveLength(1);
+    // The re-anchor's own momentum end is not a second fling.
+    await momentumEnd((list.initialScrollIndex + 1) * list.getFixedItemSize());
+    await flushFrame();
+    expect(calls()).toHaveLength(1);
+  });
+
+  // A second swipe that interrupts the first one's snap ends that animation with
+  // a momentum end while the finger is down (Android). It must not use up the
+  // drag, or the second fling's own settle is lost.
+  it("settles the fling that follows a drag, not a momentum end during it", async () => {
+    const onChangeDate = vi.fn();
+    await render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={onChangeDate}
+        onPressEvent={noop}
+      />,
+    );
+    const list = lastListProps() as {
+      getFixedItemSize: () => number;
+      initialScrollIndex: number;
+      onScrollBeginDrag: () => void;
+      onScrollEndDrag: () => void;
+    };
+    const pageWidth = list.getFixedItemSize();
+    await act(() => list.onScrollBeginDrag());
+    await momentumEnd((list.initialScrollIndex + 0.5) * pageWidth);
+    await flushFrame();
+    expect(onChangeDate).not.toHaveBeenCalled();
+    await act(() => list.onScrollEndDrag());
+    await momentumEnd((list.initialScrollIndex + 2) * pageWidth);
+    await flushFrame();
+    expect(onChangeDate).toHaveBeenCalledTimes(1);
+    const [committed] = onChangeDate.mock.calls[0] as [Date];
+    expect([committed.getMonth(), committed.getDate()]).toEqual([0, 19]);
   });
 });
 

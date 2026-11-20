@@ -3440,6 +3440,11 @@ function TimeGridInner<T>(
     [columnsWidth, pageDates, onChangeDate],
   );
 
+  // Whether a finger is on the pager, between its drag begin and end.
+  const pagerDraggingRef = useRef(false);
+  // Set when the user starts dragging the pager and cleared by the settle it leads to.
+  const pagerUserScrollRef = useRef(false);
+
   // A fast fling can outrun the list's on-demand mounting and leave the pager
   // blank until something nudges it. When momentum ends, re-anchor the list on
   // the page the offset landed on: `scrollToIndex` forces it to recompute its
@@ -3449,6 +3454,13 @@ function TimeGridInner<T>(
   const handlePagerSettled = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (columnsWidth <= 0) return;
+      // iOS also ends momentum for a programmatic, non-animated scroll, including
+      // the re-anchor below. Settling those would re-anchor every frame and report
+      // a stale page back as the date, so only settle a scroll the user started.
+      // A momentum end while the finger is still down (a snap the new drag cut
+      // short) is not that scroll's settle; keep the flag for the fling that follows.
+      if (!pagerUserScrollRef.current || pagerDraggingRef.current) return;
+      pagerUserScrollRef.current = false;
       // Only a user fling can leave the pager blank; a programmatic scroll
       // (goToPage, realign) sets `pendingScrollIndexRef` and repaints itself, so
       // skip those to avoid a redundant re-anchor during held edge paging.
@@ -3467,7 +3479,6 @@ function TimeGridInner<T>(
   // offset left between pages back onto the nearest page (or onto the target of
   // an interrupted programmatic scroll). A drag that began and has not reported
   // its end waits longer, in case a finger is still holding it.
-  const pagerDraggingRef = useRef(false);
   const lastPagerScrollRef = useRef({ offsetX: 0, at: 0 });
   const pagerIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -3515,6 +3526,7 @@ function TimeGridInner<T>(
   );
   const handlePagerDragStart = useCallback(() => {
     pagerDraggingRef.current = true;
+    pagerUserScrollRef.current = true;
   }, []);
   const handlePagerDragEnd = useCallback(() => {
     pagerDraggingRef.current = false;
@@ -3809,12 +3821,10 @@ function TimeGridInner<T>(
                                 disableIntervalMomentum: !freeSwipe,
                                 scrollEventThrottle: 16,
                                 onMomentumScrollEnd: handlePagerSettled,
+                                onScrollBeginDrag: handlePagerDragStart,
+                                onScrollEndDrag: handlePagerDragEnd,
                                 ...(Platform.OS === "android"
-                                  ? {
-                                      onScroll: handlePagerScroll,
-                                      onScrollBeginDrag: handlePagerDragStart,
-                                      onScrollEndDrag: handlePagerDragEnd,
-                                    }
+                                  ? { onScroll: handlePagerScroll }
                                   : null),
                               })}
                           initialScrollIndex={activeIndex}
