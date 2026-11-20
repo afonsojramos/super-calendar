@@ -1280,6 +1280,29 @@ describe("TimeGrid fast-fling repaint", () => {
     expect(calls?.at(-1)).toEqual({ index: list.initialScrollIndex, animated: true });
   });
 
+  it("reports a fling made while the grid is paging back", async () => {
+    const onChangeDate = vi.fn();
+    await render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={onChangeDate}
+        onPressEvent={noop}
+      />,
+    );
+    const list = lastListProps() as { getFixedItemSize: () => number; initialScrollIndex: number };
+    const next = (list.initialScrollIndex + 1) * list.getFixedItemSize();
+    await settle(next);
+    // The user flings forward again before the page-back lands.
+    await settle(next);
+    expect(onChangeDate).toHaveBeenCalledTimes(2);
+  });
+
   it("stays on the page a fling settled on when the app accepts the date", async () => {
     await render(
       <ControlledTimeGrid

@@ -64,8 +64,8 @@ object, wrap it so it does not receive `details`: `onChangeDate={(d) => setDate(
 
 `date` is controlled. To decline a change, leave `date` as it is: on native, the
 pager pages back to the date you kept. Update `date` in the same update as
-`onChangeDate` (as `onChangeDate={setDate}` does); a date that arrives later,
-after an `await`, shows the page-back first.
+`onChangeDate`, directly (as `onChangeDate={setDate}` does) or in a transition; a
+date that arrives later, after an `await`, shows the page-back first.
 
 ## Events & rendering
 

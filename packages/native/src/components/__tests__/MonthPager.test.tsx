@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useMemo, useState } from "react";
+import { startTransition, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { vi } from "vitest";
 import { act, fireEvent, render } from "@testing-library/react-native";
 import { Text } from "react-native";
@@ -328,6 +328,48 @@ describe("MonthPager controlled swipes", () => {
       expect(scrollToIndex).toHaveBeenLastCalledWith({ index: activeIndex, animated: true });
     },
   );
+
+  it("reports a swipe made while the pager is paging back", async () => {
+    const scrollToIndex = vi.fn();
+    (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex = scrollToIndex;
+    const onChangeDate = vi.fn();
+    await render(
+      <Calendar
+        mode="month"
+        date={new Date(2026, 10, 6)}
+        events={[]}
+        onChangeDate={onChangeDate}
+        onPressEvent={noop}
+      />,
+    );
+    const activeIndex = lastListProps()?.initialScrollIndex as number;
+    await swipeTo(activeIndex + 1);
+    // The user grabs the pager before the page-back lands and swipes forward again.
+    await act(() => (lastListProps() as { onScrollBeginDrag: () => void }).onScrollBeginDrag());
+    await swipeTo(activeIndex + 1);
+    expect(onChangeDate).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not page back when the app accepts the date in a transition", async () => {
+    const scrollToIndex = vi.fn();
+    (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex = scrollToIndex;
+    function Controlled() {
+      const [date, setDate] = useState(new Date(2026, 10, 6));
+      return (
+        <Calendar
+          mode="month"
+          date={date}
+          events={[]}
+          onChangeDate={(next) => startTransition(() => setDate(next))}
+          onPressEvent={noop}
+        />
+      );
+    }
+    await render(<Controlled />);
+    const activeIndex = lastListProps()?.initialScrollIndex as number;
+    await swipeTo(activeIndex + 1);
+    expect(scrollToIndex).not.toHaveBeenCalled();
+  });
 
   it("stays on the swiped page when the app accepts the date", async () => {
     const scrollToIndex = vi.fn();

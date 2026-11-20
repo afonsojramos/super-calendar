@@ -20,6 +20,7 @@ import {
   type ComponentType,
   memo,
   type ReactElement,
+  startTransition,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -61,6 +62,7 @@ import {
   type CalendarLabels,
 } from "@super-calendar/core";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
+import { useReduceMotion } from "../utils/useReduceMotion";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { DateRows, type DateRowsSource, type MonthViewSlot } from "./MonthView";
 
@@ -346,7 +348,9 @@ function DateRowsPagerInner<T>({
       viewedIndexRef.current = settled.index;
       if (!settled.item) return;
       onChangeDate(settled.item, { reason: "swipe" });
-      setSwipeReports((count) => count + 1);
+      // A transition, so an app that sets `date` in a transition of its own is
+      // batched with it and never sees the page-back below.
+      startTransition(() => setSwipeReports((count) => count + 1));
     },
     [onChangeDate],
   );
@@ -362,12 +366,19 @@ function DateRowsPagerInner<T>({
 
   // `date` is controlled: when the app keeps the old date after a swipe, page back
   // to the month it still shows instead of leaving the list on the swiped one.
+  const reduceMotion = useReduceMotion();
   useEffect(() => {
     if (swipeReports === 0 || activeIndex === viewedIndexRef.current) return;
     viewedIndexRef.current = activeIndex;
     pendingScrollIndexRef.current = activeIndex;
-    void listRef.current?.scrollToIndex({ index: activeIndex, animated: true });
-  }, [swipeReports, activeIndex]);
+    void listRef.current?.scrollToIndex({ index: activeIndex, animated: !reduceMotion });
+  }, [swipeReports, activeIndex, reduceMotion]);
+
+  // A user drag takes the pager over from any programmatic scroll still settling
+  // (a page-back, a jump to an outside date), so the pages it lands on are reported.
+  const handlePagerDragStart = useCallback(() => {
+    pendingScrollIndexRef.current = null;
+  }, []);
 
   // A new container width resizes every page (see `listExtraData`), but the
   // native scroll offset stays at the old `index * width`, which now points at a
@@ -636,6 +647,7 @@ function DateRowsPagerInner<T>({
                   scrollEnabled: swipeEnabled,
                   pagingEnabled: !freeSwipe,
                   snapToIndices: freeSwipe ? snapToIndices : undefined,
+                  onScrollBeginDrag: handlePagerDragStart,
                 })}
             initialScrollIndex={activeIndex}
             showsHorizontalScrollIndicator={false}

@@ -72,6 +72,9 @@ export function MyCalendar() {
 }
 ```
 
+`date` is controlled: update it from `onChangeDate`. If you leave it unchanged, a
+swipe pages back to the date you kept.
+
 ## Multi-week grids
 
 Use `mode="multiweek"` with `numberOfWeeks` (default `2`) for consecutive full

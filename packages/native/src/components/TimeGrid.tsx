@@ -26,6 +26,7 @@ import {
   type ReactElement,
   type RefAttributes,
   type SetStateAction,
+  startTransition,
   useCallback,
   useContext,
   useEffect,
@@ -3221,7 +3222,9 @@ function TimeGridInner<T>(
   const reportDate = useCallback(
     (target: Date, reason: DateChangeReason) => {
       onChangeDate(target, { reason });
-      setDateReports((count) => count + 1);
+      // A transition, so an app that sets `date` in a transition of its own is
+      // batched with it and never sees the page-back effect below.
+      startTransition(() => setDateReports((count) => count + 1));
     },
     [onChangeDate],
   );
@@ -3556,6 +3559,10 @@ function TimeGridInner<T>(
   const handlePagerDragStart = useCallback(() => {
     pagerDraggingRef.current = true;
     pagerUserScrollRef.current = true;
+    // The user takes the pager over from any programmatic scroll still settling (a
+    // page-back, an edge-drag page, a jump to an outside date), so the pages they
+    // land on are reported.
+    pendingScrollIndexRef.current = null;
   }, []);
   const handlePagerDragEnd = useCallback(() => {
     pagerDraggingRef.current = false;
