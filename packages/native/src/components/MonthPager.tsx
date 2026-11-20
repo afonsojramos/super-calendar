@@ -325,6 +325,10 @@ function DateRowsPagerInner<T>({
   // Bumped after each reported swipe, so the pager re-renders with the `date` the
   // app chose even when the app kept the old one (no prop changes then).
   const [swipeReports, setSwipeReports] = useState(0);
+  // Whether a finger is on the pager, between its drag begin and end.
+  const pagerDraggingRef = useRef(false);
+  // Set when a page is reported while a finger is down, so the drag end re-checks it.
+  const reportedDuringDragRef = useRef(false);
 
   const handleViewableItemsChanged = useCallback(
     (info: OnViewableItemsChangedInfo<Date>) => {
@@ -348,6 +352,7 @@ function DateRowsPagerInner<T>({
       viewedIndexRef.current = settled.index;
       if (!settled.item) return;
       onChangeDate(settled.item, { reason: "swipe" });
+      if (pagerDraggingRef.current) reportedDuringDragRef.current = true;
       // A transition, so an app that sets `date` in a transition of its own is
       // batched with it and never sees the page-back below.
       startTransition(() => setSwipeReports((count) => count + 1));
@@ -368,7 +373,10 @@ function DateRowsPagerInner<T>({
   // to the month it still shows instead of leaving the list on the swiped one.
   const reduceMotion = useReduceMotion();
   useEffect(() => {
-    if (swipeReports === 0 || activeIndex === viewedIndexRef.current) return;
+    // Not while a finger holds the pager: it would snap back to the held page on
+    // release. The drag end re-runs this check.
+    if (swipeReports === 0 || pagerDraggingRef.current) return;
+    if (activeIndex === viewedIndexRef.current) return;
     viewedIndexRef.current = activeIndex;
     pendingScrollIndexRef.current = activeIndex;
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: !reduceMotion });
@@ -377,7 +385,14 @@ function DateRowsPagerInner<T>({
   // A user drag takes the pager over from any programmatic scroll still settling
   // (a page-back, a jump to an outside date), so the pages it lands on are reported.
   const handlePagerDragStart = useCallback(() => {
+    pagerDraggingRef.current = true;
     pendingScrollIndexRef.current = null;
+  }, []);
+  const handlePagerDragEnd = useCallback(() => {
+    pagerDraggingRef.current = false;
+    if (!reportedDuringDragRef.current) return;
+    reportedDuringDragRef.current = false;
+    startTransition(() => setSwipeReports((count) => count + 1));
   }, []);
 
   // A new container width resizes every page (see `listExtraData`), but the
@@ -648,6 +663,7 @@ function DateRowsPagerInner<T>({
                   pagingEnabled: !freeSwipe,
                   snapToIndices: freeSwipe ? snapToIndices : undefined,
                   onScrollBeginDrag: handlePagerDragStart,
+                  onScrollEndDrag: handlePagerDragEnd,
                 })}
             initialScrollIndex={activeIndex}
             showsHorizontalScrollIndicator={false}

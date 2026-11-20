@@ -3219,9 +3219,12 @@ function TimeGridInner<T>(
   // Bumped after each date the user pages to, so the grid re-renders with the `date`
   // the app chose even when the app kept the old one (no prop changes then).
   const [dateReports, setDateReports] = useState(0);
+  // Set when a date is reported while a finger is down, so the drag end re-checks it.
+  const reportedDuringDragRef = useRef(false);
   const reportDate = useCallback(
     (target: Date, reason: DateChangeReason) => {
       onChangeDate(target, { reason });
+      if (pagerDraggingRef.current) reportedDuringDragRef.current = true;
       // A transition, so an app that sets `date` in a transition of its own is
       // batched with it and never sees the page-back effect below.
       startTransition(() => setDateReports((count) => count + 1));
@@ -3445,7 +3448,10 @@ function TimeGridInner<T>(
   // swipe, an arrow key or an edge drag), page back to the one it still shows
   // instead of leaving the list on the page the user moved to.
   useEffect(() => {
-    if (dateReports === 0 || activeIndex === viewedIndexRef.current) return;
+    // Not while a finger holds the pager: it would snap back to the held page on
+    // release. The drag end re-runs this check.
+    if (dateReports === 0 || pagerDraggingRef.current) return;
+    if (activeIndex === viewedIndexRef.current) return;
     viewedIndexRef.current = activeIndex;
     pendingScrollIndexRef.current = activeIndex;
     // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
@@ -3566,6 +3572,9 @@ function TimeGridInner<T>(
   }, []);
   const handlePagerDragEnd = useCallback(() => {
     pagerDraggingRef.current = false;
+    if (!reportedDuringDragRef.current) return;
+    reportedDuringDragRef.current = false;
+    startTransition(() => setDateReports((count) => count + 1));
   }, []);
 
   // Optionally snap the pager back to the active page after an empty-cell press

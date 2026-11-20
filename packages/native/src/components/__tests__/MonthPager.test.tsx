@@ -350,6 +350,28 @@ describe("MonthPager controlled swipes", () => {
     expect(onChangeDate).toHaveBeenCalledTimes(2);
   });
 
+  it("waits for the finger to lift before paging back", async () => {
+    const scrollToIndex = vi.fn();
+    (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex = scrollToIndex;
+    await render(
+      <Calendar
+        mode="month"
+        date={new Date(2026, 10, 6)}
+        events={[]}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    const activeIndex = lastListProps()?.initialScrollIndex as number;
+    const drag = lastListProps() as { onScrollBeginDrag: () => void; onScrollEndDrag: () => void };
+    await act(() => drag.onScrollBeginDrag());
+    // A slow drag shows the next month before the finger lifts.
+    await swipeTo(activeIndex + 1);
+    expect(scrollToIndex).not.toHaveBeenCalled();
+    await act(() => (lastListProps() as typeof drag).onScrollEndDrag());
+    expect(scrollToIndex).toHaveBeenLastCalledWith({ index: activeIndex, animated: true });
+  });
+
   it("does not page back when the app accepts the date in a transition", async () => {
     const scrollToIndex = vi.fn();
     (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex = scrollToIndex;

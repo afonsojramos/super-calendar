@@ -1303,6 +1303,40 @@ describe("TimeGrid fast-fling repaint", () => {
     expect(onChangeDate).toHaveBeenCalledTimes(2);
   });
 
+  it("waits for the finger to lift before paging back", async () => {
+    await render(
+      <TimeGrid
+        mode="week"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    const list = lastListProps() as FlingList & {
+      data: Date[];
+      initialScrollIndex: number;
+      onViewableItemsChanged: (info: unknown) => void;
+    };
+    const calls = () =>
+      (globalThis as { __scrollToIndexCalls?: unknown[] }).__scrollToIndexCalls ?? [];
+    const index = list.initialScrollIndex + 1;
+    await act(() => list.onScrollBeginDrag?.());
+    // A slow drag shows the next week before the finger lifts.
+    await act(() =>
+      list.onViewableItemsChanged({
+        viewableItems: [{ isViewable: true, index, item: list.data[index] }],
+      }),
+    );
+    expect(calls()).toEqual([]);
+    await act(() => (lastListProps() as FlingList).onScrollEndDrag?.());
+    expect(calls().at(-1)).toEqual({ index: list.initialScrollIndex, animated: true });
+  });
+
   it("stays on the page a fling settled on when the app accepts the date", async () => {
     await render(
       <ControlledTimeGrid
