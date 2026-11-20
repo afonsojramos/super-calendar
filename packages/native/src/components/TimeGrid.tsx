@@ -3219,12 +3219,11 @@ function TimeGridInner<T>(
   // Bumped after each date the user pages to, so the grid re-renders with the `date`
   // the app chose even when the app kept the old one (no prop changes then).
   const [dateReports, setDateReports] = useState(0);
-  // Set when a date is reported while a finger is down, so the drag end re-checks it.
-  const reportedDuringDragRef = useRef(false);
+  // Set when a page-back waits for a finger to lift, so the drag end re-runs it.
+  const pageBackHeldRef = useRef(false);
   const reportDate = useCallback(
     (target: Date, reason: DateChangeReason) => {
       onChangeDate(target, { reason });
-      if (pagerDraggingRef.current) reportedDuringDragRef.current = true;
       // A transition, so an app that sets `date` in a transition of its own is
       // batched with it and never sees the page-back effect below.
       startTransition(() => setDateReports((count) => count + 1));
@@ -3450,8 +3449,11 @@ function TimeGridInner<T>(
   useEffect(() => {
     // Not while a finger holds the pager: it would snap back to the held page on
     // release. The drag end re-runs this check.
-    if (dateReports === 0 || pagerDraggingRef.current) return;
-    if (activeIndex === viewedIndexRef.current) return;
+    if (dateReports === 0 || activeIndex === viewedIndexRef.current) return;
+    if (pagerDraggingRef.current) {
+      pageBackHeldRef.current = true;
+      return;
+    }
     viewedIndexRef.current = activeIndex;
     pendingScrollIndexRef.current = activeIndex;
     // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
@@ -3572,8 +3574,8 @@ function TimeGridInner<T>(
   }, []);
   const handlePagerDragEnd = useCallback(() => {
     pagerDraggingRef.current = false;
-    if (!reportedDuringDragRef.current) return;
-    reportedDuringDragRef.current = false;
+    if (!pageBackHeldRef.current) return;
+    pageBackHeldRef.current = false;
     startTransition(() => setDateReports((count) => count + 1));
   }, []);
 

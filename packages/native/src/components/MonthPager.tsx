@@ -327,8 +327,8 @@ function DateRowsPagerInner<T>({
   const [swipeReports, setSwipeReports] = useState(0);
   // Whether a finger is on the pager, between its drag begin and end.
   const pagerDraggingRef = useRef(false);
-  // Set when a page is reported while a finger is down, so the drag end re-checks it.
-  const reportedDuringDragRef = useRef(false);
+  // Set when a page-back waits for a finger to lift, so the drag end re-runs it.
+  const pageBackHeldRef = useRef(false);
 
   const handleViewableItemsChanged = useCallback(
     (info: OnViewableItemsChangedInfo<Date>) => {
@@ -352,7 +352,6 @@ function DateRowsPagerInner<T>({
       viewedIndexRef.current = settled.index;
       if (!settled.item) return;
       onChangeDate(settled.item, { reason: "swipe" });
-      if (pagerDraggingRef.current) reportedDuringDragRef.current = true;
       // A transition, so an app that sets `date` in a transition of its own is
       // batched with it and never sees the page-back below.
       startTransition(() => setSwipeReports((count) => count + 1));
@@ -375,8 +374,11 @@ function DateRowsPagerInner<T>({
   useEffect(() => {
     // Not while a finger holds the pager: it would snap back to the held page on
     // release. The drag end re-runs this check.
-    if (swipeReports === 0 || pagerDraggingRef.current) return;
-    if (activeIndex === viewedIndexRef.current) return;
+    if (swipeReports === 0 || activeIndex === viewedIndexRef.current) return;
+    if (pagerDraggingRef.current) {
+      pageBackHeldRef.current = true;
+      return;
+    }
     viewedIndexRef.current = activeIndex;
     pendingScrollIndexRef.current = activeIndex;
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: !reduceMotion });
@@ -390,8 +392,8 @@ function DateRowsPagerInner<T>({
   }, []);
   const handlePagerDragEnd = useCallback(() => {
     pagerDraggingRef.current = false;
-    if (!reportedDuringDragRef.current) return;
-    reportedDuringDragRef.current = false;
+    if (!pageBackHeldRef.current) return;
+    pageBackHeldRef.current = false;
     startTransition(() => setSwipeReports((count) => count + 1));
   }, []);
 

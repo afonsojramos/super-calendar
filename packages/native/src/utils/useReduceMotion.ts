@@ -10,9 +10,12 @@ export function useReduceMotion(): boolean {
   const [reduceMotion, setReduceMotion] = useState(false);
   useEffect(() => {
     let active = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (active) setReduceMotion(enabled);
-    });
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (active) setReduceMotion(enabled);
+      })
+      // Without the native module the query rejects; keep motion on.
+      .catch(() => {});
     const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
     return () => {
       active = false;
