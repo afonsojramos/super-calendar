@@ -46,6 +46,7 @@ Use pnpm or nub, not npm/npx; both install correctly from the shared `pnpm-lock.
 
 `scripts/` holds dev tooling that runs directly with `node`, using workspace dependencies where needed, with no build step.
 
+- `scripts/build-package-docs.mjs` runs in each package's `build` and converts `docs/*.mdx` into gitignored Markdown in `packages/*/docs`, which ships to npm. Its page lists choose which guides each package gets. It fails on an MDX component it cannot convert, so teach it any new component you add to `docs/`. `tests/tooling/package-docs.test.ts` checks its output.
 - `scripts/visual-parity.mjs` (`pnpm parity:visual`) screenshots the dom and native-on-react-native-web renderers side by side, for manual visual parity on shared layout changes. Prop-name parity is enforced separately by `tests/architecture/renderer-parity.test.ts`. Read the script header for setup and overrides.
 
 ## Tests

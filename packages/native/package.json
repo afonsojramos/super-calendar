@@ -27,6 +27,7 @@
   "source": "./src/index.tsx",
   "files": [
     "dist",
+    "docs",
     "src",
     "!**/__tests__"
   ],
@@ -64,7 +65,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown"
+    "build": "tsdown && node ../../scripts/build-package-docs.mjs native"
   },
   "dependencies": {
     "@super-calendar/core": "workspace:*"
