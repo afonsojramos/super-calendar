@@ -97,6 +97,20 @@ describe(rendererName, () => {
       );
     });
 
+    it("marks the first and last day of a range", () => {
+      const { container } = render(MonthView, {
+        date: new Date(2030, 0, 1),
+        weekStartsOn: 1,
+        selectedRange: { start: new Date(2030, 0, 6), end: new Date(2030, 0, 10) },
+      });
+      const day = (id: string) => container.querySelector(`[data-day="${id}"]`) as HTMLElement;
+      expect(day("2030-01-06").getAttribute("data-range-start")).toBe("");
+      expect(day("2030-01-10").getAttribute("data-range-end")).toBe("");
+      expect(day("2030-01-08").getAttribute("data-range")).toBe("");
+      expect(day("2030-01-08").hasAttribute("data-range-start")).toBe(false);
+      expect(day("2030-01-08").hasAttribute("data-range-end")).toBe(false);
+    });
+
     it("renders a rounded pill band by default and a full-cell fill when opted in", () => {
       const selectedRange = { start: new Date(2030, 0, 6), end: new Date(2030, 0, 10) };
       const { container, rerender } = render(MonthView, {

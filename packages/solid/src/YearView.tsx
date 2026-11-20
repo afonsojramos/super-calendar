@@ -479,6 +479,8 @@ export function YearView<T = unknown>(incoming: YearViewProps<T>): JSX.Element {
                                             "data-events": hasEvents(),
                                             "data-selected": state().isSelected,
                                             "data-range": state().isInRange,
+                                            "data-range-start": state().isRangeStart,
+                                            "data-range-end": state().isRangeEnd,
                                             "data-disabled": state().isDisabled,
                                             "data-creating": inCreate(),
                                           }),
