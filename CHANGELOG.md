@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.20.1](https://github.com/afonsojramos/super-calendar/compare/v2.20.0...v2.20.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* **native:** require @legendapp/list 3.7.1 or later ([#175](https://github.com/afonsojramos/super-calendar/issues/175)) ([c34c238](https://github.com/afonsojramos/super-calendar/commit/c34c2380a71b9d48ae52518fc5363097d43c0969))
+* **native:** resize calendar pages in place when their container changes size ([#171](https://github.com/afonsojramos/super-calendar/issues/171)) ([4487add](https://github.com/afonsojramos/super-calendar/commit/4487addf93d237fee208dd6d47a15ec25a0fdb93))
+* **native:** resize mounted months when the month list's row or header height changes ([#173](https://github.com/afonsojramos/super-calendar/issues/173)) ([7e958f5](https://github.com/afonsojramos/super-calendar/commit/7e958f5d9fbbc1409efacd5aaa4e92fc0b9b7617))
+* **native:** settle the time grid pager only after a user drag ([#174](https://github.com/afonsojramos/super-calendar/issues/174)) ([9d5ca35](https://github.com/afonsojramos/super-calendar/commit/9d5ca35103bde8aad9370123e78ff96b77b0a31c))
+
 ## [2.20.0](https://github.com/afonsojramos/super-calendar/compare/v2.19.0...v2.20.0) (2026-11-18)
 
 
