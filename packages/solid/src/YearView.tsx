@@ -33,8 +33,9 @@ import { mergeSolidTheme, type SolidCalendarTheme } from "./theme";
 /**
  * Styleable parts of {@link YearView}. Pass a class or inline style per slot
  * via the `classNames` / `styles` props; day cells carry `data-today`,
- * `data-events`, `data-selected`, `data-range`, `data-disabled` and
- * `data-creating` state attributes for variants.
+ * `data-events`, `data-selected`, `data-range`, `data-range-start`,
+ * `data-range-end`, `data-disabled` and `data-creating` state attributes for
+ * variants.
  */
 export type YearViewSlot =
   | "grid"
@@ -479,8 +480,10 @@ export function YearView<T = unknown>(incoming: YearViewProps<T>): JSX.Element {
                                             "data-events": hasEvents(),
                                             "data-selected": state().isSelected,
                                             "data-range": state().isInRange,
-                                            "data-range-start": state().isRangeStart,
-                                            "data-range-end": state().isRangeEnd,
+                                            "data-range-start":
+                                              state().isInRange && state().isRangeStart,
+                                            "data-range-end":
+                                              state().isInRange && state().isRangeEnd,
                                             "data-disabled": state().isDisabled,
                                             "data-creating": inCreate(),
                                           }),

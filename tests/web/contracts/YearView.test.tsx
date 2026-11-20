@@ -66,6 +66,17 @@ describe(rendererName, () => {
       expect(middle.hasAttribute("data-range-end")).toBe(false);
     });
 
+    it("leaves the endpoints unmarked until the range has an end", () => {
+      const { getByLabelText } = render(YearView, {
+        date: new Date(2026, 6, 20),
+        selectedRange: { start: new Date(2026, 6, 15), end: null },
+      });
+      const start = getByLabelText(/15 July 2026/);
+      expect(start.getAttribute("data-selected")).toBe("");
+      expect(start.hasAttribute("data-range-start")).toBe(false);
+      expect(start.hasAttribute("data-range-end")).toBe(false);
+    });
+
     it("disables days outside minDate/maxDate", () => {
       const onPressDay = vi.fn();
       const { getByLabelText } = render(YearView, {

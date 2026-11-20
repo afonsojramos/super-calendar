@@ -105,10 +105,37 @@ describe(rendererName, () => {
       });
       const day = (id: string) => container.querySelector(`[data-day="${id}"]`) as HTMLElement;
       expect(day("2030-01-06").getAttribute("data-range-start")).toBe("");
+      expect(day("2030-01-06").hasAttribute("data-range-end")).toBe(false);
       expect(day("2030-01-10").getAttribute("data-range-end")).toBe("");
+      expect(day("2030-01-10").hasAttribute("data-range-start")).toBe(false);
       expect(day("2030-01-08").getAttribute("data-range")).toBe("");
       expect(day("2030-01-08").hasAttribute("data-range-start")).toBe(false);
       expect(day("2030-01-08").hasAttribute("data-range-end")).toBe(false);
+    });
+
+    it("marks a one-day range as both its first and last day", () => {
+      const { container } = render(MonthView, {
+        date: new Date(2030, 0, 1),
+        weekStartsOn: 1,
+        selectedRange: { start: new Date(2030, 0, 8), end: new Date(2030, 0, 8) },
+      });
+      const day = container.querySelector('[data-day="2030-01-08"]') as HTMLElement;
+      expect(day.getAttribute("data-range")).toBe("");
+      expect(day.getAttribute("data-range-start")).toBe("");
+      expect(day.getAttribute("data-range-end")).toBe("");
+    });
+
+    it("leaves the endpoints unmarked until the range has an end", () => {
+      const { container } = render(MonthView, {
+        date: new Date(2030, 0, 1),
+        weekStartsOn: 1,
+        selectedRange: { start: new Date(2030, 0, 8), end: null },
+      });
+      const day = container.querySelector('[data-day="2030-01-08"]') as HTMLElement;
+      expect(day.getAttribute("data-selected")).toBe("");
+      expect(day.hasAttribute("data-range")).toBe(false);
+      expect(day.hasAttribute("data-range-start")).toBe(false);
+      expect(day.hasAttribute("data-range-end")).toBe(false);
     });
 
     it("renders a rounded pill band by default and a full-cell fill when opted in", () => {
