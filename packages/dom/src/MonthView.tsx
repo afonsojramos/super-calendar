@@ -816,7 +816,7 @@ export function DateRows<T = unknown>({
   const focusedWindow = useRef(windowKey);
   const gridRef = useRef<HTMLDivElement>(null);
   const restoreDayFocus = useRef(false);
-  if (multiWeek && windowKey !== focusedWindow.current) {
+  if (windowKey !== focusedWindow.current) {
     const active = gridRef.current?.ownerDocument.activeElement;
     // React replaces keyed week rows when paging. Remember whether the removed
     // day owned focus, so repeated PageUp/PageDown stays inside the calendar.

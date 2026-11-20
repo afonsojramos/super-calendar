@@ -830,6 +830,29 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
           .join(",")}`
       : format(props.source.date, "yyyy-MM");
   });
+  const gridRef: ElementRef<HTMLDivElement | null> = {
+    current: null,
+  };
+  const lastDayFocus: ElementRef<HTMLElement | null> = { current: null };
+  // Moves DOM focus to the tab stop, only while a day of this grid owns focus.
+  const alignDayFocus = (key: string | null) => {
+    const active = gridRef.current?.ownerDocument.activeElement;
+    const removedDay =
+      active === gridRef.current?.ownerDocument.body &&
+      lastDayFocus.current !== null &&
+      !lastDayFocus.current.isConnected;
+    if (!removedDay && (!active?.hasAttribute("data-day") || !gridRef.current?.contains(active)))
+      return;
+    if (
+      active?.getAttribute("data-day") === key &&
+      active?.getAttribute("aria-disabled") !== "true"
+    )
+      return;
+    const next = key
+      ? gridRef.current?.querySelector<HTMLElement>(`[data-day="${key}"]`)
+      : gridRef.current;
+    next?.focus();
+  };
   let focusedWindow = untrack(windowKey);
   createEffect(windowKey, (key) =>
     untrack(() => {
@@ -837,14 +860,14 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       focusedWindow = key;
       // Read the memo, not an effect-synced copy: effects run in no set order,
       // so a copy can still hold the previous window's day.
-      setFocusedDate(initialFocus());
+      const initial = initialFocus();
+      setFocusedDate(initial);
+      // Keep a focused month on its new tab stop, so repeated PageUp/PageDown
+      // stays inside the calendar. Multi-week rows realign through focusKey.
+      if (!multiWeek()) alignDayFocus(initial && format(initial, "yyyy-MM-dd"));
     }),
   );
   const [hoveredKey, setHoveredKey] = createSignal<string | null>(null);
-  const gridRef: ElementRef<HTMLDivElement | null> = {
-    current: null,
-  };
-  const lastDayFocus: ElementRef<HTMLElement | null> = { current: null };
   // A multi-week focus target that hidden days or new constraints removed falls
   // back to the initial target, without moving DOM focus.
   const focusKey = createMemo(() => {
@@ -859,23 +882,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
   createEffect(
     () => ({ enabled: multiWeek(), key: focusKey() }),
     ({ enabled, key }) => {
-      if (!enabled) return;
-      const active = gridRef.current?.ownerDocument.activeElement;
-      const removedDay =
-        active === gridRef.current?.ownerDocument.body &&
-        lastDayFocus.current !== null &&
-        !lastDayFocus.current.isConnected;
-      if (!removedDay && (!active?.hasAttribute("data-day") || !gridRef.current?.contains(active)))
-        return;
-      if (
-        active?.getAttribute("data-day") === key &&
-        active?.getAttribute("aria-disabled") !== "true"
-      )
-        return;
-      const next = key
-        ? gridRef.current?.querySelector<HTMLElement>(`[data-day="${key}"]`)
-        : gridRef.current;
-      next?.focus();
+      if (enabled) alignDayFocus(key);
     },
   );
 
