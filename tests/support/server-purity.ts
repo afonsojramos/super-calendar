@@ -47,11 +47,15 @@ function excerpt(stack: string | undefined): string {
  * then restores them. Clock and random reads are recorded and still return real
  * values, so the render runs to completion and reports every read.
  *
- * Browser globals are removed for the render, as on a real server: a
+ * `navigator` exists on Node, Deno and Bun servers too, so any read of it (even a
+ * `typeof` guard) is recorded while it keeps returning the real value. The other
+ * browser globals are removed for the render, as on a real server: a
  * `typeof window === "undefined"` guard sees nothing and records nothing, while
  * an unguarded read throws a `ReferenceError` that ends the render. That read is
  * recorded from the error, so only the first one is reported. A read inside a
- * `try`/`catch` that swallows the error is not recorded.
+ * `try`/`catch` that swallows the error is not recorded. Globals the render
+ * creates are removed afterwards, and an async render is rejected because reads
+ * after its first `await` would escape the trap.
  */
 export function traceImpureReads<T>(
   render: () => T,
@@ -91,15 +95,33 @@ export function traceImpureReads<T>(
     const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
     return descriptor ? [{ name, descriptor }] : [];
   });
+  const absent = browserGlobals.filter((name) => !saved.some((entry) => entry.name === name));
 
   globalThis.Date = TrappedDate;
   Math.random = () => {
     record("random", "Math.random()");
     return realRandom();
   };
-  for (const { name } of saved) Reflect.deleteProperty(globalThis, name);
+  for (const { name, descriptor } of saved) {
+    if (name !== "navigator") {
+      Reflect.deleteProperty(globalThis, name);
+      continue;
+    }
+    const value = descriptor.get ? descriptor.get.call(globalThis) : descriptor.value;
+    Object.defineProperty(globalThis, name, {
+      configurable: true,
+      get() {
+        record("global", name);
+        return value;
+      },
+    });
+  }
   try {
-    return { result: render(), reads };
+    const result = render();
+    if (typeof (result as { then?: unknown } | null)?.then === "function") {
+      throw new TypeError("traceImpureReads supports synchronous renders only");
+    }
+    return { result, reads };
   } catch (error) {
     const missing =
       error instanceof ReferenceError ? /^(\w+) is not defined$/.exec(error.message) : null;
@@ -110,5 +132,6 @@ export function traceImpureReads<T>(
     globalThis.Date = RealDate;
     Math.random = realRandom;
     for (const { name, descriptor } of saved) Object.defineProperty(globalThis, name, descriptor);
+    for (const name of absent) Reflect.deleteProperty(globalThis, name);
   }
 }
