@@ -275,6 +275,29 @@ describe("AllDayLane spans", () => {
       expect(StyleSheet.flatten(chip().props.style).opacity).toBeUndefined();
     });
 
+    it("keeps the carried bar and its preview through a refresh that replaces the event", async () => {
+      const onDragEvent = vi.fn();
+      const lane = (events: CalendarEvent[]) => (
+        <SlotStylesProvider classNames={{ allDayEvent: "chip" }}>
+          <AllDayLane {...props} events={events} onDragEvent={onDragEvent} />
+        </SlotStylesProvider>
+      );
+      const view = await render(lane([trip]));
+      await drag(10, 100, false);
+      await view.rerender(lane([{ ...trip }]));
+      const chip = view.container.queryAll((node) => node.props.className === "chip")[0];
+      expect(StyleSheet.flatten(chip.props.style).opacity).toBe(0.4);
+      expect(
+        view.getByTestId("all-day-move-preview", { includeHiddenElements: true }),
+      ).toBeTruthy();
+      const { handlers } = lastPan();
+      await act(() => {
+        handlers.onEnd({}, true);
+        handlers.onFinalize({}, true);
+      });
+      expect(onDragEvent).toHaveBeenCalledExactlyOnceWith(trip, days[3], days[6]);
+    });
+
     it.each([
       { title: "without onDragEvent", overrides: { onDragEvent: undefined }, event: trip },
       { title: "when the grid locks moves", overrides: { eventStartEditable: false }, event: trip },

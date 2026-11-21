@@ -190,6 +190,8 @@ const ALL_DAY_CHIP_BASE: CSSProperties = {
 // An all-day bar being carried across the lane. Columns index the visible days.
 type AllDayDrag<T> = {
   event: CalendarEvent<T>;
+  // The bar's `For` key, its identity across data refreshes that replace the event.
+  key: string | CalendarEvent<T>;
   fromCol: number;
   toCol: number;
   // Past the slop on a mouse, or picked up by a hold on touch and pen.
@@ -1094,6 +1096,8 @@ export function TimeGrid<T = unknown>(
     }));
   });
 
+  type AllDaySegment = ReturnType<typeof allDaySpans>[number];
+
   // Moving an all-day bar across the lane's day columns. The pointer is followed
   // at the document level, and the drop is the column under it, clamped to the
   // visible days. Both ends shift by the same number of calendar days.
@@ -1118,10 +1122,12 @@ export function TimeGrid<T = unknown>(
 
   const beginAllDayDrag = (
     grab: EventGrab,
-    event: CalendarEvent<T>,
-    segment: { startCol: number; endCol: number },
+    segment: AllDaySegment,
     armed: boolean,
+    // The press that starts a mouse drag, which also reaches the document.
+    press: Event | null,
   ) => {
+    const { event } = segment;
     const rect = allDayGridRef.current?.getBoundingClientRect();
     const count = daysRef.current.length;
     const columnWidth = rect && count > 0 ? rect.width / count : 0;
@@ -1177,8 +1183,10 @@ export function TimeGrid<T = unknown>(
     const cancel = (e: PointerEvent) => {
       if (e.pointerId === grab.pointerId) abandon();
     };
+    // Another finger, or a new press from a pointer whose release never arrived
+    // (it was lost outside the window), ends the drag rather than committing it.
     const anotherPointer = (e: PointerEvent) => {
-      if (e.pointerId !== grab.pointerId) abandon();
+      if (e !== press) abandon();
     };
     const keyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -1192,7 +1200,7 @@ export function TimeGrid<T = unknown>(
     };
     stopAllDayRef.current?.();
     stopAllDayRef.current = stop;
-    applyAllDayDrag({ event, fromCol, toCol: fromCol, armed });
+    applyAllDayDrag({ event, key: segment.key, fromCol, toCol: fromCol, armed });
     props.onDragStart?.(event);
     doc.addEventListener("pointermove", move);
     doc.addEventListener("pointerup", up);
@@ -1207,13 +1215,8 @@ export function TimeGrid<T = unknown>(
     doc.addEventListener("dragstart", preventNative, true);
   };
 
-  const pressAllDay = (
-    e: DomPointerEvent<HTMLElement>,
-    event: CalendarEvent<T>,
-    segment: { startCol: number; endCol: number },
-  ) => {
+  const pressAllDay = (e: DomPointerEvent<HTMLElement>, segment: AllDaySegment) => {
     if (e.button > 0 || !e.isPrimary) return;
-    suppressAllDayClick.current = false;
     if (stopAllDayRef.current || activeGrabRef.current || cancelHoldRef.current) return;
     const grab: EventGrab = {
       box: e.currentTarget,
@@ -1223,7 +1226,7 @@ export function TimeGrid<T = unknown>(
       clientY: e.clientY,
     };
     if (e.pointerType === "mouse") {
-      beginAllDayDrag(grab, event, segment, false);
+      beginAllDayDrag(grab, segment, false, e);
       return;
     }
     // Touch and pen hold first, like a timed event, so a swipe still scrolls and a
@@ -1234,7 +1237,7 @@ export function TimeGrid<T = unknown>(
       props.touchDragThreshold,
       () => {
         stopAllDayRef.current = null;
-        beginAllDayDrag(grab, event, segment, true);
+        beginAllDayDrag(grab, segment, true, null);
       },
       () => {
         stopAllDayRef.current = null;
@@ -1250,18 +1253,25 @@ export function TimeGrid<T = unknown>(
     () => [],
     () => untrack(() => () => stopAllDayRef.current?.()),
   );
-  // A new page or a removed event leaves the drag nowhere to land.
+  // New data cancels a pending hold, as it does for a timed event. An active drag
+  // ends only when moves are switched off; it commits the event it picked up.
   createEffect(
     () => [props.events, props.onDragEvent] as const,
-    ([events, onDragEvent]) =>
+    ([, onDragEvent]) =>
       untrack(() => {
-        const current = allDayDragRef.current;
         if (!stopAllDayRef.current) return;
-        if (!current || !onDragEvent || !events.includes(current.event)) stopAllDayRef.current();
+        if (!allDayDragRef.current || !onDragEvent) stopAllDayRef.current();
       }),
   );
+  // Other visible days would change what the drag's columns mean. Compared by
+  // value, matching the React renderer.
+  const visibleDaysKey = createMemo(() =>
+    days()
+      .map((day) => day.getTime())
+      .join(),
+  );
   createEffect(
-    () => days(),
+    () => visibleDaysKey(),
     () =>
       untrack(() => {
         stopAllDayRef.current?.();
@@ -1275,7 +1285,7 @@ export function TimeGrid<T = unknown>(
     if (!current?.armed || current.toCol === current.fromCol) return null;
     const visible = days();
     const next = monthDropBounds(current.event, visible[current.fromCol], visible[current.toCol]);
-    const lane = allDayLayout().segments.find((s) => s.event === current.event)?.lane;
+    const lane = allDaySpans().find((s) => s.key === current.key)?.lane;
     if (!next || lane === undefined) return null;
     const moved: CalendarEvent<T> = { ...current.event, start: next.start, end: next.end };
     const segment = layoutMonthWeek<T>(visible, [moved]).segments[0];
@@ -2453,7 +2463,7 @@ export function TimeGrid<T = unknown>(
                 const movable = createMemo(() => canMoveAllDay(segment().event));
                 const carried = createMemo(() => {
                   const current = allDayDrag();
-                  return current?.armed === true && current.event === segment().event;
+                  return current?.armed === true && current.key === segment().key;
                 });
                 return (
                   <div
@@ -2464,9 +2474,10 @@ export function TimeGrid<T = unknown>(
                     <button
                       type="button"
                       onPointerDown={(e) => {
-                        if (!movable()) return;
-                        const { event, startCol, endCol } = segment();
-                        pressAllDay(e, event, { startCol, endCol });
+                        // Every press starts a new interaction, so a guard left by a drag
+                        // whose click never reached a bar is stale.
+                        suppressAllDayClick.current = false;
+                        if (movable()) pressAllDay(e, segment());
                       }}
                       onClick={(e) => {
                         if (consumeAllDayClick(e.detail)) return;
@@ -2545,7 +2556,6 @@ export function TimeGrid<T = unknown>(
                       {...dataState({
                         "data-continues-before": preview().continuesBefore,
                         "data-continues-after": preview().continuesAfter,
-                        "data-dragging": true,
                       })}
                       {...slot("allDayEvent", { base: ALL_DAY_CHIP_BASE })}
                     >

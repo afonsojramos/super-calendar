@@ -159,6 +159,56 @@ describe(rendererName, () => {
     expect(onPressEvent).not.toHaveBeenCalled();
   });
 
+  it("keeps a drag through a refresh that rebuilds the date and events", () => {
+    const { chip, preview, rerender, onDragEvent } = setup({ getEventId: () => "trip" });
+    const refreshed = { ...trip };
+    fireEvent.pointerDown(chip(), at(1));
+    fireEvent.pointerMove(chip(), at(3));
+    rerender({
+      date: new Date(date),
+      mode: "week",
+      weekStartsOn: 1,
+      events: [refreshed],
+      getEventId: () => "trip",
+      onDragEvent,
+    });
+    expect(chip().hasAttribute("data-dragging")).toBe(true);
+    expect(preview()?.style.gridColumn).toBe("4 / span 3");
+    // The preview is not the carried bar, so it does not match `[data-dragging]`.
+    expect(preview()?.querySelector("[data-dragging]")).toBeNull();
+    fireEvent.pointerUp(chip(), at(3));
+    expect(onDragEvent).toHaveBeenCalledExactlyOnceWith(
+      trip,
+      new Date(2026, 6, 16),
+      new Date(2026, 6, 19),
+    );
+  });
+
+  it("presses a locked bar after a drag whose click landed elsewhere", () => {
+    const locked = { ...trip, title: "Locked", draggable: false };
+    const { chip, onPressEvent, onDragEvent } = setup({}, [trip, locked]);
+    fireEvent.pointerDown(chip(), at(1));
+    fireEvent.pointerMove(chip(), at(3));
+    fireEvent.pointerUp(chip(), at(3));
+    expect(onDragEvent).toHaveBeenCalledTimes(1);
+    fireEvent.pointerDown(chip("Locked"), at(1));
+    fireEvent.pointerUp(chip("Locked"), at(1));
+    fireEvent.click(chip("Locked"), { detail: 1 });
+    expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(locked);
+  });
+
+  it("drops a drag whose release was lost when the pointer presses again", () => {
+    const { chip, preview, onDragEvent } = setup();
+    fireEvent.pointerDown(chip(), at(1));
+    fireEvent.pointerMove(chip(), at(3));
+    // The release happened outside the window; the next press starts over.
+    fireEvent.pointerDown(chip(), at(4));
+    expect(preview()).toBeNull();
+    expect(chip().hasAttribute("data-dragging")).toBe(false);
+    fireEvent.pointerUp(chip(), at(4));
+    expect(onDragEvent).not.toHaveBeenCalled();
+  });
+
   it("cancels on pointer cancellation", () => {
     const { chip, preview, onDragEvent } = setup();
     fireEvent.pointerDown(chip(), at(1));
