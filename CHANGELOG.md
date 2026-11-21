@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.21.0](https://github.com/afonsojramos/super-calendar/compare/v2.20.1...v2.21.0) (2026-11-21)
+
+
+### Features
+
+* mark the first and last day of a selected range with data attributes ([#176](https://github.com/afonsojramos/super-calendar/issues/176)) ([3d7fafa](https://github.com/afonsojramos/super-calendar/commit/3d7fafa18e62bf1e2f4ef54f6d7671409cc8f49e))
+* report why the date changed in onChangeDate ([#177](https://github.com/afonsojramos/super-calendar/issues/177)) ([f287bd6](https://github.com/afonsojramos/super-calendar/commit/f287bd6eadf8eb7084db335cf7ed0214587e1edf))
+* ship version-matched agent docs inside each package ([#182](https://github.com/afonsojramos/super-calendar/issues/182)) ([ed36650](https://github.com/afonsojramos/super-calendar/commit/ed366501f9fde6fa99741d8fcd06a7ebcd4eef80))
+
+
+### Bug Fixes
+
+* keep keyboard focus and the tab stop on the web grids while paging ([#181](https://github.com/afonsojramos/super-calendar/issues/181)) ([484f74a](https://github.com/afonsojramos/super-calendar/commit/484f74afa5781bf7ddcd7322b8bd24aa6c6206b9))
+* keep Solid server renders independent of the clock and browser globals ([#179](https://github.com/afonsojramos/super-calendar/issues/179)) ([3942350](https://github.com/afonsojramos/super-calendar/commit/3942350ef4422e69a6f57e07e405bf96ff301fb6))
+* **native:** page back to the controlled `date` when the app keeps it after the user pages. Behaviour change: an app that passes a fixed `date` with a no-op `onChangeDate` can no longer swipe away from it, so update `date` from `onChangeDate` (for example `onChangeDate={setDate}`). ([e89c4ea](https://github.com/afonsojramos/super-calendar/commit/e89c4ea0c41e24f8482f8f3f50ee4f8c2612ecb3))
+
 ## [2.20.1](https://github.com/afonsojramos/super-calendar/compare/v2.20.0...v2.20.1) (2026-11-20)
 
 
