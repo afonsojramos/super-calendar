@@ -82,6 +82,7 @@ import {
   monthDropBounds,
   overlapsOtherEvents,
   compareDayEvents,
+  eventDayKeys,
   groupEventsByDay,
   isAllDayEvent,
   isBackgroundEvent,
@@ -108,6 +109,10 @@ const FALLBACK_VISIBLE_COUNT = 3;
 const DRAG_LONG_PRESS_MS = 400;
 // Opacity of an event bar while it is being dragged to another day.
 const DRAGGED_BAR_OPACITY = 0.4;
+// Opacity of the preview of a moved event at its destination, matching the
+// time grid's move preview.
+const MOVE_PREVIEW_OPACITY = 0.85;
+const noop = () => {};
 
 const numericStyle = (value: number | string | undefined, fallback: number) =>
   typeof value === "number" ? value : fallback;
@@ -290,7 +295,8 @@ export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
    * Enable drag-to-reschedule: **long-press an event bar** and drag it onto
    * another day (**press and drag** on the web). Called on release with the event
    * and its new `start`/`end`, both shifted by the whole days dragged, so the time
-   * of day and duration are preserved. Return `false` to reject the drop. Update
+   * of day and duration are preserved. Return `false` to reject the drop. While
+   * the event is over another day, a preview of it shows where it lands. Update
    * your own event state in response.
    */
   onDragEvent?: EventDragHandler<T>;
@@ -749,7 +755,7 @@ function DateRowsInner<T>({
   // While a create sweep draws its content, the rows it covers put the draft on
   // lane 0 as an all-day event and move the bars it overlaps down, so the draft
   // keeps its lane as the sweep grows.
-  const draftEvent = useMemo(
+  const createDraft = useMemo(
     () =>
       createRange
         ? ({
@@ -761,19 +767,33 @@ function DateRowsInner<T>({
         : null,
     [createRange],
   );
+  // A move over another day previews the event at its destination the same way:
+  // a copy with the shifted bounds the drop would commit, laid out beside the
+  // faded original.
+  const movePreview = useMemo(() => {
+    if (drag?.kind !== "move") return null;
+    const bounds = monthDropBounds(drag.event, drag.from, drag.to);
+    return bounds ? { ...drag.event, ...bounds } : null;
+  }, [drag]);
+  const draftEvent = createDraft ?? movePreview;
+  // The days the draft covers, as `eventsByDay` keys.
+  const draftDays = useMemo(
+    () => (draftEvent ? new Set(eventDayKeys(draftEvent)) : null),
+    [draftEvent],
+  );
   const rowLayouts = useMemo(() => {
-    if (!draftEvent) return weekLayouts;
+    if (!draftEvent || !draftDays) return weekLayouts;
     const days = withDraftEventDays(eventsByDay, draftEvent, sortedMonthView);
     return weeks.map((week, index) => {
       const base = weekLayouts[index] ?? EMPTY_LAYOUT;
-      if (!week.some((day) => day >= draftEvent.start && day < draftEvent.end)) return base;
+      if (!week.some((day) => draftDays.has(startOfDay(day).toISOString()))) return base;
       return keepMonthDraftVisible(
         layoutMonthWeek(week, collectRowEvents(week, days)),
         base,
         draftEvent,
       );
     });
-  }, [draftEvent, weekLayouts, eventsByDay, sortedMonthView, weeks]);
+  }, [draftEvent, draftDays, weekLayouts, eventsByDay, sortedMonthView, weeks]);
   const dragRef = useRef<MonthDrag<T> | null>(null);
   const interactionWindow = useRef(windowKey);
   interactionWindow.current = windowKey;
@@ -1176,13 +1196,11 @@ function DateRowsInner<T>({
     // after the cell's own gap, which may differ from its neighbor's.
     const dateMargin =
       laneTop - cell.top - (daySizes[dayKey]?.dateHeight ?? DATE_BADGE_HEIGHT) - cell.gap;
-    // Tint the days a drag is currently over: every day of a create sweep, or the
-    // one an event would land on.
+    // Tint the days a drag is currently over: every day of a create sweep, or
+    // every day a moved event would cover once dropped.
     const isDragPreview =
       isInCreateSpan(drag, day) ||
-      (drag?.kind === "move" &&
-        isSameCalendarDay(day, drag.to) &&
-        !isSameCalendarDay(day, drag.from));
+      (movePreview !== null && !!draftDays?.has(startOfDay(day).toISOString()));
     // A hovered, non-filled day gets the subtle badge highlight on the web, but only
     // in the events-free picker. The events calendar (month and list views) has no
     // hover, matching the dom renderer (its events-mode cell omits it).
@@ -1268,7 +1286,7 @@ function DateRowsInner<T>({
         dayCellLines,
         highlightWeekends && isWeekend(day) && { backgroundColor: theme.colors.weekendBackground },
         // The drag preview sits on top of the weekend tint: the span being swept
-        // out, or the day an event is about to land on.
+        // out, or the days a moved event would cover.
         isDragPreview && { backgroundColor: theme.colors.rangeBackground },
         theme.containers.dayCell,
       ],
@@ -1721,6 +1739,45 @@ function DateRowsInner<T>({
                             importantForAccessibility="no-hide-descendants"
                           >
                             <RenderCreateGhost start={createRange.start} end={createRange.end} />
+                          </View>
+                        ) : null}
+                        {/* Where a moved event lands: its bar at the destination, in
+                            a lane among the row's bars, beside the faded original. */}
+                        {movePreview &&
+                        draftSegment &&
+                        draftStart >= 0 &&
+                        draftEnd >= draftStart &&
+                        draftHeight > 0 ? (
+                          <View
+                            testID="month-move-preview"
+                            {...webPreviewProps}
+                            pointerEvents="none"
+                            accessible={false}
+                            accessibilityElementsHidden
+                            importantForAccessibility="no-hide-descendants"
+                            style={{
+                              position: "absolute",
+                              left: pct((draftStart / cols) * 100),
+                              width: pct(((draftEnd - draftStart + 1) / cols) * 100),
+                              top: draftTop,
+                              height: draftHeight,
+                              paddingHorizontal: CHIP_INSET_H,
+                              opacity: MOVE_PREVIEW_OPACITY,
+                              zIndex: 1,
+                            }}
+                          >
+                            <RenderEventComponent
+                              event={movePreview}
+                              mode={multiWeek ? "multiweek" : "month"}
+                              isAllDay={isAllDayEvent(movePreview)}
+                              continuesBefore={
+                                draftSegment.continuesBefore || draftStart > draftSegment.startCol
+                              }
+                              continuesAfter={
+                                draftSegment.continuesAfter || draftEnd < draftSegment.endCol
+                              }
+                              onPress={noop}
+                            />
                           </View>
                         ) : null}
                       </View>

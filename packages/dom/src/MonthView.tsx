@@ -28,6 +28,7 @@ import {
   type CreateGhostArgs,
   compareDayEvents,
   dayBadgeKind,
+  eventDayKeys,
   type DateRange,
   type DateSelectionConstraints,
   type EventAccessibilityLabeler,
@@ -81,6 +82,7 @@ export type MonthViewSlot =
 const pressedEvent = (event: Event) =>
   event.target instanceof Element && event.target.closest('[data-slot="chipButton"]') !== null;
 const EMPTY_LAYOUT = { segments: [], laneCount: 0 } as const;
+const noop = () => {};
 
 // Chip metrics for the events layout (when `events` is provided).
 const DATE_ROW = 24;
@@ -89,6 +91,9 @@ const CHIP_GAP = 2;
 const CELL_PAD = 4;
 // Opacity of an event chip while it is being dragged to another day.
 const DRAGGED_CHIP_OPACITY = 0.4;
+// Opacity of the preview of a moved event at its destination, matching the
+// time grid's move preview.
+const MOVE_PREVIEW_OPACITY = 0.85;
 // How far a press travels before it becomes a drag. Until then the chips stay
 // hit-testable, so a click still reaches the chip it pressed.
 const DRAG_SLOP_PX = 4;
@@ -236,8 +241,9 @@ export interface MonthViewProps<T = unknown>
    * In events mode, enables drag-to-reschedule: press an event chip and drop it on
    * another day. Called with the event and its new `start`/`end`, both shifted by
    * the whole days dragged, so the time of day and duration are preserved. Return
-   * `false` to reject the drop. The day under the pointer carries `data-drop` for
-   * styling.
+   * `false` to reject the drop. While the event is over another day, a preview of
+   * it (`data-dragging`) shows where it lands, and each day it would cover carries
+   * `data-drop` for styling.
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
   /** Fired the instant an event is picked up for a drag, before anything is committed. */
@@ -897,7 +903,7 @@ export function DateRows<T = unknown>({
   // While a create sweep draws its content, the rows it covers put the draft on
   // lane 0 as an all-day event and move the bars it overlaps down, so the draft
   // keeps its lane as the sweep grows.
-  const draftEvent = useMemo(
+  const createDraft = useMemo(
     () =>
       createRange
         ? ({
@@ -909,12 +915,30 @@ export function DateRows<T = unknown>({
         : null,
     [createRange],
   );
+  // A move over another day previews the event at its destination the same way:
+  // a copy with the shifted bounds the drop would commit, laid out beside the
+  // faded original.
+  const moving = drag?.kind === "move" ? drag : null;
+  const movingEvent = moving?.event;
+  const moveFrom = moving?.from;
+  const moveTo = moving?.to;
+  const movePreview = useMemo(() => {
+    if (!movingEvent || moveFrom === undefined || moveTo === undefined) return null;
+    const bounds = monthDropBounds(movingEvent, new Date(moveFrom), new Date(moveTo));
+    return bounds ? { ...movingEvent, ...bounds } : null;
+  }, [movingEvent, moveFrom, moveTo]);
+  const draftEvent = createDraft ?? movePreview;
+  // The days the draft covers, as `eventsByDay` keys.
+  const draftDays = useMemo(
+    () => (draftEvent ? new Set(eventDayKeys(draftEvent)) : null),
+    [draftEvent],
+  );
   const rowLayouts = useMemo(() => {
-    if (!draftEvent) return weekLayouts;
+    if (!draftEvent || !draftDays) return weekLayouts;
     const days = withDraftEventDays(eventsByDay, draftEvent);
     return weeks.map((week, index) => {
       const base = weekLayouts[index] ?? EMPTY_LAYOUT;
-      if (!week.days.some((d) => d.date >= draftEvent.start && d.date < draftEvent.end)) {
+      if (!week.days.some((d) => draftDays.has(startOfDay(d.date).toISOString()))) {
         return base;
       }
       const placed = layoutMonthWeek(
@@ -923,7 +947,7 @@ export function DateRows<T = unknown>({
       );
       return keepMonthDraftVisible(placed, base, draftEvent);
     });
-  }, [draftEvent, weekLayouts, eventsByDay, weeks]);
+  }, [draftEvent, draftDays, weekLayouts, eventsByDay, weeks]);
   const movedRef = useRef(false);
   // Set when a drag commits, so the click the browser fires next is swallowed (it
   // must not also open the day, or the event the drag landed on). A drag that ends
@@ -1311,6 +1335,14 @@ export function DateRows<T = unknown>({
           const draftTop =
             CELL_PAD + DATE_ROW + chipGap + (draftSegment?.lane ?? 0) * (chipHeight + chipGap);
           const draftHeight = Math.min(chipHeight, Math.max(0, eventRowHeight - draftTop));
+          const previewSegment =
+            movePreview && draftSegment && draftStart <= draftEnd
+              ? {
+                  continuesBefore:
+                    draftSegment.continuesBefore || draftStart > draftSegment.startCol,
+                  continuesAfter: draftSegment.continuesAfter || draftEnd < draftSegment.endCol,
+                }
+              : null;
           const barChipButton = slot("chipButton", chipButtonDefault);
           const barChip = slot("chip", chipDefault(theme, chipHeight));
           return (
@@ -1347,9 +1379,10 @@ export function DateRows<T = unknown>({
                   drag?.kind === "create" &&
                   dayTime >= Math.min(drag.anchor, drag.hover) &&
                   dayTime <= Math.max(drag.anchor, drag.hover);
-                // The day an event is about to land on (not the one it came from).
+                // Every day a moved event would cover once dropped, while it is
+                // over a day other than the one it came from.
                 const isDropTarget =
-                  drag?.kind === "move" && dayTime === drag.to && drag.to !== drag.from;
+                  movePreview !== null && !!draftDays?.has(startOfDay(day.date).toISOString());
                 // Present/absent data-* attributes so consumers can style day state
                 // with CSS/Tailwind variants (e.g. `data-[today]:bg-blue-500`).
                 const dayData = dataState({
@@ -1585,6 +1618,45 @@ export function DateRows<T = unknown>({
                           aria-hidden="true"
                         >
                           <RenderCreateGhost start={createRange.start} end={createRange.end} />
+                        </InertDiv>
+                      ) : null}
+                      {/* Where a moved event lands: its chip at the destination, in
+                          a lane among the row's bars, beside the faded original. */}
+                      {movePreview && previewSegment && draftStart === dayCol && draftHeight > 0 ? (
+                        <InertDiv
+                          {...dataState({ "data-dragging": true })}
+                          inert
+                          aria-hidden="true"
+                          style={{
+                            position: "absolute",
+                            left: 2,
+                            width: `calc(${(draftEnd - draftStart + 1) * 100}% - 4px)`,
+                            top: draftTop,
+                            height: draftHeight,
+                            overflow: "hidden",
+                            pointerEvents: "none",
+                            opacity: MOVE_PREVIEW_OPACITY,
+                            zIndex: 3,
+                          }}
+                        >
+                          {Chip ? (
+                            <Chip mode={viewMode} event={movePreview} onPress={noop} />
+                          ) : (
+                            <span
+                              {...barChip}
+                              style={{
+                                ...barChip.style,
+                                ...(previewSegment.continuesBefore
+                                  ? { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }
+                                  : null),
+                                ...(previewSegment.continuesAfter
+                                  ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 }
+                                  : null),
+                              }}
+                            >
+                              {movePreview.title}
+                            </span>
+                          )}
                         </InertDiv>
                       ) : null}
                       <div
