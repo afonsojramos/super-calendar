@@ -191,6 +191,21 @@ describe(rendererName, () => {
     );
   });
 
+  it("moves the dragged one of two identical bars", () => {
+    const twin = { ...trip };
+    const view = setup({}, [trip, twin]);
+    const [, second] = view
+      .getAllByText("Trip")
+      .map((node) => node.closest<HTMLElement>('button[data-slot="allDayEvent"]'))
+      .filter((node): node is HTMLElement => node !== null);
+    fireEvent.pointerDown(second, at(1));
+    fireEvent.pointerMove(second, at(3));
+    const faded = view.container.querySelectorAll('button[data-slot="allDayEvent"][data-dragging]');
+    expect([...faded]).toEqual([second]);
+    fireEvent.pointerUp(second, at(3));
+    expect(view.onDragEvent.mock.calls[0]?.[0]).toBe(twin);
+  });
+
   it("presses a locked bar after a drag whose click landed elsewhere", () => {
     const locked = { ...trip, title: "Locked", draggable: false };
     const { chip, onPressEvent, onDragEvent } = setup({}, [trip, locked]);

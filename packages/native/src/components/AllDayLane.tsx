@@ -109,6 +109,12 @@ export function AllDayLane<T>({
     dragRef.current = next;
     setDrag(next);
   };
+  // The event object of the bar being carried. A refresh can replace it
+  // mid-drag, so a missing original falls back to the bar's key.
+  const carriedEvent = (current: LaneDrag<T>) =>
+    spans.find((segment) => segment.event === current.event)?.event ??
+    spans.find((segment, index) => keyExtractor(segment.event, index) === current.key)?.event;
+  const carried = drag ? carriedEvent(drag) : undefined;
   const canMove = (event: CalendarEvent<T>) =>
     onDragEvent != null &&
     !event.disabled &&
@@ -131,9 +137,7 @@ export function AllDayLane<T>({
       if (!current) return;
       // Report the event as it is now, so `eventOverlap` does not count the
       // carried event's own refreshed copy as another event.
-      const event =
-        spans.find((segment, index) => keyExtractor(segment.event, index) === current.key)?.event ??
-        current.event;
+      const event = carriedEvent(current) ?? current.event;
       const next = monthDropBounds(event, days[current.fromCol], days[current.toCol]);
       if (next) onDragEvent?.(event, next.start, next.end);
     },
@@ -171,7 +175,7 @@ export function AllDayLane<T>({
         const wrapSlack = lastInLane ? Math.min(0.5, dayWidth / 4) : 0;
         const movable = canMove(event);
         const key = keyExtractor(event, index);
-        const carried = drag?.key === key;
+        const isCarried = carried === event;
         return (
           <MoveGesture
             key={key}
@@ -192,14 +196,14 @@ export function AllDayLane<T>({
                     marginLeft: dayWidth * (startCol - previousEnd - 1),
                     marginRight: dayWidth * remaining - wrapSlack,
                   },
-                  carried && styles.carriedColumn,
+                  isCarried && styles.carriedColumn,
                 ],
                 themed: theme.containers.allDayColumn,
               })}
             >
               <View
                 {...slot("allDayEvent", {
-                  base: [styles.chip, carried && { opacity: CARRIED_OPACITY }],
+                  base: [styles.chip, isCarried && { opacity: CARRIED_OPACITY }],
                 })}
               >
                 <RenderEventComponent
@@ -215,7 +219,7 @@ export function AllDayLane<T>({
                   }
                 />
               </View>
-              {carried && preview ? (
+              {isCarried && preview ? (
                 <View
                   testID="all-day-move-preview"
                   pointerEvents="none"
