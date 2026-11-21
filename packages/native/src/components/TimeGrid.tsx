@@ -26,6 +26,7 @@ import {
   type ReactElement,
   type RefAttributes,
   type SetStateAction,
+  startTransition,
   useCallback,
   useContext,
   useEffect,
@@ -115,6 +116,7 @@ import {
   useSlots,
 } from "../utils/slots";
 import { useWebGridZoom } from "../utils/useWebGridZoom";
+import { PAGER_HELD_DRAG_MS } from "../utils/pagerTiming";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { withEventAccessibilityLabel } from "../utils/withEventAccessibilityLabel";
 import { CalendarLabelsContext, useCalendarLabels } from "../utils/labels";
@@ -148,9 +150,6 @@ const PAGE_VIEWABILITY = { itemVisiblePercentThreshold: 90 };
 // How long the Android pager must go without a scroll event before an off-page
 // rest is snapped back onto a page.
 const PAGER_IDLE_MS = 150;
-// The same wait after a drag that never reported its end, which may still be
-// held by a finger.
-const PAGER_HELD_DRAG_MS = 1000;
 
 // Matches the dom renderer's default so both grids start at the same density.
 /** Default height in pixels of one hour row on the time grid. */
@@ -3210,11 +3209,27 @@ function TimeGridInner<T>(
     activeIndexShared.value = activeIndex;
   }, [activeIndex, activeIndexShared]);
   const viewedIndexRef = useRef(activeIndex);
+  const activeIndexRef = useRef(activeIndex);
+  activeIndexRef.current = activeIndex;
   // While a programmatic scroll (a "today" button, prev/next, or any date set from
   // outside) is settling, this holds its target index. Viewability ticks for the
   // intermediate pages it crosses are ignored until it lands, so they can't report
   // a page in between back as the new date — which made jumps land one page short.
   const pendingScrollIndexRef = useRef<number | null>(null);
+  // Bumped after each date the user pages to, so the grid re-renders with the `date`
+  // the app chose even when the app kept the old one (no prop changes then).
+  const [dateReports, setDateReports] = useState(0);
+  // Set when a page-back waits for a finger to lift, so the drag end re-runs it.
+  const pageBackHeldRef = useRef(false);
+  const reportDate = useCallback(
+    (target: Date, reason: DateChangeReason) => {
+      onChangeDate(target, { reason });
+      // A transition, so an app that sets `date` in a transition of its own is
+      // batched with it and never sees the page-back effect below.
+      startTransition(() => setDateReports((count) => count + 1));
+    },
+    [onChangeDate],
+  );
 
   // ISO week label for the hour column's corner (the visible page's Thursday
   // defines the week). Null unless the header is paged and week numbers are on.
@@ -3293,9 +3308,9 @@ function TimeGridInner<T>(
       }
       if (settled.index === viewedIndexRef.current) return;
       viewedIndexRef.current = settled.index;
-      if (settled.item) onChangeDate(settled.item, { reason: "swipe" });
+      if (settled.item) reportDate(settled.item, "swipe");
     },
-    [onChangeDate],
+    [reportDate],
   );
 
   // Realign the list when the date changes from outside a swipe (e.g. a "today"
@@ -3420,13 +3435,31 @@ function TimeGridInner<T>(
       // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
       pagerOffset.value = index * columnsWidth;
       void listRef.current?.scrollToIndex({ index, animated: !isWeb && !reduceMotion });
-      onChangeDate(target, { reason });
+      reportDate(target, reason);
     },
-    [pageDates, reduceMotion, onChangeDate, columnsWidth, pagerOffset],
+    [pageDates, reduceMotion, reportDate, columnsWidth, pagerOffset],
   );
   const pageByKey = useCallback((delta: number) => goToPage(delta, "keyboard"), [goToPage]);
   const pageByEdgeDrag = useCallback((delta: number) => goToPage(delta, "event-drag"), [goToPage]);
   useWebPagerKeys(swipeEnabled, pageByKey);
+
+  // `date` is controlled: when the app keeps the old date after the user paged (a
+  // swipe, an arrow key or an edge drag), page back to the one it still shows
+  // instead of leaving the list on the page the user moved to.
+  useEffect(() => {
+    // Not while a finger holds the pager: it would snap back to the held page on
+    // release. The drag end re-runs this check.
+    if (dateReports === 0 || activeIndex === viewedIndexRef.current) return;
+    if (pagerDraggingRef.current) {
+      pageBackHeldRef.current = true;
+      return;
+    }
+    viewedIndexRef.current = activeIndex;
+    pendingScrollIndexRef.current = activeIndex;
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+    pagerOffset.value = activeIndex * columnsWidth;
+    void listRef.current?.scrollToIndex({ index: activeIndex, animated: !isWeb && !reduceMotion });
+  }, [dateReports, activeIndex, columnsWidth, pagerOffset, reduceMotion]);
 
   // Commit the page nearest `offsetX` and return its index. Viewability only
   // reports a page that is nearly all on screen, so a pager that rests between
@@ -3438,11 +3471,11 @@ function TimeGridInner<T>(
       if (index !== viewedIndexRef.current) {
         viewedIndexRef.current = index;
         const target = pageDates[index];
-        if (target) onChangeDate(target, { reason: "swipe" });
+        if (target) reportDate(target, "swipe");
       }
       return index;
     },
-    [columnsWidth, pageDates, onChangeDate],
+    [columnsWidth, pageDates, reportDate],
   );
 
   // Whether a finger is on the pager, between its drag begin and end.
@@ -3474,6 +3507,8 @@ function TimeGridInner<T>(
       // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
       pagerOffset.value = index * columnsWidth;
       requestAnimationFrame(() => {
+        // The app kept its date and the grid is already paging back to it.
+        if (viewedIndexRef.current !== index) return;
         void listRef.current?.scrollToIndex({ index, animated: false });
       });
     },
@@ -3489,12 +3524,23 @@ function TimeGridInner<T>(
   useEffect(
     () => () => {
       if (pagerIdleTimerRef.current) clearTimeout(pagerIdleTimerRef.current);
+      pagerIdleTimerRef.current = null;
     },
     [],
   );
   const realignRestingPager = useCallback(
     (offsetX: number) => {
       pagerDraggingRef.current = false;
+      // A page-back held for a drag that never reported its end (a parent view took
+      // the touch, or the finger is still): run it now instead of snapping to the
+      // page the app refused. If the app has since accepted the page, snap as usual.
+      if (pageBackHeldRef.current) {
+        pageBackHeldRef.current = false;
+        if (activeIndexRef.current !== viewedIndexRef.current) {
+          startTransition(() => setDateReports((count) => count + 1));
+          return;
+        }
+      }
       if (columnsWidth <= 0) return;
       const pages = offsetX / columnsWidth;
       const offPagePx = Math.abs(pages - Math.round(pages)) * columnsWidth * PixelRatio.get();
@@ -3532,9 +3578,16 @@ function TimeGridInner<T>(
   const handlePagerDragStart = useCallback(() => {
     pagerDraggingRef.current = true;
     pagerUserScrollRef.current = true;
+    // The user takes the pager over from any programmatic scroll still settling (a
+    // page-back, an edge-drag page, a jump to an outside date), so the pages they
+    // land on are reported.
+    pendingScrollIndexRef.current = null;
   }, []);
   const handlePagerDragEnd = useCallback(() => {
     pagerDraggingRef.current = false;
+    if (!pageBackHeldRef.current) return;
+    pageBackHeldRef.current = false;
+    startTransition(() => setDateReports((count) => count + 1));
   }, []);
 
   // Optionally snap the pager back to the active page after an empty-cell press

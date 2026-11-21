@@ -83,6 +83,9 @@ swap. Make the smallest changes that compile and preserve the current behaviour.
    `verticalScrollEnabled`, `showVerticalScrollIndicator`,
    `itemSeparatorComponent`, `renderEvent`, `renderHeaderForMonthView`,
    `showAllDayEventCell`, `isRTL`.
+   - `date` is controlled: keep it in state and update it from `onChangeDate`
+     (`onChangeDate={setDate}`). A fixed `date` keeps the calendar on that date,
+     and a swipe pages back to it.
 
 10. Events
     - `start` and `end` stay JS `Date`s. Force an event into the all-day lane
