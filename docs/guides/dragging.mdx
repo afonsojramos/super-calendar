@@ -252,6 +252,11 @@ not page to another week. A tap or click still calls `onPressEvent`, and on the 
 drop onto another event. `onDragStart` fires when the bar is picked up. On native a
 movable bar does not call `onLongPressEvent`, because the long press picks it up.
 
+A drag continues when `onDragStart` or another update rebuilds `events` with new
+objects. The lane finds the carried bar by `getEventId` on the web and by
+`keyExtractor` on native, or else by its dates and title. `onDragEvent` receives
+the current object.
+
 ### Rescheduling without dragging
 
 Dragging is a gesture, so every renderer offers the same moves and resizes

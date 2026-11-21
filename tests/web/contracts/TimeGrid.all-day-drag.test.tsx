@@ -159,26 +159,33 @@ describe(rendererName, () => {
     expect(onPressEvent).not.toHaveBeenCalled();
   });
 
-  it("keeps a drag through a refresh that rebuilds the date and events", () => {
-    const { chip, preview, rerender, onDragEvent } = setup({ getEventId: () => "trip" });
+  it.each([
+    { title: "with event IDs", ids: { getEventId: () => "trip" } },
+    { title: "without event IDs", ids: {} },
+  ])("keeps a drag through a refresh that rebuilds the date and events $title", ({ ids }) => {
+    // The rebuilt copy must not count as another event under `eventOverlap`.
+    const { chip, preview, rerender, onDragEvent } = setup({ ...ids, eventOverlap: false });
     const refreshed = { ...trip };
     fireEvent.pointerDown(chip(), at(1));
-    fireEvent.pointerMove(chip(), at(3));
+    fireEvent.pointerMove(chip(), at(2));
     rerender({
       date: new Date(date),
       mode: "week",
       weekStartsOn: 1,
       events: [refreshed],
-      getEventId: () => "trip",
+      eventOverlap: false,
       onDragEvent,
+      ...ids,
     });
     expect(chip().hasAttribute("data-dragging")).toBe(true);
+    expect(chip().style.opacity).toBe("0.4");
+    fireEvent.pointerMove(chip(), at(3));
     expect(preview()?.style.gridColumn).toBe("4 / span 3");
     // The preview is not the carried bar, so it does not match `[data-dragging]`.
     expect(preview()?.querySelector("[data-dragging]")).toBeNull();
     fireEvent.pointerUp(chip(), at(3));
     expect(onDragEvent).toHaveBeenCalledExactlyOnceWith(
-      trip,
+      refreshed,
       new Date(2026, 6, 16),
       new Date(2026, 6, 19),
     );
@@ -198,7 +205,7 @@ describe(rendererName, () => {
   });
 
   it("drops a drag whose release was lost when the pointer presses again", () => {
-    const { chip, preview, onDragEvent } = setup();
+    const { chip, preview, onDragEvent, onPressEvent } = setup();
     fireEvent.pointerDown(chip(), at(1));
     fireEvent.pointerMove(chip(), at(3));
     // The release happened outside the window; the next press starts over.
@@ -206,7 +213,10 @@ describe(rendererName, () => {
     expect(preview()).toBeNull();
     expect(chip().hasAttribute("data-dragging")).toBe(false);
     fireEvent.pointerUp(chip(), at(4));
+    fireEvent.click(chip(), { detail: 1 });
     expect(onDragEvent).not.toHaveBeenCalled();
+    // That press is the user's own click, not the abandoned drag's.
+    expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(trip);
   });
 
   it("cancels on pointer cancellation", () => {

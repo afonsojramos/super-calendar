@@ -129,8 +129,13 @@ export function AllDayLane<T>({
       const current = dragRef.current;
       applyDrag(null);
       if (!current) return;
-      const next = monthDropBounds(current.event, days[current.fromCol], days[current.toCol]);
-      if (next) onDragEvent?.(current.event, next.start, next.end);
+      // Report the event as it is now, so `eventOverlap` does not count the
+      // carried event's own refreshed copy as another event.
+      const event =
+        spans.find((segment, index) => keyExtractor(segment.event, index) === current.key)?.event ??
+        current.event;
+      const next = monthDropBounds(event, days[current.fromCol], days[current.toCol]);
+      if (next) onDragEvent?.(event, next.start, next.end);
     },
     cancel: () => {
       if (dragRef.current) applyDrag(null);

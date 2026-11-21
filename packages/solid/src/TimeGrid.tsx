@@ -187,11 +187,24 @@ const ALL_DAY_CHIP_BASE: CSSProperties = {
   height: 22,
 };
 
+// Whether two event objects are the same all-day bar: the same `getEventId`, or,
+// without IDs, the same dates and title.
+function isSameAllDayBar<T>(
+  a: CalendarEvent<T>,
+  b: CalendarEvent<T>,
+  getEventId?: (event: CalendarEvent<T>) => string | number,
+) {
+  if (getEventId) return getEventId(a) === getEventId(b);
+  return (
+    a.start.getTime() === b.start.getTime() &&
+    a.end.getTime() === b.end.getTime() &&
+    a.title === b.title
+  );
+}
+
 // An all-day bar being carried across the lane. Columns index the visible days.
 type AllDayDrag<T> = {
   event: CalendarEvent<T>;
-  // The bar's `For` key, its identity across data refreshes that replace the event.
-  key: string | CalendarEvent<T>;
   fromCol: number;
   toCol: number;
   // Past the slop on a mouse, or picked up by a hold on touch and pen.
@@ -1119,6 +1132,10 @@ export function TimeGrid<T = unknown>(
     return true;
   };
   const canMoveAllDay = (event: CalendarEvent<T>) => !event.disabled && editability(event).canMove;
+  // Whether `event` is the bar being carried. A refresh can replace the event
+  // object mid-drag, so it matches by `getEventId`, or by its dates and title.
+  const isCarried = (drag: AllDayDrag<T>, event: CalendarEvent<T>) =>
+    event === drag.event || isSameAllDayBar(event, drag.event, props.getEventId);
 
   const beginAllDayDrag = (
     grab: EventGrab,
@@ -1176,17 +1193,25 @@ export function TimeGrid<T = unknown>(
       stop();
       if (!current.armed) return;
       suppressAllDayClick.current = true;
+      // Report the event as it is now, so `eventOverlap` does not count the
+      // carried event's own refreshed copy as another event.
+      const event =
+        untrack(() => allDaySpans()).find((s) => isCarried(current, s.event))?.event ??
+        current.event;
       const visible = daysRef.current;
-      const next = monthDropBounds(current.event, visible[current.fromCol], visible[current.toCol]);
-      if (next) onDragEventRef.current?.(current.event, next.start, next.end);
+      const next = monthDropBounds(event, visible[current.fromCol], visible[current.toCol]);
+      if (next) onDragEventRef.current?.(event, next.start, next.end);
     };
     const cancel = (e: PointerEvent) => {
       if (e.pointerId === grab.pointerId) abandon();
     };
     // Another finger, or a new press from a pointer whose release never arrived
     // (it was lost outside the window), ends the drag rather than committing it.
+    // A lost mouse release leaves no click behind, so that press keeps its own.
     const anotherPointer = (e: PointerEvent) => {
-      if (e !== press) abandon();
+      if (e === press) return;
+      if (e.pointerType === "mouse") stop();
+      else abandon();
     };
     const keyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -1200,7 +1225,7 @@ export function TimeGrid<T = unknown>(
     };
     stopAllDayRef.current?.();
     stopAllDayRef.current = stop;
-    applyAllDayDrag({ event, key: segment.key, fromCol, toCol: fromCol, armed });
+    applyAllDayDrag({ event, fromCol, toCol: fromCol, armed });
     props.onDragStart?.(event);
     doc.addEventListener("pointermove", move);
     doc.addEventListener("pointerup", up);
@@ -1285,7 +1310,7 @@ export function TimeGrid<T = unknown>(
     if (!current?.armed || current.toCol === current.fromCol) return null;
     const visible = days();
     const next = monthDropBounds(current.event, visible[current.fromCol], visible[current.toCol]);
-    const lane = allDaySpans().find((s) => s.key === current.key)?.lane;
+    const lane = allDaySpans().find((s) => isCarried(current, s.event))?.lane;
     if (!next || lane === undefined) return null;
     const moved: CalendarEvent<T> = { ...current.event, start: next.start, end: next.end };
     const segment = layoutMonthWeek<T>(visible, [moved]).segments[0];
@@ -2463,7 +2488,7 @@ export function TimeGrid<T = unknown>(
                 const movable = createMemo(() => canMoveAllDay(segment().event));
                 const carried = createMemo(() => {
                   const current = allDayDrag();
-                  return current?.armed === true && current.key === segment().key;
+                  return current?.armed === true && isCarried(current, segment().event);
                 });
                 return (
                   <div
