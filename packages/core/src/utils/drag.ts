@@ -74,16 +74,27 @@ export function snapDeltaMinutes(
  * day. That keeps the event starting in the column it was dropped on (a
  * cross-day *move* is the horizontal drag) while still allowing a range that
  * spans midnight. Runs on the UI thread inside the drag gesture.
+ *
+ * Pass the event's `durationMinutes` to make the top edge symmetric: when the
+ * window opens at midnight, the start may then run before it, into the previous
+ * day, while the end stays at least one `snapMinutes` step after midnight (the
+ * result stays on the step grid). Without it, or with a window that opens after
+ * midnight, the start is held at `minHour`.
  */
 export function clampMoveStartMinutes(
   startMinutes: number,
   minHour: number,
   maxHour: number,
   snapMinutes: number,
+  durationMinutes = 0,
 ): number {
   "worklet";
-  const lower = minHour * 60;
-  const upper = Math.max(lower, maxHour * 60 - snapMinutes);
+  const top = minHour * 60;
+  // Whole steps the start may move before midnight with one step left after it.
+  const stepsBefore =
+    top <= 0 && snapMinutes > 0 ? Math.floor((durationMinutes - snapMinutes) / snapMinutes) : 0;
+  const lower = stepsBefore > 0 ? -stepsBefore * snapMinutes : top;
+  const upper = Math.max(top, maxHour * 60 - snapMinutes);
   return Math.min(Math.max(startMinutes, lower), upper);
 }
 
