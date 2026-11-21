@@ -230,6 +230,28 @@ On the DOM time grid, only mouse drags trigger edge paging. Touch and pen drags
 remain inside the visible period. A resting finger cannot repeatedly change the
 date or detach its captured event through an edge page.
 
+### Move an all-day event
+
+With `onDragEvent` set, you can drag a bar in the all-day lane to other days.
+Long-press it on native. On React DOM and Solid, press and drag with a mouse, or
+hold a touch or pen for `touchDragDelay` first. A drag moves the bar by whole days
+and keeps its duration. Both ends shift by the same number of calendar days, so
+`onDragEvent` receives all-day dates. With `hiddenDays`, one column can be more
+than one calendar day.
+
+While you drag, the carried bar fades and a preview covers the days it would land
+on. On React DOM and Solid, the carried `allDayEvent` button carries
+`data-dragging`. The preview uses the same `allDayColumn` and `allDayEvent` slots,
+is hidden from assistive technology, and its renderer receives the moved dates.
+A drag past the first or last visible day stops at that day. The lane does
+not page to another week. A tap or click still calls `onPressEvent`, and on the web
+**Escape** or pointer cancellation drops the drag without a change.
+
+`draggable: false`, `startEditable: false`, `disabled`, and
+`eventStartEditable={false}` keep a bar in place. `eventOverlap={false}` rejects a
+drop onto another event. `onDragStart` fires when the bar is picked up. On native a
+movable bar does not call `onLongPressEvent`, because the long press picks it up.
+
 ### Rescheduling without dragging
 
 Dragging is a gesture, so every renderer offers the same moves and resizes

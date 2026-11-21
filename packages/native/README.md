@@ -21,6 +21,8 @@ receive the original event; `continuesBefore` and `continuesAfter` indicate
 clipping at the visible range edges. The default bar squares its corners on a
 continuing side. The `allDayColumn` slot styles one
 spanning cell. Timed events that cross midnight keep their per-day segments.
+With `onDragEvent`, a long press picks an all-day bar up to move it to other
+visible days.
 
 ## Install
 
