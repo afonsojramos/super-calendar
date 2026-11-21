@@ -518,12 +518,24 @@ function DefaultDomEvent<T>(
         }
       : null),
   }));
+  // An all-day bar clipped at the view edge squares that side, like a month bar,
+  // so it reads as continuing. Timed segments continue vertically and keep theirs.
+  // Longhands only, matching the React renderer's inline style.
+  const squareStart = createMemo(() => !!(props.isAllDay && props.continuesBefore));
+  const squareEnd = createMemo(() => !!(props.isAllDay && props.continuesAfter));
   const boxThemed = createMemo<CSSProperties>(() => ({
     padding: `${DOM_BOX_PADDING_V}px 6px`,
-    borderRadius: 6,
+    borderTopLeftRadius: squareStart() ? 0 : 6,
+    borderBottomLeftRadius: squareStart() ? 0 : 6,
+    borderTopRightRadius: squareEnd() ? 0 : 6,
+    borderBottomRightRadius: squareEnd() ? 0 : 6,
     background: props.theme.eventBackground,
     color: props.theme.eventText,
     fontSize: 12,
+  }));
+  const continuation = createMemo<CSSProperties>(() => ({
+    ...(squareStart() ? { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 } : null),
+    ...(squareEnd() ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 } : null),
   }));
   return (
     <div
@@ -534,11 +546,13 @@ function DefaultDomEvent<T>(
           ? {
               ...boxBase(),
               ...props.boxProps.style,
+              ...continuation(),
             }
           : {
               ...boxBase(),
               ...boxThemed(),
               ...props.boxProps?.style,
+              ...continuation(),
             },
       )}
     >
@@ -2246,6 +2260,10 @@ export function TimeGrid<T = unknown>(
                               labels: labels(),
                             })
                       }
+                      {...dataState({
+                        "data-continues-before": segment().continuesBefore,
+                        "data-continues-after": segment().continuesAfter,
+                      })}
                       {...slot("allDayEvent", {
                         base: {
                           border: "none",

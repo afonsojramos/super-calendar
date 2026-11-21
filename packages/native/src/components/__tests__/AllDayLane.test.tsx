@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Pressable, Text, StyleSheet } from "react-native";
 import { vi } from "vitest";
 import { AllDayLane } from "../AllDayLane";
+import { DefaultEvent } from "../DefaultEvent";
 import type { CalendarEvent, RenderEventArgs } from "../../types";
 import { SlotStylesProvider } from "../../utils/slots";
 
@@ -122,6 +123,47 @@ describe("AllDayLane spans", () => {
     expect(view.getByText("Before: true,false")).toBeTruthy();
     expect(view.getAllByText("After")).toHaveLength(1);
     expect(view.getByText("After: false,true")).toBeTruthy();
+  });
+
+  it.each([
+    { title: "Inside", start: days[1], end: days[4], before: false, after: false },
+    { title: "Before", start: new Date(2026, 6, 10), end: days[2], before: true, after: false },
+    { title: "After", start: days[5], end: new Date(2026, 6, 23), before: false, after: true },
+    {
+      title: "Both",
+      start: new Date(2026, 6, 10),
+      end: new Date(2026, 6, 23),
+      before: true,
+      after: true,
+    },
+  ])(
+    "squares the default chip's corners where $title continues",
+    async ({ title, start, end, before, after }) => {
+      const view = await render(
+        <AllDayLane
+          {...props}
+          renderEvent={DefaultEvent}
+          events={[{ ...trip, title, start, end }]}
+        />,
+      );
+      const style = StyleSheet.flatten(view.getByRole("button").props.style);
+      const corner = (squared: boolean) => (squared ? 0 : undefined);
+      expect(style.borderRadius).toBe(6);
+      expect(style.borderTopLeftRadius).toBe(corner(before));
+      expect(style.borderBottomLeftRadius).toBe(corner(before));
+      expect(style.borderTopRightRadius).toBe(corner(after));
+      expect(style.borderBottomRightRadius).toBe(corner(after));
+    },
+  );
+
+  it("keeps the default timed chip's corners rounded while it continues across days", async () => {
+    const view = await render(
+      <DefaultEvent event={trip} mode="week" continuesBefore continuesAfter onPress={() => {}} />,
+    );
+    const style = StyleSheet.flatten(view.getByRole("button").props.style);
+    expect(style.borderRadius).toBe(6);
+    expect(style.borderTopLeftRadius).toBeUndefined();
+    expect(style.borderTopRightRadius).toBeUndefined();
   });
 
   it("uses only visible columns and keeps empty pages measurable", async () => {
