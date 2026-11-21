@@ -61,7 +61,7 @@ const packages = {
       "reference/api",
     ],
     scope:
-      "Start with [Headless core](guides/headless.md). The other guides show the renderer components; the helpers and types they use come from this package.",
+      "Start with [Headless core](guides/headless.md). The other guides show the renderer components. Their date, event, recurrence and time zone helpers come from this package; component and theme types such as `RenderEventArgs` and `CalendarTheme` come from the renderer packages.",
   },
   native: {
     pages: [
@@ -83,7 +83,7 @@ const packages = {
       "coming-from-react-big-calendar",
     ],
     scope:
-      "Start with [react-dom renderer](guides/dom.md). Most other guides import from `@super-calendar/native`; this package exports the same names, and [Renderer comparison](reference/renderers.md) lists what differs.",
+      "Start with [react-dom renderer](guides/dom.md). Most other guides import from `@super-calendar/native`. This package has the same calendar components, but some names differ: themes are `defaultDomTheme`, `darkDomTheme` and `mergeDomTheme`, passed with the `theme` prop rather than a provider; render arguments are `DomRenderEventArgs`; and time zone helpers such as `eventsInTimeZone` come from `@super-calendar/core`. Native-only exports such as `MonthPager` and `DefaultEvent` have no dom equivalent. [Renderer comparison](reference/renderers.md) lists the other differences.",
   },
   solid: {
     pages: [...rendererPages, "guides/solid"],
@@ -265,6 +265,9 @@ function convert(lines, level, file) {
       while (!lines[i].includes("*/}")) {
         if (++i === lines.length) throw new Error(`${file}: unterminated MDX comment`);
       }
+      // Keep any text after the comment on its closing line.
+      const rest = lines[i].slice(lines[i].indexOf("*/}") + 3);
+      if (rest.trim()) push(rest.trimStart());
       continue;
     }
     const tag = /^<([A-Za-z][\w.]*)/.exec(trimmed);
@@ -403,10 +406,14 @@ function mapProse(markdown, transform) {
 }
 
 // Fails on MDX syntax or site-absolute links that survived conversion, such as
-// a component in the middle of a line.
+// a component in the middle of a line, an ESM import or export, an HTML tag with
+// a JSX expression attribute, or a JSX expression in prose.
 function assertConverted(markdown, file) {
   mapProse(markdown, (text) => {
-    const leftover = /<[A-Z][\w.]*|\{\/\*|\]\(<?\/|^\s*\[[^\]]+\]:\s*<?\//.exec(text);
+    const leftover =
+      /<[A-Z][\w.]*|\{\/\*|\]\(<?\/|^\s*\[[^\]]+\]:\s*<?\/|^\s*(?:import\s.*\sfrom\s|import\s+["']|export\s+(?:(?:const|let|var|function|class|default)\b|\{|\*))|<[a-z][\w-]*\s[^>]*=\{|\{[A-Za-z_$][\w.$]*\}/.exec(
+        text,
+      );
     if (leftover) throw new Error(`${file}: cannot convert ${JSON.stringify(text.trim())}`);
     return text;
   });
