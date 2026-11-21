@@ -61,9 +61,62 @@ describe("native month creation content", () => {
     },
   );
 
-  it("puts the preview on the lane the created event takes, moving bars aside", async () => {
-    // Trip starts on Sunday and keeps lane 0. Lunch starts with the sweep but is
-    // shorter, so it moves below the preview, as it will once the event exists.
+  it.each([
+    ["MonthView", "month-grid"],
+    ["MultiWeekView", "multiweek-grid"],
+  ] as const)(
+    "keeps the preview on lane 0 above a same-day all-day event in %s",
+    async (name, grid) => {
+      // Holiday ties with a one-day sweep on its day. The preview takes lane 0 from
+      // the first day and stays there when the sweep reaches the next day.
+      const holiday = {
+        title: "Holiday",
+        start: new Date(2026, 5, 16),
+        end: new Date(2026, 5, 17),
+        allDay: true,
+      };
+      const props = {
+        ...baseProps,
+        events: [holiday],
+        chipHeight: 20,
+        onCreateEvent: vi.fn(),
+        renderCreateGhost: Draft,
+      };
+      const view = await render(
+        name === "MonthView" ? (
+          <MonthView {...props} />
+        ) : (
+          <MultiWeekView {...props} numberOfWeeks={2} />
+        ),
+      );
+      await layout(view, grid);
+      const barTop = () => {
+        let node: { parent: unknown; props: { style?: unknown } } | null =
+          view.getByText("Holiday");
+        while (node && StyleSheet.flatten(node.props.style as ViewStyle)?.position !== "absolute") {
+          node = node.parent as typeof node;
+        }
+        return StyleSheet.flatten(node?.props.style as ViewStyle)?.top;
+      };
+      // Lanes are 22pt apart. 16 June is Tuesday, in the month's third row and the
+      // multi-week view's first.
+      const row = name === "MonthView" ? 2 : 0;
+      const laneZero = barTop() as number;
+      const handlers = lastGesture();
+      await act(() => handlers.onStart(point(2, row)));
+      expect(view.getByText("Draft 16 to 17", hidden)).toBeTruthy();
+      expect(view.getByTestId("month-create-ghost", hidden)).toHaveStyle({ top: laneZero });
+      expect(barTop()).toBe(laneZero + 22);
+      await act(() => handlers.onUpdate(point(3, row)));
+      expect(view.getByText("Draft 16 to 18", hidden)).toBeTruthy();
+      expect(view.getByTestId("month-create-ghost", hidden)).toHaveStyle({ top: laneZero });
+      expect(barTop()).toBe(laneZero + 22);
+    },
+  );
+
+  it("puts the preview on lane 0, moving the bars it overlaps down", async () => {
+    // Trip starts on Sunday and Lunch sits under it. The preview takes lane 0 on
+    // Tuesday, so both move down one lane and keep their order.
     const trip = {
       title: "Trip",
       start: new Date(2026, 5, 14),
@@ -97,9 +150,9 @@ describe("native month creation content", () => {
     const handlers = lastGesture();
     await act(() => handlers.onStart(point(2, 2)));
     await act(() => handlers.onUpdate(point(3, 2)));
-    // Lanes start 30pt into the row, 22pt apart: Trip 0, the preview 1, Lunch 2.
-    expect(view.getByTestId("month-create-ghost", hidden)).toHaveStyle({ top: 52 });
-    expect(barTop("Trip")).toBe(30);
+    // Lanes start 30pt into the row, 22pt apart: the preview 0, Trip 1, Lunch 2.
+    expect(view.getByTestId("month-create-ghost", hidden)).toHaveStyle({ top: 30 });
+    expect(barTop("Trip")).toBe(52);
     expect(barTop("Lunch")).toBe(74);
   });
 

@@ -56,9 +56,46 @@ describe(rendererName, () => {
       },
     );
 
-    it("puts the preview on the lane the created event takes, moving bars aside", () => {
-      // Trip starts on Monday and keeps lane 0. Lunch starts with the sweep but is
-      // shorter, so it moves below the preview, as it will once the event exists.
+    it.each([
+      ["MonthView", MonthView, {}],
+      ["MultiWeekView", MultiWeekView, { numberOfWeeks: 2 }],
+    ] as const)(
+      "keeps the preview on lane 0 above a same-day all-day event in %s",
+      (_name, Component, extra) => {
+        // Holiday ties with a one-day sweep on its day. The preview takes lane 0
+        // from the first day and stays there when the sweep reaches the next day.
+        const holiday = {
+          title: "Holiday",
+          start: new Date(2026, 6, 15),
+          end: new Date(2026, 6, 16),
+          allDay: true,
+        };
+        const view = render(Component, {
+          date,
+          events: [holiday],
+          weekStartsOn: 1,
+          onCreateEvent: vi.fn(),
+          renderCreateGhost: Draft,
+          ...extra,
+        });
+        const top = (element: HTMLElement) => Number.parseFloat(element.style.top);
+        const bar = () => view.getByLabelText("Holiday, 15 July");
+        const laneZero = top(bar());
+        down(view.container, "2026-07-15");
+        expect(top(previews(view.container)[0])).toBe(laneZero);
+        const laneOne = top(bar());
+        expect(laneOne).toBeGreaterThan(laneZero);
+        move(view.container, "2026-07-16");
+        expect(previews(view.container).map((el) => el.textContent)).toEqual(["Draft 15 to 17"]);
+        expect(top(previews(view.container)[0])).toBe(laneZero);
+        expect(top(bar())).toBe(laneOne);
+        up();
+      },
+    );
+
+    it("puts the preview on lane 0, moving the bars it overlaps down", () => {
+      // Trip starts on Monday and Lunch sits under it. The preview takes lane 0 on
+      // Wednesday, so both move down one lane and keep their order.
       const trip = {
         title: "Trip",
         start: new Date(2026, 6, 13),
@@ -84,16 +121,15 @@ describe(rendererName, () => {
       down(view.container, "2026-07-15");
       move(view.container, "2026-07-16");
       const [preview] = previews(view.container);
-      expect(top(preview)).toBeGreaterThan(tripTop);
-      expect(top(preview)).toBe(lunchTop);
-      expect(top(bar("Trip, 13 July"))).toBe(tripTop);
-      expect(top(bar("Lunch, 15 July"))).toBeGreaterThan(top(preview));
+      expect(top(preview)).toBe(tripTop);
+      expect(top(bar("Trip, 13 July"))).toBe(lunchTop);
+      expect(top(bar("Lunch, 15 July"))).toBe(lunchTop + (lunchTop - tripTop));
       up();
     });
 
-    it("keeps the preview on lane 0 when its own lane would be hidden", () => {
-      // A, B and C fill lanes 0-2 from Monday; a sweep on Wednesday would land on
-      // lane 3, past the two lanes a cap of three shows beside "+more".
+    it("keeps the preview on lane 0 when the row's lanes overflow", () => {
+      // A, B and C fill lanes 0-2 from Monday, past the two lanes a cap of three
+      // shows beside "+more".
       const allDay = (title: string) => ({
         title,
         start: new Date(2026, 6, 13),
@@ -114,33 +150,6 @@ describe(rendererName, () => {
       const [preview] = previews(view.container);
       expect(top(preview)).toBe(laneZero);
       expect(top(view.getByLabelText("A, 13 July"))).toBeGreaterThan(laneZero);
-      up();
-    });
-
-    it("keeps the preview on the hidden lane a day draws in place of its label", () => {
-      // A and B cover Monday to Thursday, C and D Monday only. A Thursday sweep
-      // lands on lane 2, Thursday's only hidden lane, which Thursday draws.
-      const allDay = (title: string, last: number) => ({
-        title,
-        start: new Date(2026, 6, 13),
-        end: new Date(2026, 6, last + 1),
-        allDay: true,
-      });
-      const view = render(MonthView, {
-        date,
-        events: [allDay("A", 16), allDay("B", 16), allDay("C", 13), allDay("D", 13)],
-        weekStartsOn: 1,
-        maxVisibleEventCount: 3,
-        onCreateEvent: vi.fn(),
-        renderCreateGhost: Draft,
-      });
-      const top = (element: HTMLElement) => Number.parseFloat(element.style.top);
-      const laneZero = top(view.getByLabelText("A, 13 July"));
-      const laneOne = top(view.getByLabelText("B, 13 July"));
-      down(view.container, "2026-07-16");
-      const [preview] = previews(view.container);
-      expect(top(preview)).toBe(laneOne + (laneOne - laneZero));
-      expect(top(view.getByLabelText("A, 13 July"))).toBe(laneZero);
       up();
     });
 
