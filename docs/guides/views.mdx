@@ -113,7 +113,7 @@ fling carry across several pages (still snapping to a boundary), or
 `swipeEnabled={false}` to page only programmatically. `onChangeDate` fires with
 the new anchor date; `onChangeDateRange` (React Native) fires with the
 `[start, end]` of the visible window. On react-native-web the pager follows the left/right arrow
-keys; the dom renderer pages with PageUp/PageDown when `onChangeDate` is wired.
+keys; the React DOM and Solid renderers page with PageUp/PageDown when `onChangeDate` is wired.
 
 The second argument of `onChangeDate` says what moved the calendar, so you can
 treat a swipe differently from keyboard paging or an event drag:
