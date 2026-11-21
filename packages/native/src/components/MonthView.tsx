@@ -77,6 +77,7 @@ import {
   keepMonthDraftVisible,
   withDraftEventDays,
   layoutMonthWeek,
+  type MonthEventSegment,
   type MonthWeekEvents,
   monthCreateRange,
   monthDropBounds,
@@ -136,6 +137,21 @@ function collectRowEvents<T>(
 }
 
 const pct = (n: number): DimensionValue => `${n}%` as DimensionValue;
+
+// React keys for a row's bars, in order. `keyOf` names a bar from its event's
+// content, never its lane or object identity: a move preview can push the
+// carried bar to another lane, and a refetch can replace events with equal
+// copies, and a remount in either case would drop a held web touch drag.
+// Identical bars count up in row order.
+function monthBarKeys<B>(bars: readonly B[], keyOf: (bar: B) => string): string[] {
+  const seen = new Map<string, number>();
+  return bars.map((bar) => {
+    const base = keyOf(bar);
+    const occurrence = seen.get(base) ?? 0;
+    seen.set(base, occurrence + 1);
+    return `${base}#${occurrence}`;
+  });
+}
 
 // An in-progress month drag: either a day span being swept out for a new event,
 // or an existing event being carried to another day.
@@ -723,6 +739,18 @@ function DateRowsInner<T>({
     }
     return map;
   }, [events, sortedMonthView]);
+
+  // A bar's key base: the consumer's key for its event (with the event's index in
+  // `events`, which an equal refetch keeps) and the column it starts in.
+  const eventIndex = useMemo(
+    () => new Map(events.map((event, index) => [event, index] as const)),
+    [events],
+  );
+  const barKeyOf = useCallback(
+    (seg: MonthEventSegment<T>) =>
+      `${keyExtractor(seg.event, eventIndex.get(seg.event) ?? -1)}|${seg.startCol}`,
+    [keyExtractor, eventIndex],
+  );
 
   // Lay out each week row's spanning bars once per data change, not per render.
   const weekLayouts = useMemo(
@@ -1607,6 +1635,10 @@ function DateRowsInner<T>({
                 const draftEnd = draftSegment ? Math.min(draftSegment.endCol, lastVisCol) : -1;
                 const draftTop = barTop + (draftSegment?.lane ?? 0) * cellLaneHeight;
                 const draftHeight = Math.min(laneChipHeight, Math.max(0, rowHeight - draftTop));
+                const bars = monthVisibleBars(rowLayout, visibleLanes, extraLane).filter(
+                  (seg) => seg.event !== draftEvent,
+                );
+                const barKeys = monthBarKeys(bars, barKeyOf);
                 return (
                   <View
                     {...slot("week", {
@@ -1653,57 +1685,55 @@ function DateRowsInner<T>({
                             : { pointerEvents: "box-none" },
                         ]}
                       >
-                        {monthVisibleBars(rowLayout, visibleLanes, extraLane)
-                          .filter((seg) => seg.event !== draftEvent)
-                          .map((seg) => {
-                            const startCol = Math.max(seg.startCol, firstVisCol);
-                            const endCol = Math.min(seg.endCol, lastVisCol);
-                            if (startCol > endCol) return null;
-                            // Fade the bar being carried, so the tinted drop target reads
-                            // as where it is going and this as where it came from.
-                            const isDragged = drag?.kind === "move" && drag.event === seg.event;
-                            return (
-                              <View
-                                key={`bar-${seg.event.start.toISOString()}:${seg.event.title}:${seg.lane}:${seg.startCol}`}
-                                style={[
-                                  {
-                                    position: "absolute",
-                                    left: pct((startCol / cols) * 100),
-                                    width: pct(((endCol - startCol + 1) / cols) * 100),
-                                    top: barTop + seg.lane * cellLaneHeight,
-                                    height: laneChipHeight,
-                                    paddingHorizontal: CHIP_INSET_H,
-                                    // Let a sweep in progress reach the cells underneath.
-                                    opacity: isDragged ? DRAGGED_BAR_OPACITY : 1,
-                                  },
-                                  multiWeek
-                                    ? drag
-                                      ? styles.noPointerEvents
-                                      : styles.childrenOnlyPointerEvents
-                                    : { pointerEvents: drag ? "none" : "box-none" },
-                                ]}
-                              >
-                                <RenderEventComponent
-                                  event={seg.event}
-                                  mode={multiWeek ? "multiweek" : "month"}
-                                  isAllDay={isAllDayEvent(seg.event)}
-                                  onPress={
-                                    disableMonthEventCellPress
-                                      ? () => {}
-                                      : () => {
-                                          if (consumeSuppressedPress()) return;
-                                          onPressEvent(seg.event);
-                                        }
-                                  }
-                                  onLongPress={
-                                    disableMonthEventCellPress || !onLongPressEvent
-                                      ? undefined
-                                      : () => onLongPressEvent(seg.event)
-                                  }
-                                />
-                              </View>
-                            );
-                          })}
+                        {bars.map((seg, index) => {
+                          const startCol = Math.max(seg.startCol, firstVisCol);
+                          const endCol = Math.min(seg.endCol, lastVisCol);
+                          if (startCol > endCol) return null;
+                          // Fade the bar being carried, so the tinted drop target reads
+                          // as where it is going and this as where it came from.
+                          const isDragged = drag?.kind === "move" && drag.event === seg.event;
+                          return (
+                            <View
+                              key={barKeys[index]}
+                              style={[
+                                {
+                                  position: "absolute",
+                                  left: pct((startCol / cols) * 100),
+                                  width: pct(((endCol - startCol + 1) / cols) * 100),
+                                  top: barTop + seg.lane * cellLaneHeight,
+                                  height: laneChipHeight,
+                                  paddingHorizontal: CHIP_INSET_H,
+                                  // Let a sweep in progress reach the cells underneath.
+                                  opacity: isDragged ? DRAGGED_BAR_OPACITY : 1,
+                                },
+                                multiWeek
+                                  ? drag
+                                    ? styles.noPointerEvents
+                                    : styles.childrenOnlyPointerEvents
+                                  : { pointerEvents: drag ? "none" : "box-none" },
+                              ]}
+                            >
+                              <RenderEventComponent
+                                event={seg.event}
+                                mode={multiWeek ? "multiweek" : "month"}
+                                isAllDay={isAllDayEvent(seg.event)}
+                                onPress={
+                                  disableMonthEventCellPress
+                                    ? () => {}
+                                    : () => {
+                                        if (consumeSuppressedPress()) return;
+                                        onPressEvent(seg.event);
+                                      }
+                                }
+                                onLongPress={
+                                  disableMonthEventCellPress || !onLongPressEvent
+                                    ? undefined
+                                    : () => onLongPressEvent(seg.event)
+                                }
+                              />
+                            </View>
+                          );
+                        })}
                         {RenderCreateGhost &&
                         createRange &&
                         draftStart >= 0 &&

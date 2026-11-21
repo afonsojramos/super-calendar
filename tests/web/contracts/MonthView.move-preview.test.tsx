@@ -221,4 +221,40 @@ describe(rendererName, () => {
       release();
     });
   });
+
+  describe.each(["month", "multiweek"])("%s bar identity", (mode) => {
+    const View = mode === "month" ? MonthView : MultiWeekView;
+    const copy = (event: CalendarEvent): CalendarEvent => ({
+      ...event,
+      start: new Date(event.start),
+      end: new Date(event.end),
+    });
+
+    it("keeps a focused chip when events are replaced with equal content", () => {
+      const lunch: CalendarEvent = {
+        title: "Lunch",
+        start: new Date(2026, 6, 15, 12),
+        end: new Date(2026, 6, 15, 13),
+      };
+      const props = { date, weekStartsOn: 1 as const, onDragEvent: vi.fn() };
+      const view = render(View, { ...props, events: [trip, lunch] });
+      const chip = view.getByRole("button", { name: /^Trip,/ });
+      chip.focus();
+      // A refetch returns new objects with the same content.
+      view.rerender({ ...props, events: [copy(trip), copy(lunch)] });
+      expect(view.getByRole("button", { name: /^Trip,/ })).toBe(chip);
+      expect(document.activeElement).toBe(chip);
+    });
+
+    it("keeps identical events apart and in place across a refetch", () => {
+      const props = { date, weekStartsOn: 1 as const, onDragEvent: vi.fn() };
+      const view = render(View, { ...props, events: [trip, copy(trip)] });
+      const before = view.getAllByRole("button", { name: /^Trip,/ });
+      expect(before).toHaveLength(2);
+      before[1].focus();
+      view.rerender({ ...props, events: [copy(trip), copy(trip)] });
+      expect(view.getAllByRole("button", { name: /^Trip,/ })).toEqual(before);
+      expect(document.activeElement).toBe(before[1]);
+    });
+  });
 });
