@@ -47,6 +47,7 @@ Use pnpm or nub, not npm/npx; both install correctly from the shared `pnpm-lock.
 `scripts/` holds dev tooling that runs directly with `node`, using workspace dependencies where needed, with no build step.
 
 - `scripts/build-package-docs.mjs` runs in each package's `build` and converts `docs/*.mdx` into gitignored Markdown in `packages/*/docs`, which ships to npm. Its page lists choose which guides each package gets. It fails on an MDX component it cannot convert, so teach it any new component you add to `docs/`. `tests/tooling/package-docs.test.ts` checks its output.
+- `scripts/device-frames.mjs` splits a device screen recording into the frames where the screen changed, named by time, to measure glitches such as a blank page. It needs `ffmpeg`; read its header for options.
 - `scripts/visual-parity.mjs` (`pnpm parity:visual`) screenshots the dom and native-on-react-native-web renderers side by side, for manual visual parity on shared layout changes. Prop-name parity is enforced separately by `tests/architecture/renderer-parity.test.ts`. Read the script header for setup and overrides.
 
 ## Tests
@@ -79,6 +80,8 @@ For a bug that only shows on a device (a gesture, a scroll, a pixel offset), ask
 - Drive exact gestures with raw motion events: `adb shell "input motionevent DOWN x y; input motionevent MOVE x y; input motionevent CANCEL x y"`. `CANCEL` reproduces a drag a gesture handler steals; `input swipe` and separately timed `input tap` calls cannot land inside a ~100 ms snap animation.
 - Turn the symptom into a number: add a temporary `console.log` (e.g. a pager's resting `contentOffset.x` against its page width, in device pixels via `PixelRatio.get()`) and read it from the Metro output. Remove it before committing.
 
+Before changing `MonthPager` or `TimeGrid` paging, read `packages/native/PAGERS.md`: it lists how React Native and LegendList actually deliver scroll and touch events on each platform. The development build of the native example has **Narrow** and **Keep date** toggles for resize and page-back repros, and `scripts/device-frames.mjs` turns a screen recording into timestamped distinct frames.
+
 ## Documentation
 
 `docs/` is a Mintlify site. Pages are MDX with YAML frontmatter; configuration lives in `docs/docs.json`. Keep docs in sync with each package's `README.md` and the exported types (`packages/native/src/index.tsx`, `packages/core/src/index.ts`).
@@ -101,4 +104,6 @@ Style:
 ## Conventions
 
 - Conventional commits; releases are automated with release-please. Commit only when asked, one line, imperative mood. Never mention Claude or AI in commits or docs.
+- Squash-merge PRs: the squash commit takes the PR title, so the title becomes the changelog entry. A merge commit or rebase merge puts every branch commit in the changelog instead. Title a PR by its most user-visible change: `fix:` or `feat:` for anything a consumer notices, even when most of the diff is tests. `test:`, `chore:`, `ci:`, and `docs:` titles stay out of the release notes.
+- To reword the changelog entry, such as flagging a behaviour change, add a `BEGIN_COMMIT_OVERRIDE` / `END_COMMIT_OVERRIDE` block to the PR body, holding the conventional commit message to use.
 - Never use em-dashes in prose.

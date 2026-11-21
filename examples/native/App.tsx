@@ -204,6 +204,10 @@ export default function App() {
   const [numberOfWeeks, setNumberOfWeeks] = useState(2);
   const [gridSelection, setGridSelection] = useState<DateRange | null>(null);
   const [date, setDate] = useState(() => new Date());
+  // Development-only toggles for reproducing device bugs: resize the calendar, or
+  // keep `date` fixed so the pager has to page back after a swipe.
+  const [narrow, setNarrow] = useState(false);
+  const [keepDate, setKeepDate] = useState(false);
   const [events, setEvents] = useState<CalendarEvent<EventMeta>[]>(buildEvents);
   // Pull-to-refresh on the schedule list and the time grid: rebuild the demo
   // events after a short pause, the way a fetch would.
@@ -423,6 +427,25 @@ export default function App() {
                       </View>
                     </View>
                   ) : null}
+                  {__DEV__ ? (
+                    <View style={styles.navButtons}>
+                      {[
+                        { label: "Narrow", on: narrow, toggle: setNarrow },
+                        { label: "Keep date", on: keepDate, toggle: setKeepDate },
+                      ].map(({ label, on, toggle }) => (
+                        <Pressable
+                          key={label}
+                          style={[styles.todayButton, on && styles.weekSelected]}
+                          role="switch"
+                          aria-label={label}
+                          aria-checked={on}
+                          onPress={() => toggle((value) => !value)}
+                        >
+                          <Text style={styles.todayText}>{label}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : null}
                   {Platform.OS === "web" ? (
                     <Text style={styles.hint}>
                       keys: ← / → or n / p move · t today · d w m x a views
@@ -604,7 +627,7 @@ export default function App() {
                 </EventMenuProvider>
               </View>
             ) : (
-              <View style={styles.card}>
+              <View style={[styles.card, narrow && isGridMode(activeMode) && styles.narrowCard]}>
                 <EventMenuProvider value={menuActions}>
                   <Calendar
                     mode={activeMode}
@@ -635,7 +658,7 @@ export default function App() {
                     renderCreateGhost={
                       activeMode === "month" || activeMode === "multiweek" ? MonthDraft : undefined
                     }
-                    onChangeDate={setDate}
+                    onChangeDate={keepDate && isGridMode(activeMode) ? () => {} : setDate}
                     onDragEvent={(event, start, end) => {
                       // The exam is pinned via `draggable: false` on the event, so it
                       // never reaches here; every other event moves.
@@ -715,6 +738,8 @@ const styles = StyleSheet.create({
     // header and all-day lane); on a device fill the available screen.
     ...Platform.select({ web: { height: 649 }, default: { flex: 1 } }),
   },
+  // A width that is not a whole number of dp on most screens.
+  narrowCard: { width: "73%", alignSelf: "center" },
   // Pill buttons that wrap onto extra rows, matching the dom example's bar.
   tabs: { flexDirection: "row", flexWrap: "wrap", paddingVertical: 8, gap: 8 },
   tab: {
