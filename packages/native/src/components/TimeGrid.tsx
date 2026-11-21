@@ -524,24 +524,15 @@ function AnimatedEventBoxInner<T>({
   // would be rebuilt under the finger, and so torn down mid-drag, the moment a
   // consumer updates `events` (the same reason `commitDrag` reads the event
   // through `latest`). `ownsStart` is false on a segment the layout clipped from
-  // an earlier day, whose 00:00 top edge isn't where the event starts. A segment
-  // that owns the start begins at the event's start and runs to its end or the
-  // next midnight, whichever comes first.
-  const segmentMinutes = ownsStart
-    ? (Math.min(
-        positioned.event.end.getTime(),
-        addDays(startOfDay(positioned.event.start), 1).getTime(),
-      ) -
-        positioned.event.start.getTime()) /
-      60_000
-    : 0;
+  // an earlier day, whose 00:00 top edge isn't where the event starts.
+  const eventMinutes = (positioned.event.end.getTime() - positioned.event.start.getTime()) / 60_000;
   const dragStartSV = useDerivedValue(
     () => ({
       minutes: startHours * MINUTES_PER_HOUR,
-      durationMinutes: segmentMinutes,
+      durationMinutes: eventMinutes,
       ownsStart,
     }),
-    [startHours, segmentMinutes, ownsStart],
+    [startHours, eventMinutes, ownsStart],
   );
   // How far into its day column the box sits, mirrored the same way: an overlap
   // group reflows when the consumer updates `events` mid-drag.

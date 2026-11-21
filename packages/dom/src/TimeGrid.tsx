@@ -1369,6 +1369,7 @@ function TimeGridInner<T = unknown>(
       // midnight-spanning event impossible to drag earlier.
       const o = dragOrigin.current;
       const raw = snap(o.startHours + dHours);
+      const heldEvent = draggedRef.current?.event;
       const requestedHours = d.continuesBefore
         ? raw
         : clampMoveStartMinutes(
@@ -1376,7 +1377,7 @@ function TimeGridInner<T = unknown>(
             windowStart,
             windowEnd,
             snapMinutes,
-            (o.segmentEnd.getTime() - o.segmentStart.getTime()) / 60_000,
+            heldEvent ? (heldEvent.end.getTime() - heldEvent.start.getTime()) / 60_000 : 0,
           ) / 60;
       // Map the horizontal drag to whole day columns, clamped so the in-view box
       // can't leave the visible range (mirrors the native renderer). Once paged,
