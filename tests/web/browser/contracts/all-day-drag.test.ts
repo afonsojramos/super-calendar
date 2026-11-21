@@ -47,12 +47,14 @@ describe(rendererName, () => {
     expect(moved && Math.abs(moved.x - thursday.x)).toBeLessThanOrEqual(3);
   });
 
-  it("clamps a drag past the last visible day", async () => {
+  it("clamps a drag past the first visible day", async () => {
     await open("all-day-drag");
-    const y = await grab("Trip", 1);
-    await page.mouse.move(2000, y, { steps: 6 });
+    // Grab Thursday and travel over the hour gutter, more than three columns left.
+    // The pointer stays inside the viewport, where every engine reports it.
+    const y = await grab("Trip", 3);
+    await page.mouse.move(1, y, { steps: 6 });
     await page.mouse.up();
-    await expect.poll(calls).toBe('["Trip@19:0:0-22:0:0"]');
+    await expect.poll(calls).toBe('["Trip@11:0:0-14:0:0"]');
   });
 
   it("presses the bar on a click with jitter inside the slop", async () => {
