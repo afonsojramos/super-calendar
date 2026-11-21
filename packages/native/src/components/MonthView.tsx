@@ -1770,12 +1770,6 @@ function DateRowsInner<T>({
                               event={movePreview}
                               mode={multiWeek ? "multiweek" : "month"}
                               isAllDay={isAllDayEvent(movePreview)}
-                              continuesBefore={
-                                draftSegment.continuesBefore || draftStart > draftSegment.startCol
-                              }
-                              continuesAfter={
-                                draftSegment.continuesAfter || draftEnd < draftSegment.endCol
-                              }
                               onPress={noop}
                             />
                           </View>
