@@ -390,10 +390,15 @@ type DragState = {
   /** Whether the dragged segment carries on from the previous day / into the next. */
   continuesBefore: boolean;
   continuesAfter: boolean;
-  /** Hours of a move that run past the end of the day, previewed in the next column. */
+  /**
+   * Hours of a move that run past midnight, previewed in the adjacent column: at
+   * the top of the next one, or at the bottom of the previous one when `spillBefore`.
+   */
   spillHours: number;
   /** Column that previews the spill, or -1 when there is none to show. */
   spillDayIndex: number;
+  /** Whether the spill runs before the start of the day rather than past its end. */
+  spillBefore: boolean;
   moved: boolean;
 };
 
@@ -1246,18 +1251,27 @@ export function TimeGrid<T = unknown>(
     const snap = (v: number) => Math.round(v / snapHours()) * snapHours();
     if (d.kind === "move") {
       // Only the start is held inside the window; the end may run past the end of
-      // the day, continuing on the next one (see `clampMoveStartMinutes`). A
-      // segment that continues *before* is skipped: its 00:00 top edge is where the
-      // layout clipped the event, not where the event starts, so holding it there
-      // would make the tail of a midnight-spanning event impossible to drag earlier.
-      const raw = snap(dragOrigin.current.startHours + dHours);
+      // the day, continuing on the next one, and with a window that opens at
+      // midnight the start may run before it, continuing from the previous one
+      // (see `clampMoveStartMinutes`). A segment that continues *before* is
+      // skipped: its 00:00 top edge is where the layout clipped the event, not
+      // where the event starts, so holding it there would make the tail of a
+      // midnight-spanning event impossible to drag earlier.
+      const o = dragOrigin.current;
+      const raw = snap(o.startHours + dHours);
+      const heldEvent = draggedRef.current?.event;
       const requestedHours = d.continuesBefore
         ? raw
-        : clampMoveStartMinutes(raw * 60, windowStart(), windowEnd(), snapMinutes()) / 60;
+        : clampMoveStartMinutes(
+            raw * 60,
+            windowStart(),
+            windowEnd(),
+            snapMinutes(),
+            heldEvent ? (heldEvent.end.getTime() - heldEvent.start.getTime()) / 60_000 : 0,
+          ) / 60;
       // Map the horizontal drag to whole day columns, clamped so the in-view box
       // can't leave the visible range (mirrors the native renderer). Once paged,
       // the drop day comes from the hit-test instead.
-      const o = dragOrigin.current;
       const rawDayDelta = o.dayWidth > 0 ? Math.round((e.clientX - o.pointerX) / o.dayWidth) : 0;
       const targetDay = clamp(o.dayIndex + rawDayDelta, 0, daysRef.current.length - 1);
       const dayDelta = targetDay - o.dayIndex;
@@ -1276,25 +1290,28 @@ export function TimeGrid<T = unknown>(
       );
       const startHours = o.startHours + moved.startHours - dayMinutes / 60;
       const durationHours = moved.hours;
-      // Preview the part that runs past *midnight* at the top of the next column.
-      // Measured against the end of the day, not `windowEnd`: a narrowed window
-      // (say 8–18) leaves plenty of events hanging below the last visible hour
-      // without them reaching the next day at all.
+      // Preview the part that runs past *midnight* at the top of the next column,
+      // or the part before it at the bottom of the previous one. Measured against
+      // the day's edges, not the window: a narrowed window (say 8–18) leaves
+      // plenty of events hanging below the last visible hour without them
+      // reaching the next day at all.
+      const spillBefore = startHours < 0;
       const spillHours = Math.min(
-        Math.max(startHours + durationHours - HOURS_PER_DAY, 0),
+        spillBefore ? -startHours : Math.max(startHours + durationHours - HOURS_PER_DAY, 0),
         windowHours(),
       );
-      const nextDay = daysRef.current[targetDay + 1];
+      const step = spillBefore ? -1 : 1;
+      const adjacentDay = daysRef.current[targetDay + step];
       const spillDayIndex =
         spillHours > 0 &&
-        nextDay &&
-        // Only when that column really is the next calendar day (`hiddenDays` can
-        // break the run), otherwise the spill lands off-view and isn't shown.
-        differenceInCalendarDays(nextDay, daysRef.current[targetDay]) === 1 &&
-        // A segment that already continues after owns a real next-day box; a
+        adjacentDay &&
+        // Only when that column really is the adjacent calendar day (`hiddenDays`
+        // can break the run), otherwise the spill lands off-view and isn't shown.
+        differenceInCalendarDays(adjacentDay, daysRef.current[targetDay]) === step &&
+        // A segment that already continues that way owns a real box there; a
         // preview on top of it would just double up.
-        !d.continuesAfter
-          ? targetDay + 1
+        !(spillBefore ? d.continuesBefore : d.continuesAfter)
+          ? targetDay + step
           : -1;
       applyDrag({
         ...d,
@@ -1305,6 +1322,7 @@ export function TimeGrid<T = unknown>(
         dayOffsetPx: dayDelta * o.dayWidth,
         spillHours,
         spillDayIndex,
+        spillBefore,
         moved: true,
       });
       // Follow the pointer with the floating ghost once the origin column is gone.
@@ -1483,6 +1501,7 @@ export function TimeGrid<T = unknown>(
       dayOffsetPx: 0,
       spillHours: 0,
       spillDayIndex: -1,
+      spillBefore: false,
       moved: false,
     });
     props.onDragStart?.(event);
@@ -1852,11 +1871,14 @@ export function TimeGrid<T = unknown>(
     return bounds ? { ...event, start: bounds.start, end: bounds.end } : event;
   };
 
-  // The tail of an in-progress move that runs past midnight, shown on `dayIndex`
-  // so the drop is visible on both days at once. `drag` and `draggedRef` are set
-  // together in `beginDrag` and cleared together in `finishDrag`, so the guard on
-  // the state keeps the ref read consistent.
-  const spillPreviewFor = (dayIndex: number): SolidRenderEventArgs<T> | null => {
+  // The part of an in-progress move that runs past midnight (its tail, or its
+  // head when moved before the start of the day), shown on `dayIndex` so the drop
+  // is visible on both days at once. `drag` and `draggedRef` are set together in
+  // `beginDrag` and cleared together in `finishDrag`, so the guard on the state
+  // keeps the ref read consistent.
+  const spillPreviewFor = (
+    dayIndex: number,
+  ): (SolidRenderEventArgs<T> & { boxHeight: number }) | null => {
     const currentDrag = drag();
     if (
       paged() ||
@@ -1872,8 +1894,8 @@ export function TimeGrid<T = unknown>(
       mode: props.mode,
       isAllDay: false,
       boxHeight: Math.max(currentDrag.spillHours * hourHeight(), props.minEventHeight),
-      continuesBefore: true,
-      continuesAfter: false,
+      continuesBefore: !currentDrag.spillBefore,
+      continuesAfter: currentDrag.spillBefore,
       ampm: props.ampm,
       onPress: () => {},
     };
@@ -2600,16 +2622,19 @@ export function TimeGrid<T = unknown>(
                             <>
                               {(() => {
                                 if (outside()) return null;
+                                // A drag that runs past either midnight is cut off at the day
+                                // boundary (a move previews the remainder in the adjacent
+                                // column). Applied to resting boxes too, where
+                                // `layoutDayEvents` has already clipped them to the day, so
+                                // the height doesn't jump on commit.
+                                const visibleStart = createMemo(() => Math.max(startHours(), 0));
                                 const top = createMemo(
-                                  () => (startHours() - windowStart()) * hourHeight(),
+                                  () => (visibleStart() - windowStart()) * hourHeight(),
                                 );
-                                // A drag that runs past midnight is cut off at the day boundary
-                                // (a move previews the remainder in the next column). Applied to
-                                // resting boxes too, where `layoutDayEvents` has already clipped
-                                // them to the day, so the height doesn't jump on commit.
                                 const boxHeight = createMemo(() =>
                                   Math.max(
-                                    Math.min(durationHours(), HOURS_PER_DAY - startHours()) *
+                                    (Math.min(startHours() + durationHours(), HOURS_PER_DAY) -
+                                      visibleStart()) *
                                       hourHeight(),
                                     props.minEventHeight,
                                   ),
@@ -2857,11 +2882,15 @@ export function TimeGrid<T = unknown>(
                             {...slot("event", {
                               base: {
                                 position: "absolute",
-                                // Anchored at midnight, which sits `windowStart` hours above
-                                // the top of the grid. With a window that starts after 00:00
-                                // the preview is scrolled out of view, exactly like the
-                                // continuation the drop will commit.
-                                top: -windowStart() * hourHeight(),
+                                // Anchored at midnight: the one opening the day, which sits
+                                // `windowStart` hours above the top of the grid, or the one
+                                // closing it for a head. With a window that doesn't reach
+                                // that midnight the preview is scrolled out of view,
+                                // exactly like the continuation the drop will commit.
+                                top: drag()?.spillBefore
+                                  ? (HOURS_PER_DAY - windowStart()) * hourHeight() -
+                                    spill().boxHeight
+                                  : -windowStart() * hourHeight(),
                                 left: props.eventGap,
                                 right: props.eventGap,
                                 height: spill().boxHeight,

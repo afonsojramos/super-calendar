@@ -134,6 +134,34 @@ describe("clampMoveStartMinutes", () => {
   it("never inverts when the step is wider than the window", () => {
     expect(clampMoveStartMinutes(12 * 60, 9, 10, 120)).toBe(9 * 60);
   });
+
+  it("lets a start run before midnight when the duration is given", () => {
+    // A 3h event moved to 22:00 the day before still ends at 01:00 on this day.
+    expect(clampMoveStartMinutes(-120, 0, 24, 15, 180)).toBe(-120);
+  });
+
+  it("keeps one snap step of the event after midnight", () => {
+    // The end stops at 00:15, mirroring the start stopping at 23:45.
+    expect(clampMoveStartMinutes(-600, 0, 24, 15, 60)).toBe(-45);
+    // A duration off the step grid still lands the start on it, ending at 00:20.
+    expect(clampMoveStartMinutes(-600, 0, 24, 15, 50)).toBe(-30);
+  });
+
+  it("holds an event no longer than one step at midnight", () => {
+    expect(clampMoveStartMinutes(-60, 0, 24, 15, 15)).toBe(0);
+    expect(clampMoveStartMinutes(-60, 0, 24, 15, 0)).toBe(0);
+    // Less than two steps long: no whole step fits before midnight.
+    expect(clampMoveStartMinutes(-60, 0, 24, 15, 20)).toBe(0);
+  });
+
+  it("holds the start at a window that opens after midnight", () => {
+    expect(clampMoveStartMinutes(-120, 8, 18, 15, 600)).toBe(8 * 60);
+    expect(clampMoveStartMinutes(7 * 60, 8, 18, 15, 120)).toBe(8 * 60);
+  });
+
+  it("keeps the downward limit when the duration is given", () => {
+    expect(clampMoveStartMinutes(26 * 60, 0, 24, 15, 240)).toBe(24 * 60 - 15);
+  });
 });
 
 describe("shiftMinutes", () => {

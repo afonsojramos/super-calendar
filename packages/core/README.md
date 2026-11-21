@@ -57,12 +57,20 @@ const range = useDateRange({ minDate: new Date() });
 
 For a custom time-grid drag, `clampMoveStartMinutes` keeps the moved event's
 start inside the visible hour window while allowing its unchanged duration to
-carry the end past midnight:
+carry the end past midnight. Pass the duration in minutes to also let the start
+run before midnight when `minHour` is 0, keeping one snap step of the event after
+midnight:
 
 ```ts
 import { clampMoveStartMinutes } from "@super-calendar/core";
 
-const startMinutes = clampMoveStartMinutes(rawStartMinutes, minHour, maxHour, snapMinutes);
+const startMinutes = clampMoveStartMinutes(
+  rawStartMinutes,
+  minHour,
+  maxHour,
+  snapMinutes,
+  durationMinutes,
+);
 ```
 
 To position your own marks on a time grid, `wallClockHours(date, dayStart, nextDayStart)`
