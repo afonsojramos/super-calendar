@@ -792,7 +792,7 @@ export function DateRows<T = unknown>({
       if (rendered(selectedRange?.start)) return startOfDay(selectedRange.start);
       const picked = selectedDates?.find(rendered);
       if (picked) return startOfDay(picked);
-      const today = new Date();
+      const today = nowInTimeZone(now, timeZone);
       if (rendered(today)) return startOfDay(today);
       return focusableDays[0] ?? null;
     }
@@ -800,9 +800,9 @@ export function DateRows<T = unknown>({
     if (inMonth(selectedRange?.start)) return startOfDay(selectedRange!.start);
     const picked = selectedDates?.find(inMonth);
     if (picked) return startOfDay(picked);
-    const today = new Date();
+    const today = nowInTimeZone(now, timeZone);
     return isSameMonth(today, date) ? startOfDay(today) : startOfMonth(date);
-  }, [focusableDays, focusableKeys, date, selectedRange, selectedDates]);
+  }, [focusableDays, focusableKeys, date, selectedRange, selectedDates, now, timeZone]);
 
   const [focusedDate, setFocusedDate] = useState(initialFocus);
   const initialFocusRef = useRef(initialFocus);
