@@ -92,9 +92,6 @@ const CHIP_GAP = 2;
 const CELL_PAD = 4;
 // Opacity of an event chip while it is being dragged to another day.
 const DRAGGED_CHIP_OPACITY = 0.4;
-// Opacity of the preview of a moved event at its destination, matching the
-// time grid's move preview.
-const MOVE_PREVIEW_OPACITY = 0.85;
 const noop = () => {};
 // How far a press travels before it becomes a drag. Until then the chips stay
 // hit-testable, so a click still reaches the chip it pressed.
@@ -1778,7 +1775,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                             </div>
                                           </Show>
                                           {/* Where a moved event lands: its chip at the destination,
-                                           in a lane among the row's bars, beside the faded original. */}
+                                           on the top lane, beside the faded original. */}
                                           <Show
                                             when={
                                               movePreview() &&
@@ -1798,7 +1795,6 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                 height: draftHeight(),
                                                 overflow: "hidden",
                                                 pointerEvents: "none",
-                                                opacity: MOVE_PREVIEW_OPACITY,
                                                 zIndex: 3,
                                               })}
                                             >
@@ -1831,6 +1827,30 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                   {movePreview()!.title}
                                                 </span>
                                               )}
+                                              {/* The default chip's background is the drop tint's colour,
+                                               so an outline drawn over the chip marks the preview. */}
+                                              <span
+                                                style={css({
+                                                  position: "absolute",
+                                                  inset: 0,
+                                                  boxSizing: "border-box",
+                                                  border: `1px solid ${theme().selectedBackground}`,
+                                                  borderRadius: 4,
+                                                  pointerEvents: "none",
+                                                  ...(draftSpan()!.continuesBefore
+                                                    ? {
+                                                        borderTopLeftRadius: 0,
+                                                        borderBottomLeftRadius: 0,
+                                                      }
+                                                    : null),
+                                                  ...(draftSpan()!.continuesAfter
+                                                    ? {
+                                                        borderTopRightRadius: 0,
+                                                        borderBottomRightRadius: 0,
+                                                      }
+                                                    : null),
+                                                })}
+                                              />
                                             </div>
                                           </Show>
                                           {

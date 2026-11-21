@@ -51,11 +51,27 @@ describe(rendererName, () => {
         expect(preview.textContent).toBe("Trip");
         expect(preview.style.pointerEvents).toBe("none");
         expect(preview.getAttribute("aria-hidden")).toBe("true");
-        expect(Number(preview.style.opacity)).toBeLessThan(1);
+        // The chip's own background matches the drop tint in the default theme,
+        // so the preview stays opaque and is outlined in the selection colour.
+        expect(preview.style.opacity).toBe("");
+        const outline = preview.lastElementChild as HTMLElement;
+        expect(outline.style.borderColor).toBe("rgb(31, 111, 235)"); // theme.selectedBackground
+        expect(outline.style.pointerEvents).toBe("none");
       }
-      // The default chip squares the ends where the preview continues.
-      const firstChip = first.firstElementChild as HTMLElement;
-      const secondChip = second.firstElementChild as HTMLElement;
+      // The default chip and its outline square the ends where the preview continues.
+      const [firstChip, firstOutline] = [...first.children] as HTMLElement[];
+      const [secondChip, secondOutline] = [...second.children] as HTMLElement[];
+      for (const [chipPart, outlinePart] of [
+        [firstChip, firstOutline],
+        [secondChip, secondOutline],
+      ]) {
+        expect(squared(outlinePart.style.borderTopLeftRadius)).toBe(
+          squared(chipPart.style.borderTopLeftRadius),
+        );
+        expect(squared(outlinePart.style.borderTopRightRadius)).toBe(
+          squared(chipPart.style.borderTopRightRadius),
+        );
+      }
       expect(squared(firstChip.style.borderTopRightRadius)).toBe(true);
       expect(squared(firstChip.style.borderTopLeftRadius)).toBe(false);
       expect(squared(secondChip.style.borderTopLeftRadius)).toBe(true);
@@ -101,6 +117,41 @@ describe(rendererName, () => {
       expect(dropDays(view.container)).toEqual([]);
       release();
       expect(onDragEvent).not.toHaveBeenCalled();
+    });
+
+    it("pushes down only the bars the preview overlaps when the row has no lane to spare", () => {
+      // One lane per row: Lisbon trip and Weekend share lane 0. The preview of
+      // Weekend on Sunday overlaps only Weekend, so Lisbon trip keeps its lane.
+      const lisbon: CalendarEvent = {
+        title: "Lisbon trip",
+        start: new Date(2026, 6, 13),
+        end: new Date(2026, 6, 16),
+        allDay: true,
+      };
+      const weekend: CalendarEvent = {
+        title: "Weekend",
+        start: new Date(2026, 6, 17),
+        end: new Date(2026, 6, 20),
+        allDay: true,
+      };
+      const view = render(View, {
+        date,
+        weekStartsOn: 1,
+        events: [lisbon, weekend],
+        maxVisibleEventCount: 1,
+        onDragEvent: vi.fn(),
+      });
+      const laneZero = top(view.getByRole("button", { name: /^Lisbon trip,/ }));
+      press(view.getByRole("button", { name: /^Weekend,/ }));
+      enter(cell(view.container, "2026-07-19"));
+      const [preview] = previews(view.container);
+      expect(preview.closest("[data-day]")).toBe(cell(view.container, "2026-07-19"));
+      expect(top(preview)).toBe(laneZero);
+      expect(top(view.getByRole("button", { name: /^Lisbon trip,/ }))).toBe(laneZero);
+      for (const day of ["2026-07-13", "2026-07-14", "2026-07-15"]) {
+        expect(cell(view.container, day).querySelector('[data-slot="more"]')).toBeNull();
+      }
+      release();
     });
 
     it("keeps the carried bar and its focus when the preview moves it to another lane", () => {

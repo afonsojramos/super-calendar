@@ -91,9 +91,6 @@ const CHIP_GAP = 2;
 const CELL_PAD = 4;
 // Opacity of an event chip while it is being dragged to another day.
 const DRAGGED_CHIP_OPACITY = 0.4;
-// Opacity of the preview of a moved event at its destination, matching the
-// time grid's move preview.
-const MOVE_PREVIEW_OPACITY = 0.85;
 // How far a press travels before it becomes a drag. Until then the chips stay
 // hit-testable, so a click still reaches the chip it pressed.
 const DRAG_SLOP_PX = 4;
@@ -1348,12 +1345,19 @@ export function DateRows<T = unknown>({
           const draftTop =
             CELL_PAD + DATE_ROW + chipGap + (draftSegment?.lane ?? 0) * (chipHeight + chipGap);
           const draftHeight = Math.min(chipHeight, Math.max(0, eventRowHeight - draftTop));
+          // The preview's squared corners where it continues past this row's
+          // visible columns, like a bar's.
           const previewSegment =
             movePreview && draftSegment && draftStart <= draftEnd
               ? {
-                  continuesBefore:
-                    draftSegment.continuesBefore || draftStart > draftSegment.startCol,
-                  continuesAfter: draftSegment.continuesAfter || draftEnd < draftSegment.endCol,
+                  corners: {
+                    ...(draftSegment.continuesBefore || draftStart > draftSegment.startCol
+                      ? { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }
+                      : null),
+                    ...(draftSegment.continuesAfter || draftEnd < draftSegment.endCol
+                      ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 }
+                      : null),
+                  },
                 }
               : null;
           const barChipButton = slot("chipButton", chipButtonDefault);
@@ -1633,8 +1637,8 @@ export function DateRows<T = unknown>({
                           <RenderCreateGhost start={createRange.start} end={createRange.end} />
                         </InertDiv>
                       ) : null}
-                      {/* Where a moved event lands: its chip at the destination, in
-                          a lane among the row's bars, beside the faded original. */}
+                      {/* Where a moved event lands: its chip at the destination, on
+                          the top lane, beside the faded original. */}
                       {movePreview && previewSegment && draftStart === dayCol && draftHeight > 0 ? (
                         <InertDiv
                           {...dataState({ "data-dragging": true })}
@@ -1648,7 +1652,6 @@ export function DateRows<T = unknown>({
                             height: draftHeight,
                             overflow: "hidden",
                             pointerEvents: "none",
-                            opacity: MOVE_PREVIEW_OPACITY,
                             zIndex: 3,
                           }}
                         >
@@ -1657,19 +1660,24 @@ export function DateRows<T = unknown>({
                           ) : (
                             <span
                               {...barChip}
-                              style={{
-                                ...barChip.style,
-                                ...(previewSegment.continuesBefore
-                                  ? { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }
-                                  : null),
-                                ...(previewSegment.continuesAfter
-                                  ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 }
-                                  : null),
-                              }}
+                              style={{ ...barChip.style, ...previewSegment.corners }}
                             >
                               {movePreview.title}
                             </span>
                           )}
+                          {/* The default chip's background is the drop tint's colour,
+                              so an outline drawn over the chip marks the preview. */}
+                          <span
+                            style={{
+                              position: "absolute",
+                              inset: 0,
+                              boxSizing: "border-box",
+                              border: `1px solid ${theme.selectedBackground}`,
+                              borderRadius: 4,
+                              pointerEvents: "none",
+                              ...previewSegment.corners,
+                            }}
+                          />
                         </InertDiv>
                       ) : null}
                       <div
