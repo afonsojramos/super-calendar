@@ -116,6 +116,7 @@ import {
   useSlots,
 } from "../utils/slots";
 import { useWebGridZoom } from "../utils/useWebGridZoom";
+import { PAGER_HELD_DRAG_MS } from "../utils/pagerTiming";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { withEventAccessibilityLabel } from "../utils/withEventAccessibilityLabel";
 import { CalendarLabelsContext, useCalendarLabels } from "../utils/labels";
@@ -149,9 +150,6 @@ const PAGE_VIEWABILITY = { itemVisiblePercentThreshold: 90 };
 // How long the Android pager must go without a scroll event before an off-page
 // rest is snapped back onto a page.
 const PAGER_IDLE_MS = 150;
-// The same wait after a drag that never reported its end, which may still be
-// held by a finger.
-const PAGER_HELD_DRAG_MS = 1000;
 
 // Matches the dom renderer's default so both grids start at the same density.
 /** Default height in pixels of one hour row on the time grid. */
@@ -3211,6 +3209,8 @@ function TimeGridInner<T>(
     activeIndexShared.value = activeIndex;
   }, [activeIndex, activeIndexShared]);
   const viewedIndexRef = useRef(activeIndex);
+  const activeIndexRef = useRef(activeIndex);
+  activeIndexRef.current = activeIndex;
   // While a programmatic scroll (a "today" button, prev/next, or any date set from
   // outside) is settling, this holds its target index. Viewability ticks for the
   // intermediate pages it crosses are ignored until it lands, so they can't report
@@ -3531,11 +3531,14 @@ function TimeGridInner<T>(
     (offsetX: number) => {
       pagerDraggingRef.current = false;
       // A page-back held for a drag that never reported its end (a parent view took
-      // the touch): run it now instead of snapping to the page the app refused.
+      // the touch, or the finger is still): run it now instead of snapping to the
+      // page the app refused. If the app has since accepted the page, snap as usual.
       if (pageBackHeldRef.current) {
         pageBackHeldRef.current = false;
-        startTransition(() => setDateReports((count) => count + 1));
-        return;
+        if (activeIndexRef.current !== viewedIndexRef.current) {
+          startTransition(() => setDateReports((count) => count + 1));
+          return;
+        }
       }
       if (columnsWidth <= 0) return;
       const pages = offsetX / columnsWidth;

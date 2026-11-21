@@ -62,6 +62,7 @@ import {
   type CalendarLabels,
 } from "@super-calendar/core";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
+import { PAGER_HELD_DRAG_MS } from "../utils/pagerTiming";
 import { useReduceMotion } from "../utils/useReduceMotion";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
 import { DateRows, type DateRowsSource, type MonthViewSlot } from "./MonthView";
@@ -329,6 +330,10 @@ function DateRowsPagerInner<T>({
   const pagerDraggingRef = useRef(false);
   // Set when a page-back waits for a finger to lift, so the drag end re-runs it.
   const pageBackHeldRef = useRef(false);
+  // When the pager last scrolled, and the Android timer that releases a held
+  // page-back once the pager has gone quiet (see `PAGER_HELD_DRAG_MS`).
+  const lastPagerScrollAtRef = useRef(0);
+  const heldReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleViewableItemsChanged = useCallback(
     (info: OnViewableItemsChangedInfo<Date>) => {
@@ -368,6 +373,30 @@ function DateRowsPagerInner<T>({
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
   }, [activeIndex]);
 
+  // Android: a parent view that takes the touch mid-drag ends it without a drag
+  // end or any touch event, so release a held page-back once the pager has gone
+  // `PAGER_HELD_DRAG_MS` without a scroll event.
+  const armHeldRelease = useCallback((delay: number) => {
+    heldReleaseTimerRef.current = setTimeout(() => {
+      const remaining = lastPagerScrollAtRef.current + PAGER_HELD_DRAG_MS - Date.now();
+      if (remaining > 0) {
+        armHeldRelease(remaining);
+        return;
+      }
+      heldReleaseTimerRef.current = null;
+      pagerDraggingRef.current = false;
+      if (!pageBackHeldRef.current) return;
+      pageBackHeldRef.current = false;
+      startTransition(() => setSwipeReports((count) => count + 1));
+    }, delay);
+  }, []);
+  useEffect(
+    () => () => {
+      if (heldReleaseTimerRef.current) clearTimeout(heldReleaseTimerRef.current);
+    },
+    [],
+  );
+
   // `date` is controlled: when the app keeps the old date after a swipe, page back
   // to the month it still shows instead of leaving the list on the swiped one.
   const reduceMotion = useReduceMotion();
@@ -377,12 +406,14 @@ function DateRowsPagerInner<T>({
     if (swipeReports === 0 || activeIndex === viewedIndexRef.current) return;
     if (pagerDraggingRef.current) {
       pageBackHeldRef.current = true;
+      if (Platform.OS === "android" && !heldReleaseTimerRef.current)
+        armHeldRelease(PAGER_HELD_DRAG_MS);
       return;
     }
     viewedIndexRef.current = activeIndex;
     pendingScrollIndexRef.current = activeIndex;
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: !reduceMotion });
-  }, [swipeReports, activeIndex, reduceMotion]);
+  }, [swipeReports, activeIndex, reduceMotion, armHeldRelease]);
 
   // A user drag takes the pager over from any programmatic scroll still settling
   // (a page-back, a jump to an outside date), so the pages it lands on are reported.
@@ -392,9 +423,14 @@ function DateRowsPagerInner<T>({
   }, []);
   const handlePagerDragEnd = useCallback(() => {
     pagerDraggingRef.current = false;
+    if (heldReleaseTimerRef.current) clearTimeout(heldReleaseTimerRef.current);
+    heldReleaseTimerRef.current = null;
     if (!pageBackHeldRef.current) return;
     pageBackHeldRef.current = false;
     startTransition(() => setSwipeReports((count) => count + 1));
+  }, []);
+  const handlePagerScroll = useCallback(() => {
+    lastPagerScrollAtRef.current = Date.now();
   }, []);
 
   // A new container width resizes every page (see `listExtraData`), but the
@@ -666,8 +702,7 @@ function DateRowsPagerInner<T>({
                   snapToIndices: freeSwipe ? snapToIndices : undefined,
                   onScrollBeginDrag: handlePagerDragStart,
                   onScrollEndDrag: handlePagerDragEnd,
-                  // A parent view that takes the touch cancels the drag without a drag end.
-                  onTouchCancel: handlePagerDragEnd,
+                  ...(Platform.OS === "android" ? { onScroll: handlePagerScroll } : null),
                 })}
             initialScrollIndex={activeIndex}
             showsHorizontalScrollIndicator={false}

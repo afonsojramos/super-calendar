@@ -1656,6 +1656,41 @@ describe("TimeGrid pager resting off a page", () => {
     expect(calls().at(-1)).toEqual({ index: initialScrollIndex, animated: true });
   });
 
+  it("still snaps a held drag that came back to the kept page", async () => {
+    await render(
+      <TimeGrid
+        mode="day"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    const pager = list() as PagerList & {
+      data: Date[];
+      onViewableItemsChanged: (info: unknown) => void;
+    };
+    const { getFixedItemSize, initialScrollIndex } = pager;
+    const report = (index: number) =>
+      act(() =>
+        pager.onViewableItemsChanged({
+          viewableItems: [{ isViewable: true, index, item: pager.data[index] }],
+        }),
+      );
+    await act(() => pager.onScrollBeginDrag());
+    // The finger reaches the next day (refused, so a page-back is held), then
+    // drags back, and a parent view takes the touch just off the kept day.
+    await report(initialScrollIndex + 1);
+    await report(initialScrollIndex);
+    await scrollTo((initialScrollIndex + 0.1) * getFixedItemSize());
+    await wait(1250);
+    expect(calls().at(-1)).toEqual({ index: initialScrollIndex, animated: true });
+  });
+
   it("uses the short wait again once the drag ends", async () => {
     await renderPager();
     const { getFixedItemSize, initialScrollIndex } = list();

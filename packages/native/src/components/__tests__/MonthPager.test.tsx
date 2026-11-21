@@ -1,7 +1,7 @@
 import { startTransition, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { vi } from "vitest";
 import { act, fireEvent, render } from "@testing-library/react-native";
-import { Text } from "react-native";
+import { Platform, Text } from "react-native";
 import * as gestureHandlerMock from "react-native-gesture-handler";
 import type { CreateGhostArgs } from "@super-calendar/core";
 import type { CalendarEvent } from "../../types";
@@ -372,25 +372,38 @@ describe("MonthPager controlled swipes", () => {
     expect(scrollToIndex).toHaveBeenLastCalledWith({ index: activeIndex, animated: true });
   });
 
-  it("pages back when a parent view cancels the drag", async () => {
-    const scrollToIndex = vi.fn();
-    (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex = scrollToIndex;
-    await render(
-      <Calendar
-        mode="month"
-        date={new Date(2026, 10, 6)}
-        events={[]}
-        onChangeDate={noop}
-        onPressEvent={noop}
-      />,
-    );
-    const activeIndex = lastListProps()?.initialScrollIndex as number;
-    type Touch = { onScrollBeginDrag: () => void; onTouchCancel: () => void };
-    await act(() => (lastListProps() as Touch).onScrollBeginDrag());
-    await swipeTo(activeIndex + 1);
-    // No drag end arrives for a cancelled gesture, only the touch cancel.
-    await act(() => (lastListProps() as Touch).onTouchCancel());
-    expect(scrollToIndex).toHaveBeenLastCalledWith({ index: activeIndex, animated: true });
+  it("pages back on Android once a drag with no end has gone quiet", async () => {
+    const os = Platform.OS;
+    Platform.OS = "android";
+    vi.useFakeTimers();
+    try {
+      const scrollToIndex = vi.fn();
+      (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex = scrollToIndex;
+      await render(
+        <Calendar
+          mode="month"
+          date={new Date(2026, 10, 6)}
+          events={[]}
+          onChangeDate={noop}
+          onPressEvent={noop}
+        />,
+      );
+      const activeIndex = lastListProps()?.initialScrollIndex as number;
+      type Pager = { onScrollBeginDrag: () => void; onScroll: () => void };
+      await act(() => (lastListProps() as Pager).onScrollBeginDrag());
+      await swipeTo(activeIndex + 1);
+      // A parent view takes the touch: Android sends no drag end and no touch event.
+      await act(() => vi.advanceTimersByTime(600));
+      // Scrolling keeps the drag alive.
+      await act(() => (lastListProps() as Pager).onScroll());
+      await act(() => vi.advanceTimersByTime(600));
+      expect(scrollToIndex).not.toHaveBeenCalled();
+      await act(() => vi.advanceTimersByTime(500));
+      expect(scrollToIndex).toHaveBeenLastCalledWith({ index: activeIndex, animated: true });
+    } finally {
+      vi.useRealTimers();
+      Platform.OS = os;
+    }
   });
 
   it("does not page back when the app accepts the date in a transition", async () => {
