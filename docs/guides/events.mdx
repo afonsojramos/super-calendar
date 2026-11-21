@@ -53,6 +53,13 @@ Multi-day events remain visible on each occupied day in month and multi-week
 grids, including when a local clock change skips midnight. An event ending at
 the start of a day does not occupy that day.
 
+While you drag an event to another day in month and multi-week grids, your month
+event renderer also draws a preview of it across the days it would cover. The
+preview receives a copy of the event with the `start` and `end` the drop would
+commit, so a chip that shows dates or times shows the destination. It ignores
+pointer input and is hidden from assistive technology. See
+[Drag to reschedule](/guides/dragging#drag-to-reschedule).
+
 ## Keep event data stable
 
 Keep the `events` array and its event objects stable while only UI state changes,

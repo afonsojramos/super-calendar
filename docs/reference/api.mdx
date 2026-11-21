@@ -96,22 +96,22 @@ The delay is in milliseconds (default 300), and the threshold is in pixels
 Additional contacts cancel pending holds and cannot take over an active drag.
 See [DOM held presses](/guides/dragging#dom-held-presses).
 
-| Prop                    | Type                                     | Notes                                                                                      |
-| ----------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `onDragEvent`           | `(event, start, end) => void \| boolean` | Enable move/resize; return `false` to reject. Month and all-day lane: drop on another day. |
-| `onDragStart`           | `(event) => void`                        | Fires on grab (e.g. haptics).                                                              |
-| `onCreateEvent`         | `(start, end) => void`                   | Drag empty space to create. Month and year: an all-day span.                               |
-| `renderCreateGhost`     | `ComponentType<CreateGhostArgs>`         | Time grid: draw content in the create preview from its live `start`/`end`.                 |
-| `onSelectDrag`          | `(start, end) => void`                   | Month and year: drag to sweep a date range; fires live.                                    |
-| `dragStepMinutes`       | `number`                                 | Snap step (default 15).                                                                    |
-| `showDragHandle`        | `boolean`                                | Show the resize grip (default true).                                                       |
-| `eventStartEditable`    | `boolean`                                | Grid-wide: allow moving events (default true). Per-event `startEditable`.                  |
-| `eventDurationEditable` | `boolean`                                | Grid-wide: allow resizing events (default true). Per-event `durationEditable`.             |
-| `eventOverlap`          | `boolean`                                | When false, reject a drag/resize that would overlap another event (default true).          |
-| `onPressEvent`          | `(event) => void`                        | Tap an event.                                                                              |
-| `onPressCell`           | `(date) => void`                         | Tap empty grid space. Month: the tapped day at midnight.                                   |
-| `onPressDay`            | `(date) => void`                         | Tap a month day cell.                                                                      |
-| `onPressMore`           | `(events, date) => void`                 | Tap the `+N more` overflow.                                                                |
+| Prop                    | Type                                     | Notes                                                                                                               |
+| ----------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `onDragEvent`           | `(event, start, end) => void \| boolean` | Enable move/resize; return `false` to reject. Month and all-day lane: drop on another day. Month previews the drop. |
+| `onDragStart`           | `(event) => void`                        | Fires on grab (e.g. haptics).                                                                                       |
+| `onCreateEvent`         | `(start, end) => void`                   | Drag empty space to create. Month and year: an all-day span.                                                        |
+| `renderCreateGhost`     | `ComponentType<CreateGhostArgs>`         | Time grid: draw content in the create preview from its live `start`/`end`.                                          |
+| `onSelectDrag`          | `(start, end) => void`                   | Month and year: drag to sweep a date range; fires live.                                                             |
+| `dragStepMinutes`       | `number`                                 | Snap step (default 15).                                                                                             |
+| `showDragHandle`        | `boolean`                                | Show the resize grip (default true).                                                                                |
+| `eventStartEditable`    | `boolean`                                | Grid-wide: allow moving events (default true). Per-event `startEditable`.                                           |
+| `eventDurationEditable` | `boolean`                                | Grid-wide: allow resizing events (default true). Per-event `durationEditable`.                                      |
+| `eventOverlap`          | `boolean`                                | When false, reject a drag/resize that would overlap another event (default true).                                   |
+| `onPressEvent`          | `(event) => void`                        | Tap an event.                                                                                                       |
+| `onPressCell`           | `(date) => void`                         | Tap empty grid space. Month: the tapped day at midnight.                                                            |
+| `onPressDay`            | `(date) => void`                         | Tap a month day cell.                                                                                               |
+| `onPressMore`           | `(events, date) => void`                 | Tap the `+N more` overflow.                                                                                         |
 
 On the time grid, dragging any segment of a multi-day event moves its whole range.
 All visible segments preview the move together on both renderers. Moving preserves
