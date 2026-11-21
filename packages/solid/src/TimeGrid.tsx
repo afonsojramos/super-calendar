@@ -1132,10 +1132,12 @@ export function TimeGrid<T = unknown>(
     return true;
   };
   const canMoveAllDay = (event: CalendarEvent<T>) => !event.disabled && editability(event).canMove;
-  // Whether `event` is the bar being carried. A refresh can replace the event
-  // object mid-drag, so it matches by `getEventId`, or by its dates and title.
-  const isCarried = (drag: AllDayDrag<T>, event: CalendarEvent<T>) =>
-    event === drag.event || isSameAllDayBar(event, drag.event, props.getEventId);
+  // The lane segment of the bar being carried. A refresh can replace the event
+  // object mid-drag, so a missing original falls back to `getEventId`, or to its
+  // dates and title.
+  const carriedSegment = (drag: AllDayDrag<T>, segments: readonly AllDaySegment[]) =>
+    segments.find((s) => s.event === drag.event) ??
+    segments.find((s) => isSameAllDayBar(s.event, drag.event, props.getEventId));
 
   const beginAllDayDrag = (
     grab: EventGrab,
@@ -1196,8 +1198,10 @@ export function TimeGrid<T = unknown>(
       // Report the event as it is now, so `eventOverlap` does not count the
       // carried event's own refreshed copy as another event.
       const event =
-        untrack(() => allDaySpans()).find((s) => isCarried(current, s.event))?.event ??
-        current.event;
+        carriedSegment(
+          current,
+          untrack(() => allDaySpans()),
+        )?.event ?? current.event;
       const visible = daysRef.current;
       const next = monthDropBounds(event, visible[current.fromCol], visible[current.toCol]);
       if (next) onDragEventRef.current?.(event, next.start, next.end);
@@ -1303,6 +1307,11 @@ export function TimeGrid<T = unknown>(
       }),
   );
 
+  const carriedBar = createMemo(() => {
+    const current = allDayDrag();
+    return current?.armed ? carriedSegment(current, allDaySpans()) : undefined;
+  });
+
   // Where the carried bar would land: the moved event clipped to the visible days,
   // in the lane it is carried from. Drawn only once it leaves its own column.
   const allDayPreview = createMemo(() => {
@@ -1310,7 +1319,7 @@ export function TimeGrid<T = unknown>(
     if (!current?.armed || current.toCol === current.fromCol) return null;
     const visible = days();
     const next = monthDropBounds(current.event, visible[current.fromCol], visible[current.toCol]);
-    const lane = allDaySpans().find((s) => isCarried(current, s.event))?.lane;
+    const lane = carriedBar()?.lane;
     if (!next || lane === undefined) return null;
     const moved: CalendarEvent<T> = { ...current.event, start: next.start, end: next.end };
     const segment = layoutMonthWeek<T>(visible, [moved]).segments[0];
@@ -2486,10 +2495,7 @@ export function TimeGrid<T = unknown>(
                   onPress: () => props.onPressEvent?.(segment().event),
                 }));
                 const movable = createMemo(() => canMoveAllDay(segment().event));
-                const carried = createMemo(() => {
-                  const current = allDayDrag();
-                  return current?.armed === true && isCarried(current, segment().event);
-                });
+                const carried = createMemo(() => carriedBar()?.event === segment().event);
                 return (
                   <div
                     {...slot("allDayColumn", {

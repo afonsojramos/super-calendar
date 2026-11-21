@@ -57,6 +57,7 @@ import {
   layoutDayEvents,
   layoutMonthWeek,
   monthDropBounds,
+  type MonthEventSegment,
   overlapsOtherEvents,
   type PositionedEvent,
   useNow,
@@ -1006,10 +1007,12 @@ function TimeGridInner<T = unknown>(
     return true;
   };
   const canMoveAllDay = (event: CalendarEvent<T>) => !event.disabled && editability(event).canMove;
-  // Whether `event` is the bar being carried. A refresh can replace the event
-  // object mid-drag, so it matches by `getEventId`, or by its dates and title.
-  const isCarried = (drag: AllDayDrag<T>, event: CalendarEvent<T>) =>
-    event === drag.event || isSameAllDayBar(event, drag.event, getEventId);
+  // The lane segment of the bar being carried. A refresh can replace the event
+  // object mid-drag, so a missing original falls back to `getEventId`, or to its
+  // dates and title.
+  const carriedSegment = (drag: AllDayDrag<T>, segments: readonly MonthEventSegment<T>[]) =>
+    segments.find((s) => s.event === drag.event) ??
+    segments.find((s) => isSameAllDayBar(s.event, drag.event, getEventId));
   const allDaySegmentsRef = useRef(allDayLayout.segments);
   allDaySegmentsRef.current = allDayLayout.segments;
 
@@ -1071,8 +1074,7 @@ function TimeGridInner<T = unknown>(
       suppressAllDayClick.current = true;
       // Report the event as it is now, so `eventOverlap` does not count the
       // carried event's own refreshed copy as another event.
-      const event =
-        allDaySegmentsRef.current.find((s) => isCarried(current, s.event))?.event ?? current.event;
+      const event = carriedSegment(current, allDaySegmentsRef.current)?.event ?? current.event;
       const visible = daysRef.current;
       const next = monthDropBounds(event, visible[current.fromCol], visible[current.toCol]);
       if (next) onDragEventRef.current?.(event, next.start, next.end);
@@ -1167,6 +1169,12 @@ function TimeGridInner<T = unknown>(
     stopAllDayRef.current?.();
   }, [visibleDaysKey]);
 
+  const carriedBar = allDayDrag?.armed
+    ? carriedSegment(allDayDrag, allDayLayout.segments)
+    : undefined;
+  const carriedEvent = carriedBar?.event;
+  const carriedLane = carriedBar?.lane;
+
   // Where the carried bar would land: the moved event clipped to the visible days,
   // in the lane it is carried from. Drawn only once it leaves its own column.
   const allDayPreview = useMemo(() => {
@@ -1176,12 +1184,11 @@ function TimeGridInner<T = unknown>(
       days[allDayDrag.fromCol],
       days[allDayDrag.toCol],
     );
-    const lane = allDayLayout.segments.find((s) => isCarried(allDayDrag, s.event))?.lane;
-    if (!next || lane === undefined) return null;
+    if (!next || carriedLane === undefined) return null;
     const moved: CalendarEvent<T> = { ...allDayDrag.event, start: next.start, end: next.end };
     const segment = layoutMonthWeek<T>(days, [moved]).segments[0];
-    return segment ? { ...segment, lane } : null;
-  }, [allDayDrag, days, allDayLayout, getEventId]);
+    return segment ? { ...segment, lane: carriedLane } : null;
+  }, [allDayDrag, days, carriedLane]);
 
   useEffect(() => {
     // On mount / when the offset prop changes, not on every zoom (hence the ref).
@@ -2263,7 +2270,7 @@ function TimeGridInner<T = unknown>(
                 onPress: () => onPressEvent?.(event),
               };
               const movable = canMoveAllDay(event);
-              const carried = allDayDrag?.armed === true && isCarried(allDayDrag, event);
+              const carried = carriedEvent === event;
               return (
                 <div
                   key={allDayKey(event)}
