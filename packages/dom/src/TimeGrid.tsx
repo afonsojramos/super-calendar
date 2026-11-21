@@ -185,11 +185,24 @@ const ALL_DAY_CHIP_BASE: CSSProperties = {
   height: 22,
 };
 
+// Whether two event objects are the same all-day bar: the same `getEventId`, or,
+// without IDs, the same dates and title.
+function isSameAllDayBar<T>(
+  a: CalendarEvent<T>,
+  b: CalendarEvent<T>,
+  getEventId?: (event: CalendarEvent<T>) => string | number,
+) {
+  if (getEventId) return getEventId(a) === getEventId(b);
+  return (
+    a.start.getTime() === b.start.getTime() &&
+    a.end.getTime() === b.end.getTime() &&
+    a.title === b.title
+  );
+}
+
 // An all-day bar being carried across the lane. Columns index the visible days.
 type AllDayDrag<T> = {
   event: CalendarEvent<T>;
-  // The bar's identity across data refreshes that replace the event object.
-  key: string;
   fromCol: number;
   toCol: number;
   // Past the slop on a mouse, or picked up by a hold on touch and pen.
@@ -993,6 +1006,12 @@ function TimeGridInner<T = unknown>(
     return true;
   };
   const canMoveAllDay = (event: CalendarEvent<T>) => !event.disabled && editability(event).canMove;
+  // Whether `event` is the bar being carried. A refresh can replace the event
+  // object mid-drag, so it matches by `getEventId`, or by its dates and title.
+  const isCarried = (drag: AllDayDrag<T>, event: CalendarEvent<T>) =>
+    event === drag.event || isSameAllDayBar(event, drag.event, getEventId);
+  const allDaySegmentsRef = useRef(allDayLayout.segments);
+  allDaySegmentsRef.current = allDayLayout.segments;
 
   const beginAllDayDrag = (
     grab: EventGrab,
@@ -1050,17 +1069,24 @@ function TimeGridInner<T = unknown>(
       stop();
       if (!current.armed) return;
       suppressAllDayClick.current = true;
+      // Report the event as it is now, so `eventOverlap` does not count the
+      // carried event's own refreshed copy as another event.
+      const event =
+        allDaySegmentsRef.current.find((s) => isCarried(current, s.event))?.event ?? current.event;
       const visible = daysRef.current;
-      const next = monthDropBounds(current.event, visible[current.fromCol], visible[current.toCol]);
-      if (next) onDragEventRef.current?.(current.event, next.start, next.end);
+      const next = monthDropBounds(event, visible[current.fromCol], visible[current.toCol]);
+      if (next) onDragEventRef.current?.(event, next.start, next.end);
     };
     const cancel = (e: PointerEvent) => {
       if (e.pointerId === grab.pointerId) abandon();
     };
     // Another finger, or a new press from a pointer whose release never arrived
     // (it was lost outside the window), ends the drag rather than committing it.
+    // A lost mouse release leaves no click behind, so that press keeps its own.
     const anotherPointer = (e: PointerEvent) => {
-      if (e !== press) abandon();
+      if (e === press) return;
+      if (e.pointerType === "mouse") stop();
+      else abandon();
     };
     const keyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -1074,7 +1100,7 @@ function TimeGridInner<T = unknown>(
     };
     stopAllDayRef.current?.();
     stopAllDayRef.current = stop;
-    applyAllDayDrag({ event, key: allDayKey(event), fromCol, toCol: fromCol, armed });
+    applyAllDayDrag({ event, fromCol, toCol: fromCol, armed });
     onDragStart?.(event);
     doc.addEventListener("pointermove", move);
     doc.addEventListener("pointerup", up);
@@ -1150,12 +1176,12 @@ function TimeGridInner<T = unknown>(
       days[allDayDrag.fromCol],
       days[allDayDrag.toCol],
     );
-    const lane = allDayLayout.segments.find((s) => allDayKey(s.event) === allDayDrag.key)?.lane;
+    const lane = allDayLayout.segments.find((s) => isCarried(allDayDrag, s.event))?.lane;
     if (!next || lane === undefined) return null;
     const moved: CalendarEvent<T> = { ...allDayDrag.event, start: next.start, end: next.end };
     const segment = layoutMonthWeek<T>(days, [moved]).segments[0];
     return segment ? { ...segment, lane } : null;
-  }, [allDayDrag, days, allDayLayout]);
+  }, [allDayDrag, days, allDayLayout, getEventId]);
 
   useEffect(() => {
     // On mount / when the offset prop changes, not on every zoom (hence the ref).
@@ -2237,7 +2263,7 @@ function TimeGridInner<T = unknown>(
                 onPress: () => onPressEvent?.(event),
               };
               const movable = canMoveAllDay(event);
-              const carried = allDayDrag?.armed === true && allDayDrag.key === allDayKey(event);
+              const carried = allDayDrag?.armed === true && isCarried(allDayDrag, event);
               return (
                 <div
                   key={allDayKey(event)}

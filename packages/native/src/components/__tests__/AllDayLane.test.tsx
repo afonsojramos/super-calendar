@@ -284,7 +284,8 @@ describe("AllDayLane spans", () => {
       );
       const view = await render(lane([trip]));
       await drag(10, 100, false);
-      await view.rerender(lane([{ ...trip }]));
+      const refreshed = { ...trip };
+      await view.rerender(lane([refreshed]));
       const chip = view.container.queryAll((node) => node.props.className === "chip")[0];
       expect(StyleSheet.flatten(chip.props.style).opacity).toBe(0.4);
       expect(
@@ -295,6 +296,8 @@ describe("AllDayLane spans", () => {
         handlers.onEnd({}, true);
         handlers.onFinalize({}, true);
       });
+      // The drop reports the current object, so an overlap check skips its own copy.
+      expect(onDragEvent.mock.calls[0][0]).toBe(refreshed);
       expect(onDragEvent).toHaveBeenCalledExactlyOnceWith(trip, days[3], days[6]);
     });
 
