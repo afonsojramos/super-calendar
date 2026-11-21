@@ -47,6 +47,7 @@ Use pnpm or nub, not npm/npx; both install correctly from the shared `pnpm-lock.
 `scripts/` holds dev tooling that runs directly with `node`, using workspace dependencies where needed, with no build step.
 
 - `scripts/build-package-docs.mjs` runs in each package's `build` and converts `docs/*.mdx` into gitignored Markdown in `packages/*/docs`, which ships to npm. Its page lists choose which guides each package gets. It fails on an MDX component it cannot convert, so teach it any new component you add to `docs/`. `tests/tooling/package-docs.test.ts` checks its output.
+- `scripts/device-frames.mjs` splits a device screen recording into the frames where the screen changed, named by time, to measure glitches such as a blank page. It needs `ffmpeg`; read its header for options.
 - `scripts/visual-parity.mjs` (`pnpm parity:visual`) screenshots the dom and native-on-react-native-web renderers side by side, for manual visual parity on shared layout changes. Prop-name parity is enforced separately by `tests/architecture/renderer-parity.test.ts`. Read the script header for setup and overrides.
 
 ## Tests
@@ -75,6 +76,8 @@ Do not fight the setup by hand: no second Metro on the same port, and don't `adb
 
 For a bug that only shows on a device (a gesture, a scroll, a pixel offset), ask the user to connect an Android device before tracing library source; a few device runs settle what static reading cannot.
 
+Before changing `MonthPager` or `TimeGrid` paging, read `packages/native/PAGERS.md`: it lists how React Native and LegendList actually deliver scroll and touch events on each platform. The development build of the native example has **Narrow** and **Keep date** toggles for resize and page-back repros, and `scripts/device-frames.mjs` turns a screen recording into timestamped distinct frames.
+
 - Match the reporter's screen: `adb shell wm size 720x1600` and `adb shell wm density 300` (from their screenshot size and DPI). Fractional dp widths only appear at some densities. Restore with `wm size reset` and `wm density reset` when done.
 - Drive exact gestures with raw motion events: `adb shell "input motionevent DOWN x y; input motionevent MOVE x y; input motionevent CANCEL x y"`. `CANCEL` reproduces a drag a gesture handler steals; `input swipe` and separately timed `input tap` calls cannot land inside a ~100 ms snap animation.
 - Turn the symptom into a number: add a temporary `console.log` (e.g. a pager's resting `contentOffset.x` against its page width, in device pixels via `PixelRatio.get()`) and read it from the Metro output. Remove it before committing.
@@ -101,4 +104,6 @@ Style:
 ## Conventions
 
 - Conventional commits; releases are automated with release-please. Commit only when asked, one line, imperative mood. Never mention Claude or AI in commits or docs.
+- PRs are squash-merged, so the PR title becomes the changelog entry. Title a PR by its most user-visible change: `fix:` or `feat:` for anything a consumer notices, even when most of the diff is tests. `test:`, `chore:`, `ci:`, and `docs:` titles stay out of the release notes.
+- To reword the changelog entry, such as flagging a behaviour change, end the PR body with a `BEGIN_COMMIT_OVERRIDE` / `END_COMMIT_OVERRIDE` block holding the conventional commit message to use.
 - Never use em-dashes in prose.

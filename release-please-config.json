@@ -7,7 +7,7 @@
   "packages": {
     ".": {
       "package-name": "",
-      "exclude-paths": ["examples", "docs", "scripts", ".github"],
+      "exclude-paths": ["examples", ".github"],
       "extra-files": [
         { "type": "json", "path": "packages/core/package.json", "jsonpath": "$.version" },
         { "type": "json", "path": "packages/core/jsr.json", "jsonpath": "$.version" },
