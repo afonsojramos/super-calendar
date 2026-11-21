@@ -627,7 +627,7 @@ export default function App() {
                 </EventMenuProvider>
               </View>
             ) : (
-              <View style={[styles.card, narrow && styles.narrowCard]}>
+              <View style={[styles.card, narrow && isGridMode(activeMode) && styles.narrowCard]}>
                 <EventMenuProvider value={menuActions}>
                   <Calendar
                     mode={activeMode}
@@ -658,7 +658,7 @@ export default function App() {
                     renderCreateGhost={
                       activeMode === "month" || activeMode === "multiweek" ? MonthDraft : undefined
                     }
-                    onChangeDate={keepDate ? () => {} : setDate}
+                    onChangeDate={keepDate && isGridMode(activeMode) ? () => {} : setDate}
                     onDragEvent={(event, start, end) => {
                       // The exam is pinned via `draggable: false` on the event, so it
                       // never reaches here; every other event moves.

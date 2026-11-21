@@ -48,7 +48,7 @@ filters.push("mpdecimate=hi=64*12:lo=64*5:frac=0.1", "showinfo", `scale=${width}
 const out = values.out ?? clip.replace(/\.[^./]+$/, "") + "-frames";
 await mkdir(out, { recursive: true });
 // Remove only frames an earlier run wrote, so a mistyped --out deletes nothing else.
-const earlierFrame = /^\d{4}(-\d+\.\d{3}s)?\.png$/;
+const earlierFrame = /^\d{6}(-\d+\.\d{3}s)?\.png$/;
 for (const name of await readdir(out)) {
   if (earlierFrame.test(name)) await rm(join(out, name));
 }
@@ -63,18 +63,19 @@ const ffmpeg = spawnSync(
     filters.join(","),
     "-fps_mode",
     "vfr",
-    join(out, "%04d.png"),
+    join(out, "%06d.png"),
   ],
-  { encoding: "utf8" },
+  // showinfo writes a few hundred bytes per frame, more than the default buffer holds.
+  { encoding: "utf8", maxBuffer: Infinity },
 );
 assert(!ffmpeg.error, `Could not run ffmpeg: ${ffmpeg.error?.message}`);
 assert.equal(ffmpeg.status, 0, ffmpeg.stderr);
 
 // showinfo logs one line per kept frame, in output order.
 const times = [...ffmpeg.stderr.matchAll(/\bpts_time:\s*([\d.]+)/g)].map((m) => Number(m[1]));
-const frames = (await readdir(out)).filter((name) => name.endsWith(".png")).sort();
+const frames = (await readdir(out)).filter((name) => /^\d{6}\.png$/.test(name)).sort();
 assert.equal(frames.length, times.length, "ffmpeg frame count and timestamps disagree");
 for (const [index, name] of frames.entries()) {
-  await rename(join(out, name), join(out, `${name.slice(0, 4)}-${times[index].toFixed(3)}s.png`));
+  await rename(join(out, name), join(out, `${name.slice(0, 6)}-${times[index].toFixed(3)}s.png`));
 }
 console.log(`${frames.length} distinct frames in ${out}`);

@@ -110,7 +110,7 @@ try {
         }
       }, "Chrome startup");
     } catch (error) {
-      if (attempt === 2) throw error;
+      if (attempt === 2 || error.message !== "Timed out: Chrome startup") throw error;
       console.warn(`${error.message}, starting Chrome again`);
       await stopChrome();
     }

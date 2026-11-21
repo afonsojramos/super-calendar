@@ -17,7 +17,9 @@ Facts were checked against React Native 0.86 and `@legendapp/list` 3.7.
 - When a scroll view starts its own drag, `JSTouchDispatcher.onChildStartedNativeGesture`
   sends JavaScript a `touchcancel` and drops the remaining touch events of that
   gesture. `onTouchCancel` on a pager therefore fires at the start of every
-  swipe, not when a drag is abandoned.
+  swipe, not when a drag is abandoned. This holds while the
+  `shouldTriggerResponderTransferOnScrollAndroid` feature flag is off, its
+  default in 0.86.
 - `ReactHorizontalScrollView` emits `onScrollEndDrag` only on `ACTION_UP` while
   dragging. A drag that a parent view takes over, or that ends in
   `ACTION_CANCEL`, sends no end event. The pagers release a held page-back after
@@ -32,7 +34,8 @@ Facts were checked against React Native 0.86 and `@legendapp/list` 3.7.
 
 - `onViewableItemsChanged` fires only when the set of visible pages changes.
   Settling back onto the page you started from sends nothing.
-- The public `onScroll` is deferred on web only.
+- On web, the public `onScroll` is held back until the initial scroll to
+  `initialScrollIndex` finishes. Native never defers it.
 - `maintainVisibleContentPosition` anchors on an internal `ScrollAdjust` view.
   If Fabric flattens it (see Android above), paging after a resize briefly shows
   a blank page. See LegendApp/legend-list#619.
