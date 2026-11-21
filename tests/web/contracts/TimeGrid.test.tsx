@@ -535,6 +535,30 @@ describe(rendererName, () => {
         expect([end.getDate(), end.getHours(), end.getMinutes()]).toEqual([26, 0, 15]);
       });
 
+      it("lets an event that continues into the next day run into the previous one", () => {
+        const onDragEvent = vi.fn();
+        // Friday's segment is a single 15-minute step, but the event lasts 5h15.
+        const overnight: CalendarEvent[] = [
+          { title: "Night", start: new Date(2026, 5, 26, 23, 45), end: new Date(2026, 5, 27, 5) },
+        ];
+        const { getAllByText } = render(TimeGrid, {
+          date: day,
+          mode: "week",
+          events: overnight,
+          hourHeight: 48,
+          onDragEvent: onDragEvent,
+        });
+        const box = wrapperOf(getAllByText("Night")[0]);
+        // Far past the top of the grid: the end stops at 00:15 on Friday.
+        fireEvent.pointerDown(box, { clientY: 1500, pointerId: 1 });
+        fireEvent.pointerMove(box, { clientY: 0, pointerId: 1 });
+        fireEvent.pointerUp(box, { clientY: 0, pointerId: 1 });
+
+        const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent, Date, Date];
+        expect([start.getDate(), start.getHours(), start.getMinutes()]).toEqual([25, 19, 0]);
+        expect([end.getDate(), end.getHours(), end.getMinutes()]).toEqual([26, 0, 15]);
+      });
+
       it("previews the head at the end of the previous column and clips the box at midnight", () => {
         const { getByText, container } = render(TimeGrid, {
           date: day,

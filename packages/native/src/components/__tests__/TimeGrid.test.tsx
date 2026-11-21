@@ -224,6 +224,15 @@ describe("TimeGrid midnight drag", () => {
       expect(end).toEqual(new Date(2026, 0, 6, 0, 15));
     });
 
+    it("lets an event that continues into the next day run into the previous one", async () => {
+      // The 6th's segment is a single 15-minute step, but the event lasts 5h15.
+      const { start, end } = await dragUp(-1500, {
+        events: [{ ...early, start: new Date(2026, 0, 6, 23, 45), end: new Date(2026, 0, 7, 5) }],
+      });
+      expect(start).toEqual(new Date(2026, 0, 5, 19, 0));
+      expect(end).toEqual(new Date(2026, 0, 6, 0, 15));
+    });
+
     it("commits without a preview when the previous day is out of view", async () => {
       const { start, end, geometry } = await dragUp(-96, { mode: "day", date: early.start });
       expect(start).toEqual(new Date(2026, 0, 5, 23, 0));
