@@ -8,7 +8,7 @@ import { MonthView } from "../MonthView";
 import { MultiWeekView } from "../MultiWeekView";
 
 const hidden = { includeHiddenElements: true };
-// Shows the bounds and continuation flags each bar is drawn with.
+// Shows the bounds and any continuation flags each bar is drawn with.
 const Chip = ({ event, continuesBefore, continuesAfter }: RenderEventArgs) => (
   <Text>
     {`${event.title} ${event.start.getDate()}-${event.end.getDate()}` +
@@ -41,7 +41,7 @@ describe.each(["month", "multiweek"] as const)("native %s move preview", (mode) 
           target: { x: 550, y: 272 },
           covered: [/19 June 2026/, /20 June 2026/, /21 June 2026/],
           untouched: [/17 June 2026/, /18 June 2026/, /22 June 2026/],
-          labels: ["Trip 19-22 >", "Trip 19-22 <"],
+          label: "Trip 19-22",
         }
       : {
           date: new Date(2030, 11, 23),
@@ -54,7 +54,7 @@ describe.each(["month", "multiweek"] as const)("native %s move preview", (mode) 
           target: { x: 550, y: 35 },
           covered: [/28 December 2030/, /29 December 2030/, /30 December 2030/],
           untouched: [/26 December 2030/, /27 December 2030/, /31 December 2030/],
-          labels: ["Trip 28-31 >", "Trip 28-31 <"],
+          label: "Trip 28-31",
         };
   const View = mode === "month" ? MonthView : MultiWeekView;
   const trip: CalendarEvent = { title: "Trip", allDay: true, ...setup.trip };
@@ -96,8 +96,9 @@ describe.each(["month", "multiweek"] as const)("native %s move preview", (mode) 
       expect(preview.props.importantForAccessibility).toBe("no-hide-descendants");
       expect(styleOf(preview)?.opacity).toBeLessThan(1);
     }
-    // The renderer draws the shifted event and learns where it continues.
-    for (const label of setup.labels) expect(view.getByText(label, hidden)).toBeTruthy();
+    // The renderer draws the shifted event in each row, with the same
+    // continuation hints as the real bars (none on the month grid).
+    expect(view.getAllByText(setup.label, hidden)).toHaveLength(2);
     // The original stays in place, faded.
     expect(
       view.getByText(`Trip ${setup.trip.start.getDate()}-${setup.trip.end.getDate()}`),

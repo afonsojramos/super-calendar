@@ -948,6 +948,19 @@ export function DateRows<T = unknown>({
       return keepMonthDraftVisible(placed, base, draftEvent);
     });
   }, [draftEvent, draftDays, weekLayouts, eventsByDay, weeks]);
+  // Bars are keyed by event identity, not lane: a move preview can push the
+  // carried bar to another lane, and a remount there would drop its focus and
+  // the pointer capture of a held touch drag.
+  const barKeys = useRef(new WeakMap<CalendarEvent<T>, number>());
+  const nextBarKey = useRef(0);
+  const barKey = (event: CalendarEvent<T>) => {
+    let key = barKeys.current.get(event);
+    if (key === undefined) {
+      key = nextBarKey.current++;
+      barKeys.current.set(event, key);
+    }
+    return key;
+  };
   const movedRef = useRef(false);
   // Set when a drag commits, so the click the browser fires next is swallowed (it
   // must not also open the day, or the event the drag landed on). A drag that ends
@@ -1516,7 +1529,7 @@ export function DateRows<T = unknown>({
                             dragArmed && drag?.kind === "move" && drag.event === b.seg.event;
                           return (
                             <button
-                              key={`bar-${b.seg.event.start.toISOString()}:${b.seg.event.title}:${b.seg.lane}:${b.startCol}`}
+                              key={`bar-${barKey(b.seg.event)}:${b.startCol}`}
                               type="button"
                               onPointerDown={
                                 canMove(b.seg.event)

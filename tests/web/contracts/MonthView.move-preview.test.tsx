@@ -103,6 +103,22 @@ describe(rendererName, () => {
       expect(onDragEvent).not.toHaveBeenCalled();
     });
 
+    it("keeps the carried bar and its focus when the preview moves it to another lane", () => {
+      const view = render(View, { date, weekStartsOn: 1, events: [trip], onDragEvent: vi.fn() });
+      const chip = view.getByRole("button", { name: /^Trip,/ });
+      chip.focus();
+      press(chip);
+      // Starting a day earlier, the preview takes lane 0 and the original moves down.
+      enter(cell(view.container, "2026-07-14"));
+      expect(top(view.getByRole("button", { name: /^Trip,/ }))).toBeGreaterThan(
+        top(previews(view.container)[0]),
+      );
+      fireEvent.keyDown(window, { key: "Escape" });
+      release();
+      expect(view.getByRole("button", { name: /^Trip,/ })).toBe(chip);
+      expect(document.activeElement).toBe(chip);
+    });
+
     it("puts the preview on the lane the moved event takes, moving bars aside", () => {
       // Lunch holds lane 0 on Tuesday. Trip moved to Tuesday starts there too but
       // spans longer, so it takes lane 0 and Lunch moves below, as after the drop.
