@@ -69,31 +69,52 @@ const server = await createServer({
 });
 const profile = await mkdtemp(join(tmpdir(), "calendar-solid-"));
 let chrome;
+async function stopChrome() {
+  if (!chrome || chrome.exitCode !== null || chrome.signalCode !== null) return;
+  const exited = new Promise((resolve) => chrome.once("exit", resolve));
+  chrome.kill("SIGTERM");
+  // A Chrome that never finished starting may not honour SIGTERM.
+  const forceKill = setTimeout(() => chrome.kill("SIGKILL"), 5_000);
+  await exited;
+  clearTimeout(forceKill);
+}
 let socket;
 let reactServer;
 try {
   await server.listen();
   const origin = server.resolvedUrls.local[0];
-  chrome = spawn(
-    chromePath,
-    [
-      "--headless=new",
-      "--remote-debugging-port=0",
-      `--user-data-dir=${profile}`,
-      "--no-first-run",
-      "--no-default-browser-check",
-      "about:blank",
-    ],
-    { stdio: "ignore" },
-  );
-  const endpoint = await until(async () => {
+  // A CI runner occasionally starts Chrome without it ever opening the debugging
+  // port. Start once more, in a fresh profile, before failing.
+  let endpoint;
+  for (let attempt = 1; !endpoint; attempt++) {
+    const userData = join(profile, `attempt-${attempt}`);
+    chrome = spawn(
+      chromePath,
+      [
+        "--headless=new",
+        "--remote-debugging-port=0",
+        `--user-data-dir=${userData}`,
+        "--no-first-run",
+        "--no-default-browser-check",
+        "about:blank",
+      ],
+      { stdio: "ignore" },
+    );
     try {
-      return await readFile(join(profile, "DevToolsActivePort"), "utf8");
+      endpoint = await until(async () => {
+        try {
+          return await readFile(join(userData, "DevToolsActivePort"), "utf8");
+        } catch (error) {
+          if (error.code !== "ENOENT") throw error;
+          return null;
+        }
+      }, "Chrome startup");
     } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-      return null;
+      if (attempt === 2) throw error;
+      console.warn(`${error.message}, starting Chrome again`);
+      await stopChrome();
     }
-  }, "Chrome startup");
+  }
   const port = endpoint.split("\n")[0];
   const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
   socket = new WebSocket(targets.find((target) => target.type === "page").webSocketDebuggerUrl);
@@ -716,11 +737,7 @@ try {
   if (distribution) assert(loadedReactArtifact, "Chrome executes the built React DOM artifact");
 } finally {
   socket?.close();
-  if (chrome && chrome.exitCode === null) {
-    const exited = new Promise((resolve) => chrome.once("exit", resolve));
-    chrome.kill("SIGTERM");
-    await exited;
-  }
+  await stopChrome();
   await server.close();
   await reactServer?.close();
   // Retry transient profile cleanup races without hiding persistent failures.
