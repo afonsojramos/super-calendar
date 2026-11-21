@@ -98,7 +98,7 @@ See [DOM held presses](/guides/dragging#dom-held-presses).
 
 | Prop                    | Type                                     | Notes                                                                             |
 | ----------------------- | ---------------------------------------- | --------------------------------------------------------------------------------- |
-| `onDragEvent`           | `(event, start, end) => void \| boolean` | Enable move/resize; return `false` to reject. Month: drop on another day.         |
+| `onDragEvent`           | `(event, start, end) => void \| boolean` | Enable move/resize; return `false` to reject. Month: previews the drop.           |
 | `onDragStart`           | `(event) => void`                        | Fires on grab (e.g. haptics).                                                     |
 | `onCreateEvent`         | `(start, end) => void`                   | Drag empty space to create. Month and year: an all-day span.                      |
 | `renderCreateGhost`     | `ComponentType<CreateGhostArgs>`         | Time grid: draw content in the create preview from its live `start`/`end`.        |
