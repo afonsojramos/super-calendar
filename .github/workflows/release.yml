@@ -62,11 +62,12 @@ jobs:
       - run: pnpm -r publish --access public --provenance --no-git-checks
       # JSR registry (Deno), via the same GitHub OIDC token (no JSR_TOKEN). Each
       # package must exist on jsr.io and be linked to this repository for OIDC to
-      # authorize. The build only writes gitignored dist/, so the tree stays clean
-      # and we omit --allow-dirty: that lets JSR attach Sigstore provenance, which
-      # it skips for a dirty publish. Best-effort: a JSR failure surfaces as a run
-      # warning but never fails the (already-done) npm publish above, and one
-      # package failing does not skip the others.
+      # authorize. The build only writes gitignored output (dist/ and the bundled
+      # docs/), so the tree stays clean and we omit --allow-dirty: that lets JSR
+      # attach Sigstore provenance, which it skips for a dirty publish.
+      # Best-effort: a JSR failure surfaces as a run warning but never fails the
+      # (already-done) npm publish above, and one package failing does not skip
+      # the others.
       - name: Publish to JSR
         run: |
           failed=""

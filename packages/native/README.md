@@ -211,6 +211,15 @@ remain 18 px height and 2 px gaps; native height keeps its theme default.
 Changing either dimension updates already mounted list and pager months.
 See the [month guide](https://super-calendar.afonsojramos.me/guides/month-view).
 
+## Docs for coding agents
+
+This package includes its docs as Markdown in `docs/`, matched to the installed
+version. Add a line like this to your project's `AGENTS.md`:
+
+```md
+Read node_modules/@super-calendar/native/docs/llms.txt before writing calendar code.
+```
+
 ## Documentation
 
 See the [full documentation](https://super-calendar.afonsojramos.me) and the [quickstart](https://super-calendar.afonsojramos.me/quickstart), including theming, recurring events, time zones, and the headless picker.

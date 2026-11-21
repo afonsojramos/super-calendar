@@ -323,6 +323,15 @@ For hydration mismatches, use `hydrate` with matching initial data and include
 `generateHydrationScript()` before the client entry. See
 [troubleshooting](https://super-calendar.afonsojramos.me/guides/solid#troubleshoot-an-integration).
 
+## Docs for coding agents
+
+This package includes its docs as Markdown in `docs/`, matched to the installed
+version. Add a line like this to your project's `AGENTS.md`:
+
+```md
+Read node_modules/@super-calendar/solid/docs/llms.txt before writing calendar code.
+```
+
 ## Run the example
 
 From the repository root:

@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# package docs generated from docs/ (scripts/build-package-docs.mjs)
+packages/*/docs/
 *.log
 .DS_Store
 
