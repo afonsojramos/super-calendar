@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render, within } from "@testing-library/react-native";
 import { StyleSheet, Text, type ViewStyle } from "react-native";
 import * as gestureHandlerMock from "react-native-gesture-handler";
 import { vi } from "vitest";
@@ -94,7 +94,15 @@ describe.each(["month", "multiweek"] as const)("native %s move preview", (mode) 
     for (const preview of previews) {
       expect(preview.props.pointerEvents).toBe("none");
       expect(preview.props.importantForAccessibility).toBe("no-hide-descendants");
-      expect(styleOf(preview)?.opacity).toBeLessThan(1);
+      // The chip's own background matches the drop tint in the default theme,
+      // so the preview stays opaque and is outlined in the selection colour.
+      expect(styleOf(preview)?.opacity ?? 1).toBe(1);
+      const outline = within(preview).getByTestId("month-move-preview-outline", hidden);
+      expect(styleOf(outline)).toMatchObject({
+        position: "absolute",
+        borderWidth: 1,
+        borderColor: defaultTheme.colors.selectedBackground,
+      });
     }
     // The renderer draws the shifted event in each row, with the same
     // continuation hints as the real bars (none on the month grid).
@@ -141,5 +149,61 @@ describe.each(["month", "multiweek"] as const)("native %s move preview", (mode) 
     expect(view.queryByTestId("month-move-preview", hidden)).toBeNull();
     for (const day of setup.covered) expect(tinted(view, day)).toBe(false);
     expect(onDragEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("native month move preview lanes", () => {
+  // The absolutely placed wrapper a bar is drawn in.
+  const barTop = (node: { parent: unknown; props: { style?: unknown } }) => {
+    let current: typeof node | null = node;
+    while (current && styleOf(current)?.position !== "absolute") {
+      current = current.parent as typeof node | null;
+    }
+    return current ? styleOf(current)?.top : undefined;
+  };
+
+  it("pushes down only the bars the preview overlaps when the row has no lane to spare", async () => {
+    // June 2026 from Sunday 31 May; row 2 is 14-20 June. One lane per row: Lisbon
+    // trip and Weekend share lane 0, and the preview of Weekend on Saturday
+    // overlaps only Weekend, so Lisbon trip keeps its lane.
+    const lisbon: CalendarEvent = {
+      title: "Lisbon trip",
+      start: new Date(2026, 5, 14),
+      end: new Date(2026, 5, 17),
+      allDay: true,
+    };
+    const weekend: CalendarEvent = {
+      title: "Weekend",
+      start: new Date(2026, 5, 18),
+      end: new Date(2026, 5, 21),
+      allDay: true,
+    };
+    const view = await render(
+      <MonthView
+        date={new Date(2026, 5, 15)}
+        weekStartsOn={0}
+        events={[lisbon, weekend]}
+        maxVisibleEventCount={1}
+        renderEvent={Chip}
+        keyExtractor={(event: CalendarEvent) => event.title ?? ""}
+        onPressEvent={() => {}}
+        onDragEvent={vi.fn()}
+      />,
+    );
+    await fireEvent(view.getByTestId("month-grid"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 700, height: 600 } },
+    });
+    const laneZero = barTop(view.getByText("Lisbon trip 14-17"));
+    const handlers = lastGesture();
+    await act(() => {
+      handlers.onStart({ x: 450, y: 272 });
+      handlers.onUpdate({ x: 650, y: 272 });
+    });
+    const [preview] = view.getAllByTestId("month-move-preview", hidden);
+    expect(styleOf(preview)).toMatchObject({ left: pct(6), top: laneZero });
+    expect(barTop(view.getByText("Lisbon trip 14-17"))).toBe(laneZero);
+    // Only Weekend's own days (18-20 June) fold the moved-down original into
+    // "+1 More"; Lisbon trip's days have nothing hidden.
+    expect(view.getAllByText(/More/)).toHaveLength(3);
   });
 });

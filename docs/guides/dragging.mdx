@@ -507,10 +507,11 @@ number of calendar days, so the **time of day and the duration are preserved**
 (a multi-day event keeps its length). Grab it with a **long-press** on native and
 a **press-drag** on web. While the event is over another day, the original bar
 fades and a preview of the event appears where it would land. The preview spans
-every destination day, stacks with the other bars on those days, and splits
-across week rows like any bar. Each day it covers is tinted. The preview ignores the
-pointer, so it never interrupts the drag, and it disappears when you drop or
-cancel. On web, a press becomes a drag only after the pointer travels a few
+every destination day on the top lane, moves down only the bars it overlaps,
+and splits across week rows like any bar. Each day it covers is tinted, and the
+preview is outlined in the theme's `selectedBackground` colour so it stands out
+from the tint. The preview ignores the pointer, so it never interrupts the drag,
+and it disappears when you drop or cancel. On web, a press becomes a drag only after the pointer travels a few
 pixels, so clicking a movable bar fires `onPressEvent` rather than the day's
 `onPressDay` or `onPressCell`.
 
@@ -533,12 +534,12 @@ on the month grid, so `durationEditable` has no effect there.
 ### Styling the drag states
 
 Both states are tinted with the theme's `rangeBackground` token by default (see
-[Theming](/guides/theming)), and the bar being carried fades. On the web
-renderers each day in a create sweep also carries `data-creating`, each day a
-moved event would cover carries `data-drop`, and the move preview carries
-`data-dragging`, so you can restyle them (see
-[Styling](/guides/styling)); give the `day` slot a class to take the tint over
-entirely.
+[Theming](/guides/theming)), the bar being carried fades, and the move preview is
+outlined in `selectedBackground`. On the web renderers each day in a create
+sweep also carries `data-creating`, each day a moved event would cover carries
+`data-drop`, and the move preview carries `data-dragging`, so you can restyle
+them (see [Styling](/guides/styling)); give the `day` slot a class to take the
+tint over entirely.
 
 ## On the year grid
 

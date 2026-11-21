@@ -38,6 +38,21 @@ describe(rendererName, () => {
       expect(second.x + second.width).toBeLessThanOrEqual(monday.x + monday.width);
       expect(second.y).toBeGreaterThan(first.y);
       expect(await previews.nth(0).textContent()).toBe("Trip");
+      // An opaque chip with an outline that covers it, so it reads against the tint.
+      const look = await previews.nth(0).evaluate((preview) => {
+        const outline = preview.lastElementChild!;
+        const ring = outline.getBoundingClientRect();
+        const bounds = preview.getBoundingClientRect();
+        return {
+          opacity: getComputedStyle(preview).opacity,
+          border: getComputedStyle(outline).borderTopColor,
+          covers:
+            Math.abs(ring.left - bounds.left) < 1 &&
+            Math.abs(ring.right - bounds.right) < 1 &&
+            Math.abs(ring.height - bounds.height) < 1,
+        };
+      });
+      expect(look).toEqual({ opacity: "1", border: "rgb(31, 111, 235)", covers: true });
       // The preview never takes the pointer: the cell beneath it is hit instead.
       const hit = await page.evaluate(
         ({ x, y }) => {

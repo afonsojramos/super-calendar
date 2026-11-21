@@ -109,9 +109,6 @@ const FALLBACK_VISIBLE_COUNT = 3;
 const DRAG_LONG_PRESS_MS = 400;
 // Opacity of an event bar while it is being dragged to another day.
 const DRAGGED_BAR_OPACITY = 0.4;
-// Opacity of the preview of a moved event at its destination, matching the
-// time grid's move preview.
-const MOVE_PREVIEW_OPACITY = 0.85;
 const noop = () => {};
 
 const numericStyle = (value: number | string | undefined, fallback: number) =>
@@ -1741,8 +1738,8 @@ function DateRowsInner<T>({
                             <RenderCreateGhost start={createRange.start} end={createRange.end} />
                           </View>
                         ) : null}
-                        {/* Where a moved event lands: its bar at the destination, in
-                            a lane among the row's bars, beside the faded original. */}
+                        {/* Where a moved event lands: its bar at the destination, on
+                            the top lane, beside the faded original. */}
                         {movePreview &&
                         draftSegment &&
                         draftStart >= 0 &&
@@ -1762,7 +1759,6 @@ function DateRowsInner<T>({
                               top: draftTop,
                               height: draftHeight,
                               paddingHorizontal: CHIP_INSET_H,
-                              opacity: MOVE_PREVIEW_OPACITY,
                               zIndex: 1,
                             }}
                           >
@@ -1771,6 +1767,16 @@ function DateRowsInner<T>({
                               mode={multiWeek ? "multiweek" : "month"}
                               isAllDay={isAllDayEvent(movePreview)}
                               onPress={noop}
+                            />
+                            {/* The default chip's background is the drop tint's colour,
+                                so an outline drawn over the chip marks the preview. */}
+                            <View
+                              testID="month-move-preview-outline"
+                              pointerEvents="none"
+                              style={[
+                                styles.movePreviewOutline,
+                                { borderColor: theme.colors.selectedBackground },
+                              ]}
                             />
                           </View>
                         ) : null}
@@ -1890,6 +1896,17 @@ const styles = StyleSheet.create({
   // react-native-web needs registered styles to expand the child rules for box-none.
   childrenOnlyPointerEvents: { pointerEvents: "box-none" },
   noPointerEvents: { pointerEvents: "none" },
+  // Covers the chip inside the preview's horizontal inset, with the default
+  // month chip's corner radius.
+  movePreviewOutline: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: CHIP_INSET_H,
+    right: CHIP_INSET_H,
+    borderWidth: 1,
+    borderRadius: 6,
+  },
   weekRow: {
     flex: 1,
     flexDirection: "row",
