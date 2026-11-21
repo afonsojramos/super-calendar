@@ -176,7 +176,9 @@ jobs:
       - uses: jdx/mise-action@v4
       # Run via npx, not `pnpm dlx`: the mint CLI's bundled scraper has an
       # undeclared `openapi-types` dependency that pnpm's strict store can't
-      # resolve, but npm's hoisted layout does.
+      # resolve, but npm's hoisted layout does. Pin the version: a new `mint`
+      # release can reach npm before the `@mintlify/cli` it depends on, which
+      # fails the install until both are published.
       - name: Check docs for broken links
-        run: npx --yes mint broken-links
+        run: npx --yes mint@4.3.81 broken-links
         working-directory: docs
