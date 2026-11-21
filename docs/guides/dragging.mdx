@@ -440,10 +440,11 @@ It receives the full all-day `start` and exclusive `end` that `onCreateEvent`
 would receive on release. Each week row crossed by the sweep renders one copy
 with the same range, including when you drag backward.
 
-The draft sits on the lane an all-day event with that range would take once
-created, and the other bars in the row move aside to make room, so nothing jumps
-when you release. If that lane is hidden under `+N more`, the draft takes the top
-lane instead and the bars move down one lane.
+The draft sits on the top lane of each row it covers from the first day of the
+sweep. The bars it overlaps move down one lane and the other bars keep their
+lanes, so nothing jumps while the sweep grows. Once the event is created, the
+grid lays it out with your other events, so it can sit below an event that
+starts earlier or on the same day.
 A sweep starts from a day, not from an event: pressing an event that can't move
 stays a press.
 

@@ -746,9 +746,9 @@ function DateRowsInner<T>({
         : null,
     [createContentEnabled, drag],
   );
-  // While a create sweep draws its content, lay the rows it covers out with the
-  // draft as an all-day event, so it takes the lane the created event will land on
-  // and the other bars move aside the same way.
+  // While a create sweep draws its content, the rows it covers put the draft on
+  // lane 0 as an all-day event and move the bars it overlaps down, so the draft
+  // keeps its lane as the sweep grows.
   const draftEvent = useMemo(
     () =>
       createRange
@@ -771,13 +771,9 @@ function DateRowsInner<T>({
         layoutMonthWeek(week, collectRowEvents(week, days)),
         base,
         draftEvent,
-        {
-          visibleLanes: (laneCount) => monthVisibleCount(laneCount, capacity),
-          extraLaneFits: (visibleLanes) => capacity.full > visibleLanes,
-        },
       );
     });
-  }, [draftEvent, weekLayouts, eventsByDay, sortedMonthView, weeks, capacity]);
+  }, [draftEvent, weekLayouts, eventsByDay, sortedMonthView, weeks]);
   const dragRef = useRef<MonthDrag<T> | null>(null);
   const interactionWindow = useRef(windowKey);
   interactionWindow.current = windowKey;
