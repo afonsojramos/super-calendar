@@ -1,5 +1,6 @@
-import { fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
 import { useState } from "react";
+import * as gestureHandlerMock from "react-native-gesture-handler";
 import { Pressable, Text, StyleSheet } from "react-native";
 import { vi } from "vitest";
 import { AllDayLane } from "../AllDayLane";
@@ -164,6 +165,147 @@ describe("AllDayLane spans", () => {
     expect(style.borderRadius).toBe(6);
     expect(style.borderTopLeftRadius).toBeUndefined();
     expect(style.borderTopRightRadius).toBeUndefined();
+  });
+
+  describe("moving a bar", () => {
+    type Pan = { handlers: Record<string, (...args: unknown[]) => void> };
+    // The pan the lane built most recently (the mock records every builder).
+    const lastPan = () => {
+      const { __gestures } = gestureHandlerMock as unknown as { __gestures: Pan[] };
+      const pan = __gestures.findLast((gesture) => gesture.handlers.onStart);
+      if (!pan) throw new Error("No pan recorded");
+      return pan;
+    };
+    // Trip covers columns 1-3 at 50 dp each; `x` is relative to the bar.
+    const drag = async (grabX: number, translationX: number, release = true) => {
+      const { handlers } = lastPan();
+      await act(() => {
+        handlers.onStart({ x: grabX, translationX: 0 });
+        handlers.onUpdate({ x: grabX + translationX, translationX });
+        if (release) {
+          handlers.onEnd({}, true);
+          handlers.onFinalize({}, true);
+        }
+      });
+    };
+    const setup = async (overrides: Partial<typeof props> & Record<string, unknown> = {}) => {
+      const onDragEvent = vi.fn();
+      const onDragStart = vi.fn();
+      const view = await render(
+        <AllDayLane
+          {...props}
+          onDragEvent={onDragEvent}
+          onDragStart={onDragStart}
+          {...overrides}
+        />,
+      );
+      return { view, onDragEvent, onDragStart };
+    };
+
+    it("moves the bar by whole days from the grabbed column and keeps its duration", async () => {
+      const { onDragEvent, onDragStart } = await setup();
+      await drag(60, 90);
+      expect(onDragStart).toHaveBeenCalledExactlyOnceWith(trip);
+      expect(onDragEvent).toHaveBeenCalledExactlyOnceWith(trip, days[3], days[6]);
+    });
+
+    it.each([
+      { title: "after the last", grabX: 10, translationX: 900, start: 19, end: 22 },
+      { title: "before the first", grabX: 120, translationX: -900, start: 11, end: 14 },
+    ])("clamps a drag $title visible column", async ({ grabX, translationX, start, end }) => {
+      const { onDragEvent } = await setup();
+      await drag(grabX, translationX);
+      expect(onDragEvent).toHaveBeenCalledExactlyOnceWith(
+        trip,
+        new Date(2026, 6, start),
+        new Date(2026, 6, end),
+      );
+    });
+
+    it("maps columns to calendar days across hidden days", async () => {
+      // Wednesday is hidden, so Thursday is one column after Tuesday.
+      const visibleDays = days.filter((day) => day.getDay() !== 3);
+      const { onDragEvent } = await setup({ days: visibleDays });
+      await drag(10, 50);
+      expect(onDragEvent).toHaveBeenCalledExactlyOnceWith(trip, days[3], days[6]);
+    });
+
+    it("commits nothing when the bar returns to its column or the gesture is cancelled", async () => {
+      const { onDragEvent } = await setup();
+      await drag(10, 20);
+      const { handlers } = lastPan();
+      await act(() => {
+        handlers.onStart({ x: 10, translationX: 0 });
+        handlers.onUpdate({ x: 110, translationX: 100 });
+        handlers.onFinalize({}, false);
+      });
+      expect(onDragEvent).not.toHaveBeenCalled();
+    });
+
+    it("fades the carried bar and previews where it lands", async () => {
+      const view = await render(
+        <SlotStylesProvider classNames={{ allDayEvent: "chip" }}>
+          <AllDayLane {...props} onDragEvent={vi.fn()} />
+        </SlotStylesProvider>,
+      );
+      const chip = () => view.container.queryAll((node) => node.props.className === "chip")[0];
+      // The preview is hidden from assistive technology, so query hidden elements.
+      const hidden = { includeHiddenElements: true };
+      await drag(10, 0, false);
+      expect(StyleSheet.flatten(chip().props.style).opacity).toBe(0.4);
+      expect(view.queryByTestId("all-day-move-preview", hidden)).toBeNull();
+      const { handlers } = lastPan();
+      await act(() => handlers.onUpdate({ x: 160, translationX: 150 }));
+      // Friday to Sunday: columns 4-6, ending exactly at the visible edge.
+      let preview = view.getByTestId("all-day-move-preview", hidden);
+      expect(StyleSheet.flatten(preview.props.style)).toMatchObject({ left: 150, width: 150 });
+      // The carried bar and its preview both end inside the visible days.
+      expect(view.getAllByText("Trip: false,false", hidden)).toHaveLength(2);
+      await act(() => handlers.onUpdate({ x: 210, translationX: 200 }));
+      // Saturday to Monday, clipped to columns 5-6 and continuing after.
+      preview = view.getByTestId("all-day-move-preview", hidden);
+      expect(StyleSheet.flatten(preview.props.style)).toMatchObject({ left: 200, width: 100 });
+      expect(preview.props.importantForAccessibility).toBe("no-hide-descendants");
+      expect(view.getByText("Trip: false,true", hidden)).toBeTruthy();
+      await act(() => {
+        handlers.onEnd({}, true);
+        handlers.onFinalize({}, true);
+      });
+      expect(view.queryByTestId("all-day-move-preview", hidden)).toBeNull();
+      expect(StyleSheet.flatten(chip().props.style).opacity).toBeUndefined();
+    });
+
+    it.each([
+      { title: "without onDragEvent", overrides: { onDragEvent: undefined }, event: trip },
+      { title: "when the grid locks moves", overrides: { eventStartEditable: false }, event: trip },
+      { title: "for a locked event", overrides: {}, event: { ...trip, draggable: false } },
+      {
+        title: "for a start-locked event",
+        overrides: {},
+        event: { ...trip, startEditable: false },
+      },
+      { title: "for a disabled event", overrides: {}, event: { ...trip, disabled: true } },
+    ])("keeps the bar static $title", async ({ overrides, event }) => {
+      const onLongPressEvent = vi.fn();
+      const { view } = await setup({ ...overrides, events: [event], onLongPressEvent });
+      const { calls } = lastPan() as unknown as { calls: Record<string, unknown[]> };
+      expect(calls.enabled).toEqual([false]);
+      await fireEvent(view.getByText("Trip"), "longPress");
+      expect(onLongPressEvent).toHaveBeenCalledExactlyOnceWith(event);
+    });
+
+    it("picks a movable bar up on a long press instead of reporting it", async () => {
+      const onLongPressEvent = vi.fn();
+      const onPressEvent = vi.fn();
+      const { view } = await setup({ onLongPressEvent, onPressEvent });
+      const pan = lastPan() as unknown as { calls: Record<string, unknown[]> };
+      expect(pan.calls.enabled).toEqual([true]);
+      expect(pan.calls.activateAfterLongPress).toEqual([500]);
+      await fireEvent(view.getByText("Trip"), "longPress");
+      expect(onLongPressEvent).not.toHaveBeenCalled();
+      await fireEvent.press(view.getByText("Trip"));
+      expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(trip);
+    });
   });
 
   it("uses only visible columns and keeps empty pages measurable", async () => {
