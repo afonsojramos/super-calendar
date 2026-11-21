@@ -61,8 +61,10 @@ const ffmpeg = spawnSync(
     clip,
     "-vf",
     filters.join(","),
+    // Write every frame mpdecimate keeps. `vfr` drops frames whose timestamps round to
+    // the same output tick, as Android screenrecord clips often do.
     "-fps_mode",
-    "vfr",
+    "passthrough",
     join(out, "%06d.png"),
   ],
   // showinfo writes a few hundred bytes per frame, more than the default buffer holds.
