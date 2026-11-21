@@ -479,6 +479,168 @@ describe(rendererName, () => {
       fireEvent.pointerUp(box, { clientY: 396, pointerId: 1 });
     });
 
+    describe("above the start of the day", () => {
+      const early: CalendarEvent[] = [
+        { title: "Red-eye", start: new Date(2026, 5, 26, 1, 0), end: new Date(2026, 5, 26, 3, 0) },
+      ];
+      const spillPreview = (container: HTMLElement) =>
+        [...container.querySelectorAll<HTMLElement>("[data-dragging]")].find((el) =>
+          el.hasAttribute("aria-hidden"),
+        );
+
+      it.each(["day", "week"] as const)(
+        "drag-moves an event into the previous day in %s view",
+        (mode) => {
+          const onDragEvent = vi.fn();
+          const { getByText } = render(TimeGrid, {
+            date: day,
+            mode,
+            events: early,
+            hourHeight: 48,
+            onDragEvent: onDragEvent,
+          });
+          const box = wrapperOf(getByText("Red-eye"));
+          // Up 96px = 2h at 48px/hour: 01:00–03:00 -> 23:00 on the 25th to 01:00 on
+          // the 26th. The start is free to run before midnight; the end stays in
+          // the day it was dropped on.
+          fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+          fireEvent.pointerMove(box, { clientY: 204, pointerId: 1 });
+          fireEvent.pointerUp(box, { clientY: 204, pointerId: 1 });
+
+          expect(onDragEvent).toHaveBeenCalledTimes(1);
+          const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent, Date, Date];
+          expect([start.getDate(), start.getHours()]).toEqual([25, 23]);
+          expect([end.getDate(), end.getHours()]).toEqual([26, 1]);
+        },
+      );
+
+      it("holds a moved end inside the day, one snap step after its start", () => {
+        const onDragEvent = vi.fn();
+        const { getByText } = render(TimeGrid, {
+          date: day,
+          mode: "week",
+          events: early,
+          hourHeight: 48,
+          onDragEvent: onDragEvent,
+        });
+        const box = wrapperOf(getByText("Red-eye"));
+        // Far past the top of the grid: the end stops at 00:15 (00:00 plus one
+        // 15-minute step) rather than rolling the whole event onto the 25th.
+        fireEvent.pointerDown(box, { clientY: 1500, pointerId: 1 });
+        fireEvent.pointerMove(box, { clientY: 0, pointerId: 1 });
+        fireEvent.pointerUp(box, { clientY: 0, pointerId: 1 });
+
+        const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent, Date, Date];
+        expect([start.getDate(), start.getHours(), start.getMinutes()]).toEqual([25, 22, 15]);
+        expect([end.getDate(), end.getHours(), end.getMinutes()]).toEqual([26, 0, 15]);
+      });
+
+      it("previews the head at the end of the previous column and clips the box at midnight", () => {
+        const { getByText, container } = render(TimeGrid, {
+          date: day,
+          mode: "week",
+          events: early,
+          hourHeight: 48,
+          onDragEvent: vi.fn(),
+        });
+        const box = wrapperOf(getByText("Red-eye"));
+        fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+        fireEvent.pointerMove(box, { clientY: 204, pointerId: 1 });
+        // The dragged box keeps 00:00–01:00 on the 26th.
+        expect([box.style.top, box.style.height]).toEqual(["0px", "48px"]);
+        // 23:00–24:00 on the 25th, the column before.
+        const preview = spillPreview(container)!;
+        expect([preview.style.top, preview.style.height]).toEqual([`${23 * 48}px`, "48px"]);
+        const columns = [...container.querySelectorAll('[data-slot="dayColumn"]')];
+        expect(columns.indexOf(preview.parentElement!)).toBe(
+          columns.indexOf(box.parentElement!) - 1,
+        );
+        fireEvent.pointerUp(box, { clientY: 204, pointerId: 1 });
+        expect(spillPreview(container)).toBeUndefined();
+      });
+
+      it("anchors the previous-day preview at midnight, not at the bottom of the visible window", () => {
+        const { getByText, container } = render(TimeGrid, {
+          date: day,
+          mode: "week",
+          events: early,
+          hourHeight: 48,
+          maxHour: 18,
+          onDragEvent: vi.fn(),
+        });
+        const box = wrapperOf(getByText("Red-eye"));
+        fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+        fireEvent.pointerMove(box, { clientY: 204, pointerId: 1 });
+        // The head ends at midnight, six hours below the 18:00 bottom of this grid.
+        expect(spillPreview(container)!.style.top).toBe(`${23 * 48}px`);
+        fireEvent.pointerUp(box, { clientY: 204, pointerId: 1 });
+      });
+
+      it("shows no previous-day preview in the first column, and still commits there", () => {
+        const onDragEvent = vi.fn();
+        // Sunday the 21st opens the Sunday-start week, so the 20th is out of view.
+        const sunday: CalendarEvent[] = [
+          { title: "Red-eye", start: new Date(2026, 5, 21, 1), end: new Date(2026, 5, 21, 3) },
+        ];
+        const { getByText, container } = render(TimeGrid, {
+          date: day,
+          mode: "week",
+          events: sunday,
+          hourHeight: 48,
+          onDragEvent: onDragEvent,
+        });
+        const box = wrapperOf(getByText("Red-eye"));
+        fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+        fireEvent.pointerMove(box, { clientY: 204, pointerId: 1 });
+        expect(container.querySelectorAll("[data-dragging]")).toHaveLength(1);
+        fireEvent.pointerUp(box, { clientY: 204, pointerId: 1 });
+
+        const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent, Date, Date];
+        expect([start.getDate(), start.getHours()]).toEqual([20, 23]);
+        expect([end.getDate(), end.getHours()]).toEqual([21, 1]);
+      });
+
+      it("shows no previous-day preview when the column before is not the previous day", () => {
+        // Hiding Thursday puts Wednesday the 24th right before Friday the 26th.
+        const { getByText, container } = render(TimeGrid, {
+          date: day,
+          mode: "week",
+          hiddenDays: [4],
+          events: early,
+          hourHeight: 48,
+          onDragEvent: vi.fn(),
+        });
+        const box = wrapperOf(getByText("Red-eye"));
+        fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+        fireEvent.pointerMove(box, { clientY: 204, pointerId: 1 });
+        expect(container.querySelectorAll("[data-dragging]")).toHaveLength(1);
+        fireEvent.pointerUp(box, { clientY: 204, pointerId: 1 });
+      });
+
+      it("holds the start at a window that opens after midnight", () => {
+        const onDragEvent = vi.fn();
+        const morning: CalendarEvent[] = [
+          { title: "Standup", start: new Date(2026, 5, 26, 9), end: new Date(2026, 5, 26, 11) },
+        ];
+        const { getByText } = render(TimeGrid, {
+          date: day,
+          mode: "week",
+          events: morning,
+          hourHeight: 48,
+          minHour: 8,
+          onDragEvent: onDragEvent,
+        });
+        const box = wrapperOf(getByText("Standup"));
+        fireEvent.pointerDown(box, { clientY: 1500, pointerId: 1 });
+        fireEvent.pointerMove(box, { clientY: 0, pointerId: 1 });
+        fireEvent.pointerUp(box, { clientY: 0, pointerId: 1 });
+
+        const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent, Date, Date];
+        expect([start.getDate(), start.getHours()]).toEqual([26, 8]);
+        expect([end.getDate(), end.getHours()]).toEqual([26, 10]);
+      });
+    });
+
     it("keeps a multi-day event whole when one of its day segments is dragged", () => {
       const onDragEvent = vi.fn();
       const trip: CalendarEvent[] = [
@@ -1465,6 +1627,19 @@ describe(rendererName, () => {
       // The dragged box and the preview of its tail in the next column agree.
       expect(getAllByText("23:00-01:00")).toHaveLength(2);
       fireEvent.pointerUp(box, { clientY: 396, pointerId: 1 });
+    });
+
+    it("previews the same times in the previous-day spill", () => {
+      const early: CalendarEvent[] = [
+        { title: "Early", start: new Date(2026, 5, 26, 1), end: new Date(2026, 5, 26, 3) },
+      ];
+      const { getByText, getAllByText } = grid({ mode: "week", events: early });
+      const box = getByText("01:00-03:00").parentElement!;
+      fireEvent.pointerDown(box, { clientY: 300, pointerId: 1 });
+      fireEvent.pointerMove(box, { clientY: 204, pointerId: 1 });
+      // The dragged box and the preview of its head in the previous column agree.
+      expect(getAllByText("23:00-01:00")).toHaveLength(2);
+      fireEvent.pointerUp(box, { clientY: 204, pointerId: 1 });
     });
 
     it("updates the built-in time label while moving", () => {
