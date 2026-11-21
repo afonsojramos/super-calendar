@@ -101,6 +101,27 @@ describe(rendererName, () => {
     },
   );
 
+  it("squares only the corners where an all-day bar continues past the visible days", async () => {
+    await open("all-day-spans");
+    const corners = (title: string) =>
+      page
+        .locator('[data-slot="allDayEvent"]')
+        .filter({ hasText: title })
+        .locator('[data-slot="eventBox"]')
+        .evaluate((element) => {
+          const style = getComputedStyle(element);
+          return [
+            style.borderTopLeftRadius,
+            style.borderBottomLeftRadius,
+            style.borderTopRightRadius,
+            style.borderBottomRightRadius,
+          ];
+        });
+    expect(await corners("Trip")).toEqual(["6px", "6px", "6px", "6px"]);
+    expect(await corners("Before")).toEqual(["0px", "0px", "6px", "6px"]);
+    expect(await corners("After")).toEqual(["6px", "6px", "0px", "0px"]);
+  });
+
   it("compresses hidden dates without duplicating a spanning event", async () => {
     await open("all-day-spans-hidden");
     await expectSpan("Trip", 1, 2);

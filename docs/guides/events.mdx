@@ -44,8 +44,10 @@ const events: CalendarEvent<Meta>[] = [
   spanning midnight keep a clipped segment in each day of the week/day grid.
   All-day bars span the covered visible columns, including across hidden days.
   Their `continuesBefore` and `continuesAfter` renderer hints describe clipping
-  at the visible range edges, rather than at each day. The renderer and press
-  callbacks receive the original event.
+  at the visible range edges, rather than at each day. The default all-day bar
+  squares its corners on a continuing side, like a month bar, and on the web its
+  `allDayEvent` button carries `data-continues-before` / `data-continues-after`.
+  The renderer and press callbacks receive the original event.
 
 Multi-day events remain visible on each occupied day in month and multi-week
 grids, including when a local clock change skips midnight. An event ending at

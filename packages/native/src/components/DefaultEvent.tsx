@@ -35,6 +35,8 @@ export function DefaultEvent<T>({
   mode,
   boxHeight,
   isAllDay,
+  continuesBefore,
+  continuesAfter,
   ampm = false,
   showTime = true,
   ellipsizeTitle = false,
@@ -130,6 +132,10 @@ export function DefaultEvent<T>({
         styles.box,
         isSchedule && styles.scheduleBox,
         { backgroundColor: theme.colors.eventBackground },
+        // An all-day bar clipped at the view edge squares that side, like the web
+        // renderers, so it reads as continuing. Timed segments continue vertically.
+        isAllDayEvent && continuesBefore && styles.continuesBefore,
+        isAllDayEvent && continuesAfter && styles.continuesAfter,
         event.disabled && styles.disabled,
         cellStyle,
       ]}
@@ -212,6 +218,14 @@ const styles = StyleSheet.create({
     paddingVertical: BOX_PADDING_V,
     paddingHorizontal: 4,
     overflow: "hidden",
+  },
+  continuesBefore: {
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
+  },
+  continuesAfter: {
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
   },
   // The roomy schedule-row card, matching the dom default agenda row.
   scheduleBox: {

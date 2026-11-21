@@ -460,6 +460,8 @@ function DefaultDomEvent<T>({
   mode,
   isAllDay,
   boxHeight,
+  continuesBefore,
+  continuesAfter,
   ampm = false,
   theme,
   boxProps,
@@ -499,12 +501,24 @@ function DefaultDomEvent<T>({
       ? { display: "flex", flexDirection: "column", justifyContent: "center" }
       : null),
   };
+  // An all-day bar clipped at the view edge squares that side, like a month bar,
+  // so it reads as continuing. Timed segments continue vertically and keep theirs.
+  // Longhands only: React warns when a rerender mixes them with the shorthand.
+  const squareStart = isAllDay && continuesBefore;
+  const squareEnd = isAllDay && continuesAfter;
   const boxThemed: CSSProperties = {
     padding: `${DOM_BOX_PADDING_V}px 6px`,
-    borderRadius: 6,
+    borderTopLeftRadius: squareStart ? 0 : 6,
+    borderBottomLeftRadius: squareStart ? 0 : 6,
+    borderTopRightRadius: squareEnd ? 0 : 6,
+    borderBottomRightRadius: squareEnd ? 0 : 6,
     background: theme.eventBackground,
     color: theme.eventText,
     fontSize: 12,
+  };
+  const squared: CSSProperties = {
+    ...(squareStart ? { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 } : null),
+    ...(squareEnd ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 } : null),
   };
   return (
     <div
@@ -512,8 +526,8 @@ function DefaultDomEvent<T>({
       data-slot={boxProps?.["data-slot"]}
       style={
         boxProps?.className
-          ? { ...boxBase, ...boxProps.style }
-          : { ...boxBase, ...boxThemed, ...boxProps?.style }
+          ? { ...boxBase, ...boxProps.style, ...squared }
+          : { ...boxBase, ...boxThemed, ...boxProps?.style, ...squared }
       }
     >
       <div
@@ -2030,6 +2044,10 @@ function TimeGridInner<T = unknown>(
                             labels,
                           })
                     }
+                    {...dataState({
+                      "data-continues-before": continuesBefore,
+                      "data-continues-after": continuesAfter,
+                    })}
                     {...slot("allDayEvent", {
                       base: {
                         border: "none",
