@@ -845,6 +845,17 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
         if (lastDayFocus.current === previous && previous.isConnected) lastDayFocus.current = null;
       });
   };
+  // A removed focused day counts only for the update that removed it, which may
+  // move focus to the new tab stop. Once the update is over, forget it, so a later
+  // update (a month change while focus is elsewhere) cannot take it for a removal.
+  createEffect(
+    () => _grid(),
+    () => {
+      setTimeout(() => {
+        if (lastDayFocus.current && !lastDayFocus.current.isConnected) lastDayFocus.current = null;
+      }, 0);
+    },
+  );
   // Moves DOM focus to the tab stop, only while a day of this grid owns focus.
   const alignDayFocus = (key: string | null) => {
     const active = gridRef.current?.ownerDocument.activeElement;

@@ -342,10 +342,27 @@ describe(rendererName, () => {
       const view = render(MonthView, props);
       act(() => day(view.getByRole("grid"), "2026-08-31").focus());
       act(() => focused().blur());
-      // The month changes in a later task than the blur, as it would for a user.
+      // The month changes after the blur has been handled, as it would for a user.
       await Promise.resolve();
       expect(focused()).toBe(document.body);
       view.rerender({ ...props, date: new Date(2026, 8, 15) });
+      expect(focused()).toBe(document.body);
+    });
+
+    it("leaves focus where it is when an earlier update removed the focused day", async () => {
+      // March 2026 has six Monday-first rows but five Sunday-first rows, so changing
+      // `weekStartsOn` removes the focused last-row day without changing the month.
+      const props: { date: Date; weekStartsOn: WeekStartsOn } = {
+        date: new Date(2026, 2, 15),
+        weekStartsOn,
+      };
+      const view = render(MonthView, props);
+      act(() => day(view.getByRole("grid"), "2026-03-30").focus());
+      view.rerender({ ...props, weekStartsOn: 0 });
+      expect(focused()).toBe(document.body);
+      // Later, in another task, the app moves to the next month.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      view.rerender({ ...props, weekStartsOn: 0, date: new Date(2026, 3, 15) });
       expect(focused()).toBe(document.body);
     });
   });
