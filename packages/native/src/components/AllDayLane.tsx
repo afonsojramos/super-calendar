@@ -53,7 +53,13 @@ type AllDayLaneProps<T> = {
 
 // A bar being carried. Columns index `days`, so a move maps to calendar days
 // correctly across hidden days and under RTL, where the columns run backwards.
-type LaneDrag<T> = { event: CalendarEvent<T>; fromCol: number; toCol: number };
+type LaneDrag<T> = {
+  event: CalendarEvent<T>;
+  // The bar's React key, its identity across refreshes that replace the event.
+  key: string;
+  fromCol: number;
+  toCol: number;
+};
 
 const clamp = (value: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, value));
 
@@ -109,8 +115,8 @@ export function AllDayLane<T>({
     event.draggable !== false &&
     (event.startEditable ?? eventStartEditable);
   const moves = {
-    start: (event: CalendarEvent<T>, fromCol: number) => {
-      applyDrag({ event, fromCol, toCol: fromCol });
+    start: (event: CalendarEvent<T>, key: string, fromCol: number) => {
+      applyDrag({ event, key, fromCol, toCol: fromCol });
       onDragStart?.(event);
     },
     update: (columns: number) => {
@@ -159,14 +165,15 @@ export function AllDayLane<T>({
         // so float32 accumulation cannot push a bar onto the following line.
         const wrapSlack = lastInLane ? Math.min(0.5, dayWidth / 4) : 0;
         const movable = canMove(event);
-        const carried = drag?.event === event;
+        const key = keyExtractor(event, index);
+        const carried = drag?.key === key;
         return (
           <MoveGesture
-            key={keyExtractor(event, index)}
+            key={key}
             enabled={movable}
             span={endCol - startCol + 1}
             dayWidth={dayWidth}
-            onStart={(column) => moves.start(event, startCol + column)}
+            onStart={(column) => moves.start(event, key, startCol + column)}
             onUpdate={moves.update}
             onEnd={moves.end}
             onCancel={moves.cancel}

@@ -188,6 +188,8 @@ const ALL_DAY_CHIP_BASE: CSSProperties = {
 // An all-day bar being carried across the lane. Columns index the visible days.
 type AllDayDrag<T> = {
   event: CalendarEvent<T>;
+  // The bar's identity across data refreshes that replace the event object.
+  key: string;
   fromCol: number;
   toCol: number;
   // Past the slop on a mouse, or picked up by a hold on touch and pen.
@@ -997,6 +999,8 @@ function TimeGridInner<T = unknown>(
     event: CalendarEvent<T>,
     segment: { startCol: number; endCol: number },
     armed: boolean,
+    // The press that starts a mouse drag, which also reaches the document.
+    press: Event | null,
   ) => {
     const rect = allDayGridRef.current?.getBoundingClientRect();
     const count = daysRef.current.length;
@@ -1053,8 +1057,10 @@ function TimeGridInner<T = unknown>(
     const cancel = (e: PointerEvent) => {
       if (e.pointerId === grab.pointerId) abandon();
     };
+    // Another finger, or a new press from a pointer whose release never arrived
+    // (it was lost outside the window), ends the drag rather than committing it.
     const anotherPointer = (e: PointerEvent) => {
-      if (e.pointerId !== grab.pointerId) abandon();
+      if (e !== press) abandon();
     };
     const keyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -1068,7 +1074,7 @@ function TimeGridInner<T = unknown>(
     };
     stopAllDayRef.current?.();
     stopAllDayRef.current = stop;
-    applyAllDayDrag({ event, fromCol, toCol: fromCol, armed });
+    applyAllDayDrag({ event, key: allDayKey(event), fromCol, toCol: fromCol, armed });
     onDragStart?.(event);
     doc.addEventListener("pointermove", move);
     doc.addEventListener("pointerup", up);
@@ -1089,7 +1095,6 @@ function TimeGridInner<T = unknown>(
     segment: { startCol: number; endCol: number },
   ) => {
     if (e.button > 0 || !e.isPrimary) return;
-    suppressAllDayClick.current = false;
     if (stopAllDayRef.current || activeGrabRef.current || cancelHoldRef.current) return;
     const grab: EventGrab = {
       box: e.currentTarget,
@@ -1099,7 +1104,7 @@ function TimeGridInner<T = unknown>(
       clientY: e.clientY,
     };
     if (e.pointerType === "mouse") {
-      beginAllDayDrag(grab, event, segment, false);
+      beginAllDayDrag(grab, event, segment, false, e.nativeEvent);
       return;
     }
     // Touch and pen hold first, like a timed event, so a swipe still scrolls and a
@@ -1110,7 +1115,7 @@ function TimeGridInner<T = unknown>(
       touchDragThreshold,
       () => {
         stopAllDayRef.current = null;
-        beginAllDayDrag(grab, event, segment, true);
+        beginAllDayDrag(grab, event, segment, true, null);
       },
       () => {
         stopAllDayRef.current = null;
@@ -1123,15 +1128,18 @@ function TimeGridInner<T = unknown>(
   };
 
   useEffect(() => () => stopAllDayRef.current?.(), []);
-  // A new page or a removed event leaves the drag nowhere to land.
+  // New data cancels a pending hold, as it does for a timed event. An active drag
+  // ends only when moves are switched off; it commits the event it picked up.
   useEffect(() => {
-    const current = allDayDragRef.current;
     if (!stopAllDayRef.current) return;
-    if (!current || !onDragEvent || !events.includes(current.event)) stopAllDayRef.current();
+    if (!allDayDragRef.current || !onDragEvent) stopAllDayRef.current();
   }, [events, onDragEvent]);
+  // Other visible days would change what the drag's columns mean. Compared by
+  // value, so a parent that rebuilds `date` on every render keeps the drag.
+  const visibleDaysKey = days.map((day) => day.getTime()).join();
   useEffect(() => {
     stopAllDayRef.current?.();
-  }, [days]);
+  }, [visibleDaysKey]);
 
   // Where the carried bar would land: the moved event clipped to the visible days,
   // in the lane it is carried from. Drawn only once it leaves its own column.
@@ -1142,7 +1150,7 @@ function TimeGridInner<T = unknown>(
       days[allDayDrag.fromCol],
       days[allDayDrag.toCol],
     );
-    const lane = allDayLayout.segments.find((s) => s.event === allDayDrag.event)?.lane;
+    const lane = allDayLayout.segments.find((s) => allDayKey(s.event) === allDayDrag.key)?.lane;
     if (!next || lane === undefined) return null;
     const moved: CalendarEvent<T> = { ...allDayDrag.event, start: next.start, end: next.end };
     const segment = layoutMonthWeek<T>(days, [moved]).segments[0];
@@ -2229,7 +2237,7 @@ function TimeGridInner<T = unknown>(
                 onPress: () => onPressEvent?.(event),
               };
               const movable = canMoveAllDay(event);
-              const carried = allDayDrag?.armed === true && allDayDrag.event === event;
+              const carried = allDayDrag?.armed === true && allDayDrag.key === allDayKey(event);
               return (
                 <div
                   key={allDayKey(event)}
@@ -2237,9 +2245,12 @@ function TimeGridInner<T = unknown>(
                 >
                   <button
                     type="button"
-                    onPointerDown={
-                      movable ? (e) => pressAllDay(e, event, { startCol, endCol }) : undefined
-                    }
+                    onPointerDown={(e) => {
+                      // Every press starts a new interaction, so a guard left by a drag
+                      // whose click never reached a bar is stale.
+                      suppressAllDayClick.current = false;
+                      if (movable) pressAllDay(e, event, { startCol, endCol });
+                    }}
                     onClick={(e) => {
                       if (consumeAllDayClick(e.detail)) return;
                       onPressEvent?.(event);
@@ -2310,7 +2321,6 @@ function TimeGridInner<T = unknown>(
                         {...dataState({
                           "data-continues-before": continuesBefore,
                           "data-continues-after": continuesAfter,
-                          "data-dragging": true,
                         })}
                         {...slot("allDayEvent", { base: ALL_DAY_CHIP_BASE })}
                       >
