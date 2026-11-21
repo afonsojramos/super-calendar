@@ -1,4 +1,5 @@
 import { act, fireEvent, render, within } from "@testing-library/react-native";
+import { useEffect } from "react";
 import { StyleSheet, Text, type ViewStyle } from "react-native";
 import * as gestureHandlerMock from "react-native-gesture-handler";
 import { vi } from "vitest";
@@ -205,5 +206,66 @@ describe("native month move preview lanes", () => {
     // Only Weekend's own days (18-20 June) fold the moved-down original into
     // "+1 More"; Lisbon trip's days have nothing hidden.
     expect(view.getAllByText(/More/)).toHaveLength(3);
+  });
+});
+
+describe("native month bar identity", () => {
+  // Counts how many times each bar's chip mounts, keyed by its label.
+  const mounts = new Map<string, number>();
+  const CountingChip = ({ event }: RenderEventArgs) => {
+    const label = `${event.title} ${event.start.getDate()}-${event.end.getDate()}`;
+    useEffect(() => {
+      mounts.set(label, (mounts.get(label) ?? 0) + 1);
+    }, [label]);
+    return <Text>{label}</Text>;
+  };
+  // Wednesday 17 to Friday 19 June 2026, in row 2 (14-20 June).
+  const trip = (): CalendarEvent => ({
+    title: "Trip",
+    start: new Date(2026, 5, 17),
+    end: new Date(2026, 5, 20),
+    allDay: true,
+  });
+  const element = (events: CalendarEvent[]) => (
+    <MonthView
+      date={new Date(2026, 5, 15)}
+      weekStartsOn={0}
+      events={events}
+      renderEvent={CountingChip}
+      keyExtractor={(event: CalendarEvent) => event.title ?? ""}
+      onPressEvent={() => {}}
+      onDragEvent={vi.fn()}
+    />
+  );
+  const mount = async (events: CalendarEvent[]) => {
+    mounts.clear();
+    const view = await render(element(events));
+    await fireEvent(view.getByTestId("month-grid"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 700, height: 600 } },
+    });
+    return view;
+  };
+
+  it("keeps the carried bar mounted when the preview moves it to another lane", async () => {
+    const view = await mount([trip()]);
+    const handlers = lastGesture();
+    // One day later the preview (18-20) overlaps the original, which moves down.
+    await act(() => {
+      handlers.onStart({ x: 350, y: 272 });
+      handlers.onUpdate({ x: 450, y: 272 });
+    });
+    expect(view.getAllByTestId("month-move-preview", hidden)).toHaveLength(1);
+    expect(mounts.get("Trip 17-20")).toBe(1);
+    await act(() => handlers.onEnd({}, false));
+    expect(mounts.get("Trip 17-20")).toBe(1);
+  });
+
+  it("keeps bars mounted when events are replaced with equal content", async () => {
+    const view = await mount([trip(), trip()]);
+    expect(view.getAllByText("Trip 17-20")).toHaveLength(2);
+    expect(mounts.get("Trip 17-20")).toBe(2);
+    await view.rerender(element([trip(), trip()]));
+    expect(view.getAllByText("Trip 17-20")).toHaveLength(2);
+    expect(mounts.get("Trip 17-20")).toBe(2);
   });
 });
