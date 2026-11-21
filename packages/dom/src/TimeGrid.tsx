@@ -56,6 +56,8 @@ import {
   isWeekend,
   layoutDayEvents,
   layoutMonthWeek,
+  monthDropBounds,
+  type MonthEventSegment,
   overlapsOtherEvents,
   type PositionedEvent,
   useNow,
@@ -158,6 +160,55 @@ const EDGE_ZONE = 32;
 const EDGE_DWELL_MS = 600;
 const EDGE_REPEAT_MS = 600;
 const CELL_TOUCH_SLOP_PX = 8;
+// A mouse press on an all-day bar becomes a move after this much travel, so a
+// click with a little jitter still presses it (the month grid uses the same slop).
+const ALL_DAY_DRAG_SLOP_PX = 4;
+// The carried all-day bar fades like a month bar; its preview matches a moved box.
+const ALL_DAY_CARRIED_OPACITY = 0.4;
+const ALL_DAY_PREVIEW_OPACITY = 0.85;
+
+// An all-day cell spanning its visible columns, matching the timed columns' grid
+// line and horizontal inset.
+const allDayColumnBase = (startCol: number, endCol: number, lane: number): CSSProperties => ({
+  gridColumn: `${startCol + 1} / span ${endCol - startCol + 1}`,
+  gridRow: lane + 1,
+  minWidth: 0,
+  borderLeft: "1px solid transparent",
+  padding: "0 1px",
+  display: "flex",
+  flexDirection: "column",
+});
+const ALL_DAY_CHIP_BASE: CSSProperties = {
+  border: "none",
+  padding: 0,
+  background: "transparent",
+  textAlign: "left",
+  height: 22,
+};
+
+// Whether two event objects are the same all-day bar: the same `getEventId`, or,
+// without IDs, the same dates and title.
+function isSameAllDayBar<T>(
+  a: CalendarEvent<T>,
+  b: CalendarEvent<T>,
+  getEventId?: (event: CalendarEvent<T>) => string | number,
+) {
+  if (getEventId) return getEventId(a) === getEventId(b);
+  return (
+    a.start.getTime() === b.start.getTime() &&
+    a.end.getTime() === b.end.getTime() &&
+    a.title === b.title
+  );
+}
+
+// An all-day bar being carried across the lane. Columns index the visible days.
+type AllDayDrag<T> = {
+  event: CalendarEvent<T>;
+  fromCol: number;
+  toCol: number;
+  // Past the slop on a mouse, or picked up by a hold on touch and pen.
+  armed: boolean;
+};
 
 // Off-screen but readable by assistive tech: gives an element an accessible name
 // without changing the visible layout.
@@ -934,6 +985,210 @@ function TimeGridInner<T = unknown>(
     }
     return `object:${key}`;
   };
+
+  // Moving an all-day bar across the lane's day columns. The pointer is followed
+  // at the document level, and the drop is the column under it, clamped to the
+  // visible days. Both ends shift by the same number of calendar days.
+  const [allDayDrag, setAllDayDrag] = useState<AllDayDrag<T> | null>(null);
+  const allDayDragRef = useRef<AllDayDrag<T> | null>(null);
+  const applyAllDayDrag = (next: AllDayDrag<T> | null) => {
+    allDayDragRef.current = next;
+    setAllDayDrag(next);
+  };
+  const allDayGridRef = useRef<HTMLDivElement>(null);
+  // Ends the active all-day drag, or the touch hold that would start one.
+  const stopAllDayRef = useRef<(() => void) | null>(null);
+  // Set when a drag ends, so the click the browser fires next does not also press
+  // the event. Keyboard and assistive-technology clicks have detail 0.
+  const suppressAllDayClick = useRef(false);
+  const consumeAllDayClick = (detail: number) => {
+    if (detail === 0 || !suppressAllDayClick.current) return false;
+    suppressAllDayClick.current = false;
+    return true;
+  };
+  const canMoveAllDay = (event: CalendarEvent<T>) => !event.disabled && editability(event).canMove;
+  // The lane segment of the bar being carried. A refresh can replace the event
+  // object mid-drag, so a missing original falls back to `getEventId`, or to its
+  // dates and title.
+  const carriedSegment = (drag: AllDayDrag<T>, segments: readonly MonthEventSegment<T>[]) =>
+    segments.find((s) => s.event === drag.event) ??
+    segments.find((s) => isSameAllDayBar(s.event, drag.event, getEventId));
+  const allDaySegmentsRef = useRef(allDayLayout.segments);
+  allDaySegmentsRef.current = allDayLayout.segments;
+
+  const beginAllDayDrag = (
+    grab: EventGrab,
+    event: CalendarEvent<T>,
+    segment: { startCol: number; endCol: number },
+    armed: boolean,
+    // The press that starts a mouse drag, which also reaches the document.
+    press: Event | null,
+  ) => {
+    const rect = allDayGridRef.current?.getBoundingClientRect();
+    const count = daysRef.current.length;
+    const columnWidth = rect && count > 0 ? rect.width / count : 0;
+    if (!rect || columnWidth <= 0) return;
+    const fromCol = clamp(
+      Math.floor((grab.clientX - rect.left) / columnWidth),
+      segment.startCol,
+      segment.endCol,
+    );
+    const touch = grab.pointerType !== "mouse";
+    const doc = grab.box.ownerDocument;
+    const stop = () => {
+      doc.removeEventListener("pointermove", move);
+      doc.removeEventListener("pointerup", up);
+      doc.removeEventListener("pointercancel", cancel);
+      doc.removeEventListener("pointerdown", anotherPointer);
+      doc.removeEventListener("keydown", keyDown);
+      doc.removeEventListener("touchmove", preventNative);
+      doc.removeEventListener("contextmenu", preventNative);
+      doc.removeEventListener("selectstart", preventNative, true);
+      doc.removeEventListener("dragstart", preventNative, true);
+      stopAllDayRef.current = null;
+      applyAllDayDrag(null);
+    };
+    const abandon = () => {
+      // The click that may still follow belongs to the abandoned drag.
+      suppressAllDayClick.current = true;
+      stop();
+    };
+    const move = (e: PointerEvent) => {
+      const current = allDayDragRef.current;
+      if (!current || e.pointerId !== grab.pointerId) return;
+      const travelled = Math.hypot(e.clientX - grab.clientX, e.clientY - grab.clientY);
+      if (!current.armed && travelled <= ALL_DAY_DRAG_SLOP_PX) return;
+      const toCol = clamp(
+        fromCol + Math.round((e.clientX - grab.clientX) / columnWidth),
+        0,
+        daysRef.current.length - 1,
+      );
+      if (current.armed && toCol === current.toCol) return;
+      applyAllDayDrag({ ...current, toCol, armed: true });
+    };
+    const up = (e: PointerEvent) => {
+      const current = allDayDragRef.current;
+      if (!current || e.pointerId !== grab.pointerId) return;
+      stop();
+      if (!current.armed) return;
+      suppressAllDayClick.current = true;
+      // Report the event as it is now, so `eventOverlap` does not count the
+      // carried event's own refreshed copy as another event.
+      const event = carriedSegment(current, allDaySegmentsRef.current)?.event ?? current.event;
+      const visible = daysRef.current;
+      const next = monthDropBounds(event, visible[current.fromCol], visible[current.toCol]);
+      if (next) onDragEventRef.current?.(event, next.start, next.end);
+    };
+    const cancel = (e: PointerEvent) => {
+      if (e.pointerId === grab.pointerId) abandon();
+    };
+    // Another finger, or a new press from a pointer whose release never arrived
+    // (it was lost outside the window), ends the drag rather than committing it.
+    // A lost mouse release leaves no click behind, so that press keeps its own.
+    const anotherPointer = (e: PointerEvent) => {
+      if (e === press) return;
+      if (e.pointerType === "mouse") stop();
+      else abandon();
+    };
+    const keyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      abandon();
+    };
+    // A held touch drag owns the gesture: no scrolling, context menu, or text
+    // selection until it ends.
+    const preventNative = (e: Event) => {
+      if (e.cancelable) e.preventDefault();
+    };
+    stopAllDayRef.current?.();
+    stopAllDayRef.current = stop;
+    applyAllDayDrag({ event, fromCol, toCol: fromCol, armed });
+    onDragStart?.(event);
+    doc.addEventListener("pointermove", move);
+    doc.addEventListener("pointerup", up);
+    doc.addEventListener("pointercancel", cancel);
+    doc.addEventListener("pointerdown", anotherPointer);
+    doc.addEventListener("keydown", keyDown);
+    if (touch) {
+      doc.addEventListener("touchmove", preventNative, { passive: false });
+      doc.addEventListener("contextmenu", preventNative);
+    }
+    doc.addEventListener("selectstart", preventNative, true);
+    doc.addEventListener("dragstart", preventNative, true);
+  };
+
+  const pressAllDay = (
+    e: ReactPointerEvent<HTMLElement>,
+    event: CalendarEvent<T>,
+    segment: { startCol: number; endCol: number },
+  ) => {
+    if (e.button > 0 || !e.isPrimary) return;
+    if (stopAllDayRef.current || activeGrabRef.current || cancelHoldRef.current) return;
+    const grab: EventGrab = {
+      box: e.currentTarget,
+      pointerId: e.pointerId,
+      pointerType: e.pointerType,
+      clientX: e.clientX,
+      clientY: e.clientY,
+    };
+    if (e.pointerType === "mouse") {
+      beginAllDayDrag(grab, event, segment, false, e.nativeEvent);
+      return;
+    }
+    // Touch and pen hold first, like a timed event, so a swipe still scrolls and a
+    // tap presses the event from its own click.
+    const cancelHold = waitForHold(
+      grab,
+      touchDragDelay,
+      touchDragThreshold,
+      () => {
+        stopAllDayRef.current = null;
+        beginAllDayDrag(grab, event, segment, true, null);
+      },
+      () => {
+        stopAllDayRef.current = null;
+      },
+      () => {
+        stopAllDayRef.current = null;
+      },
+    );
+    stopAllDayRef.current = cancelHold;
+  };
+
+  useEffect(() => () => stopAllDayRef.current?.(), []);
+  // New data cancels a pending hold, as it does for a timed event. An active drag
+  // ends only when moves are switched off; it commits the event it picked up.
+  useEffect(() => {
+    if (!stopAllDayRef.current) return;
+    if (!allDayDragRef.current || !onDragEvent) stopAllDayRef.current();
+  }, [events, onDragEvent]);
+  // Other visible days would change what the drag's columns mean. Compared by
+  // value, so a parent that rebuilds `date` on every render keeps the drag.
+  const visibleDaysKey = days.map((day) => day.getTime()).join();
+  useEffect(() => {
+    stopAllDayRef.current?.();
+  }, [visibleDaysKey]);
+
+  const carriedBar = allDayDrag?.armed
+    ? carriedSegment(allDayDrag, allDayLayout.segments)
+    : undefined;
+  const carriedEvent = carriedBar?.event;
+  const carriedLane = carriedBar?.lane;
+
+  // Where the carried bar would land: the moved event clipped to the visible days,
+  // in the lane it is carried from. Drawn only once it leaves its own column.
+  const allDayPreview = useMemo(() => {
+    if (!allDayDrag?.armed || allDayDrag.toCol === allDayDrag.fromCol) return null;
+    const next = monthDropBounds(
+      allDayDrag.event,
+      days[allDayDrag.fromCol],
+      days[allDayDrag.toCol],
+    );
+    if (!next || carriedLane === undefined) return null;
+    const moved: CalendarEvent<T> = { ...allDayDrag.event, start: next.start, end: next.end };
+    const segment = layoutMonthWeek<T>(days, [moved]).segments[0];
+    return segment ? { ...segment, lane: carriedLane } : null;
+  }, [allDayDrag, days, carriedLane]);
 
   useEffect(() => {
     // On mount / when the offset prop changes, not on every zoom (hence the ref).
@@ -1993,6 +2248,7 @@ function TimeGridInner<T = unknown>(
             {showAllDayLabel ? labels.allDay : null}
           </div>
           <div
+            ref={allDayGridRef}
             style={{
               flex: 1,
               minWidth: 0,
@@ -2013,25 +2269,25 @@ function TimeGridInner<T = unknown>(
                 ampm,
                 onPress: () => onPressEvent?.(event),
               };
+              const movable = canMoveAllDay(event);
+              const carried = carriedEvent === event;
               return (
                 <div
                   key={allDayKey(event)}
-                  {...slot("allDayColumn", {
-                    base: {
-                      gridColumn: `${startCol + 1} / span ${endCol - startCol + 1}`,
-                      gridRow: lane + 1,
-                      minWidth: 0,
-                      // Match the timed columns' grid line and horizontal inset.
-                      borderLeft: "1px solid transparent",
-                      padding: "0 1px",
-                      display: "flex",
-                      flexDirection: "column",
-                    },
-                  })}
+                  {...slot("allDayColumn", { base: allDayColumnBase(startCol, endCol, lane) })}
                 >
                   <button
                     type="button"
-                    onClick={() => onPressEvent?.(event)}
+                    onPointerDown={(e) => {
+                      // Every press starts a new interaction, so a guard left by a drag
+                      // whose click never reached a bar is stale.
+                      suppressAllDayClick.current = false;
+                      if (movable) pressAllDay(e, event, { startCol, endCol });
+                    }}
+                    onClick={(e) => {
+                      if (consumeAllDayClick(e.detail)) return;
+                      onPressEvent?.(event);
+                    }}
                     aria-label={
                       eventAccessibilityLabel
                         ? eventAccessibilityLabel(event, { mode, isAllDay: true, ampm })
@@ -2047,15 +2303,16 @@ function TimeGridInner<T = unknown>(
                     {...dataState({
                       "data-continues-before": continuesBefore,
                       "data-continues-after": continuesAfter,
+                      "data-dragging": carried,
                     })}
                     {...slot("allDayEvent", {
                       base: {
-                        border: "none",
-                        padding: 0,
-                        background: "transparent",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        height: 22,
+                        ...ALL_DAY_CHIP_BASE,
+                        cursor: movable ? "grab" : "pointer",
+                        ...(movable
+                          ? { touchAction: "pan-y", userSelect: "none", WebkitTouchCallout: "none" }
+                          : null),
+                        ...(carried ? { opacity: ALL_DAY_CARRIED_OPACITY } : null),
                       },
                     })}
                   >
@@ -2068,6 +2325,48 @@ function TimeGridInner<T = unknown>(
                 </div>
               );
             })}
+            {allDayPreview
+              ? (() => {
+                  const { event, startCol, endCol, lane, continuesBefore, continuesAfter } =
+                    allDayPreview;
+                  const args: DomRenderEventArgs<T> = {
+                    event,
+                    mode,
+                    isAllDay: true,
+                    continuesBefore,
+                    continuesAfter,
+                    ampm,
+                    onPress: () => {},
+                  };
+                  return (
+                    <div
+                      aria-hidden="true"
+                      {...slot("allDayColumn", {
+                        base: {
+                          ...allDayColumnBase(startCol, endCol, lane),
+                          pointerEvents: "none",
+                          zIndex: 1,
+                          opacity: ALL_DAY_PREVIEW_OPACITY,
+                        },
+                      })}
+                    >
+                      <div
+                        {...dataState({
+                          "data-continues-before": continuesBefore,
+                          "data-continues-after": continuesAfter,
+                        })}
+                        {...slot("allDayEvent", { base: ALL_DAY_CHIP_BASE })}
+                      >
+                        {Renderer ? (
+                          <Renderer {...args} />
+                        ) : (
+                          <DefaultDomEvent {...args} theme={theme} boxProps={slot("eventBox")} />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()
+              : null}
           </div>
         </div>
       ) : null}

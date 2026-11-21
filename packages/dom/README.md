@@ -16,6 +16,7 @@ clipping at the visible range edges. The default bar squares its corners on a
 continuing side, and the `allDayEvent` button carries `data-continues-before` /
 `data-continues-after` there. The `allDayColumn` slot styles one
 spanning cell. Timed events that cross midnight keep their per-day segments.
+With `onDragEvent`, you can drag an all-day bar to other visible days.
 
 ## Install
 

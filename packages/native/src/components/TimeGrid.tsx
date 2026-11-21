@@ -2288,6 +2288,9 @@ function TimetablePageInner<T>({
             keyExtractor={keyExtractor}
             onPressEvent={onPressEvent}
             onLongPressEvent={onLongPressEvent}
+            onDragEvent={onDragEvent}
+            onDragStart={onDragStart}
+            eventStartEditable={eventStartEditable}
             onLayout={reportLaneLayout}
           />
         </Animated.View>
