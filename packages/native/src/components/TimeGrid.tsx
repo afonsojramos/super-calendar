@@ -3524,6 +3524,7 @@ function TimeGridInner<T>(
   useEffect(
     () => () => {
       if (pagerIdleTimerRef.current) clearTimeout(pagerIdleTimerRef.current);
+      pagerIdleTimerRef.current = null;
     },
     [],
   );

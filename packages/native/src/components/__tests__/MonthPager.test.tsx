@@ -406,6 +406,39 @@ describe("MonthPager controlled swipes", () => {
     }
   });
 
+  it("cancels the Android release timer when the drag ends normally", async () => {
+    const os = Platform.OS;
+    Platform.OS = "android";
+    vi.useFakeTimers();
+    try {
+      const scrollToIndex = vi.fn();
+      (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex = scrollToIndex;
+      await render(
+        <Calendar
+          mode="month"
+          date={new Date(2026, 10, 6)}
+          events={[]}
+          onChangeDate={noop}
+          onPressEvent={noop}
+        />,
+      );
+      const activeIndex = lastListProps()?.initialScrollIndex as number;
+      type Pager = { onScrollBeginDrag: () => void; onScrollEndDrag: () => void };
+      const pager = () => lastListProps() as Pager;
+      await act(() => pager().onScrollBeginDrag());
+      await swipeTo(activeIndex + 1);
+      await act(() => pager().onScrollEndDrag());
+      expect(scrollToIndex).toHaveBeenCalledTimes(1);
+      // A new drag that holds still must not be released by the old drag's timer.
+      await act(() => pager().onScrollBeginDrag());
+      await act(() => vi.advanceTimersByTime(1500));
+      expect(scrollToIndex).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+      Platform.OS = os;
+    }
+  });
+
   it("does not page back when the app accepts the date in a transition", async () => {
     const scrollToIndex = vi.fn();
     (globalThis as { __scrollToIndex?: unknown }).__scrollToIndex = scrollToIndex;

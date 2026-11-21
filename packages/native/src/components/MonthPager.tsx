@@ -393,6 +393,7 @@ function DateRowsPagerInner<T>({
   useEffect(
     () => () => {
       if (heldReleaseTimerRef.current) clearTimeout(heldReleaseTimerRef.current);
+      heldReleaseTimerRef.current = null;
     },
     [],
   );
