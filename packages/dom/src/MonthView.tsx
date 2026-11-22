@@ -894,9 +894,9 @@ export function DateRows<T = unknown>({
       laneCount > maxVisibleEventCount ? Math.max(maxVisibleEventCount - 1, 1) : laneCount,
     [maxVisibleEventCount],
   );
-  // While a create sweep draws its content, lay the rows it covers out with the
-  // draft as an all-day event, so it takes the lane the created event will land on
-  // and the other bars move aside the same way.
+  // While a create sweep draws its content, the rows it covers put the draft on
+  // lane 0 as an all-day event and move the bars it overlaps down, so the draft
+  // keeps its lane as the sweep grows.
   const draftEvent = useMemo(
     () =>
       createRange
@@ -921,12 +921,9 @@ export function DateRows<T = unknown>({
         week.days.map((d) => d.date),
         collectRowEvents(week, days),
       );
-      return keepMonthDraftVisible(placed, base, draftEvent, {
-        visibleLanes: visibleLanesFor,
-        extraLaneFits: (visibleLanes) => visibleLanes < maxVisibleEventCount,
-      });
+      return keepMonthDraftVisible(placed, base, draftEvent);
     });
-  }, [draftEvent, weekLayouts, eventsByDay, weeks, visibleLanesFor, maxVisibleEventCount]);
+  }, [draftEvent, weekLayouts, eventsByDay, weeks]);
   const movedRef = useRef(false);
   // Set when a drag commits, so the click the browser fires next is swallowed (it
   // must not also open the day, or the event the drag landed on). A drag that ends

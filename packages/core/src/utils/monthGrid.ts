@@ -195,7 +195,12 @@ export function withDraftEventDays<T>(
   return days;
 }
 
-/** How a renderer shows a week row's lanes, for {@link keepMonthDraftVisible}. */
+/**
+ * How a renderer shows a week row's lanes.
+ *
+ * @deprecated {@link keepMonthDraftVisible} always puts the draft on lane 0 and
+ * no longer reads this.
+ */
 export interface MonthRowLanes {
   /** Lanes every day of a row with `laneCount` lanes shows. */
   visibleLanes: (laneCount: number) => number;
@@ -207,36 +212,44 @@ export interface MonthRowLanes {
 }
 
 /**
- * A week row's layout with a create draft kept in view. `withDraft` lays the row
- * out with the draft where the created event will land. When the row would hide
- * that lane, the draft moves to lane 0 instead and the row's other bars
- * (`withoutDraft`) move down one lane. A draft on the first hidden lane stays put
- * when every day it covers draws that lane in place of its label. A row the draft
- * misses comes back as `withDraft`.
+ * A week row's layout with a create draft on lane 0, so the draft stays on the
+ * top lane as the sweep grows. `withDraft` is a layout of the row that includes
+ * the draft (such as one built from {@link withDraftEventDays}) and gives the
+ * draft's columns. `withoutDraft` is the row's layout without it. Each bar the
+ * draft overlaps on lane 0 moves down one lane, and so does each bar a moved bar
+ * then overlaps. Every other bar keeps its lane, so the bars keep their relative
+ * order. A row the draft misses comes back as `withDraft`. The last argument is
+ * ignored and kept for compatibility.
  */
 export function keepMonthDraftVisible<T>(
   withDraft: MonthWeekEvents<T>,
   withoutDraft: MonthWeekEvents<T>,
   draft: CalendarEvent<T>,
-  { visibleLanes, extraLaneFits }: MonthRowLanes,
+  _lanes?: MonthRowLanes,
 ): MonthWeekEvents<T> {
   const segment = withDraft.segments.find((s) => s.event === draft);
   if (!segment) return withDraft;
-  const shown = visibleLanes(withDraft.laneCount);
-  if (segment.lane < shown) return withDraft;
-  if (segment.lane === shown && extraLaneFits?.(shown)) {
-    const columns = Math.max(...withDraft.segments.map((s) => s.endCol)) + 1;
-    const extraLane = monthExtraLaneColumns(withDraft, shown, columns);
-    let drawn = true;
-    for (let col = segment.startCol; col <= segment.endCol; col++) drawn &&= extraLane[col];
-    if (drawn) return withDraft;
+  const lanes = withoutDraft.segments.map((s) => s.lane);
+  // Bars arriving on `lane`: the draft first, then the bars moved down from above.
+  // A bar that started on `lane` and overlaps one of them moves down in turn. Bars
+  // that shared a lane never overlap each other, so one step per lane suffices.
+  let arriving: { startCol: number; endCol: number }[] = [segment];
+  for (let lane = 0; arriving.length > 0; lane++) {
+    const moved: { startCol: number; endCol: number }[] = [];
+    withoutDraft.segments.forEach((s, i) => {
+      if (s.lane !== lane) return;
+      if (!arriving.some((a) => a.startCol <= s.endCol && s.startCol <= a.endCol)) return;
+      lanes[i] = lane + 1;
+      moved.push(s);
+    });
+    arriving = moved;
   }
   return {
     segments: [
       { ...segment, lane: 0 },
-      ...withoutDraft.segments.map((s) => ({ ...s, lane: s.lane + 1 })),
+      ...withoutDraft.segments.map((s, i) => (lanes[i] === s.lane ? s : { ...s, lane: lanes[i] })),
     ],
-    laneCount: withoutDraft.laneCount + 1,
+    laneCount: Math.max(1, ...lanes.map((lane) => lane + 1)),
   };
 }
 
