@@ -12,6 +12,7 @@ import {
   type DateSelectionConstraints,
   dayAccessibilityLabel,
   dayBadgeKind,
+  eventDayKeys,
   type EventAccessibilityLabeler,
   groupEventsByDay,
   isAllDayEvent,
@@ -91,6 +92,7 @@ const CHIP_GAP = 2;
 const CELL_PAD = 4;
 // Opacity of an event chip while it is being dragged to another day.
 const DRAGGED_CHIP_OPACITY = 0.4;
+const noop = () => {};
 // How far a press travels before it becomes a drag. Until then the chips stay
 // hit-testable, so a click still reaches the chip it pressed.
 const DRAG_SLOP_PX = 4;
@@ -248,8 +250,9 @@ export interface MonthViewProps<T = unknown>
    * In events mode, enables drag-to-reschedule: press an event chip and drop it on
    * another day. Called with the event and its new `start`/`end`, both shifted by
    * the whole days dragged, so the time of day and duration are preserved. Return
-   * `false` to reject the drop. The day under the pointer carries `data-drop` for
-   * styling.
+   * `false` to reject the drop. While the event is over another day, a preview of
+   * it (`data-dragging`) shows where it lands, and each day it would cover carries
+   * `data-drop` for styling.
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
   /** Fired the instant an event is picked up for a drag, before anything is committed. */
@@ -929,20 +932,49 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
   // While a create sweep draws its content, the rows it covers put the draft on
   // lane 0 as an all-day event and move the bars it overlaps down, so the draft
   // keeps its lane as the sweep grows.
-  const draftEvent = createMemo(() => {
+  const createDraft = createMemo(() => {
     const range = createRange();
     return range
       ? ({ title: "", start: range.start, end: range.end, allDay: true } as CalendarEvent<T>)
       : null;
   });
+  // A move over another day previews the event at its destination the same way:
+  // a copy with the shifted bounds the drop would commit, laid out beside the
+  // faded original.
+  const moveSpan = createMemo(
+    () => {
+      const current = drag();
+      return current?.kind === "move"
+        ? { event: current.event, from: current.from, to: current.to }
+        : null;
+    },
+    {
+      // Arming a drag replaces it without moving it; keep the same preview.
+      equals: (a, b) =>
+        a === b || (!!a && !!b && a.event === b.event && a.from === b.from && a.to === b.to),
+    },
+  );
+  const movePreview = createMemo(() => {
+    const span = moveSpan();
+    if (!span) return null;
+    const bounds = monthDropBounds(span.event, new Date(span.from), new Date(span.to));
+    return bounds ? { ...span.event, ...bounds } : null;
+  });
+  const draftEvent = createMemo(() => createDraft() ?? movePreview());
+  // The days the draft covers, as `eventsByDay` keys.
+  const draftDays = createMemo(() => {
+    const draft = draftEvent();
+    return draft ? new Set(eventDayKeys(draft)) : null;
+  });
   const rowLayouts = createMemo(() => {
     const draft = draftEvent();
+    const covered = draftDays();
     const base = weekLayouts();
-    if (!draft) return base;
+    if (!draft || !covered) return base;
     const days = withDraftEventDays(eventsByDay(), draft);
     return _grid().weeks.map((week, index) => {
       const row = base[index] ?? EMPTY_LAYOUT;
-      if (!week.days.some((d) => d.date >= draft.start && d.date < draft.end)) return row;
+      if (!week.days.some((d) => covered.has(startOfDay(d.date).toISOString()))) return row;
       const placed = layoutMonthWeek(
         week.days.map((d) => d.date),
         collectRowEvents(week, days),
@@ -1401,7 +1433,15 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                 if (!segment) return null;
                 const start = Math.max(segment.startCol, columns().first);
                 const end = Math.min(segment.endCol, columns().last);
-                return start <= end ? { start, end, lane: segment.lane } : null;
+                return start <= end
+                  ? {
+                      start,
+                      end,
+                      lane: segment.lane,
+                      continuesBefore: segment.continuesBefore || start > segment.startCol,
+                      continuesAfter: segment.continuesAfter || end < segment.endCol,
+                    }
+                  : null;
               });
               const draftTop = createMemo(
                 () =>
@@ -1512,15 +1552,13 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                         dayTime() <= Math.max(currentDrag.anchor, currentDrag.hover)
                                       );
                                     });
-                                    // The day an event is about to land on (not the one it came from).
-                                    const isDropTarget = createMemo(() => {
-                                      const currentDrag = drag();
-                                      return (
-                                        currentDrag?.kind === "move" &&
-                                        dayTime() === currentDrag.to &&
-                                        currentDrag.to !== currentDrag.from
-                                      );
-                                    });
+                                    // Every day a moved event would cover once dropped, while
+                                    // it is over a day other than the one it came from.
+                                    const isDropTarget = createMemo(
+                                      () =>
+                                        movePreview() !== null &&
+                                        !!draftDays()?.has(startOfDay(day().date).toISOString()),
+                                    );
                                     // Present/absent data-* attributes so consumers can style day state
                                     // with CSS/Tailwind variants (e.g. `data-[today]:bg-blue-500`).
                                     const dayData = createMemo(() =>
@@ -1733,6 +1771,85 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                 component={props.renderCreateGhost!}
                                                 start={createRange()!.start}
                                                 end={createRange()!.end}
+                                              />
+                                            </div>
+                                          </Show>
+                                          {/* Where a moved event lands: its chip at the destination,
+                                           on the top lane, beside the faded original. */}
+                                          <Show
+                                            when={
+                                              movePreview() &&
+                                              draftSpan()?.start === dayCol &&
+                                              draftHeight() > 0
+                                            }
+                                          >
+                                            <div
+                                              data-dragging=""
+                                              inert
+                                              aria-hidden="true"
+                                              style={css({
+                                                position: "absolute",
+                                                left: 2,
+                                                width: `calc(${(draftSpan()!.end - dayCol + 1) * 100}% - 4px)`,
+                                                top: draftTop(),
+                                                height: draftHeight(),
+                                                overflow: "hidden",
+                                                pointerEvents: "none",
+                                                zIndex: 3,
+                                              })}
+                                            >
+                                              {Chip() ? (
+                                                <Dynamic
+                                                  component={Chip()}
+                                                  mode={viewMode()}
+                                                  event={movePreview()!}
+                                                  onPress={noop}
+                                                />
+                                              ) : (
+                                                <span
+                                                  {...barChip()}
+                                                  style={css({
+                                                    ...barChip().style,
+                                                    ...(draftSpan()!.continuesBefore
+                                                      ? {
+                                                          borderTopLeftRadius: 0,
+                                                          borderBottomLeftRadius: 0,
+                                                        }
+                                                      : null),
+                                                    ...(draftSpan()!.continuesAfter
+                                                      ? {
+                                                          borderTopRightRadius: 0,
+                                                          borderBottomRightRadius: 0,
+                                                        }
+                                                      : null),
+                                                  })}
+                                                >
+                                                  {movePreview()!.title}
+                                                </span>
+                                              )}
+                                              {/* The default chip's background is the drop tint's colour,
+                                               so an outline drawn over the chip marks the preview. */}
+                                              <span
+                                                style={css({
+                                                  position: "absolute",
+                                                  inset: 0,
+                                                  boxSizing: "border-box",
+                                                  border: `1px solid ${theme().selectedBackground}`,
+                                                  borderRadius: 4,
+                                                  pointerEvents: "none",
+                                                  ...(draftSpan()!.continuesBefore
+                                                    ? {
+                                                        borderTopLeftRadius: 0,
+                                                        borderBottomLeftRadius: 0,
+                                                      }
+                                                    : null),
+                                                  ...(draftSpan()!.continuesAfter
+                                                    ? {
+                                                        borderTopRightRadius: 0,
+                                                        borderBottomRightRadius: 0,
+                                                      }
+                                                    : null),
+                                                })}
                                               />
                                             </div>
                                           </Show>

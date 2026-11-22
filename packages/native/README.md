@@ -135,7 +135,9 @@ On the standalone `TimeGrid`, the same props are `contentPaddingBottom`,
 Pass `onDragEvent` and update your event state with the returned `start` and `end`.
 On the time grid, dragging any segment of a multi-day event previews the whole
 range moving together and preserves its duration. Drag a resize grip to change
-only the start or end. See the [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
+only the start or end. In month and multi-week views, a preview
+of the moved event spans every day it would cover, and your month event renderer
+draws it with the shifted `start` and `end`. See the [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
 
 After edge paging, the floating event's horizontal centre selects the destination
 day, and its top edge selects the time.

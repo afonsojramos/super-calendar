@@ -136,9 +136,10 @@ variant works on either slot (e.g. `dayBadge: "data-[today]:bg-blue-600"`).
 | `data-outside`          | day / badge                    | the day belongs to an adjacent month           |
 | `data-disabled`         | day / badge                    | the day is disabled (`min`/`maxDate`)          |
 | `data-creating`         | day / badge                    | the day is inside a drag-to-create span        |
-| `data-drop`             | day / badge                    | a dragged event would land on this day         |
+| `data-drop`             | day / badge                    | a moved event would cover this day             |
 | `data-events`           | year day                       | the day holds at least one event               |
 | `data-dragging`         | time-grid event, all-day event | the event is being dragged                     |
+| `data-dragging`         | month preview                  | the preview of a moved event                   |
 | `data-continues-before` | all-day event                  | the bar continues before the first visible day |
 | `data-continues-after`  | all-day event                  | the bar continues after the last visible day   |
 

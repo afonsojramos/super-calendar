@@ -146,8 +146,11 @@ across others (press and drag on the web) to sweep a span: `onSelectDrag` report
 it live as the ordered `[start, end]` days, `onCreateEvent` reports it once on
 release as an all-day range. **Hold an event chip** and drop it on another day and
 `onDragEvent` fires with the event shifted by whole days, keeping its time of day
-and duration. `selectedDates` / `selectedRange` (with `minDate`, `maxDate`,
-`isDateDisabled`) draw the selection.
+and duration. While you carry it, a preview of the event spans the days it would
+cover on the top lane, outlined, and those days are tinted. Only the bars the
+preview overlaps move down.
+`selectedDates` / `selectedRange` (with `minDate`, `maxDate`, `isDateDisabled`)
+draw the selection.
 
 ```tsx
 <Calendar

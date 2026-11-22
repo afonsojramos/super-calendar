@@ -47,6 +47,10 @@ const allDayEvents: FixtureEvent[] = [
     allDay: false,
   },
 ];
+// Friday to Sunday, so a one-day move crosses into the next week row.
+const tripEvents: FixtureEvent[] = [
+  { id: 0, title: "Trip", start: new Date(2026, 6, 17), end: new Date(2026, 6, 20), allDay: true },
+];
 const recurringEvents: FixtureEvent[] = [
   { ...initialEvents[0], recurrence: { freq: "daily", count: 1 } },
 ];
@@ -248,7 +252,9 @@ export function Fixture() {
                     ? manyEvents
                     : view === "edit"
                       ? editEvents
-                      : initialEvents,
+                      : view.endsWith("-trip")
+                        ? tripEvents
+                        : initialEvents,
   );
   const [boardEvents, setBoardEvents] = useFixtureState(
     view.endsWith("crowded")
@@ -408,9 +414,9 @@ export function Fixture() {
           maxVisibleEventCount={3}
           onPressEvent={(event) => record(`press:${event.title}`)}
         />
-      ) : view.startsWith("multiweek") || view === "month-drag" ? (
+      ) : view.startsWith("multiweek") || view.startsWith("month-drag") ? (
         <Calendar
-          mode={view === "month-drag" ? "month" : "multiweek"}
+          mode={view.startsWith("month-drag") ? "month" : "multiweek"}
           date={date() ?? anchor}
           numberOfWeeks={updated() ? 3 : view.includes("eight") ? 8 : 2}
           weekStartsOn={1}
