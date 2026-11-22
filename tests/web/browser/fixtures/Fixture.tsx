@@ -387,6 +387,16 @@ export function Fixture() {
               : undefined
           }
           onPressEvent={(event) => record(`press:${event.title}`)}
+          onDragEvent={
+            view === "all-day-drag"
+              ? (event, start, end) => {
+                  record(`${event.title}@${clock(start)}-${clock(end)}`);
+                  setEvents((current) =>
+                    current.map((item) => (item.id === event.id ? { ...item, start, end } : item)),
+                  );
+                }
+              : undefined
+          }
         />
       ) : view === "month-overflow" ? (
         <Calendar
