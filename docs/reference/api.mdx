@@ -332,7 +332,10 @@ entries and from `@super-calendar/solid`.
 
 `@super-calendar/core` also exports `clampMoveStartMinutes`. Use it when a custom
 time-grid drag must keep the moved start inside the visible hour window without
-shortening an event that continues past midnight.
+shortening an event that continues past midnight. Pass the event's duration in
+minutes as the optional fifth argument to let the start run before midnight, into
+the previous day, when the window opens at midnight. The end then stays at least
+one snap step after midnight.
 
 For a custom renderer that should read like the built-in ones, `resolveCalendarLabels`
 fills a partial `labels` object with the English defaults and

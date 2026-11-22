@@ -142,6 +142,114 @@ describe("TimeGrid midnight drag", () => {
     expect(getAllByText("Late shift")).toHaveLength(1);
   });
 
+  describe("above the start of the day", () => {
+    const early: CalendarEvent<WithId> = {
+      id: "early",
+      title: "Red-eye",
+      start: new Date(2026, 0, 6, 1, 0, 0),
+      end: new Date(2026, 0, 6, 3, 0, 0),
+    };
+
+    async function dragUp(
+      translationY: number,
+      props: Partial<ComponentProps<typeof TimeGrid<WithId>>> = {},
+    ) {
+      const onDragEvent = vi.fn();
+      const observed: Array<RenderEventArgs<WithId>> = [];
+      const ProbeEvent = (args: RenderEventArgs<WithId>) => {
+        observed.push(args);
+        return <Text>Red-eye</Text>;
+      };
+      const view = await render(
+        <TimeGrid
+          mode="week"
+          date={new Date(2026, 0, 6, 12, 0, 0)}
+          events={[early]}
+          cellHeight={{ value: 48 } as never}
+          hourHeight={48}
+          weekStartsOn={1}
+          renderEvent={ProbeEvent}
+          keyExtractor={(item) => item.id}
+          onChangeDate={noop}
+          onPressEvent={noop}
+          onDragEvent={onDragEvent}
+          {...props}
+        />,
+      );
+      const move = moveGestureHarness();
+      await act(() => {
+        move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 600 });
+        move.onUpdate?.({
+          translationX: 0,
+          translationY,
+          absoluteX: 200,
+          absoluteY: 600 + translationY,
+        });
+        animatedReactionHarness().__flushAnimatedReactions();
+      });
+      // The source box is the one render that continues neither way; a preview of
+      // the part before midnight continues after.
+      const source = observed
+        .filter((args) => !args.continuesBefore && !args.continuesAfter)
+        .at(-1);
+      const head = observed.filter((args) => args.continuesAfter).at(-1);
+      const geometry = {
+        sourceHeight: source?.boxHeight?.value,
+        headHeight: head?.boxHeight?.value,
+        // The preview is hidden from accessibility, like the downward one.
+        headCount: view.queryAllByText("Red-eye", { includeHiddenElements: true }).length - 1,
+      };
+      await act(() => {
+        move.onEnd?.({ translationX: 0, translationY });
+        move.onFinalize?.({}, true);
+        animatedReactionHarness().__flushAnimatedReactions();
+      });
+      expect(onDragEvent).toHaveBeenCalledTimes(1);
+      const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent<WithId>, Date, Date];
+      return { start, end, geometry };
+    }
+
+    it("commits a move into the previous day and previews its head there", async () => {
+      // Up 96px = 2h: 01:00–03:00 -> 23:00 on the 5th to 01:00 on the 6th.
+      const { start, end, geometry } = await dragUp(-96);
+      expect(start).toEqual(new Date(2026, 0, 5, 23, 0));
+      expect(end).toEqual(new Date(2026, 0, 6, 1, 0));
+      // The source box keeps 00:00–01:00; the 5th's column shows 23:00–24:00.
+      expect(geometry).toEqual({ sourceHeight: 48, headHeight: 48, headCount: 1 });
+    });
+
+    it("holds the end one snap step after midnight", async () => {
+      const { start, end } = await dragUp(-1500);
+      expect(start).toEqual(new Date(2026, 0, 5, 22, 15));
+      expect(end).toEqual(new Date(2026, 0, 6, 0, 15));
+    });
+
+    it("lets an event that continues into the next day run into the previous one", async () => {
+      // The 6th's segment is a single 15-minute step, but the event lasts 5h15.
+      const { start, end } = await dragUp(-1500, {
+        events: [{ ...early, start: new Date(2026, 0, 6, 23, 45), end: new Date(2026, 0, 7, 5) }],
+      });
+      expect(start).toEqual(new Date(2026, 0, 5, 19, 0));
+      expect(end).toEqual(new Date(2026, 0, 6, 0, 15));
+    });
+
+    it("commits without a preview when the previous day is out of view", async () => {
+      const { start, end, geometry } = await dragUp(-96, { mode: "day", date: early.start });
+      expect(start).toEqual(new Date(2026, 0, 5, 23, 0));
+      expect(end).toEqual(new Date(2026, 0, 6, 1, 0));
+      expect(geometry.headCount).toBe(0);
+    });
+
+    it("holds the start at a window that opens after midnight", async () => {
+      const { start, end } = await dragUp(-1500, {
+        events: [{ ...early, start: new Date(2026, 0, 6, 9), end: new Date(2026, 0, 6, 11) }],
+        minHour: 8,
+      });
+      expect(start).toEqual(new Date(2026, 0, 6, 8, 0));
+      expect(end).toEqual(new Date(2026, 0, 6, 10, 0));
+    });
+  });
+
   it.each([0, 1, 2])(
     "moves every multi-day preview segment when segment %i is grabbed",
     async (segment) => {
@@ -1861,6 +1969,45 @@ describe("TimeGrid cross-week drop", () => {
     const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent<WithId>, Date, Date];
     expect(start).toEqual(new Date(2026, 0, 18, 14, 0));
     expect(end).toEqual(new Date(2026, 0, 18, 15, 0));
+  });
+
+  it("drops a lifted ghost above midnight into the previous day", async () => {
+    const onDragEvent = vi.fn();
+    const grid = (date: Date) => (
+      <TimeGrid
+        mode="week"
+        date={date}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        hourHeight={48}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+        onDragEvent={onDragEvent}
+      />
+    );
+    const { rerender } = await render(grid(new Date(2026, 0, 6, 12, 0, 0)));
+    const move = moveGestureHarness();
+    await act(() => {
+      move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 });
+      move.onUpdate?.({ translationX: 535, translationY: 0, absoluteX: 735, absoluteY: 750 });
+    });
+    await act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    await rerender(grid(new Date(2026, 0, 12)));
+    // Far above the top of the page: the start runs into Saturday the 17th, held
+    // where one 15-minute step of the hour stays on Sunday the 18th.
+    await act(() => {
+      move.onUpdate?.({ translationX: 535, translationY: -1250, absoluteX: 735, absoluteY: -500 });
+      move.onFinalize?.({}, true);
+    });
+    expect(onDragEvent).toHaveBeenCalledTimes(1);
+    const [, start, end] = onDragEvent.mock.calls[0] as [CalendarEvent<WithId>, Date, Date];
+    expect(start).toEqual(new Date(2026, 0, 17, 23, 15));
+    expect(end).toEqual(new Date(2026, 0, 18, 0, 15));
   });
 
   it("floats a picked-up event across its whole day column until its drop lands", async () => {

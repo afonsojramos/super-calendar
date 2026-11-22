@@ -31,7 +31,7 @@ pausing to resize instead.
 While you move or resize an event on React DOM and Solid, its renderer receives
 `event` with the `start` and `end` that `onDragEvent` would report if you
 released there, so the built-in time label and a custom renderer (`renderTimeEvent` on
-`Calendar`, `renderEvent` on `TimeGrid`) show the new times as you drag. The preview of a move's tail in the next column gets the
+`Calendar`, `renderEvent` on `TimeGrid`) show the new times as you drag. The preview of the part of a move in the adjacent column gets the
 same times. Once a drag pages the view to another period, the floating preview
 keeps the stored times until release, because the drop day is resolved only then. That `event` is a copy with its other fields unchanged, so inside a
 renderer compare events by a stable field such as an ID, not by object identity.
@@ -74,6 +74,17 @@ remainder previews at the top of the next column, exactly where the committed
 event will render. The **start** stays in the day you dropped it on (it stops one
 `dragStepMinutes` step before the end of the day), so a move to a different day is
 still the horizontal drag.
+
+Dragging **up past the start of the day** works the same way in reverse: the start
+runs into the previous day, the box cuts off at midnight, and the part before it
+previews at the bottom of the previous column. The **end** stays in the day you
+dropped it on (it stops one `dragStepMinutes` step after midnight). This only
+applies when the grid's `minHour` is 0. With a later `minHour`, the start stops at
+the top of the visible window.
+
+When the adjacent day has no column in view (day view, the first or last column
+of a week, or a day removed by `hiddenDays`), no preview shows, but the drop still
+commits the range across midnight.
 
 `onDragEvent` then receives a `start` and `end` on different dates. Dragging any
 day's segment of the resulting multi-day event moves the whole thing, so it never
