@@ -137,6 +137,54 @@ describe(rendererName, () => {
     expect(content.getAttribute("data-after")).toBe(String(after));
   });
 
+  it.each([
+    { title: "Inside", start: 14, end: 17, before: false, after: false },
+    { title: "Starts before", start: 11, end: 15, before: true, after: false },
+    { title: "Ends after", start: 18, end: 22, before: false, after: true },
+    { title: "Both edges", start: 11, end: 22, before: true, after: true },
+  ])(
+    "marks and squares the continuing ends of the default chip for $title",
+    ({ title, start, end, before, after }) => {
+      const view = render(TimeGrid, {
+        date,
+        mode: "week",
+        weekStartsOn: 1,
+        events: [{ ...trip, title, start: new Date(2026, 6, start), end: new Date(2026, 6, end) }],
+      });
+      const chip = view.getByText(title).closest('[data-slot="allDayEvent"]');
+      const box = chip?.querySelector<HTMLElement>('[data-slot="eventBox"]');
+      if (!chip || !box) throw new Error(`Missing chip for ${title}`);
+      expect(chip.getAttribute("data-continues-before")).toBe(before ? "" : null);
+      expect(chip.getAttribute("data-continues-after")).toBe(after ? "" : null);
+      const radius = (corner: string) => box.style.getPropertyValue(corner).replace(/^0$/, "0px");
+      expect([radius("border-top-left-radius"), radius("border-bottom-left-radius")]).toEqual(
+        before ? ["0px", "0px"] : ["6px", "6px"],
+      );
+      expect([radius("border-top-right-radius"), radius("border-bottom-right-radius")]).toEqual(
+        after ? ["0px", "0px"] : ["6px", "6px"],
+      );
+    },
+  );
+
+  it("updates the continuation attributes when the visible week changes", () => {
+    const props = {
+      date,
+      mode: "week" as const,
+      weekStartsOn: 1 as const,
+      events: [{ ...trip, start: new Date(2026, 6, 11), end: new Date(2026, 6, 22) }],
+    };
+    const view = render(TimeGrid, props);
+    const chip = () => view.getByText("Trip").closest('[data-slot="allDayEvent"]');
+    expect(chip()?.hasAttribute("data-continues-before")).toBe(true);
+    expect(chip()?.hasAttribute("data-continues-after")).toBe(true);
+    view.rerender({ ...props, date: new Date(2026, 6, 20) });
+    expect(chip()?.hasAttribute("data-continues-before")).toBe(true);
+    expect(chip()?.hasAttribute("data-continues-after")).toBe(false);
+    const box = chip()?.querySelector<HTMLElement>('[data-slot="eventBox"]');
+    expect(box?.style.getPropertyValue("border-top-right-radius")).toBe("6px");
+    expect(box?.style.getPropertyValue("border-top-left-radius")).toMatch(/^0(px)?$/);
+  });
+
   it("keeps one item across hidden days and omits events confined to them", () => {
     const view = render(TimeGrid, {
       date,

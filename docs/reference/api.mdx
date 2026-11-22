@@ -216,7 +216,10 @@ across their covered columns. Overlapping events occupy separate rows. This
 applies to native, React DOM, and Solid. The end is exclusive; hidden days take
 no width. `renderEvent` receives the original event, and its `continuesBefore`
 and `continuesAfter` hints indicate clipping at the visible range edges for
-all-day bars. The `allDayColumn` slot styles each spanning cell. Native rows
+all-day bars. The default bar squares its corners on a continuing side. In React
+DOM and Solid, the `allDayEvent` button carries `data-continues-before` and
+`data-continues-after` on those sides. The `allDayColumn` slot styles each
+spanning cell. Native rows
 measure custom event content to determine the band height.
 
 In React DOM and Solid, `getEventId` preserves all-day focus and renderer state
