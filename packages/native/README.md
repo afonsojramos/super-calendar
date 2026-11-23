@@ -148,6 +148,12 @@ only the start or end. In month and multi-week views, a preview
 of the moved event spans every day it would cover, and your month event renderer
 draws it with the shifted `start` and `end`. See the [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
 
+While you move or resize a time-grid event, `renderEvent` receives a copy of the event whose `start` and `end`
+are the times the drop would report, so the label updates as you drag. It
+re-renders only when the snapped times change. Compare events by a stable ID
+inside a renderer. After a drag pages the view, the floating preview keeps the
+stored times until release.
+
 After edge paging, the floating event's horizontal centre selects the destination
 day, and its top edge selects the time.
 

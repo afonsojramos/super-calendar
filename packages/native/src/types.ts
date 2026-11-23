@@ -61,6 +61,12 @@ export type EventDragStartHandler<T> = (event: CalendarEvent<T>) => void;
  * `boxHeight`, `continuesBefore`/`continuesAfter`, and `isAllDay`.
  */
 export type RenderEventArgs<T = unknown> = {
+  /**
+   * The event to render. While it is being moved or resized on the time grid, a
+   * copy whose `start` and `end` are the times `onDragEvent` would report on
+   * release. After a drag pages the view, the floating preview keeps the stored
+   * times until release.
+   */
   event: CalendarEvent<T>;
   mode: CalendarMode;
   /**

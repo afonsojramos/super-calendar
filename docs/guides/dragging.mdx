@@ -28,13 +28,15 @@ On native, a long press picks the event up wherever it lands, grips included,
 so you can move a short event whose grips cover most of it. Drag a grip without
 pausing to resize instead.
 
-While you move or resize an event on React DOM and Solid, its renderer receives
+While you move or resize an event, its renderer receives
 `event` with the `start` and `end` that `onDragEvent` would report if you
 released there, so the built-in time label and a custom renderer (`renderTimeEvent` on
-`Calendar`, `renderEvent` on `TimeGrid`) show the new times as you drag. The preview of the part of a move in the adjacent column gets the
-same times. Once a drag pages the view to another period, the floating preview
+the web `Calendar`, `renderEvent` on the native `Calendar` and on `TimeGrid`) show the new times as you drag. The preview of the part of a move in the adjacent column gets the
+same times, as do the segments of a multi-day move. Once a drag pages the view to another period, the floating preview
 keeps the stored times until release, because the drop day is resolved only then. That `event` is a copy with its other fields unchanged, so inside a
 renderer compare events by a stable field such as an ID, not by object identity.
+On React Native, the drag stays on the UI thread, and the renderer re-renders
+only when the snapped times change.
 
 ```tsx
 <Calendar
