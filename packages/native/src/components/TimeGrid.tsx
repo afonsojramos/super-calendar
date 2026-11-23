@@ -113,6 +113,7 @@ import {
   resolveCalendarLabels,
   type WeekdayFormat,
   weekdayFormatToken,
+  findCurrentEvent,
 } from "@super-calendar/core";
 import {
   type ResolvedSlot,
@@ -2076,11 +2077,15 @@ function TimetablePageInner<T>({
     [days, events, multiDayTimedEventPlacement],
   );
   const [multiDayMove, setMultiDayMove] = useState<MultiDayMove<T> | null>(null);
+  // The held object loses its ID key once a refresh replaces it, so match by
+  // `getEventId` before the key.
   const movingEvent = multiDayMove
-    ? (events.find(
+    ? (findCurrentEvent(events, multiDayMove.event, getEventId) ??
+      events.find(
         (event, index) =>
           keyExtractor(event, index) === keyExtractor(multiDayMove.event, multiDayMove.eventIndex),
-      ) ?? null)
+      ) ??
+      null)
     : null;
   useEffect(() => {
     if (!multiDayMove) return;

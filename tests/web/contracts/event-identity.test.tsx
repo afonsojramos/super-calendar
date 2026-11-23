@@ -47,12 +47,14 @@ describe(rendererName, () => {
       view.getByText(title).parentElement!.parentElement!;
     const setup = () => {
       const onDragEvent = vi.fn();
+      const onPressEvent = vi.fn();
       const props = {
         date: day,
         mode: "day" as const,
         events: [standup, focus],
         hourHeight: 48,
         onDragEvent,
+        onPressEvent,
         getEventId,
       };
       const view = render(TimeGrid<{ id: string }>, props);
@@ -61,8 +63,19 @@ describe(rendererName, () => {
         view.rerender({ ...props, events: [early, { ...standup }, refreshed] });
         return refreshed;
       };
-      return { view, onDragEvent, refresh };
+      return { view, onDragEvent, onPressEvent, refresh };
     };
+
+    it("presses the refreshed event when a held press is released in place", () => {
+      const { view, onDragEvent, onPressEvent, refresh } = setup();
+      const box = boxOf(view, "Focus");
+      fireEvent.pointerDown(box, { clientY: 300, pointerId: 1, pointerType: "mouse" });
+      const refreshed = refresh();
+      fireEvent.pointerUp(document, { clientY: 300, pointerId: 1, pointerType: "mouse" });
+      expect(onDragEvent).not.toHaveBeenCalled();
+      expect(onPressEvent).toHaveBeenCalledOnce();
+      expect(onPressEvent.mock.calls[0]?.[0]).toBe(refreshed);
+    });
 
     it("keeps a held move on its event through a refresh that reorders the day", () => {
       const { view, onDragEvent, refresh } = setup();
@@ -79,6 +92,8 @@ describe(rendererName, () => {
         new Date(2026, 5, 26, 12),
         new Date(2026, 5, 26, 14),
       );
+      // The same object, not an equal copy.
+      expect(onDragEvent.mock.calls[0]?.[0]).toBe(refreshed);
     });
 
     it("keeps a held resize on its event through a refresh that reorders the day", () => {
@@ -96,6 +111,8 @@ describe(rendererName, () => {
         new Date(2026, 5, 26, 15),
         new Date(2026, 5, 26, 16),
       );
+      // The same object, not an equal copy.
+      expect(onDragEvent.mock.calls[0]?.[0]).toBe(refreshed);
     });
 
     it("keeps focus on a timed event through a refresh that reorders the day", () => {
@@ -167,6 +184,31 @@ describe(rendererName, () => {
         new Date(2026, 6, 20),
       );
     });
+  });
+
+  it("keeps focus on a '+N more' popover event through a refresh that inserts an earlier one", () => {
+    const hourly = (hour: number): Item => ({
+      id: `event-${hour}`,
+      title: `Event ${hour}`,
+      start: new Date(2026, 5, 15, hour),
+      end: new Date(2026, 5, 15, hour + 1),
+    });
+    const props = {
+      date: new Date(2026, 5, 15),
+      events: [10, 11, 12, 13].map(hourly),
+      maxVisibleEventCount: 2,
+      getEventId,
+    };
+    const view = render(MonthView<{ id: string }>, props);
+    fireEvent.click(view.getByText(/More/));
+    const choice = () =>
+      view
+        .getAllByText("Event 13")
+        .map((node) => node.closest("button")!)
+        .at(-1)!;
+    choice().focus();
+    view.rerender({ ...props, events: [9, 10, 11, 12, 13].map(hourly) });
+    expect(focused()).toBe(choice());
   });
 
   it("keeps focus on a MonthList event through a refresh that renames and reorders it", () => {
@@ -315,6 +357,8 @@ describe(rendererName, () => {
         new Date(2026, 5, 26, 11),
         resources[0],
       );
+      // The same object, not an equal copy.
+      expect(onDragEvent.mock.calls[0]?.[0]).toBe(refreshed);
     });
 
     it("keeps focus on a booking through a refresh", () => {

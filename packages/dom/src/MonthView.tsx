@@ -1830,7 +1830,7 @@ export function DateRows<T = unknown>({
                             </div>
                             {dayEvents.map((event, i) => (
                               <button
-                                key={i}
+                                key={eventIds.get(event) ?? i}
                                 type="button"
                                 onClick={() => {
                                   setMoreOpenFor(null);

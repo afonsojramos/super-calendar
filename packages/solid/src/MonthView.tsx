@@ -2166,8 +2166,15 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                   {dayLabel()}
                                                 </div>
                                                 {
-                                                  <For each={dayEvents()} keyed={false}>
-                                                    {(event) => {
+                                                  <For
+                                                    each={dayEvents().map((event, index) => ({
+                                                      event,
+                                                      key: eventIds().get(event) ?? index,
+                                                    }))}
+                                                    keyed={(entry) => entry.key}
+                                                  >
+                                                    {(entry) => {
+                                                      const event = () => entry().event;
                                                       return (
                                                         <button
                                                           type="button"

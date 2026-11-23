@@ -179,6 +179,25 @@ describe("TimeGrid", () => {
     );
   });
 
+  it("keeps a dropped multi-day move previewed through a refresh before the commit lands", async () => {
+    const hidden = { includeHiddenElements: true };
+    const overnight: Item = { ...standup, end: new Date(2026, 0, 8, 10) };
+    const props = { getEventId, keyExtractor: contentKey, onDragEvent: vi.fn() };
+    const view = await render(grid([overnight], props));
+    const move = timedMove();
+    await act(() => {
+      move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 });
+      move.onUpdate?.({ translationX: 0, translationY: 48, absoluteX: 200, absoluteY: 348 });
+      move.onEnd?.({ translationX: 0, translationY: 48 }, true);
+      move.onFinalize?.({}, true);
+    });
+    const previews = view.getAllByTestId("multi-day-move-preview", hidden).length;
+    expect(previews).toBeGreaterThan(0);
+    // The consumer has not applied the move yet, so the refreshed copy keeps the old times.
+    await view.rerender(grid([{ ...overnight, title: "Standup renamed" }], props));
+    expect(view.getAllByTestId("multi-day-move-preview", hidden)).toHaveLength(previews);
+  });
+
   it("keeps a held resize on its event through a refresh", async () => {
     const onDragEvent = vi.fn();
     const props = { getEventId, keyExtractor: contentKey, onDragEvent };

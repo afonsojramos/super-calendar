@@ -1989,7 +1989,11 @@ function TimeGridInner<T = unknown>(
       ? findCurrentEvent(events, draggedRef.current.event, getEventId)
       : undefined;
   if (draggedRef.current && heldReplacement && heldReplacement !== draggedRef.current.event) {
-    draggedRef.current = { ...draggedRef.current, event: heldReplacement };
+    draggedRef.current = {
+      ...draggedRef.current,
+      event: heldReplacement,
+      onPress: () => onPressEvent?.(heldReplacement),
+    };
   }
   const heldEvent = draggedRef.current?.event;
   // A held event with an ID marks its box by identity on the day it was grabbed,
