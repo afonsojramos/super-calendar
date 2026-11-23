@@ -332,6 +332,104 @@ describe("AllDayLane spans", () => {
       await fireEvent.press(view.getByText("Trip"));
       expect(onPressEvent).toHaveBeenCalledExactlyOnceWith(trip);
     });
+
+    it("promotes and drags >= 24h timed events under 'all-day' placement while preserving times", async () => {
+      const conference: CalendarEvent = {
+        title: "Conference",
+        start: new Date(2026, 6, 14, 9, 0),
+        end: new Date(2026, 6, 16, 17, 0),
+        allDay: false,
+      };
+      const overnight: CalendarEvent = {
+        title: "Overnight",
+        start: new Date(2026, 6, 14, 22, 0),
+        end: new Date(2026, 6, 15, 6, 0),
+        allDay: false,
+      };
+      const { view, onDragEvent } = await setup({
+        events: [conference, overnight],
+        renderEvent: DefaultEvent,
+        multiDayTimedEventPlacement: "all-day",
+        ampm: true,
+      });
+      expect(view.getByText("Conference")).toBeTruthy();
+      expect(view.getByText("9:00 AM")).toBeTruthy();
+      expect(view.queryByText("Overnight")).toBeNull();
+
+      await drag(60, 100);
+      expect(onDragEvent).toHaveBeenCalledExactlyOnceWith(
+        conference,
+        new Date(2026, 6, 16, 9, 0),
+        new Date(2026, 6, 18, 17, 0),
+      );
+    });
+
+    it("keeps chronological start-time visibility under RTL column order and during RTL drag previews", async () => {
+      // Reversed (RTL) week: Sun 19 down to Mon 13 July 2026.
+      const rtlDays = [...days].reverse();
+      const startsInsideContinuesAfter: CalendarEvent = {
+        title: "After",
+        start: new Date(2026, 6, 18, 15, 15), // Sat 15:15 (visible) -> next week
+        end: new Date(2026, 6, 22, 10, 0),
+        allDay: false,
+      };
+      const startsBeforeEndsInside: CalendarEvent = {
+        title: "Before",
+        start: new Date(2026, 6, 11, 14, 30), // prior Sat 14:30 -> Tue 14:30
+        end: new Date(2026, 6, 14, 14, 30),
+        allDay: false,
+      };
+      const { view } = await setup({
+        days: rtlDays,
+        events: [startsInsideContinuesAfter, startsBeforeEndsInside],
+        renderEvent: DefaultEvent,
+        multiDayTimedEventPlacement: "all-day",
+      });
+
+      // "After" starts inside the visible week so it keeps "15:15" and squares its leading (left) edge.
+      expect(view.getByText("15:15")).toBeTruthy();
+      // "Before" started before the visible week so it hides "14:30" and squares its trailing (right) edge.
+      expect(view.queryByText("14:30")).toBeNull();
+      const buttons = view.getAllByRole("button");
+      const afterStyle = StyleSheet.flatten(buttons[0].props.style);
+      const beforeStyle = StyleSheet.flatten(buttons[1].props.style);
+      expect(afterStyle.borderTopLeftRadius).toBe(0);
+      expect(afterStyle.borderTopRightRadius).toBeUndefined();
+      expect(beforeStyle.borderTopLeftRadius).toBeUndefined();
+      expect(beforeStyle.borderTopRightRadius).toBe(0);
+
+      // Drag "Before" (lastPan is the second bar) left by 2 columns (+2 days in RTL -> starts Mon 13 inside week):
+      // the live preview now starts inside the visible week, so "14:30" appears in the preview.
+      const hidden = { includeHiddenElements: true };
+      await drag(25, -100, false);
+      expect(view.getByTestId("all-day-move-preview", hidden)).toBeTruthy();
+      expect(view.getByText("14:30", hidden)).toBeTruthy();
+    });
+
+    it("hides the start time when a promoted event starts on an interior hidden day", async () => {
+      // Hide Tuesday (2): visible days are Mon, Wed, Thu, Fri, Sat, Sun.
+      const visibleDays = days.filter((day) => day.getDay() !== 2);
+      const startsOnHiddenTue: CalendarEvent = {
+        title: "Hidden Start",
+        start: new Date(2026, 6, 14, 9, 0),
+        end: new Date(2026, 6, 15, 9, 0),
+        allDay: false,
+      };
+      const startsOnVisibleMon: CalendarEvent = {
+        title: "Visible Start",
+        start: new Date(2026, 6, 13, 8, 30),
+        end: new Date(2026, 6, 15, 8, 30),
+        allDay: false,
+      };
+      const { view } = await setup({
+        days: visibleDays,
+        events: [startsOnHiddenTue, startsOnVisibleMon],
+        renderEvent: DefaultEvent,
+        multiDayTimedEventPlacement: "all-day",
+      });
+      expect(view.queryByText("09:00")).toBeNull();
+      expect(view.getByText("08:30")).toBeTruthy();
+    });
   });
 
   it("uses only visible columns and keeps empty pages measurable", async () => {

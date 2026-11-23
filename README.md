@@ -97,7 +97,9 @@ FullCalendar and react-big-calendar, see the
 **Feature parity.** It also covers the rest of react-native-big-calendar's
 surface: month / day / 3-day / week / **custom N-day** (and `weekEndsOn`
 partial-weeks) / **agenda (`schedule`)** modes, **all-day events** (lane +
-`allDay` flag, toggle the lane with `showAllDayEventCell`), multi-day clipping,
+`allDay` flag, toggle the lane with `showAllDayEventCell`, or move timed events
+lasting 24 hours or longer into the lane with
+`multiDayTimedEventPlacement="all-day"`), multi-day clipping,
 `minHour`/`maxHour`, `ampm` (hour axis and event times), `showTime`, `timeslots`,
 `hideHours`, `showWeekNumber`, `weekNumberPrefix`, `hourComponent`,
 `sortedMonthView`, `moreLabel`, `showAdjacentMonths`, `showSixWeeks`,

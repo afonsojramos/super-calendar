@@ -77,4 +77,60 @@ describe("DefaultEvent", () => {
     // A 96px box fits the title and the time: top-aligned as before.
     expect(await justifyOf(boxHeightOf(96))).toBe("flex-start");
   });
+
+  it("shows inline start time, timed accessibility label, and squared continuing corners for a promoted timed bar", async () => {
+    const multiDay: CalendarEvent = {
+      title: "Conference",
+      start: new Date(2026, 6, 14, 9, 0),
+      end: new Date(2026, 6, 16, 17, 0),
+      allDay: false,
+    };
+    const view = await render(
+      <DefaultEvent
+        event={multiDay}
+        mode="week"
+        isAllDay={false}
+        inAllDayLane
+        continuesAfter
+        onPress={() => {}}
+      />,
+    );
+    expect(view.getByText("09:00")).toBeTruthy();
+    expect(view.getByText("Conference")).toBeTruthy();
+    expect(view.queryByText("09:00 - 17:00")).toBeNull();
+    expect(view.getByLabelText("Conference, 09:00 to 17:00")).toBeTruthy();
+    const style = StyleSheet.flatten(view.getByRole("button").props.style);
+    expect(style.borderTopLeftRadius).toBeUndefined();
+    expect(style.borderTopRightRadius).toBe(0);
+    expect(style.borderBottomRightRadius).toBe(0);
+
+    // Omits the start time when continuing from before the visible range or when showTime is false.
+    await view.rerender(
+      <DefaultEvent
+        event={multiDay}
+        mode="week"
+        isAllDay={false}
+        inAllDayLane
+        continuesBefore
+        onPress={() => {}}
+      />,
+    );
+    expect(view.queryByText("09:00")).toBeNull();
+    expect(view.getByText("Conference")).toBeTruthy();
+    const beforeStyle = StyleSheet.flatten(view.getByRole("button").props.style);
+    expect(beforeStyle.borderTopLeftRadius).toBe(0);
+    expect(beforeStyle.borderBottomLeftRadius).toBe(0);
+
+    await view.rerender(
+      <DefaultEvent
+        event={multiDay}
+        mode="week"
+        isAllDay={false}
+        inAllDayLane
+        showTime={false}
+        onPress={() => {}}
+      />,
+    );
+    expect(view.queryByText("09:00")).toBeNull();
+  });
 });

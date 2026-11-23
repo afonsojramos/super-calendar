@@ -44,10 +44,12 @@ import {
   zonedEventSource,
   expandRecurringEvents,
   getViewDays,
+  isAllDayLaneEvent,
   type WeekdayFormat,
   type WeekStartsOn,
   type CalendarHandle,
   type CalendarLabels,
+  type MultiDayTimedEventPlacement,
 } from "@super-calendar/core";
 import { Agenda, type AgendaSlot, type DomAgendaEvent } from "./Agenda";
 import { YearView, type YearViewSlot } from "./YearView";
@@ -188,6 +190,12 @@ export interface CalendarProps<T = unknown>
   showAllDayEventCell?: boolean;
   /** Show the "all-day" text beside the lane (default false). */
   showAllDayLabel?: boolean;
+  /**
+   * Where timed events lasting 24 hours or longer render on the time grid:
+   * `"grid"` (default) keeps them on the vertical columns; `"all-day"` places
+   * them in the horizontal all-day lane with their start time and title.
+   */
+  multiDayTimedEventPlacement?: MultiDayTimedEventPlacement;
   /** Tint weekend columns (default true). Set false to treat weekends normally. */
   highlightWeekends?: boolean;
   /** Allow moving events by default (per-event `startEditable` overrides). Default true. */
@@ -404,6 +412,7 @@ function CalendarInner<T = unknown>(
     showNowIndicator,
     showAllDayEventCell,
     showAllDayLabel,
+    multiDayTimedEventPlacement,
     highlightWeekends,
     eventStartEditable,
     eventDurationEditable,
@@ -482,8 +491,9 @@ function CalendarInner<T = unknown>(
   // report wall-clock dates. Hand back the consumer's own events and real
   // instants. Whole days (`onPressDay`, a month sweep, ...) stay device-local
   // dates, as `date` is, so only the time grid's cell callbacks convert.
-  // A time-grid move keeps the event's elapsed duration; a month drop keeps the
-  // clock time of both edges.
+  // A vertical time-grid move keeps the event's elapsed duration; a month drop
+  // or all-day lane bar move shifts by whole days and keeps the clock time of
+  // both edges.
   const timeGridMode = mode !== "month" && mode !== "multiweek";
   const zoned = useMemo(() => {
     if (!timeZone) {
@@ -505,7 +515,9 @@ function CalendarInner<T = unknown>(
       onDragEvent:
         onDragEvent &&
         ((event: CalendarEvent<T>, start: Date, end: Date) => {
-          const bounds = zonedDragBounds(event, start, end, { keepDuration: timeGridMode });
+          const bounds = zonedDragBounds(event, start, end, {
+            keepDuration: timeGridMode && !isAllDayLaneEvent(event, multiDayTimedEventPlacement),
+          });
           // An edge dropped into an hour the zone's clock skips can leave no
           // usable span; reject the drop, so the event snaps back.
           if (!bounds) return false;
@@ -527,6 +539,7 @@ function CalendarInner<T = unknown>(
   }, [
     timeZone,
     timeGridMode,
+    multiDayTimedEventPlacement,
     onPressEvent,
     onDragStart,
     onDragEvent,
@@ -730,6 +743,7 @@ function CalendarInner<T = unknown>(
         showNowIndicator={showNowIndicator}
         showAllDayEventCell={showAllDayEventCell}
         showAllDayLabel={showAllDayLabel}
+        multiDayTimedEventPlacement={multiDayTimedEventPlacement}
         highlightWeekends={highlightWeekends}
         eventStartEditable={eventStartEditable}
         eventDurationEditable={eventDurationEditable}

@@ -85,9 +85,11 @@ describe("titleNumberOfLines", () => {
     expect(titleNumberOfLines("multiweek", false)).toBe(1);
   });
 
-  it("clamps all-day events to one line in any mode", () => {
+  it("clamps all-day events and all-day lane bars to one line in any mode", () => {
     expect(titleNumberOfLines("week", true)).toBe(1);
     expect(titleNumberOfLines("day", true)).toBe(1);
+    expect(titleNumberOfLines("week", false, true)).toBe(1);
+    expect(titleNumberOfLines("day", false, true)).toBe(1);
   });
 
   it("lets timed-grid titles wrap (undefined)", () => {
@@ -137,6 +139,56 @@ describe("eventTimeLabel", () => {
   it("shows nothing for all-day events on the day/week grid (the lane signals it)", () => {
     expect(eventTimeLabel({ ...base, mode: "week", isAllDay: true })).toBeNull();
     expect(eventTimeLabel({ ...base, mode: "day", isAllDay: true })).toBeNull();
+    expect(
+      eventTimeLabel({ ...base, mode: "week", isAllDay: true, inAllDayLane: true }),
+    ).toBeNull();
+  });
+
+  it("shows only the start time for a timed event in the all-day lane unless it continues from before", () => {
+    expect(eventTimeLabel({ ...base, mode: "week", isAllDay: false, inAllDayLane: true })).toBe(
+      "09:00",
+    );
+    expect(
+      eventTimeLabel({ ...base, mode: "week", isAllDay: false, inAllDayLane: true, ampm: true }),
+    ).toBe("9:00 AM");
+    expect(
+      eventTimeLabel({
+        ...base,
+        mode: "week",
+        isAllDay: false,
+        inAllDayLane: true,
+        continuesBefore: true,
+      }),
+    ).toBeNull();
+    expect(
+      eventTimeLabel({
+        ...base,
+        mode: "week",
+        isAllDay: false,
+        inAllDayLane: true,
+        continuesBefore: true,
+        startsBeforeVisible: false,
+      }),
+    ).toBe("09:00");
+    expect(
+      eventTimeLabel({
+        ...base,
+        mode: "week",
+        isAllDay: false,
+        inAllDayLane: true,
+        continuesBefore: false,
+        startsBeforeVisible: true,
+      }),
+    ).toBeNull();
+    expect(
+      eventTimeLabel({
+        ...base,
+        mode: "week",
+        isAllDay: false,
+        inAllDayLane: true,
+        showTime: false,
+      }),
+    ).toBeNull();
   });
 });
 

@@ -40,11 +40,19 @@ const events: CalendarEvent<Meta>[] = [
   resize (see the [drag guide](/guides/dragging)).
 - `dragHandleColor` overrides the resize grip colour for an event in the native
   time grid and resource timeline. It defaults to `theme.colors.eventText`.
-- Multi-day events draw as one continuous bar in month view. Timed events
-  spanning midnight keep a clipped segment in each day of the week/day grid.
-  All-day bars span the covered visible columns, including across hidden days.
+- Multi-day events draw as one continuous bar in month view. On the week/day
+  grid, timed events spanning midnight keep a clipped segment in each day by
+  default (`multiDayTimedEventPlacement="grid"`). Pass
+  `multiDayTimedEventPlacement="all-day"` to move timed events lasting 24 hours
+  or longer into the all-day lane above the grid, displaying their start time
+  and title on a single bar while keeping shorter cross-midnight events on the
+  vertical columns.
+  Lane bars span the covered visible columns, including across hidden days.
   Their `continuesBefore` and `continuesAfter` renderer hints describe clipping
-  at the visible range edges, rather than at each day. The default all-day bar
+  at the visible range edges, rather than at each day, `startsBeforeVisible`
+  indicates whether the event started chronologically before its first visible
+  day, and `inAllDayLane` is `true` (`isAllDay` stays `false` for promoted timed
+  events so screen readers still announce their times). The default lane bar
   squares its corners on a continuing side, like a month bar, and on the web its
   `allDayEvent` button carries `data-continues-before` / `data-continues-after`.
   The renderer and press callbacks receive the original event.

@@ -65,7 +65,45 @@ export function utcTime(
   second = 0,
   ms = 0,
 ): number {
+  if (year >= 100) return Date.UTC(year, month, day, hour, minute, second, ms);
   const date = new Date(0);
   date.setUTCFullYear(year, month, day);
   return date.setUTCHours(hour, minute, second, ms);
 }
+
+// `timeZone`'s offset from UTC (ms) at `instant`: the zone's wall clock read as
+// if it were UTC, minus the real instant. Read from plain fields, so the
+// device's own DST changes can't distort it.
+function zoneOffsetMs(instant: Date, timeZone: string): number {
+  const [year, month, day, hour, minute, second] = zoneFields(instant, timeZone);
+  const wallAsUtc = utcTime(year, month, day, hour, minute, second, instant.getUTCMilliseconds());
+  return wallAsUtc - instant.getTime();
+}
+
+/**
+ * Internal implementation of `zonedTimeToUtc`: convert a wall-clock time (stored
+ * in the UTC fields of `wallClock`) in `timeZone` to its absolute UTC instant.
+ * Kept here so `layout.ts` can check midnight-skipping DST transitions without
+ * introducing a circular import with `timezone.ts`.
+ */
+export function zonedWallClockToUtc(wallClock: Date, timeZone: string): Date {
+  const guess = wallClock.getTime();
+  const firstPass = zoneOffsetMs(new Date(guess), timeZone);
+  const secondPass = zoneOffsetMs(new Date(guess - firstPass), timeZone);
+  const instant = new Date(guess - secondPass);
+  // Neither offset maps a skipped time back to itself. Read it with the offset
+  // in force before the change, which is the smaller of the two.
+  if (firstPass !== secondPass && zoneOffsetMs(instant, timeZone) !== secondPass) {
+    return new Date(guess - Math.min(firstPass, secondPass));
+  }
+  return instant;
+}
+
+/**
+ * Internal registry mapping each display copy made by `eventsInTimeZone` to its
+ * source event and display zone. Shared between `timezone.ts` and `layout.ts`.
+ */
+export const zonedSources = new WeakMap<
+  object,
+  { event: { start: Date; end: Date }; timeZone: string }
+>();

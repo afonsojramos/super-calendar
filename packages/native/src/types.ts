@@ -23,6 +23,8 @@ export type {
   EventAccessibilityLabeler,
   EventKeyExtractor,
   ICalendarEvent,
+  LayoutDayEventsOptions,
+  MultiDayTimedEventPlacement,
   RecurrenceFrequency,
   RecurrenceRule,
   ScrollToTimeOptions,
@@ -74,8 +76,15 @@ export type RenderEventArgs<T = unknown> = {
    */
   continuesBefore?: boolean;
   continuesAfter?: boolean;
-  /** True when this event is rendered in the all-day lane (week/day) or is an all-day event in month view. */
+  /**
+   * True for a lane bar whose event started chronologically before its first
+   * visible day (including across interior hidden days or RTL column order).
+   */
+  startsBeforeVisible?: boolean;
+  /** True when the event itself is an all-day event. */
   isAllDay?: boolean;
+  /** True when the event renders in the horizontal all-day lane above the time grid. */
+  inAllDayLane?: boolean;
   /** Format the built-in renderer's time range in 12-hour AM/PM. Default false (24h). */
   ampm?: boolean;
   /** Show the time range in the built-in renderer (day/week/schedule). Default true. */

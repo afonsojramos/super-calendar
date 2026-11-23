@@ -247,7 +247,9 @@ With `onDragEvent` set, you can drag a bar in the all-day lane to other days.
 Long-press it on native. On React DOM and Solid, press and drag with a mouse, or
 hold a touch or pen for `touchDragDelay` first. A drag moves the bar by whole days
 and keeps its duration. Both ends shift by the same number of calendar days, so
-`onDragEvent` receives all-day dates. With `hiddenDays`, one column can be more
+`onDragEvent` receives all-day dates (or, for timed events placed in the lane
+with `multiDayTimedEventPlacement="all-day"`, the shifted dates with their
+original start and end times preserved). With `hiddenDays`, one column can be more
 than one calendar day.
 
 While you drag, the carried bar fades and a preview covers the days it would land

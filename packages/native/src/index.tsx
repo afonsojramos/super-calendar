@@ -68,7 +68,9 @@ export type {
   EventAccessibilityLabeler,
   EventKeyExtractor,
   ICalendarEvent,
+  LayoutDayEventsOptions,
   MonthDateInfo,
+  MultiDayTimedEventPlacement,
   RecurrenceFrequency,
   RecurrenceRule,
   RenderEvent,
@@ -140,6 +142,7 @@ export {
 export {
   layoutDayEvents,
   isAllDayEvent,
+  isAllDayLaneEvent,
   isBackgroundEvent,
   backgroundBandsForDay,
   type PositionedEvent,

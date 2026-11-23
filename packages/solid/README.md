@@ -18,8 +18,12 @@ receive the original event; `continuesBefore` and `continuesAfter` indicate
 clipping at the visible range edges. The default bar squares its corners on a
 continuing side, and the `allDayEvent` button carries `data-continues-before` /
 `data-continues-after` there. The `allDayColumn` slot styles one
-spanning cell. Timed events that cross midnight keep their per-day segments.
-With `onDragEvent`, you can drag an all-day bar to other visible days.
+spanning cell. Timed events that cross midnight keep their per-day segments by
+default (`multiDayTimedEventPlacement="grid"`); set
+`multiDayTimedEventPlacement="all-day"` on `Calendar` or `TimeGrid` to place
+timed events lasting 24 hours or longer in the all-day lane with their start
+time and title while keeping shorter cross-midnight events on the grid.
+With `onDragEvent`, you can drag a lane bar to other visible days.
 
 ## Install
 

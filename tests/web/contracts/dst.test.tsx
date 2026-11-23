@@ -431,4 +431,37 @@ describe(rendererName, () => {
       expect(end).toEqual(est(3));
     });
   });
+
+  describe("cross-midnight drags under multiDayTimedEventPlacement", () => {
+    it("keeps previewing a < 24h cross-midnight move across spring-forward under all-day placement", () => {
+      // Fri 6 Mar 09:00 EST to Sat 7 Mar 08:30 EST (23.5h, stays on the vertical grid).
+      // Dragging +1 day onto Sat 7 / Sun 8 (spring-forward) spans 24.5 clock hours in the
+      // preview; the move preview must stay visible instead of vanishing.
+      const shift: CalendarEvent = {
+        title: "Long Shift",
+        start: new Date(2026, 2, 6, 9, 0),
+        end: new Date(2026, 2, 7, 8, 30),
+        allDay: false,
+      };
+      const { container, getAllByText } = render(TimeGrid, {
+        date: new Date(2026, 2, 4), // Mon 2 Mar to Sun 8 Mar
+        mode: "week",
+        weekStartsOn: 1,
+        multiDayTimedEventPlacement: "all-day",
+        events: [shift],
+        hourHeight: 48,
+        onDragEvent: vi.fn(),
+      });
+      const firstBox = wrapperOf(getAllByText("Long Shift")[0]);
+      const column = firstBox.parentElement as HTMLElement;
+      column.getBoundingClientRect = () => ({ width: 100 }) as DOMRect;
+
+      fireEvent.pointerDown(firstBox, { clientX: 50, clientY: 432, pointerId: 1 });
+      fireEvent.pointerMove(document, { clientX: 150, clientY: 432, pointerId: 1 });
+      const previews = [...container.querySelectorAll('[data-dragging][data-slot="event"]')];
+      expect(previews).toHaveLength(2);
+      expect(previews.every((preview) => preview.textContent?.includes("Long Shift"))).toBe(true);
+      fireEvent.pointerUp(document, { clientX: 150, clientY: 432, pointerId: 1 });
+    });
+  });
 });

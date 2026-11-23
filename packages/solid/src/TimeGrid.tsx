@@ -21,6 +21,7 @@ import {
   nowInTimeZone,
   getViewDays,
   isAllDayEvent,
+  isAllDayLaneEvent,
   isBackgroundEvent,
   isSameCalendarDay,
   isWeekend,
@@ -28,6 +29,7 @@ import {
   layoutMonthWeek,
   monthDropBounds,
   movedClockSpan,
+  type MultiDayTimedEventPlacement,
   overlapsOtherEvents,
   pageStepDays,
   type PositionedEvent,
@@ -187,6 +189,17 @@ const ALL_DAY_CHIP_BASE: CSSProperties = {
   height: 22,
 };
 
+// Whether a horizontal lane segment's event started chronologically before its
+// first visible day (independent of RTL column order or interior hidden days).
+const segmentStartsBeforeVisible = (
+  event: { start: Date },
+  days: readonly Date[],
+  startCol: number,
+  endCol: number,
+): boolean =>
+  startOfDay(event.start).getTime() <
+  Math.min(startOfDay(days[startCol]).getTime(), startOfDay(days[endCol]).getTime());
+
 // Whether two event objects are the same all-day bar: the same `getEventId`, or,
 // without IDs, the same dates and title.
 function isSameAllDayBar<T>(
@@ -239,12 +252,19 @@ export interface SolidRenderEventArgs<T = unknown> {
   mode: CalendarMode;
   /** Whether the event is all-day. */
   isAllDay: boolean;
+  /** Whether the event renders in the horizontal all-day lane above the grid. */
+  inAllDayLane?: boolean;
   /** Pixel height of the event box (timed events only). */
   boxHeight?: number;
   /** Starts before the visible day (timed) or visible date range (all-day). */
   continuesBefore?: boolean;
   /** Ends after the visible day (timed) or visible date range (all-day). */
   continuesAfter?: boolean;
+  /**
+   * True for a lane bar whose event started chronologically before its first
+   * visible day (including across interior hidden days or RTL column order).
+   */
+  startsBeforeVisible?: boolean;
   /** Show the time range in 12-hour AM/PM. */
   ampm?: boolean;
   /** Call to fire the view's `onPressEvent` for this event. */
@@ -345,6 +365,12 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   showAllDayEventCell?: boolean;
   /** Show the "all-day" text beside the lane (default false). */
   showAllDayLabel?: boolean;
+  /**
+   * Where timed events lasting 24 hours or longer render: `"grid"` (default)
+   * keeps them on the vertical hour columns; `"all-day"` places them in the
+   * horizontal all-day lane above the grid with their start time and title.
+   */
+  multiDayTimedEventPlacement?: MultiDayTimedEventPlacement;
   /** Translations for the screen-reader words and gutter text; omitted keys use English. */
   labels?: Partial<CalendarLabels>;
   /** Tint Saturday/Sunday columns with the weekend background (default true). Set
@@ -530,16 +556,22 @@ function DefaultDomEvent<T>(
     >,
     incoming,
   );
+  const isLane = createMemo(() => props.isAllDay || Boolean(props.inAllDayLane));
   const timeLabel = createMemo(() =>
     eventTimeLabel({
       mode: props.mode,
       isAllDay: props.isAllDay,
+      inAllDayLane: isLane(),
+      continuesBefore: props.continuesBefore,
+      startsBeforeVisible: props.startsBeforeVisible,
       start: props.event.start,
       end: props.event.end,
       ampm: props.ampm,
       showTime: true,
     }),
   );
+  const laneTimeLabel = createMemo(() => (isLane() ? timeLabel() : null));
+  const gridTimeLabel = createMemo(() => (!isLane() ? timeLabel() : null));
   // The title fills the box in whole lines; the time is secondary and only shows
   // once a full line is free beneath it. Mirrors the RN renderer via the same
   // core helper, so a 30-minute slot shows just its title instead of clipping
@@ -548,13 +580,13 @@ function DefaultDomEvent<T>(
     eventChipLayout({
       boxHeightPx: props.boxHeight,
       mode: props.mode,
-      hasTime: !props.isAllDay && timeLabel() != null,
+      hasTime: gridTimeLabel() != null,
       titleLineHeightPx: DOM_TITLE_LINE_HEIGHT,
       timeLineHeightPx: DOM_TIME_LINE_HEIGHT,
       paddingYPx: DOM_BOX_PADDING_V,
     }),
   );
-  const oneLine = createMemo(() => titleNumberOfLines(props.mode, props.isAllDay) === 1);
+  const oneLine = createMemo(() => titleNumberOfLines(props.mode, props.isAllDay, isLane()) === 1);
   // A chip reduced to a single title line (no time) centers it vertically, so a
   // very short event reads balanced instead of hugging the top edge.
   const centerLoneTitle = createMemo(() => layout().titleMaxLines === 1 && !layout().showTime);
@@ -573,11 +605,11 @@ function DefaultDomEvent<T>(
         }
       : null),
   }));
-  // An all-day bar clipped at the view edge squares that side, like a month bar,
+  // A lane bar clipped at the view edge squares that side, like a month bar,
   // so it reads as continuing. Timed segments continue vertically and keep theirs.
   // Longhands only, matching the React renderer's inline style.
-  const squareStart = createMemo(() => !!(props.isAllDay && props.continuesBefore));
-  const squareEnd = createMemo(() => !!(props.isAllDay && props.continuesAfter));
+  const squareStart = createMemo(() => !!(isLane() && props.continuesBefore));
+  const squareEnd = createMemo(() => !!(isLane() && props.continuesAfter));
   const boxThemed = createMemo<CSSProperties>(() => ({
     padding: `${DOM_BOX_PADDING_V}px 6px`,
     borderTopLeftRadius: squareStart() ? 0 : 6,
@@ -611,39 +643,60 @@ function DefaultDomEvent<T>(
             },
       )}
     >
-      <div
-        style={css({
-          fontWeight: 600,
-          overflow: "hidden",
-          // Clip on a line boundary with no ellipsis. The all-day lane is a single
-          // line; timed events wrap to as many whole lines as the box allows.
-          ...(oneLine()
-            ? {
-                whiteSpace: "nowrap",
-              }
-            : {
-                wordBreak: "break-word",
-                ...(layout().titleMaxLines > 0
-                  ? {
-                      maxHeight: layout().titleMaxLines * DOM_TITLE_LINE_HEIGHT,
-                    }
-                  : null),
-              }),
-        })}
-      >
-        {props.event.title}
-      </div>
-      {layout().showTime ? (
+      {laneTimeLabel() != null ? (
         <div
           style={css({
-            opacity: 0.75,
             overflow: "hidden",
-            maxHeight: DOM_TIME_LINE_HEIGHT,
+            whiteSpace: "nowrap",
+            display: "flex",
+            alignItems: "baseline",
+            gap: 4,
           })}
         >
-          {timeLabel()}
+          <span style={css({ opacity: 0.75, fontWeight: 400, flexShrink: 0 })}>
+            {laneTimeLabel()}
+          </span>
+          {props.event.title ? (
+            <span style={css({ fontWeight: 600, overflow: "hidden" })}>{props.event.title}</span>
+          ) : null}
         </div>
-      ) : null}
+      ) : (
+        <>
+          <div
+            style={css({
+              fontWeight: 600,
+              overflow: "hidden",
+              // Clip on a line boundary with no ellipsis. The all-day lane is a single
+              // line; timed events wrap to as many whole lines as the box allows.
+              ...(oneLine()
+                ? {
+                    whiteSpace: "nowrap",
+                  }
+                : {
+                    wordBreak: "break-word",
+                    ...(layout().titleMaxLines > 0
+                      ? {
+                          maxHeight: layout().titleMaxLines * DOM_TITLE_LINE_HEIGHT,
+                        }
+                      : null),
+                  }),
+            })}
+          >
+            {props.event.title}
+          </div>
+          {layout().showTime ? (
+            <div
+              style={css({
+                opacity: 0.75,
+                overflow: "hidden",
+                maxHeight: DOM_TIME_LINE_HEIGHT,
+              })}
+            >
+              {gridTimeLabel()}
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
@@ -700,6 +753,7 @@ export function TimeGrid<T = unknown>(
       eventOverlap: true,
       showAllDayEventCell: true,
       showAllDayLabel: false,
+      multiDayTimedEventPlacement: "grid",
       height: 600,
     } satisfies Partial<
       TimeGridProps<T> & {
@@ -990,7 +1044,8 @@ export function TimeGrid<T = unknown>(
     };
   };
   const hasEditActions = (event: CalendarEvent<T>) => {
-    if (isAllDayEvent(event) || isBackgroundEvent(event)) return false;
+    if (isAllDayLaneEvent(event, props.multiDayTimedEventPlacement) || isBackgroundEvent(event))
+      return false;
     const { canMove, canResize } = editability(event);
     return canMove || canResize;
   };
@@ -1085,8 +1140,7 @@ export function TimeGrid<T = unknown>(
       days(),
       props.events.filter(
         (event) =>
-          isAllDayEvent(event) &&
-          !isBackgroundEvent(event) &&
+          isAllDayLaneEvent(event, props.multiDayTimedEventPlacement) &&
           days().some(
             (day) => event.start < addDays(startOfDay(day), 1) && event.end > startOfDay(day),
           ),
@@ -1304,8 +1358,11 @@ export function TimeGrid<T = unknown>(
       .map((day) => day.getTime())
       .join(),
   );
+  const allDayDragKey = createMemo(
+    () => `${visibleDaysKey()}|${props.multiDayTimedEventPlacement}`,
+  );
   createEffect(
-    () => visibleDaysKey(),
+    () => allDayDragKey(),
     () =>
       untrack(() => {
         stopAllDayRef.current?.();
@@ -1880,10 +1937,29 @@ export function TimeGrid<T = unknown>(
       }),
   );
   createEffect(
-    () => [props.date, props.events, props.onDragEvent],
+    () => [props.date, props.events, props.onDragEvent, props.multiDayTimedEventPlacement],
     () =>
       untrack(() => {
         cancelHoldRef.current?.();
+      }),
+  );
+  // Changing timed-event placement can move events between the vertical grid
+  // and the all-day lane and shift day-column indices; cancel any active grid
+  // drag so detached listeners and previews cannot linger or commit stale bounds.
+  // Memoized so unrelated prop rerenders with the same placement keep the drag.
+  const timedPlacement = createMemo(() => props.multiDayTimedEventPlacement);
+  createEffect(
+    () => timedPlacement(),
+    () =>
+      untrack(() => {
+        if (!dragRef.current) return;
+        try {
+          const grab = activeGrabRef.current;
+          if (grab) grab.box.releasePointerCapture?.(grab.pointerId);
+        } catch {
+          // Best-effort release if the box already unmounted or capture was never granted.
+        }
+        finishDrag();
       }),
   );
   const pxFromTop = (el: HTMLElement, clientY: number) => clientY - el.getBoundingClientRect().top;
@@ -2070,7 +2146,13 @@ export function TimeGrid<T = unknown>(
   // Per-day layout and shading are pure functions of days/events/businessHours,
   // so memoize them, otherwise every drag pointermove (which calls setDrag)
   // re-runs the full layout for each column.
-  const positionedByDay = createMemo(() => days().map((day) => layoutDayEvents(props.events, day)));
+  const positionedByDay = createMemo(() =>
+    days().map((day) =>
+      layoutDayEvents(props.events, day, {
+        multiDayTimedEventPlacement: props.multiDayTimedEventPlacement,
+      }),
+    ),
+  );
 
   // Keep the original boxes mounted for pointer capture, but replace every
   // segment of a moving multi-day event with the same shifted range.
@@ -2092,6 +2174,16 @@ export function TimeGrid<T = unknown>(
           }) ?? currentHeldEvent))
     );
   });
+  // When placement toggles mid-drag, the event being dragged may move into the
+  // all-day lane before the cleanup effect cancels the drag. Suppress every
+  // vertical drag preview / active-box match during that render frame.
+  const draggedPromoted = createMemo(() => {
+    const currentMovingEvent = movingEvent();
+    return (
+      !!currentMovingEvent &&
+      isAllDayLaneEvent(currentMovingEvent, props.multiDayTimedEventPlacement)
+    );
+  });
   // A held multi-day event, moved or not. The active box must also be the held
   // event, because an events refresh can give its `day:index` key to another
   // event, even before the pointer moves.
@@ -2111,6 +2203,7 @@ export function TimeGrid<T = unknown>(
     // Only once the pointer has moved: a press that may still be a click keeps
     // the segments in their shared columns instead of swapping in the preview.
     return !paged() &&
+      !draggedPromoted() &&
       currentDrag?.kind === "move" &&
       currentDrag.moved &&
       (currentDrag.continuesBefore || currentDrag.continuesAfter) &&
@@ -2163,6 +2256,7 @@ export function TimeGrid<T = unknown>(
     const currentDrag = drag();
     if (
       paged() ||
+      draggedPromoted() ||
       !currentDrag ||
       currentDrag.kind !== "move" ||
       currentDrag.spillDayIndex !== dayIndex
@@ -2507,12 +2601,20 @@ export function TimeGrid<T = unknown>(
           >
             <For each={allDaySpans()} keyed={(segment) => segment.key}>
               {(segment) => {
+                const allDay = createMemo(() => isAllDayEvent(segment().event));
                 const args = createMemo<SolidRenderEventArgs<T>>(() => ({
                   event: segment().event,
                   mode: props.mode,
-                  isAllDay: true,
+                  isAllDay: allDay(),
+                  inAllDayLane: true,
                   continuesBefore: segment().continuesBefore,
                   continuesAfter: segment().continuesAfter,
+                  startsBeforeVisible: segmentStartsBeforeVisible(
+                    segment().event,
+                    days(),
+                    segment().startCol,
+                    segment().endCol,
+                  ),
                   ampm: props.ampm,
                   onPress: () => props.onPressEvent?.(segment().event),
                 }));
@@ -2540,12 +2642,12 @@ export function TimeGrid<T = unknown>(
                         props.eventAccessibilityLabel
                           ? props.eventAccessibilityLabel(segment().event, {
                               mode: props.mode,
-                              isAllDay: true,
+                              isAllDay: allDay(),
                               ampm: props.ampm,
                             })
                           : defaultEventAccessibilityLabel({
                               title: segment().event.title,
-                              isAllDay: true,
+                              isAllDay: allDay(),
                               start: segment().event.start,
                               end: segment().event.end,
                               ampm: props.ampm,
@@ -2587,9 +2689,16 @@ export function TimeGrid<T = unknown>(
                 const args = createMemo<SolidRenderEventArgs<T>>(() => ({
                   event: preview().event,
                   mode: props.mode,
-                  isAllDay: true,
+                  isAllDay: isAllDayEvent(preview().event),
+                  inAllDayLane: true,
                   continuesBefore: preview().continuesBefore,
                   continuesAfter: preview().continuesAfter,
+                  startsBeforeVisible: segmentStartsBeforeVisible(
+                    preview().event,
+                    days(),
+                    preview().startCol,
+                    preview().endCol,
+                  ),
                   ampm: props.ampm,
                   onPress: () => {},
                 }));
@@ -2919,6 +3028,7 @@ export function TimeGrid<T = unknown>(
                           const active = createMemo(() => {
                             const currentDrag = drag();
                             return !paged() &&
+                              !draggedPromoted() &&
                               currentDrag?.key === key() &&
                               (!multiDayHeld() || pe().event === movingEvent())
                               ? currentDrag
@@ -3330,7 +3440,7 @@ export function TimeGrid<T = unknown>(
           event's own column has unmounted. Positioned imperatively per pointer
           move (see moveDrag) and pointer-transparent so the drop hit-test reads
           the column beneath it. */}
-      {paged() && draggedRef.current ? (
+      {paged() && !draggedPromoted() && draggedRef.current ? (
         <div
           ref={(el) => (ghostRef.current = el)}
           aria-hidden="true"

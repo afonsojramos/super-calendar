@@ -44,7 +44,7 @@ export function eventAccessibilityLabel(args: {
 export interface EventAccessibilityLabelContext {
   /** The view the event is rendered in. */
   mode: CalendarMode;
-  /** Whether the event sits in the all-day lane (or is an all-day event in month view). */
+  /** Whether the event itself is an all-day event (false for timed events placed in the all-day lane). */
   isAllDay: boolean;
   /** Whether times are formatted as 12-hour AM/PM. */
   ampm: boolean;
@@ -65,16 +65,24 @@ export type EventAccessibilityLabeler<T = unknown> = (
  * Month and multi-week cells and the all-day lane show a single clipped line;
  * timed-grid titles (`undefined`) wrap to fill the box.
  */
-export function titleNumberOfLines(mode: CalendarMode, isAllDay: boolean): number | undefined {
-  return mode === "month" || mode === "multiweek" || isAllDay ? 1 : undefined;
+export function titleNumberOfLines(
+  mode: CalendarMode,
+  isAllDay: boolean,
+  inAllDayLane = false,
+): number | undefined {
+  return mode === "month" || mode === "multiweek" || isAllDay || inAllDayLane ? 1 : undefined;
 }
 
 /**
  * The secondary line under the title in the built-in renderer, or `null` when
- * none should show. Timed events get their `start - end` range. An all-day event
- * gets the literal "All day" in the schedule (which has no all-day lane to
- * signal it positionally) and nothing on the day/week grid (the lane already
- * does). Month and multi-week cells and `showTime={false}` always return `null`.
+ * none should show. Timed events on the grid or schedule get their
+ * `start - end` range; a timed event placed in the all-day lane gets its start
+ * time when it begins on a visible day (omitted when `startsBeforeVisible`, or
+ * `continuesBefore` if `startsBeforeVisible` is omitted, is true). An all-day
+ * event gets the literal "All day" in the schedule (which has no all-day lane
+ * to signal it positionally) and nothing on the day/week grid (the lane
+ * already does). Month and multi-week cells and `showTime={false}` always
+ * return `null`.
  */
 export function eventTimeLabel(args: {
   mode: CalendarMode;
@@ -83,12 +91,27 @@ export function eventTimeLabel(args: {
   end: Date;
   ampm: boolean;
   showTime: boolean;
+  /** Whether the event renders in the time grid's horizontal all-day lane. */
+  inAllDayLane?: boolean;
+  /** Whether the horizontal lane bar continues past the leading visual edge. */
+  continuesBefore?: boolean;
+  /**
+   * Whether the event started chronologically before its first visible day
+   * (independent of RTL column order or interior hidden days). Takes precedence
+   * over `continuesBefore` when deciding whether to hide a lane bar's start time.
+   */
+  startsBeforeVisible?: boolean;
   /** Text for an all-day event in the schedule. Default "All day". */
   allDayLabel?: string;
 }): string | null {
   if (!args.showTime || args.mode === "month" || args.mode === "multiweek") return null;
   if (args.isAllDay) return args.mode === "schedule" ? (args.allDayLabel ?? "All day") : null;
   const timeFormat = args.ampm ? "h:mm a" : "HH:mm";
+  if (args.inAllDayLane) {
+    return (args.startsBeforeVisible ?? args.continuesBefore)
+      ? null
+      : format(args.start, timeFormat);
+  }
   return `${format(args.start, timeFormat)} - ${format(args.end, timeFormat)}`;
 }
 
