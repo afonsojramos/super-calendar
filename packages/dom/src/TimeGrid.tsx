@@ -361,6 +361,8 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
    * (pair with `eventsInTimeZone`).
    */
   timeZone?: string;
+  /** Highlight this date in the header instead of the real "today". */
+  activeDate?: Date;
   /** Show the all-day lane above the grid (default true). */
   showAllDayEventCell?: boolean;
   /** Show the "all-day" text beside the lane (default false). */
@@ -722,6 +724,7 @@ function TimeGridInner<T = unknown>(
     eventOverlap = true,
     now: nowProp,
     timeZone,
+    activeDate,
     showAllDayEventCell = true,
     showAllDayLabel = false,
     multiDayTimedEventPlacement = "grid",
@@ -2259,6 +2262,7 @@ function TimeGridInner<T = unknown>(
         </div>
         {days.map((day) => {
           const today = getIsToday(day, todayDate);
+          const highlighted = activeDate ? isSameCalendarDay(day, activeDate) : today;
           // Full, unambiguous date for assistive tech; the visible weekday + day
           // number below are decorative (aria-hidden) so it isn't read twice.
           const dateLabel = format(day, "EEEE, d MMMM yyyy", dfns);
@@ -2302,8 +2306,8 @@ function TimeGridInner<T = unknown>(
                   themed: {
                     fontSize: 15,
                     fontWeight: 600,
-                    background: today ? theme.todayBackground : "transparent",
-                    color: today ? theme.todayText : theme.text,
+                    background: highlighted ? theme.todayBackground : "transparent",
+                    color: highlighted ? theme.todayText : theme.text,
                   },
                 })}
               >

@@ -119,6 +119,11 @@ Counts must be positive safe integers whose date span is representable; invalid
 counts or dates throw `RangeError`. Rows are materialized, so larger counts need
 more space. `MonthView` and `MonthPager` retain their month-only behavior.
 
+Every mode, including `schedule`, highlights today as `now` and `timeZone` read
+it. Pass `activeDate` to `Calendar`, `MonthView`, `MultiWeekView`, `MonthList`,
+`TimeGrid`, `YearView`, or `Agenda` to highlight another day instead.
+Screen-reader labels still announce the real today.
+
 Keep `events` stable during unrelated UI updates. With recurrence or `timeZone`,
 replacing the array rebuilds displayed events and cancels a held move on web. See
 [keep event data stable](https://super-calendar.afonsojramos.me/guides/events#keep-event-data-stable).

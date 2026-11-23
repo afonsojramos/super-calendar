@@ -117,8 +117,9 @@ inside that viewport. See [multi-week grids](/guides/views#multi-week-grids).
 
 `mode="schedule"` (or the `Agenda` component directly) renders a scrolling list of
 events grouped under a date header per day, sorted by start. It does not window
-by `date`: it shows exactly the `events` you pass, so you control the range. Each
-row defaults to a time + title; override it with `renderScheduleEvent`.
+by `date`: it shows exactly the `events` you pass, so you control the range. It
+highlights today's header (or `activeDate`), not the day of `date`. Each row
+defaults to a time + title; override it with `renderScheduleEvent`.
 
 ```tsx
 import { Agenda, type CalendarEvent } from "@super-calendar/dom";

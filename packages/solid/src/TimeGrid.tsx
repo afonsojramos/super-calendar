@@ -362,6 +362,8 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
    * (pair with `eventsInTimeZone`).
    */
   timeZone?: string;
+  /** Highlight this date in the header instead of the real "today". */
+  activeDate?: Date;
   /** Show the all-day lane above the grid (default true). */
   showAllDayEventCell?: boolean;
   /** Show the "all-day" text beside the lane (default false). */
@@ -2466,6 +2468,10 @@ export function TimeGrid<T = unknown>(
           <For each={days()} keyed={false}>
             {(day) => {
               const today = createMemo(() => getIsToday(day(), new Date(todayKey())));
+              const highlighted = createMemo(() => {
+                const active = props.activeDate;
+                return active ? isSameCalendarDay(day(), active) : today();
+              });
               // Full, unambiguous date for assistive tech; the visible weekday + day
               // number below are decorative (aria-hidden) so it isn't read twice.
               const dateLabel = createMemo(() => format(day(), "EEEE, d MMMM yyyy", dfns()));
@@ -2521,8 +2527,8 @@ export function TimeGrid<T = unknown>(
                       themed: {
                         fontSize: 15,
                         fontWeight: 600,
-                        background: today() ? theme().todayBackground : "transparent",
-                        color: today() ? theme().todayText : theme().text,
+                        background: highlighted() ? theme().todayBackground : "transparent",
+                        color: highlighted() ? theme().todayText : theme().text,
                       },
                     })}
                   >

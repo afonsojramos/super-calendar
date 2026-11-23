@@ -122,6 +122,8 @@ export interface CalendarProps<T = unknown>
    * `eventsInTimeZone`.
    */
   timeZone?: string;
+  /** Highlight this date (header/cell/agenda) instead of the real "today". */
+  activeDate?: Date;
   /** Theme overrides; falls back to the default light theme. */
   theme?: Partial<DomCalendarTheme>;
   /** Height of the scroll viewport, in px. */
@@ -388,6 +390,7 @@ function CalendarInner<T = unknown>(
     numberOfWeeks = 2,
     locale,
     timeZone,
+    activeDate,
     theme,
     height,
     className,
@@ -575,6 +578,7 @@ function CalendarInner<T = unknown>(
         locale={locale}
         now={now}
         timeZone={timeZone}
+        activeDate={activeDate}
         labels={labels}
         theme={theme}
         className={className}
@@ -599,10 +603,10 @@ function CalendarInner<T = unknown>(
         locale={locale}
         now={now}
         timeZone={timeZone}
+        activeDate={activeDate}
         ampm={ampm}
         theme={theme}
         height={height}
-        activeDate={date}
         className={className}
         style={style}
         classNames={classNames}
@@ -625,6 +629,7 @@ function CalendarInner<T = unknown>(
         locale={locale}
         now={now}
         timeZone={timeZone}
+        activeDate={activeDate}
         labels={labels}
         theme={theme}
         className={className}
@@ -672,6 +677,7 @@ function CalendarInner<T = unknown>(
         locale={locale}
         now={now}
         timeZone={timeZone}
+        activeDate={activeDate}
         labels={labels}
         theme={theme}
         className={className}
@@ -716,6 +722,7 @@ function CalendarInner<T = unknown>(
         hiddenDays={hiddenDays}
         now={now}
         timeZone={timeZone}
+        activeDate={activeDate}
         weekdayFormat={weekdayFormat}
         numberOfDays={numberOfDays}
         locale={locale}
