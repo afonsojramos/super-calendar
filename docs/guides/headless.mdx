@@ -108,9 +108,11 @@ month grid uses, so a custom month cell can draw identical multi-day bars.
 
 ## Laying out timed events
 
-`layoutDayEvents(events, day)` resolves overlaps into side-by-side columns for a
-day/week grid — the same math the `TimeGrid` uses, with no rendering opinion. Each
-`PositionedEvent` gives you placement:
+`layoutDayEvents(events, day, options?)` resolves overlaps into side-by-side columns for a
+day/week grid, using the same math `TimeGrid` uses, with no rendering opinion. Pass
+`{ multiDayTimedEventPlacement: "all-day" }` to exclude timed events lasting 24
+hours or longer from the vertical columns, matching `isAllDayLaneEvent(event, placement)`.
+Each `PositionedEvent` gives you placement:
 
 ```tsx
 import { layoutDayEvents } from "@super-calendar/core";
@@ -165,7 +167,7 @@ TypeScript types for exact signatures.
 - **Selection** — the `useDateRange` hook, plus pure `nextDateRange`,
   `daySelectionState`, `isDateSelectable`, `isRangeEndpoint`, `isWithinDateRange`.
 - **Dates** — `getViewDays`, `getWeekDays`, `getIsToday`, `isWeekend`,
-  `isSameCalendarDay`, `minutesIntoDay`, `isAllDayEvent`.
+  `isSameCalendarDay`, `minutesIntoDay`, `isAllDayEvent`, `isAllDayLaneEvent`.
 - **Theme tokens** — `lightColors` / `darkColors` (the neutral `CalendarColors`
   palette) to build a theme from scratch.
 

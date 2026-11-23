@@ -76,8 +76,11 @@ const startMinutes = clampMoveStartMinutes(
 To position your own marks on a time grid, `wallClockHours(date, dayStart, nextDayStart)`
 returns the fractional clock hour, clamped to the day. It matches `layoutDayEvents`,
 which places events by clock time so they line up with the hour labels on a
-daylight saving change day. `clockHoursBetween(from, to)` returns how many rows a
-span covers.
+daylight saving change day. Pass `{ multiDayTimedEventPlacement: "all-day" }`
+to `layoutDayEvents(events, day, options)` (and pair it with
+`isAllDayLaneEvent(event, placement)`) to exclude timed events lasting 24 hours
+or longer from the vertical columns so they render in the all-day lane instead.
+`clockHoursBetween(from, to)` returns how many rows a span covers.
 
 Use `resolveDraggedBounds` to commit a move or resize. Equal start and end deltas
 move the event while preserving elapsed duration, including across daylight

@@ -1,6 +1,6 @@
 import type { CalendarEvent } from "../types";
 import { isAllDayEvent } from "./layout";
-import { utcTime, zoneFields } from "./zoneFields";
+import { utcTime, zoneFields, zonedSources, zonedWallClockToUtc } from "./zoneFields";
 
 /**
  * Reinterpret an instant as its wall-clock time in `timeZone`, returned as a
@@ -28,15 +28,6 @@ export function nowInTimeZone(now?: Date, timeZone?: string): Date {
   return timeZone ? toZonedTime(instant, timeZone) : instant;
 }
 
-// `timeZone`'s offset from UTC (ms) at `instant`: the zone's wall clock read as
-// if it were UTC, minus the real instant. Read from plain fields, so the
-// device's own DST changes can't distort it.
-function zoneOffsetMs(instant: Date, timeZone: string): number {
-  const [year, month, day, hour, minute, second] = zoneFields(instant, timeZone);
-  const wallAsUtc = utcTime(year, month, day, hour, minute, second, instant.getUTCMilliseconds());
-  return wallAsUtc - instant.getTime();
-}
-
 /**
  * The inverse of {@link toZonedTime}: given a wall-clock time in `timeZone`,
  * return the absolute UTC instant. Pass the wall clock as a `Date` whose **UTC**
@@ -46,16 +37,7 @@ function zoneOffsetMs(instant: Date, timeZone: string): number {
  * distance after the skipped hour (02:30 becomes 03:30), as a device clock does.
  */
 export function zonedTimeToUtc(wallClock: Date, timeZone: string): Date {
-  const guess = wallClock.getTime();
-  const firstPass = zoneOffsetMs(new Date(guess), timeZone);
-  const secondPass = zoneOffsetMs(new Date(guess - firstPass), timeZone);
-  const instant = new Date(guess - secondPass);
-  // Neither offset maps a skipped time back to itself. Read it with the offset
-  // in force before the change, which is the smaller of the two.
-  if (firstPass !== secondPass && zoneOffsetMs(instant, timeZone) !== secondPass) {
-    return new Date(guess - Math.min(firstPass, secondPass));
-  }
-  return instant;
+  return zonedWallClockToUtc(wallClock, timeZone);
 }
 
 /**
@@ -79,10 +61,6 @@ export function fromZonedTime(date: Date, timeZone: string): Date {
     timeZone,
   );
 }
-
-// Each display copy made by `eventsInTimeZone`, mapped to the event it copies
-// and the zone it was shifted into.
-const zonedSources = new WeakMap<object, { event: object; timeZone: string }>();
 
 /**
  * Shift every timed event's `start`/`end` through {@link toZonedTime} so the

@@ -1,4 +1,4 @@
-import { type ReactElement, useMemo, useRef, useState } from "react";
+import { type ReactElement, useEffect, useMemo, useRef, useState } from "react";
 import { addDays, startOfDay } from "date-fns";
 import { type LayoutChangeEvent, Platform, StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -9,12 +9,13 @@ import type {
   EventDragHandler,
   EventDragStartHandler,
   EventKeyExtractor,
+  MultiDayTimedEventPlacement,
   RenderEvent,
 } from "../types";
 import { useSlots } from "../utils/slots";
 import {
   isAllDayEvent,
-  isBackgroundEvent,
+  isAllDayLaneEvent,
   layoutMonthWeek,
   monthDropBounds,
   type MonthEventSegment,
@@ -47,6 +48,10 @@ type AllDayLaneProps<T> = {
   onDragStart?: EventDragStartHandler<T>;
   /** The grid default for moves; an event's `startEditable` overrides it. */
   eventStartEditable?: boolean;
+  /** Where timed events lasting 24 hours or longer render (default `"grid"`). */
+  multiDayTimedEventPlacement?: MultiDayTimedEventPlacement;
+  /** Format promoted timed events' start times in 12-hour AM/PM. Default false. */
+  ampm?: boolean;
   /** Reports the lane's natural height, which the grid's all-day band follows. */
   onLayout?: (event: LayoutChangeEvent) => void;
 };
@@ -62,6 +67,17 @@ type LaneDrag<T> = {
 };
 
 const clamp = (value: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, value));
+
+// Whether a horizontal lane segment's event started chronologically before its
+// first visible day (independent of RTL column order or interior hidden days).
+const segmentStartsBeforeVisible = (
+  event: { start: Date },
+  days: readonly Date[],
+  startCol: number,
+  endCol: number,
+): boolean =>
+  startOfDay(event.start).getTime() <
+  Math.min(startOfDay(days[startCol]).getTime(), startOfDay(days[endCol]).getTime());
 
 /**
  * The all-day lane of one page, pinned above the scrolling hours. All-day
@@ -82,6 +98,8 @@ export function AllDayLane<T>({
   onDragEvent,
   onDragStart,
   eventStartEditable = true,
+  multiDayTimedEventPlacement = "grid",
+  ampm = false,
   onLayout,
 }: AllDayLaneProps<T>) {
   const theme = useCalendarTheme();
@@ -89,19 +107,18 @@ export function AllDayLane<T>({
   const RenderEventComponent = renderEvent;
 
   const spans = useMemo(() => {
-    const allDay = events.filter(
+    const laneEvents = events.filter(
       (event) =>
-        isAllDayEvent(event) &&
-        !isBackgroundEvent(event) &&
+        isAllDayLaneEvent(event, multiDayTimedEventPlacement) &&
         days.some(
           (day) => event.start < addDays(startOfDay(day), 1) && event.end > startOfDay(day),
         ),
     );
-    const { segments, laneCount } = layoutMonthWeek(days, allDay);
+    const { segments, laneCount } = layoutMonthWeek(days, laneEvents);
     const lanes: MonthEventSegment<T>[][] = Array.from({ length: laneCount }, () => []);
     for (const segment of segments) lanes[segment.lane].push(segment);
     return lanes.flat();
-  }, [days, events]);
+  }, [days, events, multiDayTimedEventPlacement]);
 
   const [drag, setDrag] = useState<LaneDrag<T> | null>(null);
   const dragRef = useRef<LaneDrag<T> | null>(null);
@@ -109,6 +126,9 @@ export function AllDayLane<T>({
     dragRef.current = next;
     setDrag(next);
   };
+  useEffect(() => {
+    if (dragRef.current) applyDrag(null);
+  }, [multiDayTimedEventPlacement]);
   // The event object of the bar being carried. A refresh can replace it
   // mid-drag, so a missing original falls back to the bar's key.
   const carriedEvent = (current: LaneDrag<T>) =>
@@ -209,9 +229,12 @@ export function AllDayLane<T>({
                 <RenderEventComponent
                   event={event}
                   mode={mode}
-                  isAllDay
+                  isAllDay={isAllDayEvent(event)}
+                  inAllDayLane
+                  ampm={ampm}
                   continuesBefore={continuesBefore}
                   continuesAfter={continuesAfter}
+                  startsBeforeVisible={segmentStartsBeforeVisible(event, days, startCol, endCol)}
                   onPress={() => onPressEvent(event)}
                   // A long press picks a movable bar up instead.
                   onLongPress={
@@ -236,9 +259,17 @@ export function AllDayLane<T>({
                   <RenderEventComponent
                     event={preview.event}
                     mode={mode}
-                    isAllDay
+                    isAllDay={isAllDayEvent(preview.event)}
+                    inAllDayLane
+                    ampm={ampm}
                     continuesBefore={preview.continuesBefore}
                     continuesAfter={preview.continuesAfter}
+                    startsBeforeVisible={segmentStartsBeforeVisible(
+                      preview.event,
+                      days,
+                      preview.startCol,
+                      preview.endCol,
+                    )}
                     onPress={() => {}}
                   />
                 </View>

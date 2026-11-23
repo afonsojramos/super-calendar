@@ -4,6 +4,7 @@ import {
   eventDayKeys,
   groupEventsByDay,
   isAllDayEvent,
+  isAllDayLaneEvent,
   layoutDayEvents,
 } from "../layout";
 import type { CalendarEvent } from "../../types";
@@ -337,6 +338,127 @@ describe("layoutDayEvents", () => {
       expect(layoutDayEvents([toMidnight], new Date(2026, 5, 16))).toEqual([]);
       expect(layoutDayEvents([toMidnight], new Date(2026, 5, 15))).toHaveLength(1);
     });
+
+    it("excludes >= 24h timed events under 'all-day' placement and leaves < 24h cross-midnight events on the grid", () => {
+      const threeDay: CalendarEvent = {
+        title: "Conference",
+        start: new Date(2026, 5, 15, 9),
+        end: new Date(2026, 5, 17, 17),
+        allDay: false,
+      };
+      const fullDayTimed: CalendarEvent = {
+        title: "On-call",
+        start: new Date(2026, 5, 16, 0),
+        end: new Date(2026, 5, 17, 0),
+        allDay: false,
+      };
+      const exact24h: CalendarEvent = {
+        title: "Shift",
+        start: new Date(2026, 5, 15, 9),
+        end: new Date(2026, 5, 16, 9),
+        allDay: false,
+      };
+      const under24h: CalendarEvent = {
+        title: "Almost 24h",
+        start: new Date(2026, 5, 15, 9),
+        end: new Date(2026, 5, 16, 8, 59),
+        allDay: false,
+      };
+      const midDay: CalendarEvent = {
+        title: "Standup",
+        start: new Date(2026, 5, 16, 10),
+        end: new Date(2026, 5, 16, 11),
+      };
+      const all = [threeDay, fullDayTimed, exact24h, under24h, spanning, midDay];
+
+      // Default "grid" keeps all timed events on the grid; Standup shares width with Conference and On-call.
+      const onGrid = layoutDayEvents(all, new Date(2026, 5, 16));
+      expect(onGrid.find((p) => p.event === midDay)?.columns).toBeGreaterThan(1);
+
+      // "all-day" excludes >= 24h timed events, so Standup gets the full column width.
+      const promoted = layoutDayEvents(all, new Date(2026, 5, 16), {
+        multiDayTimedEventPlacement: "all-day",
+      });
+      expect(promoted.map((p) => p.event)).toEqual([under24h, spanning, midDay]);
+      expect(promoted.find((p) => p.event === midDay)).toMatchObject({ column: 0, columns: 1 });
+    });
+  });
+});
+
+describe("isAllDayLaneEvent", () => {
+  it("always includes all-day events and excludes background events", () => {
+    const explicit: CalendarEvent = {
+      start: new Date(2026, 5, 15, 9),
+      end: new Date(2026, 5, 15, 10),
+      allDay: true,
+    };
+    const inferred: CalendarEvent = {
+      start: new Date(2026, 5, 15),
+      end: new Date(2026, 5, 16),
+    };
+    const bg: CalendarEvent = {
+      start: new Date(2026, 5, 15),
+      end: new Date(2026, 5, 18),
+      allDay: true,
+      display: "background",
+    };
+    const bgTimed: CalendarEvent = {
+      start: new Date(2026, 5, 15, 9),
+      end: new Date(2026, 5, 18, 17),
+      allDay: false,
+      display: "background",
+    };
+
+    expect(isAllDayLaneEvent(explicit, "grid")).toBe(true);
+    expect(isAllDayLaneEvent(explicit, "all-day")).toBe(true);
+    expect(isAllDayLaneEvent(inferred, "grid")).toBe(true);
+    expect(isAllDayLaneEvent(inferred, "all-day")).toBe(true);
+    expect(isAllDayLaneEvent(bg, "grid")).toBe(false);
+    expect(isAllDayLaneEvent(bg, "all-day")).toBe(false);
+    expect(isAllDayLaneEvent(bgTimed, "all-day")).toBe(false);
+  });
+
+  it("promotes timed events >= 24h only when placement is 'all-day'", () => {
+    const exactMidnight: CalendarEvent = {
+      start: new Date(2026, 5, 15, 0),
+      end: new Date(2026, 5, 16, 0),
+      allDay: false,
+    };
+    const exact24h: CalendarEvent = {
+      start: new Date(2026, 5, 15, 9),
+      end: new Date(2026, 5, 16, 9),
+      allDay: false,
+    };
+    const multiDay: CalendarEvent = {
+      start: new Date(2026, 5, 15, 9),
+      end: new Date(2026, 5, 17, 17),
+      allDay: false,
+    };
+    const under24h: CalendarEvent = {
+      start: new Date(2026, 5, 15, 9, 0, 0, 0),
+      end: new Date(2026, 5, 16, 8, 59, 59, 999),
+      allDay: false,
+    };
+    const overnight: CalendarEvent = {
+      start: new Date(2026, 5, 15, 22),
+      end: new Date(2026, 5, 16, 6),
+      allDay: false,
+    };
+    const zero: CalendarEvent = {
+      start: new Date(2026, 5, 15, 9),
+      end: new Date(2026, 5, 15, 9),
+      allDay: false,
+    };
+
+    for (const e of [exactMidnight, exact24h, multiDay]) {
+      expect(isAllDayLaneEvent(e)).toBe(false);
+      expect(isAllDayLaneEvent(e, "grid")).toBe(false);
+      expect(isAllDayLaneEvent(e, "all-day")).toBe(true);
+    }
+    for (const e of [under24h, overnight, zero]) {
+      expect(isAllDayLaneEvent(e, "grid")).toBe(false);
+      expect(isAllDayLaneEvent(e, "all-day")).toBe(false);
+    }
   });
 });
 

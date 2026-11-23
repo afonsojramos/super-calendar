@@ -199,6 +199,7 @@ the [Date selection](/guides/selection) guide.
 | `showNowIndicator`             | `boolean`                                  | Current-time line (default on).                                                 |
 | `showAllDayEventCell`          | `boolean`                                  | All-day lane (default on; grows with all-day events, none when empty).          |
 | `showAllDayLabel`              | `boolean`                                  | Time grid: show the "all-day" text label (default off).                         |
+| `multiDayTimedEventPlacement`  | `MultiDayTimedEventPlacement`              | Time grid: place timed events >= 24h in `"grid"` (default) or `"all-day"` lane. |
 | `refreshControl`               | `ScrollViewProps["refreshControl"]`        | Pull-to-refresh control for schedule, time-grid and year modes (React Native).  |
 | `timeGridContentPaddingBottom` | `number`                                   | Week/day: scrollable space below the last hour (React Native).                  |
 | `onTimeGridScroll`             | `(event) => void`                          | Week/day: vertical scroll events on the JS thread (React Native).               |
@@ -212,16 +213,26 @@ the [Date selection](/guides/selection) guide.
 | `styles`                       | `Partial<Record<CalendarSlot, StyleProp>>` | Per-slot style overrides, merged last.                                          |
 
 Time-grid all-day events render once per visible date range as spanning bars
-across their covered columns. Overlapping events occupy separate rows. This
+across their covered columns. Set `multiDayTimedEventPlacement="all-day"` on
+`Calendar` or `TimeGrid` to also place timed events lasting 24 hours or longer
+(including `00:00` to `24:00` blocks with `allDay: false`) in this lane with
+their start time and title, leaving the vertical hour columns clear. Timed
+events shorter than 24 hours stay on the vertical grid even when they cross
+midnight. Overlapping lane events occupy separate rows. This
 applies to native, React DOM, and Solid. The end is exclusive; hidden days take
-no width. `renderEvent` receives the original event, and its `continuesBefore`
-and `continuesAfter` hints indicate clipping at the visible range edges for
-all-day bars. The default bar squares its corners on a continuing side. In React
+no width. `renderEvent` receives the original event, `inAllDayLane: true`,
+`isAllDay` reflecting whether the event itself is all-day, `continuesBefore`
+and `continuesAfter` hints indicating clipping at the visible range edges, and
+`startsBeforeVisible` indicating whether the event started chronologically
+before its first visible day (including across interior hidden days or RTL).
+The default bar squares its corners on a continuing side and omits the start
+time when `startsBeforeVisible` is true. In React
 DOM and Solid, the `allDayEvent` button carries `data-continues-before` and
 `data-continues-after` on those sides. The `allDayColumn` slot styles each
 spanning cell. Native rows
 measure custom event content to determine the band height. With `onDragEvent`,
-a bar moves by whole days within the visible range and keeps its duration.
+a bar moves by whole days within the visible range and keeps its duration and
+clock times.
 
 In React DOM and Solid, `getEventId` preserves all-day focus and renderer state
 when a data refresh replaces event objects. Return a stable, unique string or
@@ -249,7 +260,7 @@ Changing either dimension updates already mounted list and pager months.
   <Card title="Helpers">
     `expandRecurringEvents`, `parseICalendar`, `toICalendar`, `eventsInTimeZone`, `toZonedTime`,
     `fromZonedTime`, `fromZonedRange`, `zonedEventSource`, `zonedDragBounds`, `nowInTimeZone`,
-    `layoutDayEvents`, `layoutMonthWeek`, `isAllDayEvent`, `isBackgroundEvent`,
+    `layoutDayEvents`, `layoutMonthWeek`, `isAllDayEvent`, `isAllDayLaneEvent`, `isBackgroundEvent`,
     `backgroundBandsForDay`, `buildMonthGrid`, `buildMultiWeekGrid`, `buildMonthWeeks`,
     `nextDateRange`, `isDateSelectable`, `isRangeEndpoint`, `isWithinDateRange`,
     `daySelectionState`, `getViewDays`, `getWeekDays`, `getIsToday`, `isWeekend`,
@@ -261,7 +272,7 @@ Changing either dimension updates already mounted list and pager months.
     `EventDragHandler`, `CalendarTheme`, `PositionedEvent`, `DateRange`, `MonthGrid`,
     `MonthEventSegment`, `MonthWeekEvents`, `MonthListProps`, `CalendarSlot`, `SlotStyleProps`,
     `CalendarLabels`, `CalendarHandle`, `ScrollToTimeOptions`, `CreateGhostArgs`, `MonthDateInfo`,
-    `DateChangeDetails`, `DateChangeReason`
+    `DateChangeDetails`, `DateChangeReason`, `MultiDayTimedEventPlacement`, `LayoutDayEventsOptions`
   </Card>
 </CardGroup>
 

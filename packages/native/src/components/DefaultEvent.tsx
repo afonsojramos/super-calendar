@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { StyleSheet, Text, TouchableOpacity } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated, { useAnimatedStyle, useDerivedValue } from "react-native-reanimated";
 import { useCalendarTheme } from "../theme";
 import { useCalendarLabels } from "../utils/labels";
@@ -35,8 +35,10 @@ export function DefaultEvent<T>({
   mode,
   boxHeight,
   isAllDay,
+  inAllDayLane,
   continuesBefore,
   continuesAfter,
+  startsBeforeVisible,
   ampm = false,
   showTime = true,
   ellipsizeTitle = false,
@@ -51,15 +53,23 @@ export function DefaultEvent<T>({
   const theme = useCalendarTheme();
   const labels = useCalendarLabels();
   const isAllDayEvent = isAllDay ?? false;
+  const isAllDayLane =
+    inAllDayLane ??
+    (isAllDayEvent && mode !== "month" && mode !== "multiweek" && mode !== "schedule");
   const timeLabel = eventTimeLabel({
     mode,
     isAllDay: isAllDayEvent,
+    inAllDayLane: isAllDayLane,
+    continuesBefore,
+    startsBeforeVisible,
     start: event.start,
     end: event.end,
     ampm,
     showTime,
     allDayLabel,
   });
+  const laneTimeLabel = isAllDayLane ? timeLabel : null;
+  const gridTimeLabel = !isAllDayLane ? timeLabel : null;
   const ellipsizeMode = titleEllipsizeMode(ellipsizeTitle);
   const titleLineHeight = numericStyle(
     theme.text.eventTitle.lineHeight,
@@ -85,7 +95,7 @@ export function DefaultEvent<T>({
   // Month cells and the all-day lane get a single clipped line; the timed grid
   // (and the roomy schedule rows) wrap to fill the box. `titleNumberOfLines`
   // returns 1 for the single-line contexts and undefined for the wrapping ones.
-  const fixedTitleLines = titleNumberOfLines(mode, isAllDayEvent);
+  const fixedTitleLines = titleNumberOfLines(mode, isAllDayEvent, isAllDayLane);
 
   // The schedule view is a list, not a grid, so its rows are a roomier card with
   // a larger title and time, mirroring the dom renderer's default agenda row.
@@ -99,12 +109,12 @@ export function DefaultEvent<T>({
       eventChipLayout({
         boxHeightPx: boxHeight?.value,
         mode,
-        hasTime: timeLabel != null,
+        hasTime: gridTimeLabel != null,
         titleLineHeightPx: titleLineHeight,
         timeLineHeightPx: TIME_LINE_HEIGHT,
         paddingYPx: BOX_PADDING_V,
       }),
-    [boxHeight, mode, timeLabel, titleLineHeight],
+    [boxHeight, mode, gridTimeLabel, titleLineHeight],
   );
 
   // Clip the wrapped title to a whole number of lines (overflow hidden on the
@@ -132,10 +142,10 @@ export function DefaultEvent<T>({
         styles.box,
         isSchedule && styles.scheduleBox,
         { backgroundColor: theme.colors.eventBackground },
-        // An all-day bar clipped at the view edge squares that side, like the web
+        // A lane bar clipped at the view edge squares that side, like the web
         // renderers, so it reads as continuing. Timed segments continue vertically.
-        isAllDayEvent && continuesBefore && styles.continuesBefore,
-        isAllDayEvent && continuesAfter && styles.continuesAfter,
+        isAllDayLane && continuesBefore && styles.continuesBefore,
+        isAllDayLane && continuesAfter && styles.continuesAfter,
         event.disabled && styles.disabled,
         cellStyle,
       ]}
@@ -151,56 +161,80 @@ export function DefaultEvent<T>({
       onAccessibilityAction={onAccessibilityAction}
     >
       <Animated.View testID="event-chip-content" style={[styles.content, contentStyle]}>
-        {event.title ? (
-          fixedTitleLines == null ? (
-            <Animated.View style={[styles.titleClip, titleClipStyle]}>
+        {laneTimeLabel ? (
+          <View style={styles.laneRow}>
+            <Text
+              style={[styles.laneTime, { color: theme.colors.eventText }]}
+              numberOfLines={1}
+              allowFontScaling={false}
+            >
+              {laneTimeLabel}
+            </Text>
+            {event.title ? (
               <Text
-                style={[
-                  theme.text.eventTitle,
-                  isSchedule && styles.scheduleTitle,
-                  { color: theme.colors.eventText },
-                ]}
+                style={[theme.text.eventTitle, styles.title, { color: theme.colors.eventText }]}
+                numberOfLines={1}
                 ellipsizeMode={ellipsizeMode}
                 allowFontScaling={false}
               >
                 {event.title}
               </Text>
-            </Animated.View>
-          ) : (
-            <Text
-              style={[
-                theme.text.eventTitle,
-                styles.title,
-                isSchedule && styles.scheduleTitle,
-                { color: theme.colors.eventText },
-              ]}
-              // Month cells and the all-day lane are compact: a single clipped line.
-              numberOfLines={fixedTitleLines}
-              ellipsizeMode={ellipsizeMode}
-              allowFontScaling={false}
-            >
-              {event.title}
-            </Text>
-          )
-        ) : null}
-        {timeLabel ? (
-          <Animated.View style={timeStyle}>
-            <Text
-              style={[
-                styles.time,
-                isSchedule && styles.scheduleTime,
-                { color: theme.colors.eventText },
-              ]}
-              // Wrap rather than clip horizontally: a narrow column shows the full
-              // range across two lines instead of a cut-off "11:00 - 1".
-              numberOfLines={2}
-              ellipsizeMode={ellipsizeMode}
-              allowFontScaling={false}
-            >
-              {timeLabel}
-            </Text>
-          </Animated.View>
-        ) : null}
+            ) : null}
+          </View>
+        ) : (
+          <>
+            {event.title ? (
+              fixedTitleLines == null ? (
+                <Animated.View style={[styles.titleClip, titleClipStyle]}>
+                  <Text
+                    style={[
+                      theme.text.eventTitle,
+                      isSchedule && styles.scheduleTitle,
+                      { color: theme.colors.eventText },
+                    ]}
+                    ellipsizeMode={ellipsizeMode}
+                    allowFontScaling={false}
+                  >
+                    {event.title}
+                  </Text>
+                </Animated.View>
+              ) : (
+                <Text
+                  style={[
+                    theme.text.eventTitle,
+                    styles.title,
+                    isSchedule && styles.scheduleTitle,
+                    { color: theme.colors.eventText },
+                  ]}
+                  // Month cells and the all-day lane are compact: a single clipped line.
+                  numberOfLines={fixedTitleLines}
+                  ellipsizeMode={ellipsizeMode}
+                  allowFontScaling={false}
+                >
+                  {event.title}
+                </Text>
+              )
+            ) : null}
+            {gridTimeLabel ? (
+              <Animated.View style={timeStyle}>
+                <Text
+                  style={[
+                    styles.time,
+                    isSchedule && styles.scheduleTime,
+                    { color: theme.colors.eventText },
+                  ]}
+                  // Wrap rather than clip horizontally: a narrow column shows the full
+                  // range across two lines instead of a cut-off "11:00 - 1".
+                  numberOfLines={2}
+                  ellipsizeMode={ellipsizeMode}
+                  allowFontScaling={false}
+                >
+                  {gridTimeLabel}
+                </Text>
+              </Animated.View>
+            ) : null}
+          </>
+        )}
       </Animated.View>
     </TouchableOpacity>
   );
@@ -257,6 +291,17 @@ const styles = StyleSheet.create({
   // flexShrink of 0 keeps it whole), so a short lane never shows a half-cut time.
   title: {
     flexShrink: 1,
+  },
+  laneRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  laneTime: {
+    fontSize: 11,
+    lineHeight: FALLBACK_TITLE_LINE_HEIGHT,
+    opacity: 0.75,
+    flexShrink: 0,
   },
   time: {
     fontSize: 11,

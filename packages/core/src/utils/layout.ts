@@ -1,6 +1,17 @@
 import { addDays, max as maxDate, min as minDate, startOfDay } from "date-fns";
-import type { BusinessHours, CalendarEvent } from "../types";
+import type { BusinessHours, CalendarEvent, MultiDayTimedEventPlacement } from "../types";
 import { MIN_DURATION_HOURS } from "./minDuration";
+import { utcTime, zoneFields, zonedSources, zonedWallClockToUtc } from "./zoneFields";
+
+/** Options for {@link layoutDayEvents}. */
+export interface LayoutDayEventsOptions {
+  /**
+   * Where timed events lasting 24 hours or longer render on the time grid.
+   * Default `"grid"`. Set `"all-day"` to exclude them from the vertical hour
+   * columns so they render in the horizontal all-day lane instead.
+   */
+  multiDayTimedEventPlacement?: MultiDayTimedEventPlacement;
+}
 
 /** An event placed on a single day's time grid by {@link layoutDayEvents}, with its vertical span and overlap column. */
 export type PositionedEvent<T> = {
@@ -97,14 +108,19 @@ const clockSpan = (
  * on `day` (e.g. a 23:00→01:00 event renders 23:00–24:00 on the start day and
  * 00:00–01:00 on the next). Pure — safe to call per render, never per frame.
  */
-export function layoutDayEvents<T>(events: CalendarEvent<T>[], day: Date): PositionedEvent<T>[] {
+export function layoutDayEvents<T>(
+  events: CalendarEvent<T>[],
+  day: Date,
+  options?: LayoutDayEventsOptions,
+): PositionedEvent<T>[] {
   const dayStart = startOfDay(day);
   const nextDayStart = addDays(dayStart, 1);
+  const placement = options?.multiDayTimedEventPlacement;
 
   const segments: Segment<T>[] = events
-    // All-day events live in the lane, not the timed columns; background events
-    // paint as bands (see `backgroundBandsForDay`), not boxes.
-    .filter((event) => !isAllDayEvent(event) && !isBackgroundEvent(event))
+    // Lane events live in the all-day lane, not the timed columns; background
+    // events paint as bands (see `backgroundBandsForDay`), not boxes.
+    .filter((event) => !isAllDayLaneEvent(event, placement) && !isBackgroundEvent(event))
     // Overlaps this day if it starts before the day ends and ends after it begins.
     // A zero-length event occupies its own instant, so one at midnight belongs to
     // the day it starts.
@@ -178,14 +194,90 @@ const atMidnight = (date: Date): boolean =>
   date.getSeconds() === 0 &&
   date.getMilliseconds() === 0;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// `date`'s wall-clock reading in UTC milliseconds. On spring-forward days that
+// skip midnight (e.g. America/Havana jumping 00:00 -> 01:00), `startOfDay`
+// lands on 01:00; normalize that day-start boundary to 00:00 so a 23h
+// 01:00..24:00 single-day event isn't promoted and a full transition-day
+// block (`startOfDay(d)` to `startOfDay(d + 1)`) still reads 24 clock hours.
+function localWallClockMs(date: Date): number {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+  const hour = date.getHours();
+  const minute = date.getMinutes();
+  const second = date.getSeconds();
+  const ms = date.getMilliseconds();
+  if (
+    (hour !== 0 || minute !== 0) &&
+    hour <= 2 &&
+    second === 0 &&
+    ms === 0 &&
+    date.getTime() === startOfDay(date).getTime()
+  ) {
+    return utcTime(year, month, day);
+  }
+  return utcTime(year, month, day, hour, minute, second, ms);
+}
+
+// Same normalization for a display copy created by `eventsInTimeZone`, read
+// directly from the source instant in its display zone so the device's own
+// time zone cannot distort midnight-skipping DST transitions.
+function zonedWallClockMs(instant: Date, timeZone: string): number {
+  const [year, month, day, hour, minute, second] = zoneFields(instant, timeZone);
+  const ms = instant.getUTCMilliseconds();
+  if (
+    (hour !== 0 || minute !== 0) &&
+    hour <= 2 &&
+    second === 0 &&
+    ms === 0 &&
+    instant.getTime() ===
+      zonedWallClockToUtc(new Date(utcTime(year, month, day)), timeZone).getTime()
+  ) {
+    return utcTime(year, month, day);
+  }
+  return utcTime(year, month, day, hour, minute, second, ms);
+}
+
 /**
- * Whether an event belongs in the all-day lane. An explicit `allDay` flag wins;
+ * Whether an event is an all-day event. An explicit `allDay` flag wins;
  * otherwise it's inferred when the event spans whole days (both `start` and
- * `end` land on midnight, e.g. an iCal-style all-day event). Pure.
+ * `end` land on midnight, e.g. an iCal-style all-day event). For time-grid
+ * lane membership (which can also include timed events lasting 24 hours or
+ * longer), see {@link isAllDayLaneEvent}. Pure.
  */
 export function isAllDayEvent<T>(event: CalendarEvent<T>): boolean {
   if (typeof event.allDay === "boolean") return event.allDay;
   return event.end > event.start && atMidnight(event.start) && atMidnight(event.end);
+}
+
+/**
+ * Whether an event belongs in the time grid's horizontal all-day lane rather
+ * than the vertical hour columns. Background events never enter the lane.
+ * All-day events (see {@link isAllDayEvent}) always do; under `"all-day"`
+ * placement, timed events spanning 24 clock hours or more do too. Pure.
+ */
+export function isAllDayLaneEvent<T>(
+  event: CalendarEvent<T>,
+  placement: MultiDayTimedEventPlacement = "grid",
+): boolean {
+  if (isBackgroundEvent(event)) return false;
+  if (isAllDayEvent(event)) return true;
+  if (placement !== "all-day") return false;
+  const zoned = zonedSources.get(event);
+  if (zoned) {
+    return (
+      zoned.event.end.getTime() > zoned.event.start.getTime() &&
+      zonedWallClockMs(zoned.event.end, zoned.timeZone) -
+        zonedWallClockMs(zoned.event.start, zoned.timeZone) >=
+        DAY_MS
+    );
+  }
+  return (
+    event.end.getTime() > event.start.getTime() &&
+    localWallClockMs(event.end) - localWallClockMs(event.start) >= DAY_MS
+  );
 }
 
 /**

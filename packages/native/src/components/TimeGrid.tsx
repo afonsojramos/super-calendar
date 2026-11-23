@@ -78,6 +78,7 @@ import type {
   EventDragHandler,
   EventDragStartHandler,
   EventKeyExtractor,
+  MultiDayTimedEventPlacement,
   RenderEvent,
   TimeGridMode,
   WeekStartsOn,
@@ -100,6 +101,7 @@ import {
   movedClockSpan,
   snapDeltaMinutes,
   formatHour,
+  isAllDayLaneEvent,
   layoutDayEvents,
   type PositionedEvent,
   type CalendarHandle,
@@ -216,9 +218,11 @@ type EdgePaging = {
   ghostW: SharedValue<number>;
   ghostH: SharedValue<number>;
   ghostVisible: SharedValue<number>;
-  // Show the ghost for `event`, then drop it at its pager-local top-left
-  // (clearing the ghost either way).
-  beginLift: (event: CalendarEvent<unknown>) => void;
+  // Show the ghost for `event` (returning false if placement rejected the
+  // lift), check whether the active lift is still valid on repeat ticks, and
+  // drop it at its pager-local top-left (clearing the ghost either way).
+  beginLift: (event: CalendarEvent<unknown>) => boolean;
+  isLiftActive: () => boolean;
   commitLiftedDrop: (ghostLocalX: number, minuteDelta: number) => void;
 };
 const EdgePagingContext = createContext<EdgePaging | null>(null);
@@ -817,20 +821,29 @@ function AnimatedEventBoxInner<T>({
   // while the finger stays at the edge, matching "hold at the edge to move to the
   // next/previous week"; the tested commit path does the move.
   const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
   const disarmEdge = useCallback(() => {
     if (dwellTimer.current) {
       clearTimeout(dwellTimer.current);
       dwellTimer.current = null;
     }
   }, []);
+  useLayoutEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      disarmEdge();
+    };
+  }, [disarmEdge]);
   // Cancel a pending dwell. Runs on every gesture end.
   const releaseEdge = disarmEdge;
   const armEdge = useCallback(
     (dir: number) => {
+      if (!mountedRef.current) return;
       disarmEdge();
       const fire = () => {
         dwellTimer.current = null;
-        if (!edgePaging) return;
+        if (!mountedRef.current || !edgePaging) return;
         // First edge fire: lift the event into the floating ghost. It must NOT
         // commit here — committing relocates the event off this page, which
         // unmounts the dragging box and kills the gesture. Instead the ghost
@@ -838,13 +851,15 @@ function AnimatedEventBoxInner<T>({
         // page, and the drop commits on release. The source box stays mounted, so
         // the same gesture keeps tracking after the page changes.
         if (!lifted.value) {
+          if (!edgePaging.beginLift(latest.current.event as CalendarEvent<unknown>)) return;
           lifted.value = 1;
           edgePaging.ghostW.value = dayWidth;
           edgePaging.ghostH.value = boxHeight.value;
           edgePaging.ghostX.value = liveAbsX.value - grabX.value - edgePaging.pagerLeft.value;
           edgePaging.ghostY.value = liveAbsY.value - grabY.value - edgePaging.pagerTop.value;
           edgePaging.ghostVisible.value = 1;
-          edgePaging.beginLift(latest.current.event as CalendarEvent<unknown>);
+        } else if (!edgePaging.isLiftActive()) {
+          return;
         }
         onEdgeAdvance?.(dir);
         dwellTimer.current = setTimeout(fire, EDGE_REPEAT_MS);
@@ -1750,6 +1765,8 @@ type TimetablePageProps<T> = {
   /** The grid's vertical offset, so the band can hold still at the top while the hours scroll. */
   scrollY: SharedValue<number>;
   showAllDayEventCell: boolean;
+  multiDayTimedEventPlacement: MultiDayTimedEventPlacement;
+  ampm: boolean;
   onLaneLayout: (index: number, height: number) => void;
   /**
    * Fixed height of the page (and the pager): tall enough for the fully zoomed
@@ -1816,6 +1833,8 @@ function TimetablePageInner<T>({
   laneHeight,
   scrollY,
   showAllDayEventCell,
+  multiDayTimedEventPlacement,
+  ampm,
   onLaneLayout,
   height,
   pagedHeader,
@@ -1856,7 +1875,10 @@ function TimetablePageInner<T>({
     [days],
   );
 
-  const dayLayouts = useMemo(() => days.map((day) => layoutDayEvents(events, day)), [days, events]);
+  const dayLayouts = useMemo(
+    () => days.map((day) => layoutDayEvents(events, day, { multiDayTimedEventPlacement })),
+    [days, events, multiDayTimedEventPlacement],
+  );
   const [multiDayMove, setMultiDayMove] = useState<MultiDayMove<T> | null>(null);
   const movingEvent = multiDayMove
     ? (events.find(
@@ -1865,15 +1887,17 @@ function TimetablePageInner<T>({
       ) ?? null)
     : null;
   useEffect(() => {
+    if (!multiDayMove) return;
     if (
-      multiDayMove?.phase === "dropped" &&
-      (!movingEvent ||
-        movingEvent.start.getTime() !== multiDayMove.event.start.getTime() ||
-        movingEvent.end.getTime() !== multiDayMove.event.end.getTime())
+      isAllDayLaneEvent(multiDayMove.event, multiDayTimedEventPlacement) ||
+      (multiDayMove.phase === "dropped" &&
+        (!movingEvent ||
+          movingEvent.start.getTime() !== multiDayMove.event.start.getTime() ||
+          movingEvent.end.getTime() !== multiDayMove.event.end.getTime()))
     ) {
       setMultiDayMove(null);
     }
-  }, [multiDayMove, movingEvent]);
+  }, [multiDayMove, movingEvent, multiDayTimedEventPlacement]);
 
   // Map a tap on empty grid space back to the date+time it represents. Reads the
   // live row height on the JS thread to convert the touch Y into minutes.
@@ -2344,6 +2368,8 @@ function TimetablePageInner<T>({
             onDragEvent={onDragEvent}
             onDragStart={onDragStart}
             eventStartEditable={eventStartEditable}
+            multiDayTimedEventPlacement={multiDayTimedEventPlacement}
+            ampm={ampm}
             onLayout={reportLaneLayout}
           />
         </Animated.View>
@@ -2523,7 +2549,7 @@ function TimetablePageInner<T>({
             }),
         )}
 
-        {multiDayMove ? (
+        {multiDayMove && !isAllDayLaneEvent(multiDayMove.event, multiDayTimedEventPlacement) ? (
           <MultiDayMovePreview
             move={multiDayMove}
             days={days}
@@ -2658,6 +2684,12 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   /** Show the "all-day" text label in the hour column. Default false; the lane
    * still reserves its row, it just isn't labelled. */
   showAllDayLabel?: boolean;
+  /**
+   * Where timed events lasting 24 hours or longer render: `"grid"` (default)
+   * keeps them on the vertical hour columns; `"all-day"` places them in the
+   * horizontal all-day lane above the grid with their start time and title.
+   */
+  multiDayTimedEventPlacement?: MultiDayTimedEventPlacement;
   /** Tint Saturday/Sunday columns with the weekend background. Default true. Set
    * false to treat weekends like any other day. */
   highlightWeekends?: boolean;
@@ -2812,6 +2844,7 @@ function TimeGridInner<T>(
     timeslots = 1,
     showAllDayEventCell = true,
     showAllDayLabel = false,
+    multiDayTimedEventPlacement = "grid",
     refreshControl,
     highlightWeekends = true,
     calendarCellStyle,
@@ -3064,19 +3097,44 @@ function TimeGridInner<T>(
     minHour: clampedMinHour,
     maxHour: clampedMaxHour,
     snapMinutes: Math.max(1, dragStepMinutes),
+    multiDayTimedEventPlacement,
     onDragEvent,
     onChangeDate,
   });
-  const beginLift = useCallback((event: CalendarEvent<unknown>) => {
-    liftedEventRef.current = event as CalendarEvent<T>;
-    setLiftedEvent(event as CalendarEvent<T>);
-  }, []);
+  const beginLift = useCallback(
+    (event: CalendarEvent<unknown>) => {
+      const ev = event as CalendarEvent<T>;
+      if (isAllDayLaneEvent(ev, dropRef.current.multiDayTimedEventPlacement)) {
+        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+        ghostVisible.value = 0;
+        return false;
+      }
+      liftedEventRef.current = ev;
+      setLiftedEvent(ev);
+      return true;
+    },
+    [ghostVisible],
+  );
+  const isLiftActive = useCallback(
+    () =>
+      liftedEventRef.current != null &&
+      !isAllDayLaneEvent(liftedEventRef.current, dropRef.current.multiDayTimedEventPlacement),
+    [],
+  );
   const clearLift = useCallback(() => {
     // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
     ghostVisible.value = 0;
     liftedEventRef.current = null;
     setLiftedEvent(null);
   }, [ghostVisible]);
+  useEffect(() => {
+    if (
+      liftedEventRef.current &&
+      isAllDayLaneEvent(liftedEventRef.current, multiDayTimedEventPlacement)
+    ) {
+      clearLift();
+    }
+  }, [multiDayTimedEventPlacement, clearLift]);
   const commitLiftedDrop = useCallback(
     (ghostLocalX: number, ghostLocalY: number) => {
       const {
@@ -3086,13 +3144,14 @@ function TimeGridInner<T>(
         minHour: min,
         maxHour: max,
         snapMinutes: snap,
+        multiDayTimedEventPlacement: placement,
         onDragEvent: onDrag,
         onChangeDate: onDate,
       } = dropRef.current;
       const ev = liftedEventRef.current;
       const duration = ev ? ev.end.getTime() - ev.start.getTime() : 0;
       clearLift();
-      if (!ev || !onDrag || days.length === 0) return;
+      if (!ev || !onDrag || days.length === 0 || isAllDayLaneEvent(ev, placement)) return;
       // Map the ghost's drawn position on the page it landed on back to a cell:
       // its centre picks the day column, its top edge picks the time. Both are
       // pager-local, and the pager is the scrolling content itself, so the top
@@ -3138,6 +3197,7 @@ function TimeGridInner<T>(
       ghostH,
       ghostVisible,
       beginLift,
+      isLiftActive,
       commitLiftedDrop,
     }),
     [
@@ -3150,6 +3210,7 @@ function TimeGridInner<T>(
       ghostH,
       ghostVisible,
       beginLift,
+      isLiftActive,
       commitLiftedDrop,
     ],
   );
@@ -3347,6 +3408,7 @@ function TimeGridInner<T>(
     minHour: clampedMinHour,
     maxHour: clampedMaxHour,
     snapMinutes: Math.max(1, dragStepMinutes),
+    multiDayTimedEventPlacement,
     onDragEvent,
     onChangeDate,
   };
@@ -3714,6 +3776,8 @@ function TimeGridInner<T>(
         laneHeight={laneHeight}
         scrollY={scrollY}
         showAllDayEventCell={showAllDayEventCell}
+        multiDayTimedEventPlacement={multiDayTimedEventPlacement}
+        ampm={ampm}
         onLaneLayout={reportLaneHeight}
         height={pagerHeight}
         pagedHeader={pagedHeader}
@@ -3736,6 +3800,8 @@ function TimeGridInner<T>(
       laneHeight,
       scrollY,
       showAllDayEventCell,
+      multiDayTimedEventPlacement,
+      ampm,
       reportLaneHeight,
       mode,
       numberOfDays,
@@ -3803,6 +3869,8 @@ function TimeGridInner<T>(
       showNowIndicator,
       nowTime,
       timeZone,
+      multiDayTimedEventPlacement,
+      ampm,
     }),
     [
       events,
@@ -3818,6 +3886,8 @@ function TimeGridInner<T>(
       showNowIndicator,
       nowTime,
       timeZone,
+      multiDayTimedEventPlacement,
+      ampm,
     ],
   );
 
@@ -3955,7 +4025,8 @@ function TimeGridInner<T>(
                           renderItem={renderItem}
                         />
                       ) : null}
-                      {liftedEvent ? (
+                      {liftedEvent &&
+                      !isAllDayLaneEvent(liftedEvent, multiDayTimedEventPlacement) ? (
                         <DragGhost
                           x={ghostX}
                           y={ghostY}

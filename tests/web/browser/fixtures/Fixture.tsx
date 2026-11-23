@@ -47,6 +47,36 @@ const allDayEvents: FixtureEvent[] = [
     allDay: false,
   },
 ];
+const multiDayTimedEvents: FixtureEvent[] = [
+  {
+    id: 0,
+    title: "Conference",
+    start: new Date(2026, 6, 14, 9),
+    end: new Date(2026, 6, 16, 17),
+    allDay: false,
+  },
+  {
+    id: 1,
+    title: "On-call",
+    start: new Date(2026, 6, 15, 0),
+    end: new Date(2026, 6, 16, 0),
+    allDay: false,
+  },
+  {
+    id: 2,
+    title: "Overnight",
+    start: new Date(2026, 6, 14, 22),
+    end: new Date(2026, 6, 15, 6),
+    allDay: false,
+  },
+  {
+    id: 3,
+    title: "Standup",
+    start: new Date(2026, 6, 15, 10),
+    end: new Date(2026, 6, 15, 11),
+    allDay: false,
+  },
+];
 // Friday to Sunday, so a one-day move crosses into the next week row.
 const tripEvents: FixtureEvent[] = [
   { id: 0, title: "Trip", start: new Date(2026, 6, 17), end: new Date(2026, 6, 20), allDay: true },
@@ -232,29 +262,32 @@ export function Fixture() {
     end: new Date(2026, 6, 16),
   });
   const [events, setEvents] = useFixtureState(
-    view.startsWith("all-day")
-      ? view.startsWith("all-day-repack")
-        ? [allDayEvents[0]]
-        : allDayEvents
-      : view === "month-overflow"
-        ? overflowEvents
-        : view === "multiweek-transformed"
-          ? recurringEvents
-          : view === "dense"
-            ? denseEvents
-            : view === "edit-clipped"
-              ? clippedEvents
-              : view === "edit-overnight"
-                ? overnightEvents
-                : view === "edit-crowded"
-                  ? crowdedEvents
-                  : view === "edit-many" || (view.startsWith("multiweek") && view.endsWith("dense"))
-                    ? manyEvents
-                    : view === "edit"
-                      ? editEvents
-                      : view.endsWith("-trip")
-                        ? tripEvents
-                        : initialEvents,
+    view === "all-day-multiday-timed"
+      ? multiDayTimedEvents
+      : view.startsWith("all-day")
+        ? view.startsWith("all-day-repack")
+          ? [allDayEvents[0]]
+          : allDayEvents
+        : view === "month-overflow"
+          ? overflowEvents
+          : view === "multiweek-transformed"
+            ? recurringEvents
+            : view === "dense"
+              ? denseEvents
+              : view === "edit-clipped"
+                ? clippedEvents
+                : view === "edit-overnight"
+                  ? overnightEvents
+                  : view === "edit-crowded"
+                    ? crowdedEvents
+                    : view === "edit-many" ||
+                        (view.startsWith("multiweek") && view.endsWith("dense"))
+                      ? manyEvents
+                      : view === "edit"
+                        ? editEvents
+                        : view.endsWith("-trip")
+                          ? tripEvents
+                          : initialEvents,
   );
   const [boardEvents, setBoardEvents] = useFixtureState(
     view.endsWith("crowded")
@@ -370,7 +403,7 @@ export function Fixture() {
         />
       ) : view.startsWith("all-day") ? (
         <TimeGrid<{ id: number }>
-          date={updated() ? new Date(2026, 6, 22) : anchor}
+          date={view !== "all-day-multiday-timed" && updated() ? new Date(2026, 6, 22) : anchor}
           mode="week"
           weekStartsOn={1}
           height={260}
@@ -385,6 +418,9 @@ export function Fixture() {
               : events()
           }
           showAllDayLabel
+          multiDayTimedEventPlacement={
+            view === "all-day-multiday-timed" ? (updated() ? "grid" : "all-day") : undefined
+          }
           getEventId={view.endsWith("stable") ? (event) => event.id : undefined}
           hideHours={view.endsWith("no-hours")}
           classNames={
@@ -394,7 +430,7 @@ export function Fixture() {
           }
           onPressEvent={(event) => record(`press:${event.title}`)}
           onDragEvent={
-            view === "all-day-drag"
+            view === "all-day-drag" || view === "all-day-multiday-timed"
               ? (event, start, end) => {
                   record(`${event.title}@${clock(start)}-${clock(end)}`);
                   setEvents((current) =>

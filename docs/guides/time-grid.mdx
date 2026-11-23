@@ -144,7 +144,13 @@ and `verticalBounces`.
 
 All-day events (flagged `allDay`, or spanning midnight-to-midnight) leave the
 timed columns and stack in a lane above the grid, which both renderers drop
-entirely for a week with no all-day events. On React Native the lane pages with
+entirely for a week with no all-day events. Set
+`multiDayTimedEventPlacement="all-day"` to also move timed events lasting 24
+hours or longer (including `00:00` to `24:00` blocks with `allDay: false`) into
+the all-day lane, showing their start time alongside the title and keeping the
+hourly columns clear. Shorter cross-midnight events remain on the vertical
+grid; the default `"grid"` keeps every timed event on the vertical grid. On
+React Native the lane pages with
 the day columns and stays pinned above the hours while you scroll, and its
 height follows the week under it as you swipe. The "all-day" text label is off
 by default so the lane can come and go without a stranded label; set

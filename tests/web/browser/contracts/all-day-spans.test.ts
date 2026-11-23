@@ -139,4 +139,49 @@ describe(rendererName, () => {
     expect(await page.locator('[data-slot="allDayEvent"]').count()).toBe(1);
     await expectSpan("After", 0, 1);
   });
+
+  it("promotes >= 24h timed events into the all-day lane, keeps grid columns full width, and drags preserving times", async () => {
+    await open("all-day-multiday-timed");
+    const conference = await expectSpan("Conference", 1, 3);
+    expect(conference.height).toBeLessThanOrEqual(24);
+    await expectSpan("On-call", 2, 2);
+    expect(
+      await page.locator('[data-slot="allDayEvent"]').filter({ hasText: "09:00" }).count(),
+    ).toBe(1);
+    expect(
+      await page.locator('[data-slot="allDayEvent"]').filter({ hasText: "00:00" }).count(),
+    ).toBe(1);
+    // Overnight (< 24h) stays on the vertical grid as 2 segments; Standup fills Wednesday's full width.
+    expect(await page.locator('[data-slot="event"]').filter({ hasText: "Overnight" }).count()).toBe(
+      2,
+    );
+    const wednesday = await page.locator('[data-slot="dayColumn"]').nth(2).boundingBox();
+    const standup = await page
+      .locator('[data-slot="event"]')
+      .filter({ hasText: "Standup" })
+      .boundingBox();
+    if (!wednesday || !standup) throw new Error("Missing Wednesday or Standup bounds");
+    expect(Math.abs(standup.width - wednesday.width)).toBeLessThanOrEqual(4);
+
+    // Dragging a promoted bar shifts whole days while keeping its 09:00 -> 17:00 times.
+    const tuesday = await page.locator('[data-slot="dayColumn"]').nth(1).boundingBox();
+    const thursday = await page.locator('[data-slot="dayColumn"]').nth(3).boundingBox();
+    if (!tuesday || !thursday) throw new Error("Missing day column bounds");
+    const y = conference.y + conference.height / 2;
+    await page.mouse.move(tuesday.x + tuesday.width / 2, y);
+    await page.mouse.down();
+    await page.mouse.move(thursday.x + thursday.width / 2, y, { steps: 6 });
+    await page.mouse.up();
+    await expect
+      .poll(() => page.getByLabel("Calls").textContent())
+      .toBe('["Conference@16:9:0-18:17:0"]');
+    await expectSpan("Conference", 3, 5);
+
+    // Switching back to "grid" moves promoted events back onto the vertical columns.
+    await page.getByRole("button", { name: "Update props", exact: true }).click();
+    await expect.poll(() => page.locator('[data-slot="allDayLane"]').count()).toBe(0);
+    expect(
+      await page.locator('[data-slot="event"]').filter({ hasText: "Conference" }).count(),
+    ).toBe(3);
+  });
 });

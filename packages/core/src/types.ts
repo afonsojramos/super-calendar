@@ -17,6 +17,13 @@ export type CalendarMode =
 export type TimeGridMode = Exclude<CalendarMode, "month" | "multiweek" | "schedule" | "year">;
 
 /**
+ * Where timed events lasting 24 hours or longer render on the time grid:
+ * `"grid"` (default) keeps them on the vertical hour columns; `"all-day"`
+ * places them in the horizontal all-day lane above the grid.
+ */
+export type MultiDayTimedEventPlacement = "grid" | "all-day";
+
+/**
  * The minimal shape every calendar event must have. Layout (positioning,
  * overlap resolution, paging) only ever reads `start`/`end`; `title` is used by
  * the built-in default renderer. Anything else lives in your own type and is

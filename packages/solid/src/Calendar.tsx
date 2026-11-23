@@ -19,6 +19,8 @@ import {
   zonedEventSource,
   expandRecurringEvents,
   getViewDays,
+  isAllDayLaneEvent,
+  type MultiDayTimedEventPlacement,
   type WeekdayFormat,
   type WeekStartsOn,
 } from "@super-calendar/core/vanilla";
@@ -174,6 +176,12 @@ export interface CalendarProps<T = unknown>
   showAllDayEventCell?: boolean;
   /** Show the "all-day" text beside the lane (default false). */
   showAllDayLabel?: boolean;
+  /**
+   * Where timed events lasting 24 hours or longer render on the time grid:
+   * `"grid"` (default) keeps them on the vertical columns; `"all-day"` places
+   * them in the horizontal all-day lane with their start time and title.
+   */
+  multiDayTimedEventPlacement?: MultiDayTimedEventPlacement;
   /** Tint weekend columns (default true). Set false to treat weekends normally. */
   highlightWeekends?: boolean;
   /** Allow moving events by default (per-event `startEditable` overrides). Default true. */
@@ -429,10 +437,14 @@ export function Calendar<T = unknown>(
       const handler = props.onDragEvent;
       return handler && props.timeZone
         ? (event: CalendarEvent<T>, start: Date, end: Date) => {
-            // A time-grid move keeps the event's elapsed duration; a month drop
-            // keeps the clock time of both edges.
+            // A vertical time-grid move keeps the event's elapsed duration; a
+            // month drop or all-day lane bar move shifts by whole days and keeps
+            // the clock time of both edges.
             const bounds = zonedDragBounds(event, start, end, {
-              keepDuration: props.mode !== "month" && props.mode !== "multiweek",
+              keepDuration:
+                props.mode !== "month" &&
+                props.mode !== "multiweek" &&
+                !isAllDayLaneEvent(event, props.multiDayTimedEventPlacement),
             });
             // An edge dropped into an hour the zone's clock skips can leave no
             // usable span; reject the drop, so the event snaps back.
@@ -685,6 +697,7 @@ export function Calendar<T = unknown>(
           showNowIndicator={props.showNowIndicator}
           showAllDayEventCell={props.showAllDayEventCell}
           showAllDayLabel={props.showAllDayLabel}
+          multiDayTimedEventPlacement={props.multiDayTimedEventPlacement}
           highlightWeekends={props.highlightWeekends}
           eventStartEditable={props.eventStartEditable}
           eventDurationEditable={props.eventDurationEditable}

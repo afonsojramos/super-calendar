@@ -6,9 +6,11 @@ import {
   backgroundBandsForDay,
   clockHoursBetween,
   drawnEnd,
+  isAllDayLaneEvent,
   layoutDayEvents,
   wallClockHours,
 } from "../layout";
+import { eventsInTimeZone } from "../timezone";
 import type { CalendarEvent } from "../../types";
 
 // New York clocks go back at 02:00 on 1 Nov 2026 (a 25-hour day) and forward at
@@ -71,6 +73,64 @@ describe("layout on DST change days", () => {
       expect(range.start.getHours()).toBe(10);
       expect(layoutDayEvents([ev("new", range.start, range.end)], day)[0].startHours).toBe(10);
     }
+  });
+
+  it("classifies 24-clock-hour timed events consistently across DST transitions", () => {
+    // Spring-forward: 00:00 -> 24:00 (23 elapsed hours, 24 clock hours) promotes to the all-day lane.
+    const springFullDay: CalendarEvent = {
+      title: "Spring full day",
+      start: new Date(2026, 2, 8, 0),
+      end: new Date(2026, 2, 9, 0),
+      allDay: false,
+    };
+    expect(isAllDayLaneEvent(springFullDay, "all-day")).toBe(true);
+    expect(
+      layoutDayEvents([springFullDay], springForward, {
+        multiDayTimedEventPlacement: "all-day",
+      }),
+    ).toEqual([]);
+
+    // Fall-back: 00:00 -> 24:00 (25 elapsed hours, 24 clock hours) promotes to the all-day lane.
+    const fallFullDay: CalendarEvent = {
+      title: "Fall full day",
+      start: new Date(2026, 10, 1, 0),
+      end: new Date(2026, 10, 2, 0),
+      allDay: false,
+    };
+    expect(isAllDayLaneEvent(fallFullDay, "all-day")).toBe(true);
+
+    // Fall-back: 00:30 -> 24:00 (24.5 elapsed hours, 23.5 clock hours) stays on Sunday's grid.
+    const fallPartialDay: CalendarEvent = {
+      title: "Fall partial day",
+      start: new Date(2026, 10, 1, 0, 30),
+      end: new Date(2026, 10, 2, 0),
+      allDay: false,
+    };
+    expect(isAllDayLaneEvent(fallPartialDay, "all-day")).toBe(false);
+    expect(
+      layoutDayEvents([fallPartialDay], fallBack, {
+        multiDayTimedEventPlacement: "all-day",
+      }),
+    ).toHaveLength(1);
+  });
+
+  it("classifies zoned display copies accurately in a midnight-skipping display zone", () => {
+    // Running in America/New_York while displaying America/Havana (which skips 00:00 -> 01:00 on 8 Mar 2026).
+    const havanaSat23h: CalendarEvent = {
+      title: "Havana Sat 01:00-24:00",
+      start: new Date(Date.UTC(2026, 2, 7, 6, 0)), // Sat 01:00 CST
+      end: new Date(Date.UTC(2026, 2, 8, 5, 0)), // Sun 01:00 CDT
+      allDay: false,
+    };
+    const havanaSunFullDay: CalendarEvent = {
+      title: "Havana Sun full day",
+      start: new Date(Date.UTC(2026, 2, 8, 5, 0)), // Sun 01:00 CDT
+      end: new Date(Date.UTC(2026, 2, 9, 4, 0)), // Mon 00:00 CDT
+      allDay: false,
+    };
+    const zoned = eventsInTimeZone([havanaSat23h, havanaSunFullDay], "America/Havana");
+    expect(isAllDayLaneEvent(zoned[0], "all-day")).toBe(false);
+    expect(isAllDayLaneEvent(zoned[1], "all-day")).toBe(true);
   });
 });
 
