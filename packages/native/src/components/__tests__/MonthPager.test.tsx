@@ -106,6 +106,49 @@ describe("MonthPager event updates", () => {
   });
 });
 
+describe("MonthPager first frames", () => {
+  // Monday 15 June holds four events.
+  const events: CalendarEvent[] = ["A", "B", "C", "D"].map((title, i) => ({
+    title: `Mon ${title}`,
+    start: new Date(2026, 5, 15, 9 + i),
+    end: new Date(2026, 5, 15, 10 + i),
+  }));
+  const props = {
+    mode: "month" as const,
+    date: new Date(2026, 5, 15),
+    events,
+    weekStartsOn: 0 as const,
+    chipHeight: 20,
+    onChangeDate: noop,
+    onPressEvent: noop,
+  };
+  const page = (view: Awaited<ReturnType<typeof render>>) =>
+    view.getByTestId("month-pager-page", { includeHiddenElements: true });
+
+  it("hides its pages until it has measured their height", async () => {
+    const view = await render(<Calendar {...props} />);
+    expect(page(view)).toHaveStyle({ opacity: 0 });
+    await fireEvent(view.getByTestId("month-pager"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 700, height: 350 } },
+    });
+    expect(page(view)).toHaveStyle({ opacity: 1 });
+  });
+
+  it("fits auto-fit lanes to a resized page before the grid measures again", async () => {
+    const view = await render(<Calendar {...props} />);
+    // The grid first lays out at the pager's seed height, then the pager measures
+    // its real 350pt area: five 70pt rows fit one 22pt lane and the label.
+    await fireEvent(view.getByTestId("month-grid"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 700, height: 900 } },
+    });
+    await fireEvent(view.getByTestId("month-pager"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 700, height: 350 } },
+    });
+    expect(view.getByLabelText("3 more events, 15 June")).toBeTruthy();
+    expect(view.queryByText("Mon B")).toBeNull();
+  });
+});
+
 describe("MonthPager creation preview updates", () => {
   it.each(["month", "multiweek"] as const)(
     "updates the cached %s page renderer and creation callback",

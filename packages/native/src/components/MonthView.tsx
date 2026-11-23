@@ -2,9 +2,11 @@ import { addDays, format, type Locale, isSameMonth, startOfDay } from "date-fns"
 import {
   type ComponentRef,
   type ComponentType,
+  createContext,
   memo,
   type ReactElement,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -199,8 +201,9 @@ export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
    * as one bar spanning a lane across the week, this caps lanes per row, not chips
    * per day, so a long bar can push a lightly-booked day's own events into "+N more".
    * Omit to auto-fit as many lanes as the cell height allows (the default); set a
-   * number for a fixed cap. Auto-fit assumes the built-in chip size, so pass an
-   * explicit value when using a custom `renderEvent`.
+   * number for a fixed cap. A capped row is always tall enough for its lanes, and
+   * the grid scrolls when the rows outgrow the view. Auto-fit assumes the built-in
+   * chip size, so pass an explicit value when using a custom `renderEvent`.
    */
   maxVisibleEventCount?: number;
   /** Chip and overflow height in pixels; defaults to the theme title height plus padding. */
@@ -349,7 +352,20 @@ export type DateRowsSource =
 export type DateRowsProps<T> = Omit<
   MonthViewProps<T>,
   "date" | "showAdjacentMonths" | "showSixWeeks"
-> & { source: DateRowsSource };
+> & {
+  source: DateRowsSource;
+  /**
+   * The height a pager gives the grid. Auto-fit sizes its lanes from it as soon as
+   * it changes, instead of from the height the grid measured before the resize.
+   */
+  gridHeightHint?: number;
+};
+
+/**
+ * True inside a host that sets its own week row height (`MonthList`), so a fixed
+ * `maxVisibleEventCount` keeps those rows instead of growing them and scrolling.
+ */
+export const FixedWeekRowsContext = createContext(false);
 
 function MonthViewInner<T>({
   date,
@@ -413,9 +429,16 @@ function DateRowsInner<T>({
   onDayPointerEnter,
   classNames,
   styles: styleOverrides,
+  gridHeightHint,
 }: DateRowsProps<T>): ReactElement {
   const { date } = source;
   const multiWeek = source.kind === "multiweek";
+  // A fixed cap sizes every row for its lanes and the label row, as React DOM and
+  // Solid do, and the rows scroll when they outgrow the view (multi-week always
+  // does). Hosts that size their own rows keep them.
+  const fixedWeekRows = useContext(FixedWeekRowsContext);
+  const scrollRows = multiWeek || (maxVisibleEventCount != null && !fixedWeekRows);
+  const cappedMonthRows = scrollRows && !multiWeek;
   const chipGap = chipGapProp ?? CELL_ROW_GAP;
   const defaultCellSpacing = !multiWeek || !classNames?.day;
   // A custom create preview needs lanes even before the first event exists.
@@ -445,7 +468,15 @@ function DateRowsInner<T>({
   );
   // Measured grid box: the height auto-fits the event chips per cell, and both
   // dimensions map a drag's position onto a day cell.
-  const [gridSize, setGridSize] = useState({ width: 0, height: 0 });
+  const [gridSize, setGridSize] = useState({ width: 0, height: gridHeightHint ?? 0 });
+  // A pager that resizes its pages lays the grid out again before the grid's own
+  // layout event arrives; take the new height now so no frame sizes the lanes for
+  // the old one.
+  const [hintedHeight, setHintedHeight] = useState(gridHeightHint);
+  if (gridHeightHint !== hintedHeight) {
+    setHintedHeight(gridHeightHint);
+    if (gridHeightHint != null) setGridSize((prev) => ({ ...prev, height: gridHeightHint }));
+  }
   const gridHeight = gridSize.height;
   const weekTops = useRef<number[]>([]);
   const [drawnWeek, setDrawnWeek] = useState({ width: 0, height: 0 });
@@ -1105,24 +1136,24 @@ function DateRowsInner<T>({
       style?: { touchAction?: string; userSelect?: string };
     } | null;
     if (node?.style) {
-      node.style.touchAction = multiWeek ? "pan-y" : "none";
+      node.style.touchAction = scrollRows ? "pan-y" : "none";
       node.style.userSelect = "none";
     }
     return () => target.removeEventListener?.("pointerup", up);
-  }, [dragEnabled, endDrag, multiWeek]);
+  }, [dragEnabled, endDrag, scrollRows]);
 
   const webDragHandlers = useRef({ beginDrag, extendDrag });
   webDragHandlers.current = { beginDrag, extendDrag };
   const pressWebGrid = (event: RNPointerEvent) => {
     const pointer = event.nativeEvent;
-    if (multiWeek && (pointer.button !== 0 || pointer.isPrimary === false || heldTouch.current))
+    if (scrollRows && (pointer.button !== 0 || pointer.isPrimary === false || heldTouch.current))
       return;
-    if (multiWeek) suppressPressRef.current = false;
+    if (scrollRows) suppressPressRef.current = false;
     const start = () => {
       const point = gridPoint(pointer.clientX, pointer.clientY);
       if (point) webDragHandlers.current.beginDrag(point.x, point.y);
     };
-    if (!multiWeek || !pointer.pointerType || pointer.pointerType === "mouse") {
+    if (!scrollRows || !pointer.pointerType || pointer.pointerType === "mouse") {
       start();
       return;
     }
@@ -1587,7 +1618,12 @@ function DateRowsInner<T>({
             </Pressable>
           </Modal>
         ) : null}
-        <DateRowsViewport scrollable={multiWeek} onHeight={setViewportHeight}>
+        <DateRowsViewport
+          scrollable={scrollRows}
+          testID={multiWeek ? "multiweek-viewport" : "month-viewport"}
+          alwaysBounce={multiWeek}
+          onHeight={setViewportHeight}
+        >
           <MonthGridSurface gesture={dragGesture}>
             <View
               ref={gridRef}
@@ -1599,6 +1635,7 @@ function DateRowsInner<T>({
                   multiWeek && {
                     minHeight: minimumRowHeight * weeks.length + (gridProbe ? gridInnerSpacing : 0),
                   },
+                  cappedMonthRows && { minHeight: minimumRowHeight * weeks.length },
                 ],
               })}
               onLayout={handleLayout}
@@ -1659,7 +1696,9 @@ function DateRowsInner<T>({
                               flexShrink: 1,
                             },
                           ]
-                        : styles.weekRow,
+                        : cappedMonthRows
+                          ? [styles.weekRow, { minHeight: minimumRowHeight }]
+                          : styles.weekRow,
                       themed: theme.containers.weekRow,
                     })}
                     key={multiWeekGrid?.weeks[weekIndex].id ?? week[0].toISOString()}
@@ -1843,16 +1882,22 @@ function weekAtOffset(y: number, count: number, topOf: (index: number) => number
 
 function DateRowsViewport({
   scrollable,
+  testID,
+  alwaysBounce,
   onHeight,
   children,
 }: {
   scrollable: boolean;
+  testID: string;
+  alwaysBounce: boolean;
   onHeight: (height: number) => void;
   children: ReactElement;
 }): ReactElement {
   return scrollable ? (
     <ScrollView
-      testID="multiweek-viewport"
+      testID={testID}
+      // A capped month whose rows fit stays still on iOS, as it did before it scrolled.
+      alwaysBounceVertical={alwaysBounce}
       style={styles.multiWeekViewport}
       contentContainerStyle={{ flexGrow: 1 }}
       onLayout={(event) => onHeight(event.nativeEvent.layout.height)}

@@ -51,7 +51,7 @@ import {
 } from "@super-calendar/core";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { DefaultMonthEvent } from "./DefaultMonthEvent";
-import { MonthView, type MonthViewSlot } from "./MonthView";
+import { FixedWeekRowsContext, MonthView, type MonthViewSlot } from "./MonthView";
 
 /** The styleable parts of {@link MonthList}: the same slots as {@link MonthView}. */
 export type MonthListSlot = MonthViewSlot;
@@ -486,41 +486,43 @@ function MonthListInner<T>({
           {/* Each mounted month re-groups the full events array (cheap for the
               empty-events picker; with large event sets, group once upstream
               and pass a per-month slice if it ever profiles as hot). */}
-          <MonthView
-            date={item}
-            events={events}
-            // The list renders its own per-month header and a shared weekday row,
-            // so the grid itself omits the title and weekday labels.
-            showTitle={false}
-            showWeekdays={false}
-            maxVisibleEventCount={maxVisibleEventCount}
-            chipHeight={chipHeight}
-            chipGap={chipGap}
-            weekStartsOn={weekStartsOn}
-            locale={locale}
-            sortedMonthView={sortedMonthView}
-            moreLabel={moreLabel}
-            labels={labels}
-            showAdjacentMonths={showAdjacentMonths}
-            highlightWeekends={highlightWeekends}
-            disableMonthEventCellPress={disableMonthEventCellPress}
-            isRTL={isRTL}
-            activeDate={activeDate}
-            fillCellOnSelection={fillCellOnSelection}
-            calendarCellStyle={calendarCellStyle}
-            renderEvent={renderEvent}
-            eventAccessibilityLabel={eventAccessibilityLabel}
-            keyExtractor={keyExtractor}
-            onPressDay={dragEnabled ? handlePressDay : onPressDay}
-            onLongPressDay={onLongPressDay}
-            onPressEvent={onPressEvent}
-            onLongPressEvent={onLongPressEvent}
-            onPressMore={onPressMore}
-            onDayPointerDown={isWeb && dragEnabled ? onDayPointerDown : undefined}
-            onDayPointerEnter={isWeb && dragEnabled ? onDayPointerEnter : undefined}
-            classNames={classNames}
-            styles={styleOverrides}
-          />
+          <FixedWeekRowsContext.Provider value>
+            <MonthView
+              date={item}
+              events={events}
+              // The list renders its own per-month header and a shared weekday row,
+              // so the grid itself omits the title and weekday labels.
+              showTitle={false}
+              showWeekdays={false}
+              maxVisibleEventCount={maxVisibleEventCount}
+              chipHeight={chipHeight}
+              chipGap={chipGap}
+              weekStartsOn={weekStartsOn}
+              locale={locale}
+              sortedMonthView={sortedMonthView}
+              moreLabel={moreLabel}
+              labels={labels}
+              showAdjacentMonths={showAdjacentMonths}
+              highlightWeekends={highlightWeekends}
+              disableMonthEventCellPress={disableMonthEventCellPress}
+              isRTL={isRTL}
+              activeDate={activeDate}
+              fillCellOnSelection={fillCellOnSelection}
+              calendarCellStyle={calendarCellStyle}
+              renderEvent={renderEvent}
+              eventAccessibilityLabel={eventAccessibilityLabel}
+              keyExtractor={keyExtractor}
+              onPressDay={dragEnabled ? handlePressDay : onPressDay}
+              onLongPressDay={onLongPressDay}
+              onPressEvent={onPressEvent}
+              onLongPressEvent={onLongPressEvent}
+              onPressMore={onPressMore}
+              onDayPointerDown={isWeb && dragEnabled ? onDayPointerDown : undefined}
+              onDayPointerEnter={isWeb && dragEnabled ? onDayPointerEnter : undefined}
+              classNames={classNames}
+              styles={styleOverrides}
+            />
+          </FixedWeekRowsContext.Provider>
         </View>
       </MonthBlock>
     ),

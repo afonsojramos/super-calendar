@@ -415,6 +415,21 @@ describe("MonthView fixed maxVisibleEventCount", () => {
     }).length;
   };
 
+  it("keeps every capped row tall enough for its lanes and scrolls when they overflow", async () => {
+    const view = await mount([allDay("A", 17, 17), allDay("B", 17, 17), allDay("C", 17, 17)]);
+    // Three 22pt rows (the label row included) below the 30pt date area.
+    const grid = view.getByTestId("month-grid");
+    expect(StyleSheet.flatten(grid.props.style as ViewStyle).minHeight).toBe(96 * 5);
+    for (const row of grid.children) {
+      const style = StyleSheet.flatten(
+        (row as { props: { style?: unknown } }).props.style as ViewStyle,
+      );
+      expect(style.minHeight).toBe(96);
+    }
+    // A short parent scrolls the rows rather than clipping them.
+    expect(view.getByTestId("month-viewport")).toBeTruthy();
+  });
+
   it("draws every lane, with no overflow row, when the row fits the cap", async () => {
     const { getByText, queryByText } = await mount([
       allDay("A", 17, 18),

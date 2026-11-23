@@ -273,6 +273,9 @@ function DateRowsPagerInner<T>({
   // window height (so it renders immediately and in tests) and refine to the
   // exact area on layout. Without this the grid collapses to 0px.
   const [pageHeight, setPageHeight] = useState(height);
+  // The seed height is a guess, so pages stay transparent until the pager has
+  // measured them; their first visible frame is the settled layout.
+  const [pageMeasured, setPageMeasured] = useState(false);
   // Each month page sizes to the container width, not the window, so it fits a
   // constrained layout on the web (e.g. a max-width card). On native the pager
   // fills the window, so this equals the window width and behaviour is unchanged.
@@ -483,6 +486,7 @@ function DateRowsPagerInner<T>({
     () => ({
       containerWidth,
       pageHeight,
+      pageMeasured,
       events,
       activeDate,
       nowTime,
@@ -499,6 +503,7 @@ function DateRowsPagerInner<T>({
     [
       containerWidth,
       pageHeight,
+      pageMeasured,
       events,
       activeDate,
       nowTime,
@@ -541,9 +546,15 @@ function DateRowsPagerInner<T>({
   const getFixedItemSize = useCallback(() => containerWidth, [containerWidth]);
   const renderItem = useCallback(
     ({ item }: LegendListRenderItemProps<Date>) => (
-      <View testID="month-pager-page" style={{ width: containerWidth, height: pageHeight }}>
+      <View
+        testID="month-pager-page"
+        style={{ width: containerWidth, height: pageHeight, opacity: pageMeasured ? 1 : 0 }}
+      >
         <DateRows
           source={sourceFor(item)}
+          gridHeightHint={
+            numberOfWeeks === undefined && maxVisibleEventCount == null ? pageHeight : undefined
+          }
           events={events}
           // The pager shows one shared weekday header and the month title above it
           // (see below), so each page's grid omits its own title and weekday row.
@@ -590,6 +601,8 @@ function DateRowsPagerInner<T>({
     [
       containerWidth,
       pageHeight,
+      pageMeasured,
+      numberOfWeeks,
       events,
       maxVisibleEventCount,
       chipHeight,
@@ -679,6 +692,7 @@ function DateRowsPagerInner<T>({
           style={styles.pager}
           onLayout={(event) => {
             setPageHeight(event.nativeEvent.layout.height);
+            setPageMeasured(true);
             setContainerWidth(event.nativeEvent.layout.width);
           }}
         >

@@ -75,6 +75,16 @@ describe("MonthList event updates", () => {
   });
 });
 
+describe("MonthList capped rows", () => {
+  it("keeps its weekRowHeight rows instead of scrolling each month", async () => {
+    const date = new Date(2026, 0, 6);
+    const view = await render(
+      <MonthList date={date} events={[]} weekStartsOn={1} maxVisibleEventCount={3} />,
+    );
+    expect(view.queryByTestId("month-viewport")).toBeNull();
+  });
+});
+
 describe("MonthList row size updates", () => {
   // LegendList re-resolves `getFixedItemSize` and repaints mounted months only
   // when `extraData` changes, so new row or header heights must reach it there.
