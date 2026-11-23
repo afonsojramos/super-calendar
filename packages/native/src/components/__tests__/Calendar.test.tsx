@@ -216,7 +216,8 @@ describe("Calendar refreshControl", () => {
         onPressEvent={noop}
       />,
     );
-    const scrollers = container.queryAll((node) => node.type === "RCTScrollView");
+    // The year's scroll view tracks its offset with a scroll throttle.
+    const scrollers = container.queryAll((node) => node.props.scrollEventThrottle === 16);
     expect(scrollers.some((node) => node.props.refreshControl === control)).toBe(true);
   });
 });

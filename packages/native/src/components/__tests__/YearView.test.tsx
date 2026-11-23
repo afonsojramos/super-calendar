@@ -238,7 +238,7 @@ describe("YearView sweep across mini months", () => {
   const monthOrigin = (month: number) => ({ x: (month % 3) * 160, y: Math.floor(month / 3) * 180 });
   const GRID_OFFSET = { x: 10, y: 40 };
   // Week rows per month in 2026 with weekStartsOn 1.
-  const ROWS: Record<number, number> = { 6: 5, 7: 6, 8: 5, 9: 5 };
+  const ROWS: Record<number, number> = { 3: 5, 6: 5, 7: 6, 8: 5, 9: 5 };
   // A point in the year grid, from a mini month and an offset inside its week rows.
   const inGrid = (month: number, x: number, y: number) => ({
     x: monthOrigin(month).x + GRID_OFFSET.x + x,
@@ -275,7 +275,7 @@ describe("YearView sweep across mini months", () => {
   });
 
   const layOut = async (getByTestId: (id: string) => { parent: unknown }) => {
-    for (const month of [6, 7, 8, 9]) {
+    for (const month of [3, 6, 7, 8, 9]) {
       const grid = getByTestId(`year-month-grid-${month}`);
       const { x, y } = monthOrigin(month);
       await fireEvent(grid.parent as never, "layout", {
@@ -394,5 +394,117 @@ describe("YearView sweep across mini months", () => {
     expect(onSelectDrag).toHaveBeenLastCalledWith(new Date(2026, 6, 31), new Date(2026, 7, 3));
     animation.__deferRunOnJS(false);
     await july.release();
+  });
+
+  const deliver = () =>
+    act(() => {
+      for (const send of animation.__jsQueue.splice(0)) send();
+    });
+
+  it("lands on the day under the finger when days arrive faster than renders", async () => {
+    const onSelectDrag = vi.fn();
+    const onCreateEvent = vi.fn();
+    const { getByTestId } = await render(
+      <YearView
+        date={new Date(2026, 6, 20)}
+        weekStartsOn={1}
+        onSelectDrag={onSelectDrag}
+        onCreateEvent={onCreateEvent}
+      />,
+    );
+    await layOut(getByTestId);
+
+    const july = sweep(6);
+    await july.start(cell(6, 2, 2)); // Wed 15 July
+    await july.move(cell(6, 2, 3)); // Thu 16 July
+    animation.__deferRunOnJS(true);
+    await july.move(cell(6, 2, 4)); // Fri 17 July
+    await july.move(cell(6, 2, 3)); // back to Thu 16 July
+    await deliver(); // both steps reach JavaScript before React renders
+    animation.__deferRunOnJS(false);
+    expect(onSelectDrag).toHaveBeenLastCalledWith(new Date(2026, 6, 15), new Date(2026, 6, 16));
+
+    await july.release();
+    expect(onCreateEvent).toHaveBeenCalledWith(new Date(2026, 6, 15), new Date(2026, 6, 17));
+  });
+
+  it("commits a sweep whose first step arrives before its start renders", async () => {
+    const onCreateEvent = vi.fn();
+    const { getByTestId } = await render(
+      <YearView date={new Date(2026, 6, 20)} weekStartsOn={1} onCreateEvent={onCreateEvent} />,
+    );
+    await layOut(getByTestId);
+
+    const july = sweep(6);
+    animation.__deferRunOnJS(true);
+    await july.start(cell(6, 2, 2)); // Wed 15 July
+    await july.move(cell(6, 2, 4)); // Fri 17 July
+    await deliver();
+    animation.__deferRunOnJS(false);
+
+    await july.release();
+    expect(onCreateEvent).toHaveBeenCalledWith(new Date(2026, 6, 15), new Date(2026, 6, 18));
+  });
+
+  it("ignores months scrolled out of view", async () => {
+    const onSelectDrag = vi.fn();
+    const { getByTestId } = await render(
+      <YearView date={new Date(2026, 6, 20)} weekStartsOn={1} onSelectDrag={onSelectDrag} />,
+    );
+    await layOut(getByTestId);
+    // The month view, the year grid, then the scroll view.
+    const scroll = (
+      getByTestId("year-month-grid-6") as unknown as { parent: { parent: { parent: never } } }
+    ).parent.parent.parent;
+    await fireEvent(scroll, "layout", { nativeEvent: { layout: { width: 480, height: 300 } } });
+    await fireEvent(scroll, "scroll", { nativeEvent: { contentOffset: { x: 0, y: 300 } } });
+
+    const july = sweep(6);
+    await july.start(cell(6, 2, 2)); // Wed 15 July
+    // Mon 6 April sits above the visible band, under whatever covers the scroll view.
+    await july.move(cell(3, 1, 0));
+    expect(onSelectDrag).not.toHaveBeenCalled();
+    await july.move(cell(3, 4, 0)); // Mon 27 April, in view
+    expect(onSelectDrag).toHaveBeenLastCalledWith(new Date(2026, 3, 27), new Date(2026, 6, 15));
+    await july.release();
+  });
+
+  it("sweeps when the handler arrives after the year has laid out", async () => {
+    const onSelectDrag = vi.fn();
+    const { getByTestId, rerender } = await render(
+      <YearView date={new Date(2026, 6, 20)} weekStartsOn={1} />,
+    );
+    await layOut(getByTestId);
+    await rerender(
+      <YearView date={new Date(2026, 6, 20)} weekStartsOn={1} onSelectDrag={onSelectDrag} />,
+    );
+
+    const july = sweep(6);
+    await july.start(cell(6, 4, 4)); // Fri 31 July
+    await july.move(cell(7, 1, 0)); // Mon 3 August
+    expect(onSelectDrag).toHaveBeenLastCalledWith(new Date(2026, 6, 31), new Date(2026, 7, 3));
+    await july.release();
+  });
+
+  it("leaves a running sweep to the finger that started it", async () => {
+    const onCreateEvent = vi.fn();
+    const { getByTestId } = await render(
+      <YearView date={new Date(2026, 6, 20)} weekStartsOn={1} onCreateEvent={onCreateEvent} />,
+    );
+    await layOut(getByTestId);
+
+    const july = sweep(6);
+    const august = sweep(7);
+    await july.start(cell(6, 2, 2)); // Wed 15 July
+    await july.move(cell(6, 2, 4)); // Fri 17 July
+    // A second finger holds in August, then lifts.
+    await august.start(cell(7, 2, 2));
+    await august.move(cell(7, 2, 4));
+    await august.release();
+    expect(onCreateEvent).not.toHaveBeenCalled();
+
+    await july.release();
+    expect(onCreateEvent).toHaveBeenCalledTimes(1);
+    expect(onCreateEvent).toHaveBeenCalledWith(new Date(2026, 6, 15), new Date(2026, 6, 18));
   });
 });
