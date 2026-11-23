@@ -135,6 +135,9 @@ export function Agenda<T = unknown>({
 }: AgendaProps<T>): ReactElement {
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
   const today = nowInTimeZone(now, timeZone);
+  // Legend List keeps rendered rows until `data` or `extraData` changes, so the
+  // highlighted day (today or `activeDate`) has to invalidate them.
+  const highlightKey = `${startOfDay(today).getTime()}:${activeDate ? startOfDay(activeDate).getTime() : ""}`;
   const slot = createSlots<AgendaSlot>({ classNames, styles });
   const Renderer = renderEvent;
 
@@ -162,6 +165,7 @@ export function Agenda<T = unknown>({
     >
       <LegendList
         data={rows}
+        extraData={highlightKey}
         keyExtractor={(row: Row<T>) => row.key}
         recycleItems={false}
         estimatedItemSize={44}

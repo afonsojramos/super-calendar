@@ -45,6 +45,13 @@ describe(rendererName, () => {
       expect(headerColors(getByText)).toEqual([HIGHLIGHT, MUTED, MUTED]);
     });
 
+    it("moves the highlight on a mounted schedule when now changes", () => {
+      const props = { mode: "schedule" as const, date: new Date(2026, 10, 20), events, theme };
+      const view = render(Calendar, { ...props, now: new Date(2026, 10, 12, 12) });
+      view.rerender({ ...props, now: new Date(2026, 10, 13, 12) });
+      expect(headerColors(view.getByText)).toEqual([MUTED, HIGHLIGHT, MUTED]);
+    });
+
     it("highlights activeDate instead of today when set", () => {
       const { getByText } = render(Calendar, {
         mode: "schedule",
@@ -125,17 +132,42 @@ describe(rendererName, () => {
       ).toContain("19");
     });
 
-    it("fills the activeDate badge in a month list", () => {
-      const { container } = render(MonthList, {
+    it("moves the activeDate badge in a mounted month list", () => {
+      const props = { date, pastMonths: 0, futureMonths: 0, theme };
+      const view = render(MonthList, { ...props, activeDate });
+      const badge = (label: string) =>
+        view.container.querySelector<HTMLElement>(
+          `[aria-label^="${label}"] [data-slot="dayBadge"]`,
+        );
+      expect(badge("Friday, 20 November 2026")?.style.background).toBe(HIGHLIGHT);
+      view.rerender({ ...props, activeDate: new Date(2026, 10, 18) });
+      expect(badge("Wednesday, 18 November 2026")?.style.background).toBe(HIGHLIGHT);
+      expect(badge("Friday, 20 November 2026")?.style.background).not.toBe(HIGHLIGHT);
+    });
+
+    it("moves the activeDate highlight in a mounted schedule and week view", () => {
+      const schedule = render(Calendar, { mode: "schedule", date, events, now, activeDate, theme });
+      schedule.rerender({
+        mode: "schedule",
         date,
-        pastMonths: 0,
-        futureMonths: 0,
-        activeDate,
+        events,
+        now,
+        activeDate: new Date(2026, 10, 12),
         theme,
       });
-      const badge = (label: string) =>
-        container.querySelector<HTMLElement>(`[aria-label^="${label}"] [data-slot="dayBadge"]`);
-      expect(badge("Friday, 20 November 2026")?.style.background).toBe(HIGHLIGHT);
+      expect(schedule.getByText("Thursday, 12 November").style.color).toBe(HIGHLIGHT);
+      expect(schedule.getByText("Friday, 20 November").style.color).toBe(MUTED);
+      schedule.unmount();
+
+      const weekProps = { mode: "week" as const, date: activeDate, now, theme };
+      const week = render(Calendar, { ...weekProps, activeDate });
+      week.rerender({ ...weekProps, activeDate: new Date(2026, 10, 18) });
+      const header = (day: string) =>
+        [...week.container.querySelectorAll<HTMLElement>('[data-slot="columnHeaderDate"]')].find(
+          (node) => node.textContent === day,
+        );
+      expect(header("18")?.style.background).toBe(HIGHLIGHT);
+      expect(header("20")?.style.background).not.toBe(HIGHLIGHT);
     });
   });
 });

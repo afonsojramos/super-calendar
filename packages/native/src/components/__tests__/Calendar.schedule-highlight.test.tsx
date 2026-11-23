@@ -1,16 +1,23 @@
 import { vi } from "vitest";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { StyleSheet, type TextStyle } from "react-native";
 import { render } from "../../../../../tests/support/native-time-grid";
 import type { CalendarEvent } from "../../types";
 
-// The test renderer cannot lay out LegendList, so render every agenda row.
+// The test renderer cannot lay out LegendList, so render every agenda row, and keep
+// its row cache so a prop-only update must invalidate rows through data or extraData.
 vi.mock("@legendapp/list/react-native", () => ({
   __esModule: true,
   LegendList: (props: {
     data: unknown[];
+    extraData?: unknown;
     renderItem: (item: { item: unknown; index: number }) => ReactNode;
-  }) => props.data.map((item, index) => props.renderItem({ item, index })),
+  }) =>
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- rendered as a component
+    useMemo(
+      () => props.data.map((item, index) => props.renderItem({ item, index })),
+      [props.data, props.extraData],
+    ),
 }));
 
 import { Calendar } from "../Calendar";
@@ -64,6 +71,22 @@ describe("Calendar schedule mode highlight", () => {
         activeDate={new Date(2026, 10, 20)}
         now={now}
         timeZone="Asia/Tokyo"
+      />,
+    );
+    expect(headerColors(view)).toEqual([MUTED, MUTED, HIGHLIGHT]);
+  });
+
+  it("moves the highlight on mounted rows when now or activeDate changes", async () => {
+    const date = new Date(2026, 10, 20);
+    const view = await render(<Calendar {...props} date={date} now={new Date(2026, 10, 12, 12)} />);
+    await view.rerender(<Calendar {...props} date={date} now={new Date(2026, 10, 13, 12)} />);
+    expect(headerColors(view)).toEqual([MUTED, HIGHLIGHT, MUTED]);
+    await view.rerender(
+      <Calendar
+        {...props}
+        date={date}
+        now={new Date(2026, 10, 13, 12)}
+        activeDate={new Date(2026, 10, 20)}
       />,
     );
     expect(headerColors(view)).toEqual([MUTED, MUTED, HIGHLIGHT]);
