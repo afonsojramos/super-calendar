@@ -552,8 +552,8 @@ const { range, onPressDate, selectRange } = useDateRange({ minDate });
 `MonthList` is the continuous, virtualized vertical scroll of months behind the
 picker above (a month title then its grid, under a fixed weekday header), sized
 per month with no adjacent-month fill. It also renders events: pass `events`,
-and optionally a `renderEvent`. Both `renderEvent` and `keyExtractor` default,
-so an events-free picker needs neither:
+and optionally a `renderEvent` and a `getEventId`. An events-free picker needs
+neither:
 
 ```tsx
 import { MonthList } from "@super-calendar/native";
@@ -563,7 +563,7 @@ import { MonthList } from "@super-calendar/native";
   events={events}
   weekStartsOn={1}
   renderEvent={MyEvent}
-  keyExtractor={(event) => event.id}
+  getEventId={(event) => event.id}
   onChangeVisibleMonth={setDate}
 />;
 ```
@@ -842,7 +842,7 @@ are also exported for advanced layouts:
 - **External `cellHeight`.** If you own `cellHeight`, drive zoom through the
   pinch gesture. Programmatic writes outside a pinch won't propagate to
   off-screen pages until the next gesture settles.
-- **Stable props.** Pass stable `renderEvent`/`keyExtractor`/`on*` references
+- **Stable props.** Pass stable `renderEvent`/`getEventId`/`on*` references
   (module scope or `useCallback`) so the memoized inner views can skip renders.
 
 ## Example app

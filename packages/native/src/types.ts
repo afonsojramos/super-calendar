@@ -21,6 +21,7 @@ export type {
   DateChangeReason,
   EventAccessibilityLabelContext,
   EventAccessibilityLabeler,
+  EventIdGetter,
   EventKeyExtractor,
   ICalendarEvent,
   LayoutDayEventsOptions,

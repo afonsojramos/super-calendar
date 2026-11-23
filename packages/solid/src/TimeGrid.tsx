@@ -15,7 +15,10 @@ import {
   eventAccessibilityLabel as defaultEventAccessibilityLabel,
   type EventAccessibilityLabeler,
   eventChipLayout,
+  eventIdKeys,
+  type EventIdGetter,
   eventTimeLabel,
+  findCurrentEvent,
   formatHour,
   getIsToday,
   nowInTimeZone,
@@ -436,8 +439,12 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
    * Return `false` to reject the drop (the event snaps back).
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
-  /** Stable, unique identity for the editing dialog and all-day bars across data refreshes. */
-  getEventId?: (event: CalendarEvent<T>) => string | number;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its focus, rendered state,
+   * open actions dialog, and any held move or resize.
+   */
+  getEventId?: EventIdGetter<T>;
   /**
    * Page the grid to a new anchor date. Supplying it alongside `onDragEvent`
    * turns on edge auto-advance: dragging an event to the left/right edge and
@@ -1158,20 +1165,10 @@ export function TimeGrid<T = unknown>(
     ),
   );
   const hasAllDay = createMemo(() => allDayLayout().segments.length > 0);
+  // Keys for events with a valid, unique `getEventId`.
+  const eventIds = createMemo(() => eventIdKeys(props.events, props.getEventId));
   const allDaySpans = createMemo(() => {
-    const keys = new Map<CalendarEvent<T>, string>();
-    const seen = new Map<string, CalendarEvent<T>>();
-    for (const { event } of allDayLayout().segments) {
-      const id = props.getEventId?.(event);
-      if (typeof id !== "string" && typeof id !== "number") continue;
-      const key = `${typeof id}:${id}`;
-      const previous = seen.get(key);
-      if (previous) keys.delete(previous);
-      else {
-        seen.set(key, event);
-        keys.set(event, key);
-      }
-    }
+    const keys = eventIds();
     return allDayLayout().segments.map((segment) => ({
       ...segment,
       key: keys.get(segment.event) ?? segment.event,
@@ -1727,6 +1724,7 @@ export function TimeGrid<T = unknown>(
     } catch {
       // Best-effort release; ignore if the capture was never granted.
     }
+    followHeldEvent();
     const held = draggedRef.current;
     if (!d.moved) {
       const wasTouch = touchDragRef.current;
@@ -2167,9 +2165,22 @@ export function TimeGrid<T = unknown>(
   // Keep the original boxes mounted for pointer capture, but replace every
   // segment of a moving multi-day event with the same shifted range.
   const moveOrigin = () => dragOrigin.current;
+  // A refresh can replace the held event. With `getEventId`, the drag follows the
+  // event with its ID, so the drop and the renderers get the current object.
+  const followHeldEvent = () => {
+    const held = draggedRef.current;
+    const replacement =
+      held && props.getEventId
+        ? findCurrentEvent(props.events, held.event, props.getEventId)
+        : undefined;
+    if (held && replacement && replacement !== held.event) {
+      draggedRef.current = { ...held, event: replacement };
+    }
+  };
   const heldEvent = () => draggedRef.current?.event;
   const movingEvent = createMemo(() => {
     drag();
+    followHeldEvent();
     const currentHeldEvent = heldEvent();
     return (
       currentHeldEvent &&
@@ -2183,6 +2194,14 @@ export function TimeGrid<T = unknown>(
             );
           }) ?? currentHeldEvent))
     );
+  });
+  // A held event with an ID marks its box by identity on the day it was grabbed,
+  // since the refresh can give its `day:index` key to another event.
+  const heldById = createMemo(() => {
+    // `movingEvent` follows a replacement before the held event is read.
+    movingEvent();
+    const held = heldEvent();
+    return !!held && eventIds().has(held);
   });
   // When placement toggles mid-drag, the event being dragged may move into the
   // all-day lane before the cleanup effect cancels the drag. Suppress every
@@ -2821,6 +2840,10 @@ export function TimeGrid<T = unknown>(
             <For each={days()} keyed={false}>
               {(day, dayIndex) => {
                 const positioned = createMemo(() => positionedByDay()[dayIndex]);
+                // Boxes keep their element by event ID, or else by position.
+                const keyedPositioned = createMemo(() =>
+                  positioned().map((pe, index) => ({ pe, key: eventIds().get(pe.event) ?? index })),
+                );
                 const nowHours = createMemo(
                   () => (now().getHours() * 60 + now().getMinutes()) / 60,
                 );
@@ -3035,9 +3058,10 @@ export function TimeGrid<T = unknown>(
                       })}
                     />
                     {
-                      <For each={positioned()} keyed={false}>
-                        {(pe, idx) => {
-                          const key = createMemo(() => `${dayIndex}:${idx}`);
+                      <For each={keyedPositioned()} keyed={(entry) => entry.key}>
+                        {(entry, idx) => {
+                          const pe = () => entry().pe;
+                          const key = createMemo(() => `${dayIndex}:${idx()}`);
                           // Not while paged: after a page change the origin box is gone and
                           // the ghost stands in, so a same-slot event on the new page (e.g. a
                           // recurring one) must not also render lifted.
@@ -3045,8 +3069,10 @@ export function TimeGrid<T = unknown>(
                             const currentDrag = drag();
                             return !paged() &&
                               !draggedPromoted() &&
-                              currentDrag?.key === key() &&
-                              (!multiDayHeld() || pe().event === movingEvent())
+                              (heldById()
+                                ? dayIndex === moveOrigin()?.dayIndex && pe().event === heldEvent()
+                                : currentDrag?.key === key() &&
+                                  (!multiDayHeld() || pe().event === movingEvent()))
                               ? currentDrag
                               : null;
                           });

@@ -49,6 +49,7 @@ import {
   type WeekStartsOn,
   type CalendarHandle,
   type CalendarLabels,
+  type EventIdGetter,
   type MultiDayTimedEventPlacement,
 } from "@super-calendar/core";
 import { Agenda, type AgendaSlot, type DomAgendaEvent } from "./Agenda";
@@ -237,8 +238,12 @@ export interface CalendarProps<T = unknown>
    * days dragged so the time of day and duration are kept.
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
-  /** Stable, unique identity for the editing dialog and time-grid all-day bars across data refreshes. */
-  getEventId?: (event: CalendarEvent<T>) => string | number;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its focus, rendered state,
+   * open actions dialog, and any held move or resize, in every mode.
+   */
+  getEventId?: EventIdGetter<T>;
   /** Tap a day's column header. */
   onPressDateHeader?: (day: Date) => void;
   /** Custom time-grid event renderer. */
@@ -613,6 +618,7 @@ function CalendarInner<T = unknown>(
         styles={styles}
         renderEvent={renderScheduleEvent}
         eventAccessibilityLabel={eventAccessibilityLabel}
+        getEventId={getEventId}
         onPressEvent={zoned.onPressEvent}
         onPressDay={onPressDay}
       />
@@ -662,6 +668,7 @@ function CalendarInner<T = unknown>(
         onPressMore={zoned.onPressMore}
         renderEvent={renderMonthEvent}
         eventAccessibilityLabel={eventAccessibilityLabel}
+        getEventId={getEventId}
       />
     );
   } else if (mode === "multiweek") {
@@ -709,6 +716,7 @@ function CalendarInner<T = unknown>(
         onPressMore={zoned.onPressMore}
         renderEvent={renderMonthEvent}
         eventAccessibilityLabel={eventAccessibilityLabel}
+        getEventId={getEventId}
       />
     );
   } else {

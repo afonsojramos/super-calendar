@@ -175,9 +175,12 @@ refreshes close it. See
 Active gestures retain the original event through live insertions and reordering;
 removing the event or lane, losing capture, or unmounting cancels the gesture.
 
-In time grids, `getEventId` also preserves all-day focus and renderer state when
-a refresh replaces event objects. Bars without a valid, unique ID use object
-identity and remount when that object changes.
+`Calendar`, `TimeGrid`, `MonthView`, `MultiWeekView`, `MonthList`, `Agenda`, and
+`ResourceTimeline` accept `getEventId`. When a refresh replaces event objects,
+the event with the same ID keeps its focus, rendered content, and any held move,
+resize, or all-day drag, and `onDragEvent` receives the current object. Events
+without a valid, unique ID fall back to the renderer's own matching, so a refresh
+can remount their content or cancel a held move.
 
 ## Month chip dimensions
 

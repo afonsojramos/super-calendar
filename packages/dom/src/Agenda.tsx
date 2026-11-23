@@ -4,6 +4,8 @@ import { type ComponentType, type CSSProperties, type ReactElement, useMemo } fr
 import {
   type CalendarEvent,
   type EventAccessibilityLabeler,
+  eventIdKeys,
+  type EventIdGetter,
   eventTimeLabel,
   getIsToday,
   isAllDayEvent,
@@ -65,6 +67,11 @@ export interface AgendaProps<T = unknown> extends SlotStyleProps<AgendaSlot> {
    * announce. Defaults to the row's own text content.
    */
   eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the row with the same ID keeps its focus and rendered state.
+   */
+  getEventId?: EventIdGetter<T>;
   /** Tap an event row. */
   onPressEvent?: (event: CalendarEvent<T>) => void;
   /** Tap a day's header. */
@@ -126,6 +133,7 @@ export function Agenda<T = unknown>({
   height = 480,
   renderEvent,
   eventAccessibilityLabel,
+  getEventId,
   onPressEvent,
   onPressDay,
   className,
@@ -146,6 +154,7 @@ export function Agenda<T = unknown>({
       // Background events shade the grids; they have no agenda row.
       .filter((event) => !isBackgroundEvent(event))
       .sort((a, b) => a.start.getTime() - b.start.getTime());
+    const ids = eventIdKeys(sorted, getEventId);
     const out: Row<T>[] = [];
     let currentDay: Date | null = null;
     sorted.forEach((event, index) => {
@@ -153,10 +162,15 @@ export function Agenda<T = unknown>({
         currentDay = startOfDay(event.start);
         out.push({ kind: "header", date: currentDay, key: `h-${currentDay.toISOString()}` });
       }
-      out.push({ kind: "event", event, key: `e-${event.start.toISOString()}-${index}` });
+      const id = ids.get(event);
+      out.push({
+        kind: "event",
+        event,
+        key: id === undefined ? `e-${event.start.toISOString()}-${index}` : `id-${id}`,
+      });
     });
     return out;
-  }, [events]);
+  }, [events, getEventId]);
 
   return (
     <div

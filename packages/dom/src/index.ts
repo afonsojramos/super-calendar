@@ -76,6 +76,7 @@ export {
   type DaySelectionState,
   type EventAccessibilityLabelContext,
   type EventAccessibilityLabeler,
+  type EventIdGetter,
   type ICalendarEvent,
   type ICalEvent,
   type LayoutDayEventsOptions,

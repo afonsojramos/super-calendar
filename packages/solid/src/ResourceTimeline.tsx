@@ -19,6 +19,9 @@ import {
   type PositionedEvent,
   resolveCalendarLabels,
   resolveDraggedBounds,
+  eventIdKeys,
+  type EventIdGetter,
+  findCurrentEvent,
 } from "@super-calendar/core/vanilla";
 import {
   type Component,
@@ -146,8 +149,12 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
     end: Date,
     resource: Resource,
   ) => void | boolean;
-  /** Stable, unique event identity for the web editing dialog across data refreshes. */
-  getEventId?: (event: CalendarEvent<T>) => string | number;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its focus, rendered state,
+   * open actions dialog, and any held move or resize.
+   */
+  getEventId?: EventIdGetter<T>;
   /** Tap empty lane space; called with the snapped time and the lane's resource. */
   onPressCell?: (at: Date, resource: Resource) => void;
   /** Drag empty lane space to create; called with the swept start/end and the lane's resource. */
@@ -426,6 +433,35 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
     dragRef.current = next;
     setDrag(next);
   };
+  // Keys for events with a valid, unique `getEventId`; their bars keep their
+  // element across a refresh.
+  const eventIds = createMemo(() => eventIdKeys(props.events, props.getEventId));
+  // Each key is computed with its item, because `For` recomputes the key of a
+  // previous item against the current ID map.
+  const keyedEvents = (list: readonly PositionedEvent<T>[]) => {
+    const ids = eventIds();
+    return list.map((pe) => ({ ...pe, key: ids.get(pe.event) ?? pe.event }));
+  };
+  // The held event as rendered now: a refresh can replace it with the event that
+  // has the same `getEventId`.
+  const heldEvent = createMemo(() => {
+    const current = drag();
+    return current ? findCurrentEvent(props.events, current.event, props.getEventId) : undefined;
+  });
+  // Whether the drag holds the bar that was created for `event`. That bar keeps
+  // its element for every later event with the same ID.
+  const holds = (event: CalendarEvent<T>) => {
+    const held = dragRef.current?.event;
+    return (
+      !!held &&
+      (held === event ||
+        !!findCurrentEvent(
+          [event],
+          held,
+          untrack(() => props.getEventId),
+        ))
+    );
+  };
   const clearDrag = () => {
     const previous = dragRef.current;
     const element = origin.current?.element;
@@ -557,9 +593,11 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
     const d = dragRef.current;
     if (!d || d.pointerId !== e.pointerId) return;
     handledClick = origin.current?.element ?? null;
+    // Report the held event as rendered now, after any refresh.
+    const event = findCurrentEvent(props.events, d.event, props.getEventId) ?? d.event;
     if (!d.moved) {
       clearDrag();
-      props.onPressEvent?.(d.event);
+      props.onPressEvent?.(event);
       return;
     }
     const resource = resources().find((resource) => resource.id === d.resource.id);
@@ -577,14 +615,14 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
     const endDelta =
       d.kind === "move" ? startDelta : o ? Math.round((d.durationHours - o.durationHours) * 60) : 0;
     const next = resolveDraggedBounds(
-      d.event.start,
-      d.event.end,
+      event.start,
+      event.end,
       startDelta,
       endDelta,
       props.dragStepMinutes,
     );
     clearDrag();
-    if (next) props.onDragEvent?.(d.event, next.start, next.end, target);
+    if (next) props.onDragEvent?.(event, next.start, next.end, target);
   };
   const cancelDrag = (e: DomPointerEvent) => {
     if (dragRef.current?.pointerId !== e.pointerId) return;
@@ -1145,15 +1183,16 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
                               })}
                             />
                             {
-                              <For each={positioned()} keyed={(pe) => pe.event}>
+                              <For each={keyedEvents(positioned())} keyed={(pe) => pe.key}>
                                 {(pe) => {
                                   const event = untrack(() => pe().event);
                                   onCleanup(() => {
-                                    if (dragRef.current?.event === event) clearDrag();
+                                    if (holds(event)) clearDrag();
                                   });
                                   const active = createMemo(() => {
                                     const currentDrag = drag();
-                                    return currentDrag?.event === event &&
+                                    return !!currentDrag &&
+                                      heldEvent() === pe().event &&
                                       currentDrag.resource.id === resource().id
                                       ? currentDrag
                                       : null;
@@ -1549,15 +1588,16 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
                             })}
                           />
                           {
-                            <For each={positioned()} keyed={(pe) => pe.event}>
+                            <For each={keyedEvents(positioned())} keyed={(pe) => pe.key}>
                               {(pe) => {
                                 const event = untrack(() => pe().event);
                                 onCleanup(() => {
-                                  if (dragRef.current?.event === event) clearDrag();
+                                  if (holds(event)) clearDrag();
                                 });
                                 const active = createMemo(() => {
                                   const currentDrag = drag();
-                                  return currentDrag?.event === event &&
+                                  return !!currentDrag &&
+                                    heldEvent() === pe().event &&
                                     currentDrag.resource.id === resource().id
                                     ? currentDrag
                                     : null;

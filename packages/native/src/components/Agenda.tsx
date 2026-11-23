@@ -3,7 +3,8 @@ import { format, isSameDay, type Locale, startOfDay } from "date-fns";
 import { type ComponentType, type ReactElement, useCallback, useMemo } from "react";
 import { StyleSheet, Text, type TextStyle, View, type ScrollViewProps } from "react-native";
 import { useCalendarTheme } from "../theme";
-import type { CalendarEvent, EventKeyExtractor, RenderEvent } from "../types";
+import type { CalendarEvent, EventIdGetter, EventKeyExtractor, RenderEvent } from "../types";
+import { useEventKeyExtractor } from "../utils/eventKeys";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
 import { getIsToday, nowInTimeZone, isAllDayEvent, isBackgroundEvent } from "@super-calendar/core";
 
@@ -25,7 +26,17 @@ export type AgendaProps<T> = SlotStyleProps<AgendaSlot> & {
   /** Highlight today as it is in this IANA time zone (default: the device's). */
   timeZone?: string;
   renderEvent: RenderEvent<T>;
-  keyExtractor: EventKeyExtractor<T>;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the row with the same ID keeps its rendered state. Takes
+   * precedence over `keyExtractor`.
+   */
+  getEventId?: EventIdGetter<T>;
+  /**
+   * Stable key per event. Defaults to start, end, and title.
+   * @deprecated Use `getEventId`.
+   */
+  keyExtractor?: EventKeyExtractor<T>;
   onPressEvent: (event: CalendarEvent<T>) => void;
   onLongPressEvent?: (event: CalendarEvent<T>) => void;
   onPressDay?: (date: Date) => void;
@@ -52,7 +63,8 @@ export function Agenda<T>({
   now,
   timeZone,
   renderEvent,
-  keyExtractor,
+  getEventId,
+  keyExtractor: keyExtractorProp,
   onPressEvent,
   onLongPressEvent,
   onPressDay,
@@ -62,6 +74,7 @@ export function Agenda<T>({
   classNames,
   styles: styleOverrides,
 }: AgendaProps<T>): ReactElement {
+  const keyExtractor = useEventKeyExtractor(events, getEventId, keyExtractorProp);
   const theme = useCalendarTheme();
   // Stable across renders (it feeds the memoized renderItem below).
   const slot = useMemo(

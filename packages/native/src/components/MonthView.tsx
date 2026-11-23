@@ -41,6 +41,7 @@ import type {
   CalendarEvent,
   EventDragHandler,
   EventDragStartHandler,
+  EventIdGetter,
   EventKeyExtractor,
   MonthDateInfo,
   RenderEvent,
@@ -89,7 +90,9 @@ import {
   groupEventsByDay,
   isAllDayEvent,
   isBackgroundEvent,
+  findCurrentEvent,
 } from "@super-calendar/core";
+import { useEventKeyExtractor } from "../utils/eventKeys";
 
 // Day-cell metrics, mirrored from the styles below, used to estimate how many
 // event chips fit when auto-fitting `maxVisibleEventCount`.
@@ -274,7 +277,17 @@ export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
    * announce. Defaults to the built-in title-and-time label.
    */
   eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
-  keyExtractor: EventKeyExtractor<T>;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its rendered state and any
+   * held move. Takes precedence over `keyExtractor`.
+   */
+  getEventId?: EventIdGetter<T>;
+  /**
+   * Stable key per event. Defaults to start, end, and title.
+   * @deprecated Use `getEventId`, which also keeps a held move on its event.
+   */
+  keyExtractor?: EventKeyExtractor<T>;
   onPressDay?: (date: Date) => void;
   onLongPressDay?: (date: Date) => void;
   /**
@@ -411,7 +424,8 @@ function DateRowsInner<T>({
   calendarCellStyle,
   renderEvent,
   eventAccessibilityLabel,
-  keyExtractor,
+  getEventId,
+  keyExtractor: keyExtractorProp,
   onPressDay,
   onLongPressDay,
   onPressCell,
@@ -448,6 +462,7 @@ function DateRowsInner<T>({
   const showAdjacentMonths = source.kind === "month" ? source.showAdjacentMonths : true;
   const showSixWeeks = source.kind === "month" ? source.showSixWeeks : false;
   const numberOfWeeks = source.kind === "multiweek" ? source.numberOfWeeks : undefined;
+  const keyExtractor = useEventKeyExtractor(events, getEventId, keyExtractorProp);
   const theme = useCalendarTheme();
   const slot = useMemo(
     () => createSlots<MonthViewSlot>({ classNames, styles: styleOverrides }),
@@ -837,11 +852,19 @@ function DateRowsInner<T>({
   // A move over another day previews the event at its destination the same way:
   // a copy with the shifted bounds the drop would commit, laid out beside the
   // faded original.
+  // The carried event as rendered now: a refresh can replace it with the event
+  // that has the same `getEventId`.
+  const movingEvent =
+    drag?.kind === "move"
+      ? (findCurrentEvent(events, drag.event, getEventId) ?? drag.event)
+      : undefined;
+  const moveFrom = drag?.kind === "move" ? drag.from : undefined;
+  const moveTo = drag?.kind === "move" ? drag.to : undefined;
   const movePreview = useMemo(() => {
-    if (drag?.kind !== "move") return null;
-    const bounds = monthDropBounds(drag.event, drag.from, drag.to);
-    return bounds ? { ...drag.event, ...bounds } : null;
-  }, [drag]);
+    if (!movingEvent || !moveFrom || !moveTo) return null;
+    const bounds = monthDropBounds(movingEvent, moveFrom, moveTo);
+    return bounds ? { ...movingEvent, ...bounds } : null;
+  }, [movingEvent, moveFrom, moveTo]);
   const draftEvent = createDraft ?? movePreview;
   // The days the draft covers, as `eventsByDay` keys.
   const draftDays = useMemo(
@@ -925,11 +948,14 @@ function DateRowsInner<T>({
         : current.to
       : origin.day;
     const constraints = { minDate, maxDate, isDateDisabled };
+    const originEvent = origin.event
+      ? findCurrentEvent(events, origin.event, getEventId)
+      : undefined;
     if (
       !isDateSelectable(origin.day, constraints) ||
       !isDateSelectable(destination, constraints) ||
       (origin.event
-        ? !onDragEvent || !events.includes(origin.event) || !canMoveEvent(origin.event)
+        ? !onDragEvent || !originEvent || !canMoveEvent(originEvent)
         : !onCreateEvent && !onSelectDrag)
     ) {
       heldTouch.current?.();
@@ -1086,18 +1112,17 @@ function DateRowsInner<T>({
       onCreateEvent?.(range.start, range.end);
       return;
     }
-    const next = monthDropBounds(current.event, current.from, current.to);
+    // A refresh may have replaced the carried event; report the current object.
+    const moved = findCurrentEvent(events, current.event, getEventId) ?? current.event;
+    const next = monthDropBounds(moved, current.from, current.to);
     if (!next) return;
     // Reject a drop that would land the event on top of another when
     // `eventOverlap` is off, before the consumer's handler ever sees it.
-    if (
-      eventOverlap === false &&
-      overlapsOtherEvents(events, current.event, next.start, next.end)
-    ) {
+    if (eventOverlap === false && overlapsOtherEvents(events, moved, next.start, next.end)) {
       return;
     }
-    onDragEvent?.(current.event, next.start, next.end);
-  }, [applyDrag, onCreateEvent, onDragEvent, eventOverlap, events]);
+    onDragEvent?.(moved, next.start, next.end);
+  }, [applyDrag, onCreateEvent, onDragEvent, eventOverlap, events, getEventId]);
 
   // Native: a pan over the grid, held first so it doesn't hijack a tap or the
   // pager's own horizontal swipe.
@@ -1736,7 +1761,7 @@ function DateRowsInner<T>({
                           if (startCol > endCol) return null;
                           // Fade the bar being carried, so the tinted drop target reads
                           // as where it is going and this as where it came from.
-                          const isDragged = drag?.kind === "move" && drag.event === seg.event;
+                          const isDragged = movingEvent === seg.event;
                           return (
                             <View
                               key={barKeys[index]}

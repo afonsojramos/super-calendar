@@ -602,6 +602,7 @@ export function App() {
               renderBackgroundEvent={FocusBand}
               date={date}
               events={events}
+              getEventId={(event) => event.id}
               weekStartsOn={1}
               height={560}
               // Enables PageUp/PageDown paging and, with onDragEvent, edge

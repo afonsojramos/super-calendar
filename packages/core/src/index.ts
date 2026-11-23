@@ -23,6 +23,7 @@ export * from "./utils/dateRange";
 export * from "./utils/dates";
 export * from "./utils/drag";
 export * from "./utils/eventDisplay";
+export * from "./utils/eventIdentity";
 export * from "./utils/ical";
 export * from "./utils/labels";
 export * from "./utils/useNow";

@@ -45,6 +45,8 @@ import {
   snapDeltaMinutes,
   type CalendarLabels,
   resolveCalendarLabels,
+  eventIdKeys,
+  type EventIdGetter,
 } from "@super-calendar/core";
 import { useCalendarTheme } from "../theme";
 
@@ -146,6 +148,12 @@ export interface ResourceTimelineProps<T = unknown> {
     end: Date,
     resource: Resource,
   ) => void | boolean;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its rendered state and any
+   * held move or resize.
+   */
+  getEventId?: EventIdGetter<T>;
   /** Tap empty lane space; called with the snapped time and the lane's resource. */
   onPressCell?: (at: Date, resource: Resource) => void;
   /**
@@ -900,6 +908,7 @@ export function ResourceTimeline<T = unknown>({
   onPressEvent,
   onLongPressEvent,
   onDragEvent,
+  getEventId,
   onPressCell,
   onLongPressCell,
   onCreateEvent,
@@ -933,6 +942,8 @@ export function ResourceTimeline<T = unknown>({
       ? (vBodyWidth - GUTTER_WIDTH) / resources.length
       : 0;
   const Renderer = renderEvent ?? DefaultBar;
+  // Bars keep their element, and so a held gesture, by event ID, or else by position.
+  const eventIds = useMemo(() => eventIdKeys(events, getEventId), [events, getEventId]);
   const cellEnabled = !!onPressCell || !!onLongPressCell || !!onCreateEvent;
   // The current-time line, shown only when the board's day is the zone's today.
   const now = useNow(showNowIndicator, { now: nowProp, timeZone });
@@ -1132,7 +1143,7 @@ export function ResourceTimeline<T = unknown>({
                     if (onDragEvent) {
                       return (
                         <ResourceBar
-                          key={idx}
+                          key={eventIds.get(pe.event) ?? idx}
                           pe={pe}
                           vertical
                           resources={resources}
@@ -1160,7 +1171,7 @@ export function ResourceTimeline<T = unknown>({
                     }
                     return (
                       <Pressable
-                        key={idx}
+                        key={eventIds.get(pe.event) ?? idx}
                         onPress={onPress}
                         onLongPress={
                           onLongPressEvent ? () => onLongPressEvent(pe.event) : undefined
@@ -1313,7 +1324,7 @@ export function ResourceTimeline<T = unknown>({
                   if (onDragEvent) {
                     return (
                       <ResourceBar
-                        key={idx}
+                        key={eventIds.get(pe.event) ?? idx}
                         pe={pe}
                         vertical={false}
                         resources={resources}
@@ -1341,7 +1352,7 @@ export function ResourceTimeline<T = unknown>({
                   }
                   return (
                     <Pressable
-                      key={idx}
+                      key={eventIds.get(pe.event) ?? idx}
                       onPress={onPress}
                       onLongPress={onLongPressEvent ? () => onLongPressEvent(pe.event) : undefined}
                       accessibilityRole="button"

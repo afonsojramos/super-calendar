@@ -33,6 +33,7 @@ export {
   type DaySelectionState,
   type EventAccessibilityLabelContext,
   type EventAccessibilityLabeler,
+  type EventIdGetter,
   type EventSource,
   type EventSourceOptions,
   type ICalEvent,
