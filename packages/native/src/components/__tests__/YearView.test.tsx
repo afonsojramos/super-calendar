@@ -506,7 +506,7 @@ describe("YearView sweep across mini months", () => {
     await rerender(year(new Date(2027, 6, 20)));
     expect(onCreateEvent).not.toHaveBeenCalled();
 
-    // Another month's hold starts a fresh sweep in the new year.
+    // A fresh hold starts a new sweep in the new year.
     const july = sweep(6);
     await july.start(cell(6, 1, 0)); // Mon 5 July 2027
     await july.move(cell(6, 1, 2)); // Wed 7 July 2027
