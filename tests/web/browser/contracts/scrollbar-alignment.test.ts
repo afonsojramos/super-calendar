@@ -48,9 +48,9 @@ function scrollbarWidth(selector: string) {
     });
 }
 
-async function updateProps() {
+async function press(name = "Update props") {
   await page
-    .getByRole("button", { name: "Update props", exact: true })
+    .getByRole("button", { name, exact: true })
     .evaluate((button) => button.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 }
 
@@ -91,8 +91,12 @@ describe(rendererName, () => {
     if (scrollbars) expect(await scrollbarWidth(column)).toBeGreaterThan(10);
     expect(await timeGridDrift()).toBeLessThanOrEqual(1);
 
-    await updateProps();
+    // Narrow the hours so the scrollbar goes, then widen them so it comes back.
+    await press("Toggle disabled");
     await expect.poll(() => scrollbarWidth(column)).toBe(0);
+    await expect.poll(timeGridDrift).toBeLessThanOrEqual(1);
+    await press("Toggle disabled");
+    if (scrollbars) await expect.poll(() => scrollbarWidth(column)).toBeGreaterThan(10);
     await expect.poll(timeGridDrift).toBeLessThanOrEqual(1);
   });
 
@@ -103,7 +107,7 @@ describe(rendererName, () => {
     if (scrollbars) expect(await scrollbarWidth(days[0])).toBeGreaterThan(10);
     expect(await weekdayDrift(days)).toBeLessThanOrEqual(1);
 
-    await updateProps();
+    await press();
     await expect.poll(() => scrollbarWidth(days[0])).toBe(0);
     await expect.poll(() => weekdayDrift(days)).toBeLessThanOrEqual(1);
   });

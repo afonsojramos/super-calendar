@@ -382,7 +382,7 @@ export function Fixture() {
         ) : null}
       </nav>
       {view === "scrollbar-week" ? (
-        // Tall enough to scroll until "Update props" narrows the visible hours.
+        // Tall enough to scroll while "Toggle disabled" is off; on, it narrows the visible hours.
         <TimeGrid<{ id: number }>
           date={anchor}
           now={anchor}
@@ -391,8 +391,8 @@ export function Fixture() {
           events={allDayEvents}
           height={300}
           hourHeight={48}
-          minHour={updated() ? 8 : undefined}
-          maxHour={updated() ? 10 : undefined}
+          minHour={disabled() ? 8 : undefined}
+          maxHour={disabled() ? 10 : undefined}
           showWeekNumber
           showAllDayLabel
         />
