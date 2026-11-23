@@ -63,10 +63,11 @@ fixed `maxVisibleEventCount` and for the native auto-fit layout.
 - `maxVisibleEventCount`: a fixed cap on **lanes per week row**, the overflow row
   included. With a cap of 3, a row shows up to three lanes, or two lanes and the
   overflow row. Without it, native auto-fits the lanes to the cell height, and
-  React DOM and Solid show 3. Every renderer keeps a capped row tall enough for its
-  lanes and the overflow row. When the rows outgrow the view, the page scrolls on
-  the web and the grid scrolls on native; native `MonthList` keeps its
-  `weekRowHeight` instead. Because a multi-day bar occupies a lane across the
+  React DOM and Solid show 3. A capped row is tall enough for its lanes and the
+  overflow row. React DOM and Solid rows grow with their content. Native rows fit
+  the built-in date badge and cell padding, and the native grid scrolls when the
+  rows outgrow the view. Native `MonthList` keeps its `weekRowHeight`, so raise it
+  for a larger cap. Because a multi-day bar occupies a lane across the
   whole week, a long bar can push a lightly-booked day's own events into `+N more`.
   Recommended on native when you pass a custom `renderEvent`, since auto-fit
   assumes the built-in chip height.

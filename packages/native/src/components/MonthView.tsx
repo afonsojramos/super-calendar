@@ -201,8 +201,9 @@ export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
    * as one bar spanning a lane across the week, this caps lanes per row, not chips
    * per day, so a long bar can push a lightly-booked day's own events into "+N more".
    * Omit to auto-fit as many lanes as the cell height allows (the default); set a
-   * number for a fixed cap. A capped row is always tall enough for its lanes, and
-   * the grid scrolls when the rows outgrow the view. Auto-fit assumes the built-in
+   * number for a fixed cap. A capped row fits its lanes under the built-in date
+   * badge and cell padding, and the grid scrolls when the rows outgrow the view
+   * (`MonthList` keeps its `weekRowHeight`). Auto-fit assumes the built-in
    * chip size, so pass an explicit value when using a custom `renderEvent`.
    */
   maxVisibleEventCount?: number;
@@ -471,11 +472,16 @@ function DateRowsInner<T>({
   const [gridSize, setGridSize] = useState({ width: 0, height: gridHeightHint ?? 0 });
   // A pager that resizes its pages lays the grid out again before the grid's own
   // layout event arrives; take the new height now so no frame sizes the lanes for
-  // the old one.
+  // the old one. Only a grid that filled its page follows: a restyled grid keeps
+  // its measured height until it reports a new one.
   const [hintedHeight, setHintedHeight] = useState(gridHeightHint);
   if (gridHeightHint !== hintedHeight) {
     setHintedHeight(gridHeightHint);
-    if (gridHeightHint != null) setGridSize((prev) => ({ ...prev, height: gridHeightHint }));
+    if (gridHeightHint != null && hintedHeight != null) {
+      setGridSize((prev) =>
+        Math.abs(prev.height - hintedHeight) < 0.5 ? { ...prev, height: gridHeightHint } : prev,
+      );
+    }
   }
   const gridHeight = gridSize.height;
   const weekTops = useRef<number[]>([]);
@@ -1618,12 +1624,7 @@ function DateRowsInner<T>({
             </Pressable>
           </Modal>
         ) : null}
-        <DateRowsViewport
-          scrollable={scrollRows}
-          testID={multiWeek ? "multiweek-viewport" : "month-viewport"}
-          alwaysBounce={multiWeek}
-          onHeight={setViewportHeight}
-        >
+        <DateRowsViewport scrollable={scrollRows} month={!multiWeek} onHeight={setViewportHeight}>
           <MonthGridSurface gesture={dragGesture}>
             <View
               ref={gridRef}
@@ -1882,22 +1883,22 @@ function weekAtOffset(y: number, count: number, topOf: (index: number) => number
 
 function DateRowsViewport({
   scrollable,
-  testID,
-  alwaysBounce,
+  month,
   onHeight,
   children,
 }: {
   scrollable: boolean;
-  testID: string;
-  alwaysBounce: boolean;
+  month: boolean;
   onHeight: (height: number) => void;
   children: ReactElement;
 }): ReactElement {
   return scrollable ? (
     <ScrollView
-      testID={testID}
-      // A capped month whose rows fit stays still on iOS, as it did before it scrolled.
-      alwaysBounceVertical={alwaysBounce}
+      testID={month ? "month-viewport" : "multiweek-viewport"}
+      // A capped month whose rows fit stays still on iOS, and a tap on a day or chip
+      // still reaches it while the keyboard is open, as before the month scrolled.
+      alwaysBounceVertical={!month}
+      keyboardShouldPersistTaps={month ? "handled" : undefined}
       style={styles.multiWeekViewport}
       contentContainerStyle={{ flexGrow: 1 }}
       onLayout={(event) => onHeight(event.nativeEvent.layout.height)}
