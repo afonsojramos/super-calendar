@@ -35,6 +35,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import {
   type AccessibilityActionEvent,
@@ -80,6 +81,7 @@ import type {
   EventKeyExtractor,
   MultiDayTimedEventPlacement,
   RenderEvent,
+  RenderEventArgs,
   TimeGridMode,
   WeekStartsOn,
 } from "../types";
@@ -229,6 +231,55 @@ const EdgePagingContext = createContext<EdgePaging | null>(null);
 
 const noop = () => {};
 
+// The times a move or resize in progress would commit, with the stored times they
+// were resolved from, so they stop applying once the parent commits new ones.
+type LiveDrag = { fromStart: number; fromEnd: number; start: Date; end: Date };
+type LiveDragStore = {
+  get: () => LiveDrag | null;
+  set: (next: LiveDrag | null) => void;
+  subscribe: (listener: () => void) => () => void;
+};
+
+function createLiveDragStore(): LiveDragStore {
+  let current: LiveDrag | null = null;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => current,
+    set: (next) => {
+      if (next === current) return;
+      current = next;
+      for (const listener of listeners) listener();
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+}
+
+/**
+ * Renders `event` with the live drag times while they apply to it. Subscribes to
+ * the store itself, so a snapped step re-renders only the event's renderer.
+ */
+function LiveDragEvent<T>({
+  liveStore,
+  component: RenderEventComponent,
+  event,
+  ...args
+}: RenderEventArgs<T> & { liveStore: LiveDragStore; component: RenderEvent<T> }): ReactElement {
+  const live = useSyncExternalStore(liveStore.subscribe, liveStore.get, liveStore.get);
+  const shown = useMemo(
+    () =>
+      live && event.start.getTime() === live.fromStart && event.end.getTime() === live.fromEnd
+        ? { ...event, start: live.start, end: live.end }
+        : event,
+    [event, live],
+  );
+  return <RenderEventComponent {...args} event={shown} />;
+}
+
 /**
  * The part of a move that runs past midnight, drawn in the adjacent day's column
  * so the drop reads on both days before the finger lifts: a tail at the top of
@@ -246,6 +297,7 @@ function MoveSpillPreview<T>({
   nextDayDirection,
   minHour,
   event,
+  liveStore,
   mode,
   renderEvent,
   eventGap,
@@ -260,6 +312,7 @@ function MoveSpillPreview<T>({
   nextDayDirection: number;
   minHour: number;
   event: CalendarEvent<T>;
+  liveStore: LiveDragStore;
   mode: CalendarMode;
   renderEvent: RenderEvent<T>;
   eventGap: number;
@@ -298,7 +351,9 @@ function MoveSpillPreview<T>({
         style,
       ]}
     >
-      <RenderEventComponent
+      <LiveDragEvent
+        liveStore={liveStore}
+        component={RenderEventComponent}
         event={event}
         mode={mode}
         boxHeight={spillHeight}
@@ -516,18 +571,16 @@ function AnimatedEventBoxInner<T>({
   // compared on the UI thread so the renderer re-renders once per snapped step
   // rather than every frame. `liveCommitted` marks a release that committed, so
   // the renderer keeps the dropped times until the parent's update lands, like
-  // the box keeps its offset.
+  // the box keeps its offset. `liveOwner` is the gesture that started (1 move,
+  // 2 bottom grip, 3 top grip), so a competing gesture that fails to activate
+  // doesn't clear another one's times when it finalizes.
   const liveStartDelta = useSharedValue(0);
   const liveEndDelta = useSharedValue(0);
   const liveCommitted = useSharedValue(0);
-  // The times the renderer shows while dragging, with the stored times they were
-  // resolved from, so they stop applying once the parent commits new ones.
-  const [liveDrag, setLiveDrag] = useState<{
-    fromStart: number;
-    fromEnd: number;
-    start: Date;
-    end: Date;
-  } | null>(null);
+  const liveOwner = useSharedValue(0);
+  // The times the renderer shows while dragging. Held outside this box's state so
+  // a step re-renders only the renderers, not the box and its gesture detectors.
+  const [liveStore] = useState(createLiveDragStore);
 
   // Pull the geometry out as primitives so the worklets below close over plain
   // numbers, not `positioned` itself. Referencing `positioned.*` inside a
@@ -746,10 +799,15 @@ function AnimatedEventBoxInner<T>({
     liveStartDelta.value = 0;
     // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
     liveEndDelta.value = 0;
-    setLiveDrag(null);
+    liveStore.set(null);
   }, [
     positioned.startHours,
     positioned.durationHours,
+    // A segment between the first and last day of a multi-day event keeps its
+    // 00:00 to 24:00 geometry when the event moves by hours.
+    eventStartMs,
+    eventEndMs,
+    liveStore,
     moveOffset,
     moveOffsetX,
     resizeDelta,
@@ -791,8 +849,16 @@ function AnimatedEventBoxInner<T>({
     liveStartDelta.value = 0;
     // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
     liveEndDelta.value = 0;
-    setLiveDrag(null);
-  }, [moveOffset, moveOffsetX, resizeDelta, resizeStartDelta, liveStartDelta, liveEndDelta]);
+    liveStore.set(null);
+  }, [
+    moveOffset,
+    moveOffsetX,
+    resizeDelta,
+    resizeStartDelta,
+    liveStartDelta,
+    liveEndDelta,
+    liveStore,
+  ]);
 
   // Resolves the snapped deltas exactly as `commitDrag` will, on the JS thread.
   const applyLiveDelta = useCallback(
@@ -802,11 +868,11 @@ function AnimatedEventBoxInner<T>({
         startDelta === 0 && endDelta === 0
           ? null
           : resolveDraggedBounds(event.start, event.end, startDelta, endDelta, snapMinutes);
-      setLiveDrag(
+      liveStore.set(
         next ? { fromStart: event.start.getTime(), fromEnd: event.end.getTime(), ...next } : null,
       );
     },
-    [snapMinutes],
+    [snapMinutes, liveStore],
   );
   // Records the deltas a release would commit and crosses to JavaScript only when
   // they change. `render` is false for a multi-day move, whose box is hidden while
@@ -994,6 +1060,7 @@ function AnimatedEventBoxInner<T>({
         edgeDir.value = 0;
         lifted.value = 0;
         liveCommitted.value = 0;
+        liveOwner.value = 1;
         // Where in the box the finger grabbed, and the live finger position, so
         // the ghost can be seeded and tracked in window space (see armEdge). The
         // grab is measured from the day column, where the floating box now starts.
@@ -1050,6 +1117,8 @@ function AnimatedEventBoxInner<T>({
           event.translationX,
           event.translationY,
         );
+        // The release can land a step past the last update; show what it commits.
+        showLiveDelta(totalDelta, totalDelta, !multiDay);
         if (minuteDelta === 0 && dayDelta === 0) {
           moveOffset.value = 0;
           moveOffsetX.value = 0;
@@ -1067,7 +1136,10 @@ function AnimatedEventBoxInner<T>({
         dragZ.value = 0;
         // A cancelled or paged drag returns the renderer to the stored times; a
         // committed one keeps the dropped times until the parent's update lands.
-        if (!liveCommitted.value) showLiveDelta(0, 0, !multiDay);
+        if (liveOwner.value === 1) {
+          liveOwner.value = 0;
+          if (!liveCommitted.value) showLiveDelta(0, 0, !multiDay);
+        }
         // Commit the cross-week drop here: onFinalize fires on every gesture end,
         // including the cancel RNGH reports when the source page moves under the
         // touch, so committing from the last finger position (ghost column + the
@@ -1135,6 +1207,7 @@ function AnimatedEventBoxInner<T>({
     disarmEdge,
     releaseEdge,
     liveCommitted,
+    liveOwner,
     showLiveDelta,
   ]);
 
@@ -1167,6 +1240,7 @@ function AnimatedEventBoxInner<T>({
         }
         dragZ.value = DRAG_EVENT_Z;
         liveCommitted.value = 0;
+        liveOwner.value = 2;
         runOnJS(notifyDragStart)();
       })
       .onUpdate((event) => {
@@ -1177,6 +1251,7 @@ function AnimatedEventBoxInner<T>({
       .onEnd((event) => {
         if (resizeYielded.value) return;
         const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
+        showLiveDelta(0, delta, true);
         if (delta === 0) {
           resizeDelta.value = 0;
           return;
@@ -1187,8 +1262,9 @@ function AnimatedEventBoxInner<T>({
       })
       .onFinalize(() => {
         // A yielded resize leaves the moving box raised.
-        if (!resizeYielded.value) {
-          dragZ.value = 0;
+        if (!resizeYielded.value) dragZ.value = 0;
+        if (liveOwner.value === 2) {
+          liveOwner.value = 0;
           if (!liveCommitted.value) showLiveDelta(0, 0, true);
         }
         resizeYielded.value = 0;
@@ -1218,6 +1294,9 @@ function AnimatedEventBoxInner<T>({
     handlePress,
     canLongPress,
     handleLongPressFromHandle,
+    liveCommitted,
+    liveOwner,
+    showLiveDelta,
   ]);
 
   // Top-edge resize: dragging the top changes the start (end fixed). Mirrors the
@@ -1232,6 +1311,7 @@ function AnimatedEventBoxInner<T>({
         }
         dragZ.value = DRAG_EVENT_Z;
         liveCommitted.value = 0;
+        liveOwner.value = 3;
         runOnJS(notifyDragStart)();
       })
       .onUpdate((event) => {
@@ -1242,6 +1322,7 @@ function AnimatedEventBoxInner<T>({
       .onEnd((event) => {
         if (resizeYielded.value) return;
         const delta = snapDeltaMinutes(event.translationY, cellHeight.value, snapMinutes);
+        showLiveDelta(delta, 0, true);
         if (delta === 0) {
           resizeStartDelta.value = 0;
           return;
@@ -1252,8 +1333,9 @@ function AnimatedEventBoxInner<T>({
       })
       .onFinalize(() => {
         // A yielded resize leaves the moving box raised.
-        if (!resizeYielded.value) {
-          dragZ.value = 0;
+        if (!resizeYielded.value) dragZ.value = 0;
+        if (liveOwner.value === 3) {
+          liveOwner.value = 0;
           if (!liveCommitted.value) showLiveDelta(0, 0, true);
         }
         resizeYielded.value = 0;
@@ -1283,6 +1365,9 @@ function AnimatedEventBoxInner<T>({
     handlePress,
     canLongPress,
     handleLongPressFromHandle,
+    liveCommitted,
+    liveOwner,
+    showLiveDelta,
   ]);
 
   // When movable, a long press grabs the event to move it, so don't also fire
@@ -1338,26 +1423,16 @@ function AnimatedEventBoxInner<T>({
       }
     : undefined;
 
-  // While dragging, a copy with the times a release would report. Applied only to
-  // the stored times it was resolved from, so it never shifts the committed event.
-  const liveEvent = useMemo(
-    () =>
-      liveDrag &&
-      positioned.event.start.getTime() === liveDrag.fromStart &&
-      positioned.event.end.getTime() === liveDrag.fromEnd
-        ? { ...positioned.event, start: liveDrag.start, end: liveDrag.end }
-        : positioned.event,
-    [positioned.event, liveDrag],
-  );
-
   const eventSlot = slot("event", {
     base: [styles.eventBox, { left, width, padding: eventGap }],
     themed: theme.containers.timeGridEvent,
   });
   const box = (
     <Animated.View {...eventSlot} style={[eventSlot.style, boxStyle]}>
-      <RenderEventComponent
-        event={liveEvent}
+      <LiveDragEvent
+        liveStore={liveStore}
+        component={RenderEventComponent}
+        event={positioned.event}
         mode={mode}
         boxHeight={visibleBoxHeight}
         continuesBefore={positioned.continuesBefore}
@@ -1419,7 +1494,8 @@ function AnimatedEventBoxInner<T>({
           dayWidth={dayWidth}
           nextDayDirection={nextDayDirection}
           minHour={minHour}
-          event={liveEvent}
+          event={positioned.event}
+          liveStore={liveStore}
           mode={mode}
           renderEvent={renderEvent}
           eventGap={eventGap}

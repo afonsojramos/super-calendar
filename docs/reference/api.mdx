@@ -89,6 +89,11 @@ waits for it to finish.
 | `headerComponent`          | `ReactNode`                        | Extra element between header and grid.                    |
 | `keyExtractor`             | `(event, index) => string`         | Stable event keys.                                        |
 
+While you move or resize a time-grid event, `renderEvent` receives a copy of it
+whose `start` and `end` are the times the drop would report. Compare events by a
+stable ID, and see [live drag times](/guides/dragging#move-and-resize) for the
+paging exception.
+
 ## Interactions
 
 DOM `Calendar` and `TimeGrid` accept `touchDragDelay` and `touchDragThreshold`.

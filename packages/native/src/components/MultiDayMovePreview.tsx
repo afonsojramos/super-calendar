@@ -1,5 +1,5 @@
 import { addDays, differenceInCalendarDays, startOfDay } from "date-fns";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Animated, {
   runOnJS,
   type SharedValue,
@@ -57,15 +57,18 @@ export function MultiDayMovePreview<T>(props: PreviewProps<T>) {
     () => days.map((day) => differenceInCalendarDays(day, days[move.dayIndex]) * 1440),
     [days, move],
   );
-  const [delta, setDelta] = useState(() => ({
-    start: liveStartDelta.value,
-    end: liveEndDelta.value,
-  }));
+  const [delta, setDelta] = useState({ start: 0, end: 0 });
+  const syncDelta = useCallback((next: { start: number; end: number }) => {
+    setDelta((current) =>
+      current.start === next.start && current.end === next.end ? current : next,
+    );
+  }, []);
+  // The first run syncs too, since the shared values may hold a delta already.
   useAnimatedReaction(
     () => ({ start: liveStartDelta.value, end: liveEndDelta.value }),
     (next, previous) => {
-      if (previous && (next.start !== previous.start || next.end !== previous.end)) {
-        runOnJS(setDelta)(next);
+      if (!previous || next.start !== previous.start || next.end !== previous.end) {
+        runOnJS(syncDelta)(next);
       }
     },
   );

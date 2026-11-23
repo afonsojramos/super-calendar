@@ -191,12 +191,92 @@ describe("TimeGrid live drag times", () => {
     },
   );
 
+  it("starts the next multi-day move from the committed times", async () => {
+    const trip: CalendarEvent<WithId> = {
+      id: "trip",
+      title: "Trip",
+      start: new Date(2026, 0, 6, 17),
+      end: new Date(2026, 0, 8, 21),
+    };
+    let events = [trip];
+    const onDragEvent = vi.fn((dragged: CalendarEvent<WithId>, start: Date, end: Date) => {
+      events = [{ ...dragged, start, end }];
+    });
+    const { getAllByText, queryAllByText, rerender } = await render(
+      grid({ mode: "week", events, onDragEvent }),
+    );
+    // The middle segment spans its whole day, so moving by hours keeps its geometry.
+    const first = moveGesture(1);
+    await act(() => {
+      first.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 });
+      first.onUpdate?.({ translationX: 0, translationY: 48, absoluteX: 200, absoluteY: 348 });
+      first.onEnd?.({ translationX: 0, translationY: 48 }, true);
+      first.onFinalize?.({}, true);
+      reactions().__flushAnimatedReactions();
+    });
+    await rerender(grid({ mode: "week", events, onDragEvent }));
+    await act(() => {
+      moveGesture(1).onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 });
+      reactions().__flushAnimatedReactions();
+    });
+    expect(getAllByText("18:00-22:00", { includeHiddenElements: true }).length).toBeGreaterThan(0);
+    expect(queryAllByText("19:00-23:00", { includeHiddenElements: true })).toHaveLength(0);
+  });
+
+  it("keeps the gestures while the times change", async () => {
+    await render(grid({}));
+    const move = moveGesture();
+    const built = chains().length;
+    for (const y of [12, 24, 36, 48]) {
+      await act(() => {
+        move.onUpdate?.({ translationX: 0, translationY: y, absoluteX: 200, absoluteY: 300 + y });
+      });
+    }
+    // A rebuilt gesture would tear down the drag under the finger.
+    expect(chains().length).toBe(built);
+  });
+
+  it("shows the times the release commits when it lands past the last update", async () => {
+    const onDragEvent = vi.fn();
+    const { getByText } = await render(grid({ onDragEvent }));
+    const move = moveGesture();
+    await act(() => {
+      move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 });
+      move.onUpdate?.({ translationX: 0, translationY: 48, absoluteX: 200, absoluteY: 348 });
+      move.onEnd?.({ translationX: 0, translationY: 60 }, true);
+      move.onFinalize?.({}, true);
+    });
+    expect(onDragEvent).toHaveBeenCalledWith(
+      standup,
+      new Date(2026, 0, 6, 10, 15),
+      new Date(2026, 0, 6, 11, 15),
+    );
+    // The parent has not updated yet: the box holds the dropped place and times.
+    expect(getByText("10:15-11:15")).toBeTruthy();
+  });
+
+  it("keeps a resize's times when the move gesture fails to activate", async () => {
+    const { getByText } = await render(grid({}));
+    const move = moveGesture();
+    const handle = resizeGesture("bottom");
+    await act(() => {
+      handle.onStart?.({});
+      handle.onUpdate?.({ translationY: 24 });
+      // The grip's pan won, so the long-press move finalizes without starting.
+      move.onFinalize?.({}, false);
+    });
+    expect(getByText("09:00-10:30")).toBeTruthy();
+  });
+
   it("restores the stored times after a rejected drop", async () => {
     const { getByText } = await render(grid({ onDragEvent: () => false }));
     const move = moveGesture();
     await act(() => {
       move.onStart?.({ x: 10, y: 10, absoluteX: 200, absoluteY: 300 });
       move.onUpdate?.({ translationX: 0, translationY: 48, absoluteX: 200, absoluteY: 348 });
+    });
+    expect(getByText("10:00-11:00")).toBeTruthy();
+    await act(() => {
       move.onEnd?.({ translationX: 0, translationY: 48 }, true);
       move.onFinalize?.({}, true);
     });
