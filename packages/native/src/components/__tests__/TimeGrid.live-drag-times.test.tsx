@@ -2,6 +2,7 @@ import * as reanimatedMock from "react-native-reanimated";
 import * as gestureHandlerMock from "react-native-gesture-handler";
 import { vi } from "vitest";
 import { act } from "@testing-library/react-native";
+import type { ComponentProps } from "react";
 import { Dimensions, Text } from "react-native";
 import type { CalendarEvent, RenderEventArgs } from "../../types";
 import { render } from "../../../../../tests/support/native-time-grid";
@@ -69,8 +70,10 @@ const grid = (props: {
   mode?: "day" | "week";
   renderEvent?: typeof LiveEvent;
   onDragEvent?: (event: CalendarEvent<WithId>, start: Date, end: Date) => boolean | void;
+  labels?: ComponentProps<typeof TimeGrid>["labels"];
 }) => (
   <TimeGrid<WithId>
+    labels={props.labels}
     mode={props.mode ?? "day"}
     date={(props.events ?? [standup])[0].start}
     events={props.events ?? [standup]}
@@ -223,15 +226,22 @@ describe("TimeGrid live drag times", () => {
     expect(queryAllByText("19:00-23:00", { includeHiddenElements: true })).toHaveLength(0);
   });
 
-  it("keeps the gestures while the times change", async () => {
-    await render(grid({}));
+  it("re-renders only the renderer while the times change", async () => {
+    // The event box builds its accessibility actions on every render, so this
+    // counts box renders. A box render also updates every gesture detector in it.
+    const moveLater = vi.fn((minutes: number) => `Move ${minutes} minutes later`);
+    await render(grid({ labels: { moveLater } }));
     const move = moveGesture();
     const built = chains().length;
+    const boxRenders = moveLater.mock.calls.length;
+    const before = renders;
     for (const y of [12, 24, 36, 48]) {
       await act(() => {
         move.onUpdate?.({ translationX: 0, translationY: y, absoluteX: 200, absoluteY: 300 + y });
       });
     }
+    expect(renders - before).toBe(4);
+    expect(moveLater.mock.calls.length).toBe(boxRenders);
     // A rebuilt gesture would tear down the drag under the finger.
     expect(chains().length).toBe(built);
   });
