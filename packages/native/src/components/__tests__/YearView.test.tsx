@@ -486,6 +486,35 @@ describe("YearView sweep across mini months", () => {
     await july.release();
   });
 
+  it("drops a sweep whose month is replaced mid-drag", async () => {
+    const onSelectDrag = vi.fn();
+    const onCreateEvent = vi.fn();
+    const year = (date: Date) => (
+      <YearView
+        date={date}
+        weekStartsOn={1}
+        onSelectDrag={onSelectDrag}
+        onCreateEvent={onCreateEvent}
+      />
+    );
+    const { getByTestId, rerender } = await render(year(new Date(2026, 6, 20)));
+    await layOut(getByTestId);
+
+    await sweep(6).start(cell(6, 2, 2)); // Wed 15 July 2026
+    await sweep(6).move(cell(6, 2, 4)); // Fri 17 July 2026
+    // A new year re-keys every mini month, so the running pan never finalizes.
+    await rerender(year(new Date(2027, 6, 20)));
+    expect(onCreateEvent).not.toHaveBeenCalled();
+
+    // Another month's hold starts a fresh sweep in the new year.
+    const july = sweep(6);
+    await july.start(cell(6, 1, 0)); // Mon 5 July 2027
+    await july.move(cell(6, 1, 2)); // Wed 7 July 2027
+    expect(onSelectDrag).toHaveBeenLastCalledWith(new Date(2027, 6, 5), new Date(2027, 6, 7));
+    await july.release();
+    expect(onCreateEvent).toHaveBeenCalledWith(new Date(2027, 6, 5), new Date(2027, 6, 8));
+  });
+
   it("leaves a running sweep to the finger that started it", async () => {
     const onCreateEvent = vi.fn();
     const { getByTestId } = await render(

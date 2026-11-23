@@ -347,6 +347,11 @@ function YearViewInner<T>({
       begin: (time: number) => sweepHandlers.current.beginSweep(new Date(time)),
       extend: (time: number) => sweepHandlers.current.extendSweep(new Date(time)),
       finish: () => sweepHandlers.current.finishSweep(),
+      // Drops the sweep without committing, for a pan removed mid-drag.
+      cancel: () => {
+        sweepRef.current = null;
+        setSweep(null);
+      },
     }),
     [],
   );
@@ -653,7 +658,12 @@ function MiniMonthGrid({
     height: SharedValue<number>;
     gridTop: SharedValue<number>;
   };
-  callbacks: { begin: (time: number) => void; extend: (time: number) => void; finish: () => void };
+  callbacks: {
+    begin: (time: number) => void;
+    extend: (time: number) => void;
+    finish: () => void;
+    cancel: () => void;
+  };
   onMeasure: ((store: "month" | "rows", index: number, layout: GridBox) => void) | undefined;
   children: React.ReactNode;
 }) {
@@ -701,6 +711,18 @@ function MiniMonthGrid({
         runOnJS(finish)();
       });
   }, [sweepEnabled, monthIndex, table, boxes, active, hover, view, callbacks]);
+  // A pan removed mid-drag (a new year re-keys the months, or the sweep
+  // handlers go away) may never finalize, which would leave its sweep owning
+  // every other month's pan and the scroll view frozen.
+  useEffect(() => {
+    if (!gesture) return;
+    return () => {
+      if (active.value !== monthIndex + 1) return;
+      active.value = 0;
+      hover.value = -1;
+      callbacks.cancel();
+    };
+  }, [gesture, active, hover, monthIndex, callbacks]);
   const grid = (
     <View testID={testID} onLayout={onMeasure ? onLayout : undefined}>
       {children}
