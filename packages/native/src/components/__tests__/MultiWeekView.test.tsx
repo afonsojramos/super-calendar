@@ -185,6 +185,14 @@ describe("native MultiWeekView", () => {
     expect(view.queryByText("Solo")).toBeNull();
     expect(view.getAllByText("Span")).toHaveLength(1);
     expect(view.queryByLabelText(/more events?, 1 January/)).toBeNull();
+    // Span is cut to 1 January (Wednesday, the third column), on the third lane.
+    let bar: { parent: unknown; props: { style?: unknown } } | null = view.getByText("Span");
+    while (bar && StyleSheet.flatten(bar.props.style as ViewStyle)?.position !== "absolute") {
+      bar = bar.parent as typeof bar;
+    }
+    const style = StyleSheet.flatten(bar?.props.style as ViewStyle);
+    expect(style.left).toBe(`${(2 / 7) * 100}%`);
+    expect(style.width).toBe(`${(1 / 7) * 100}%`);
   });
 
   it("fits a themed overflow line height under a fixed cap", async () => {

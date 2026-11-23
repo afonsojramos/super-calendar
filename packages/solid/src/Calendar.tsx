@@ -238,7 +238,7 @@ export interface CalendarProps<T = unknown>
   keyboardEventNavigation?: boolean;
 
   // --- Month mode ---
-  /** Max event lanes per month week row, the "+N more" row included (default 3). */
+  /** Max event lanes per month week row, the "+N more" row included, keeping at least one lane (default 3). */
   maxVisibleEventCount?: number;
   /** Month chip height in pixels; omit to keep the renderer default. */
   chipHeight?: number;

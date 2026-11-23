@@ -698,7 +698,7 @@ function DateRowsInner<T>({
       return { full: maxVisibleEventCount, withMore: maxVisibleEventCount - 1 };
     }
     if (gridHeight <= 0 || weeks.length === 0) {
-      return { full: FALLBACK_VISIBLE_COUNT, withMore: FALLBACK_VISIBLE_COUNT };
+      return { full: FALLBACK_VISIBLE_COUNT, withMore: FALLBACK_VISIBLE_COUNT - 1 };
     }
     // Lanes start below the date (the built-in badge, or a taller custom date) and
     // end above the cell's bottom inset.

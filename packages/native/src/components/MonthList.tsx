@@ -108,6 +108,7 @@ export type MonthListProps<T> = {
    * must fit this height, since it also anchors the drag hit-test.
    */
   monthHeaderHeight?: number;
+  /** Max event lanes per month week row, the "+N more" row included; omit to auto-fit. */
   maxVisibleEventCount?: number;
   /** Month chip height in pixels; omit to keep the renderer default. */
   chipHeight?: number;

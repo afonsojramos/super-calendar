@@ -376,6 +376,15 @@ describe("MonthView per-day overflow", () => {
     expect(queryByLabelText(/more events?, 16 June/)).toBeNull();
   });
 
+  it("gives the label the last of three rows before the grid is measured", async () => {
+    const { getByLabelText, getByText, queryByText } = await render(
+      <MonthView {...baseProps} events={events} chipHeight={20} />,
+    );
+    expect(getByLabelText("2 more events, 15 June")).toBeTruthy();
+    expect(queryByText("Mon C")).toBeNull();
+    expect(getByText("Tue C")).toBeTruthy();
+  });
+
   it("draws every lane when the auto-fit row holds them all", async () => {
     const { getByText, queryByText } = await mount({ events: events.slice(0, 3) });
     expect(getByText("Mon C")).toBeTruthy();
@@ -462,7 +471,8 @@ describe("MonthView fixed maxVisibleEventCount", () => {
       allDay("S", 16, 16),
       allDay("U", 17, 18),
     ]);
-    expect(getByLabelText("1 more events, 18 June")).toBeTruthy();
+    // Thursday keeps the label on the cap's last row; lane 2 stays a gap.
+    expect(lanesAbove(getByLabelText("1 more events, 18 June"))).toBe(2);
   });
 });
 

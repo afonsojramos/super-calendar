@@ -84,6 +84,7 @@ const PAGE_VIEWABILITY = { itemVisiblePercentThreshold: 90 };
 export type MonthPagerProps<T> = {
   date: Date;
   events: CalendarEvent<T>[];
+  /** Max event lanes per month week row, the "+N more" row included; omit to auto-fit. */
   maxVisibleEventCount?: number;
   /** Month chip height in pixels; omit to keep the theme default. */
   chipHeight?: number;

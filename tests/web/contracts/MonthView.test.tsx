@@ -357,7 +357,8 @@ describe(rendererName, () => {
             allDay("S", 14, 14),
             allDay("U", 15, 16),
           ]);
-          expect(getByLabelText("1 more events, 16 July")).toBeTruthy();
+          // Thursday keeps the label on the cap's last row; lane 2 stays a gap.
+          expect(lanesAbove(getByLabelText("1 more events, 16 July"))).toBe(2);
         });
       });
 
