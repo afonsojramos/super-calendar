@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.22.0](https://github.com/afonsojramos/super-calendar/compare/v2.21.0...v2.22.0) (2026-11-23)
+
+
+### Features
+
+* preview where a moved event lands in month and multi-week views ([#193](https://github.com/afonsojramos/super-calendar/issues/193)) ([69bd327](https://github.com/afonsojramos/super-calendar/commit/69bd327f8d2a31ca9026f646ce867f7c4d633f73))
+* **time-grid:** add `multiDayTimedEventPlacement="all-day"` to place 24-hour and longer timed events in the all-day lane (defaults to `"grid"`) ([#197](https://github.com/afonsojramos/super-calendar/issues/197)) ([80f5db0](https://github.com/afonsojramos/super-calendar/commit/80f5db0df90d8ac7f75e16114c66e6e7d80e2e49))
+* **time-grid:** drag all-day events across days. Behaviour change on native: when `onDragEvent` is set, a long press on a movable all-day bar starts a drag instead of calling `onLongPressEvent` (matching timed and month events; set `draggable: false`, `startEditable: false`, or `eventStartEditable={false}` to keep a bar static). ([#194](https://github.com/afonsojramos/super-calendar/issues/194)) ([091ad94](https://github.com/afonsojramos/super-calendar/commit/091ad946d336f8ce15da69f0cc5e65e6b497500e))
+* **time-grid:** square the continuing ends of all-day bars ([#190](https://github.com/afonsojramos/super-calendar/issues/190)) ([1404d2b](https://github.com/afonsojramos/super-calendar/commit/1404d2b1fbc72539d64eceb96b8782379b38977f))
+
+
+### Bug Fixes
+
+* keep the month create draft on the top lane from the first day of the sweep. Headless API note: `MonthRowLanes` is now deprecated and the fourth argument to `keepMonthDraftVisible` is optional and ignored (kept for compatibility). ([#192](https://github.com/afonsojramos/super-calendar/issues/192)) ([cccbe70](https://github.com/afonsojramos/super-calendar/commit/cccbe703ce93598356fff0a0b4801cb44507bdd7))
+* let a timed-event drag cross midnight upwards into the previous day ([#191](https://github.com/afonsojramos/super-calendar/issues/191)) ([1c77df0](https://github.com/afonsojramos/super-calendar/commit/1c77df0eea55b90a447846f6b3ecbdd10577c040))
+
 ## [2.21.0](https://github.com/afonsojramos/super-calendar/compare/v2.20.1...v2.21.0) (2026-11-21)
 
 
