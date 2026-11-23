@@ -145,16 +145,29 @@ async function connectChrome() {
   };
 }
 
-// Click a view tab by its (case-insensitive, exact) label text. The tab label is
-// the same in both examples, so one selector drives both renderers.
-function clickTabExpr(view) {
-  return `(() => {
+// Choose a view by its (case-insensitive, exact) name in the "View" menu. The dom
+// example uses a select; the native example opens a menu of the same names.
+function selectViewExpr(view) {
+  return `(async () => {
     const re = new RegExp('^' + ${JSON.stringify(view)} + '$', 'i');
-    const leaf = [...document.querySelectorAll('*')].find(
-      (el) => el.children.length === 0 && re.test((el.textContent || '').trim()),
+    const select = document.querySelector('select[aria-label="View"]');
+    if (select) {
+      const option = [...select.options].find((o) => re.test(o.value));
+      if (!option) return false;
+      // React tracks the value through the setter, so set it the way input does.
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, option.value);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+    const trigger = document.querySelector('[aria-label="View"]');
+    if (!trigger) return false;
+    trigger.click();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const item = [...document.querySelectorAll('[role="menuitem"]')].find((el) =>
+      re.test((el.textContent || '').replace('✓', '').trim()),
     );
-    if (!leaf) return false;
-    leaf.click();
+    if (!item) return false;
+    item.click();
     return true;
   })()`;
 }
@@ -165,9 +178,9 @@ async function captureRenderer(page, renderer) {
   await sleep(4000); // let the SPA mount (native-on-web is the slower of the two)
   const captured = [];
   for (const view of VIEWS) {
-    const ok = await page.evaluate(clickTabExpr(view));
+    const ok = await page.evaluate(selectViewExpr(view));
     if (!ok) {
-      console.log(`  · ${view}: tab not found, skipped`);
+      console.log(`  · ${view}: view not found, skipped`);
       continue;
     }
     await sleep(1600); // let the view settle (LegendList paints, layout measures)
