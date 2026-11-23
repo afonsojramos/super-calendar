@@ -52,6 +52,7 @@ import {
 } from "solid-js";
 import { holdDateDrag } from "./touch";
 import { withDefaults } from "./props";
+import { createScrollbarWidth } from "./scrollbar";
 import { createSlots, dataState, type SlotDefault, type SlotStyleProps } from "./slots";
 import { css, type CSSProperties, type DomKeyboardEvent, type ElementRef } from "./styles";
 import { mergeSolidTheme, type SolidCalendarTheme } from "./theme";
@@ -836,6 +837,9 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
   const gridRef: ElementRef<HTMLDivElement | null> = {
     current: null,
   };
+  // Reserved after the weekday columns so they line up with the day cells when
+  // a classic scrollbar narrows the scrolling multi-week grid.
+  const scrollbarWidth = createScrollbarWidth(gridRef, () => multiWeek() && props.showWeekdays);
   const lastDayFocus: ElementRef<HTMLElement | null> = { current: null };
   // Forget the focused day once focus leaves it. Removal blurs before detaching
   // the node, so tell it from a manual blur once the DOM update finishes.
@@ -1345,7 +1349,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
           {...slot("weekdays", {
             base: {
               display: "grid",
-              gridTemplateColumns: `repeat(${_grid().weekdays.length}, minmax(0, 1fr))`,
+              gridTemplateColumns: `repeat(${_grid().weekdays.length}, minmax(0, 1fr))${scrollbarWidth() > 0 ? ` ${scrollbarWidth()}px` : ""}`,
             },
             themed: {
               borderBottom: `1px solid ${theme().gridLine}`,

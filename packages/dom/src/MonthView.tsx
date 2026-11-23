@@ -54,6 +54,7 @@ import {
 } from "@super-calendar/core";
 import { holdDateDrag } from "./touch";
 import { InertDiv } from "./InertDiv";
+import { useScrollbarWidth } from "./scrollbar";
 import { createSlots, dataState, type SlotDefault, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
@@ -833,6 +834,9 @@ export function DateRows<T = unknown>({
   windowKeyRef.current = windowKey;
   const focusedWindow = useRef(windowKey);
   const gridRef = useRef<HTMLDivElement>(null);
+  // Reserved after the weekday columns so they line up with the day cells when
+  // a classic scrollbar narrows the scrolling multi-week grid.
+  const scrollbarWidth = useScrollbarWidth(gridRef, multiWeek && showWeekdays);
   const restoreDayFocus = useRef(false);
   if (windowKey !== focusedWindow.current) {
     const active = gridRef.current?.ownerDocument.activeElement;
@@ -1262,7 +1266,7 @@ export function DateRows<T = unknown>({
           {...slot("weekdays", {
             base: {
               display: "grid",
-              gridTemplateColumns: `repeat(${weekdays.length}, minmax(0, 1fr))`,
+              gridTemplateColumns: `repeat(${weekdays.length}, minmax(0, 1fr))${scrollbarWidth > 0 ? ` ${scrollbarWidth}px` : ""}`,
             },
             themed: { borderBottom: `1px solid ${theme.gridLine}`, padding: "6px 0" },
           })}

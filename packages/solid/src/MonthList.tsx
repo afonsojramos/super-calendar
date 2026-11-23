@@ -17,7 +17,8 @@ import { createMemo, For } from "solid-js";
 import { MonthView, type MonthViewSlot, type SolidMonthEvent } from "./MonthView";
 import { withDefaults } from "./props";
 import { createSlots, type SlotStyleProps } from "./slots";
-import { css, type CSSProperties } from "./styles";
+import { createScrollbarWidth } from "./scrollbar";
+import { css, type CSSProperties, type ElementRef } from "./styles";
 import { mergeSolidTheme, type SolidCalendarTheme } from "./theme";
 import { VirtualList } from "./VirtualList";
 
@@ -113,6 +114,10 @@ export function MonthList<T = unknown>(incoming: MonthListProps<T>): JSX.Element
   );
   const theme = createMemo(() => mergeSolidTheme(props.theme));
   const slot = createSlots<MonthListSlot>(props);
+  // Reserved after the weekday columns so they line up with the day cells when
+  // a classic scrollbar narrows the list.
+  const scrollerRef: ElementRef<HTMLDivElement | null> = { current: null };
+  const scrollbarWidth = createScrollbarWidth(scrollerRef);
   const months = createMemo(() => {
     const first = startOfMonth(addMonths(props.date, -props.pastMonths));
     const count = props.pastMonths + props.futureMonths + 1;
@@ -157,7 +162,7 @@ export function MonthList<T = unknown>(incoming: MonthListProps<T>): JSX.Element
         {...slot("weekdays", {
           base: {
             display: "grid",
-            gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+            gridTemplateColumns: `repeat(7, minmax(0, 1fr))${scrollbarWidth() > 0 ? ` ${scrollbarWidth()}px` : ""}`,
           },
           themed: {
             borderBottom: `1px solid ${theme().gridLine}`,
@@ -185,6 +190,7 @@ export function MonthList<T = unknown>(incoming: MonthListProps<T>): JSX.Element
         }
       </div>
       <VirtualList
+        viewportRef={(element) => (scrollerRef.current = element)}
         data={months()}
         keyExtractor={(m: Date) => m.toISOString()}
         estimatedItemSize={theme().cellHeight * 7 + 40}

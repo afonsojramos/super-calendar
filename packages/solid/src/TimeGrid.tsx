@@ -70,6 +70,7 @@ import {
 } from "./EventActions";
 import { withDefaults } from "./props";
 import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
+import { createScrollbarWidth } from "./scrollbar";
 import { createNow } from "./state";
 import {
   css,
@@ -768,6 +769,13 @@ export function TimeGrid<T = unknown>(
   const scrollRef: ElementRef<HTMLDivElement | null> = {
     current: null,
   };
+  // Reserved at the end of the header and all-day lane so their columns line up
+  // with the body's when a classic scrollbar narrows it.
+  const scrollbarWidth = createScrollbarWidth(scrollRef);
+  const scrollbarSpacer = () =>
+    scrollbarWidth() > 0 ? (
+      <div aria-hidden="true" style={css({ width: scrollbarWidth(), flex: "none" })} />
+    ) : null;
   const dfns = createMemo(() =>
     props.locale
       ? {
@@ -2553,6 +2561,7 @@ export function TimeGrid<T = unknown>(
             }}
           </For>
         }
+        {scrollbarSpacer()}
       </div>
 
       {/* All-day lane */}
@@ -2732,6 +2741,7 @@ export function TimeGrid<T = unknown>(
               }}
             </Show>
           </div>
+          {scrollbarSpacer()}
         </div>
       ) : null}
 

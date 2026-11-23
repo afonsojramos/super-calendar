@@ -80,6 +80,7 @@ import {
 } from "./EventActions";
 import { createSlots, dataState, type ResolvedSlot, type SlotStyleProps } from "./slots";
 import { InertDiv } from "./InertDiv";
+import { useScrollbarWidth } from "./scrollbar";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 import { type EventGrab, waitForHold } from "./touch";
 
@@ -751,6 +752,9 @@ function TimeGridInner<T = unknown>(
   const labels = useMemo(() => resolveCalendarLabels(labelsProp), [labelsProp]);
   const slot = createSlots<TimeGridSlot>({ classNames, styles });
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Reserved at the end of the header and all-day lane so their columns line up
+  // with the body's when a classic scrollbar narrows it.
+  const scrollbarWidth = useScrollbarWidth(scrollRef);
   const dfns = locale ? { locale } : undefined;
   // Clamped like the native renderer: a zero or negative step would divide by zero
   // in the snap below and put NaN through every drag commit.
@@ -2192,6 +2196,8 @@ function TimeGridInner<T = unknown>(
     return `${hourLines}, repeating-linear-gradient(to bottom, transparent 0, transparent ${slotHeight - 1}px, ${theme.gridLine}80 ${slotHeight - 1}px, ${theme.gridLine}80 ${slotHeight}px)`;
   }, [hourHeight, timeslots, theme.gridLine]);
   const openActionsEvent = eventActions.openEvent;
+  const scrollbarSpacer =
+    scrollbarWidth > 0 ? <div aria-hidden style={{ width: scrollbarWidth, flex: "none" }} /> : null;
   return (
     <div
       ref={eventActions.rootRef}
@@ -2324,6 +2330,7 @@ function TimeGridInner<T = unknown>(
             </div>
           );
         })}
+        {scrollbarSpacer}
       </div>
 
       {/* All-day lane */}
@@ -2488,6 +2495,7 @@ function TimeGridInner<T = unknown>(
                 })()
               : null}
           </div>
+          {scrollbarSpacer}
         </div>
       ) : null}
 

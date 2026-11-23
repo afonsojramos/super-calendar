@@ -1,6 +1,6 @@
-import { LegendList } from "@legendapp/list/react";
+import { LegendList, type LegendListRef } from "@legendapp/list/react";
 import { addMonths, type Locale, startOfMonth } from "date-fns";
-import { type CSSProperties, type ReactElement, useCallback, useMemo } from "react";
+import { type CSSProperties, type ReactElement, useCallback, useMemo, useRef } from "react";
 import {
   buildMonthGrid,
   type CalendarEvent,
@@ -15,6 +15,7 @@ import {
   type CalendarLabels,
 } from "@super-calendar/core";
 import { type DomMonthEvent, MonthView, type MonthViewSlot } from "./MonthView";
+import { useScrollbarWidth } from "./scrollbar";
 import { createSlots, type SlotStyleProps } from "./slots";
 import { type DomCalendarTheme, mergeDomTheme } from "./theme";
 
@@ -130,6 +131,13 @@ export function MonthList<T = unknown>({
 }: MonthListProps<T>): ReactElement {
   const theme = useMemo(() => mergeDomTheme(themeOverrides), [themeOverrides]);
   const slot = createSlots<MonthListSlot>({ classNames, styles });
+  // Reserved after the weekday columns so they line up with the day cells when
+  // a classic scrollbar narrows the list.
+  const scrollerRef = useRef<HTMLElement | null>(null);
+  const scrollbarWidth = useScrollbarWidth(scrollerRef);
+  const listRef = useCallback((list: LegendListRef | null) => {
+    scrollerRef.current = list?.getScrollableNode() ?? null;
+  }, []);
 
   const months = useMemo(() => {
     const first = startOfMonth(addMonths(date, -pastMonths));
@@ -223,7 +231,10 @@ export function MonthList<T = unknown>({
     >
       <div
         {...slot("weekdays", {
-          base: { display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))" },
+          base: {
+            display: "grid",
+            gridTemplateColumns: `repeat(7, minmax(0, 1fr))${scrollbarWidth > 0 ? ` ${scrollbarWidth}px` : ""}`,
+          },
           themed: { borderBottom: `1px solid ${theme.gridLine}`, padding: "8px 0" },
         })}
       >
@@ -244,6 +255,7 @@ export function MonthList<T = unknown>({
         ))}
       </div>
       <LegendList
+        ref={listRef}
         data={months}
         // Legend List caches rows independently of renderItem's identity.
         extraData={renderMonth}

@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { Browser, BrowserContext, Page } from "playwright";
+import type { Browser, BrowserContext, LaunchOptions, Page } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, inject } from "vitest";
 import { fixtureConfig } from "./fixture-config";
@@ -31,6 +31,12 @@ let origin: string;
 let cache: string | undefined;
 const diagnostics: string[] = [];
 let loadedLibrary = false;
+let launchOptions: LaunchOptions = {};
+
+/** Call at a contract's top level, before its first case, to change how the browser launches. */
+export function launchWith(options: LaunchOptions) {
+  launchOptions = options;
+}
 
 beforeAll(async () => {
   if (!existsSync(entry)) throw new Error(`Missing ${entry}. Run pnpm build before browser tests.`);
@@ -38,7 +44,7 @@ beforeAll(async () => {
   server = await createServer({ ...config, cacheDir: cache });
   await server.listen();
   origin = server.resolvedUrls!.local[0];
-  browser = await launchBrowser(engine);
+  browser = await launchBrowser(engine, launchOptions);
   // Finish Vite's first dependency crawl before recording browser diagnostics.
   // Its initial optimizer reload can cancel requests in the warmup page.
   const warmup = await browser.newPage();
