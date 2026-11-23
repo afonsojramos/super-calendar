@@ -154,7 +154,9 @@ TypeScript types for exact signatures.
   date and its state words. Pass the resolved labels to `eventAccessibilityLabel`
   to localize a custom renderer's event label the same way.
 - **Month overflow** — `monthEventCapacity` + `monthVisibleCount` decide how many
-  chips fit before a "+N more" row. `monthExtraLaneColumns` finds the days whose one
+  chips fit before a "+N more" row. For a fixed cap of `n` lanes, the overflow row
+  included, as the renderers apply `maxVisibleEventCount`, use
+  `{ full: n, withMore: n - 1 }`. `monthExtraLaneColumns` finds the days whose one
   hidden event can take that row, and `monthVisibleBars` returns the bars to draw.
 - **Month create drafts** — `withDraftEventDays` adds a create draft to the per-day
   event map, so `layoutMonthWeek` gives it a segment in each row it covers;

@@ -42,7 +42,7 @@ describe("native month chip dimensions", () => {
       />,
     );
     expect(getByLabelText(/15 July 2026, 3 events/)).toHaveStyle({ gap: 6 });
-    expect(getByLabelText(/1 more events, 15 July/)).toHaveStyle({ height: 44 });
+    expect(getByLabelText(/2 more events, 15 July/)).toHaveStyle({ height: 44 });
   });
 
   it("positions and sizes a spanning bar with the same chip metrics", async () => {

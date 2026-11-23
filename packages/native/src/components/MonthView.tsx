@@ -193,12 +193,13 @@ export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
   date: Date;
   events: CalendarEvent<T>[];
   /**
-   * Max event lanes (stacked rows) shown per week before the rest of a day's
-   * events collapse into a "+N more" label. Because multi-day events draw as one
-   * bar spanning a lane across the week, this caps lanes per row, not chips per
-   * day, so a long bar can push a lightly-booked day's own events into "+N more".
+   * Max event lanes (stacked rows) shown per week. When a row has more, the last of
+   * these rows holds each day's "+N more" label, or the day's one hidden event when
+   * it sits on that lane; a row always keeps one lane. Because multi-day events draw
+   * as one bar spanning a lane across the week, this caps lanes per row, not chips
+   * per day, so a long bar can push a lightly-booked day's own events into "+N more".
    * Omit to auto-fit as many lanes as the cell height allows (the default); set a
-   * number for a fixed cap. Auto-fit assumes the built-in chip size — pass an
+   * number for a fixed cap. Auto-fit assumes the built-in chip size, so pass an
    * explicit value when using a custom `renderEvent`.
    */
   maxVisibleEventCount?: number;
@@ -527,8 +528,8 @@ function DateRowsInner<T>({
       return margin + (typeof style.height === "number" ? style.height : line + padding);
     })();
   // A row draws its date, then each lane with the gap after it, then the label when
-  // events overflow. A fixed cap shows all its lanes and the label; the auto-fit
-  // capacity gives up lanes for the label but always keeps one.
+  // events overflow. The label takes the place of the last lane, for a fixed cap
+  // and the auto-fit capacity alike, but a row always keeps one lane.
   // The tallest date (built-in badge or custom) among the shown days, measured as
   // multi-week cells lay out, so a fixed row never clips a date restyled or
   // rendered taller than the 24pt badge. Kept per day and read for the shown days
@@ -665,7 +666,10 @@ function DateRowsInner<T>({
     cellGeometry.gap +
     cellGeometry.bottom +
     (maxVisibleEventCount != null
-      ? Math.max(1, maxVisibleEventCount) * cellLaneHeight + moreLabelArea
+      ? Math.max(
+          Math.max(1, maxVisibleEventCount) * cellLaneHeight,
+          Math.max(1, maxVisibleEventCount - 1) * cellLaneHeight + moreLabelArea,
+        )
       : Math.max(FALLBACK_VISIBLE_COUNT * cellLaneHeight, cellLaneHeight + moreLabelArea));
   const minimumRowHeight = Math.max(contentHeight, cellGeometry.minimumHeight);
   // In a scroll view, rows with an automatic basis can grow with their events.
@@ -691,7 +695,7 @@ function DateRowsInner<T>({
   // else derived from the measured cell height and the (default) chip metrics.
   const capacity = useMemo(() => {
     if (maxVisibleEventCount != null) {
-      return { full: maxVisibleEventCount, withMore: maxVisibleEventCount };
+      return { full: maxVisibleEventCount, withMore: maxVisibleEventCount - 1 };
     }
     if (gridHeight <= 0 || weeks.length === 0) {
       return { full: FALLBACK_VISIBLE_COUNT, withMore: FALLBACK_VISIBLE_COUNT };
@@ -711,9 +715,10 @@ function DateRowsInner<T>({
     moreLabelArea,
   ]);
 
-  // The lanes a week row shows. When the auto-fit capacity leaves room for one lane
-  // more than the row shows, a day whose only hidden event sits on that lane draws
-  // it in place of a "+1 more" label (see monthExtraLaneColumns).
+  // The lanes a week row shows. When the capacity (a fixed cap, or what auto-fit
+  // measured) leaves room for one lane more than the row shows, a day whose only
+  // hidden event sits on that lane draws it in place of a "+1 more" label (see
+  // monthExtraLaneColumns).
   const rowLanes = useCallback(
     (rowLayout: MonthWeekEvents<T>, columns: number) => {
       const visibleLanes = monthVisibleCount(rowLayout.laneCount, capacity);

@@ -158,6 +158,35 @@ describe("native MultiWeekView", () => {
     expect(view.getByText(/More/)).toBeTruthy();
   });
 
+  it("counts the overflow row as one of a fixed cap's rows, as the month does", async () => {
+    // A, B and Span cover 31 December and 1 January on lanes 0-2; Solo adds a
+    // fourth event on the 31st. A cap of three rows shows two lanes and a label
+    // row, where 1 January draws Span, its one hidden event, instead of "+1".
+    const allDay = (title: string, last: number): CalendarEvent => ({
+      title,
+      start: new Date(2030, 11, 31),
+      end: addDays(new Date(2030, 11, 31), last),
+      allDay: true,
+    });
+    const view = await render(
+      <MultiWeekView
+        {...base}
+        events={[allDay("A", 2), allDay("B", 2), allDay("Span", 2), allDay("Solo", 1)]}
+        numberOfWeeks={3}
+        chipHeight={20}
+        chipGap={2}
+        maxVisibleEventCount={3}
+      />,
+    );
+    await layoutViewport(view, 90);
+    // Three 22pt rows under a 30pt date area, the label row included.
+    expectRows(rowHeights(view), 3, 96);
+    expect(view.getByLabelText("2 more events, 31 December")).toBeTruthy();
+    expect(view.queryByText("Solo")).toBeNull();
+    expect(view.getAllByText("Span")).toHaveLength(1);
+    expect(view.queryByLabelText(/more events?, 1 January/)).toBeNull();
+  });
+
   it("fits a themed overflow line height under a fixed cap", async () => {
     // Default 20pt chips and a 40pt overflow line: 30 + 22 + (40 + 2).
     const busy = busyEvents(2);

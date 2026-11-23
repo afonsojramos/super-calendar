@@ -47,27 +47,31 @@ theme-derived height and 2 px gaps when you omit the options. Choose a smaller
 ## Event chips and overflow
 
 Each week row stacks its events into lanes (a multi-day bar keeps its lane across
-the days it spans) and shows as many lanes as the cell height allows, collapsing
-the rest of a day's events into a `+N more` label. When a day would hide only one
-event, that event sits on the first hidden lane, and the label's row has room for
-it, the day draws the event there instead of `+1 more`. A day whose one hidden
-event sits on a lower lane keeps the label. On native the row has room only in the
-auto-fit layout, so a fixed `maxVisibleEventCount` keeps the label.
+the days it spans) and shows as many lanes as fit. When a row has more, its last
+lane becomes the overflow row: it holds each day's `+N more` label, so the row
+shows one lane fewer, and always at least one. When a day would hide only one
+event, that event sits on the overflow row's lane, and the row is a full lane tall,
+the day draws the event there instead of `+1 more`. A day whose one hidden event
+sits on a lower lane keeps the label. Every renderer follows these rules, for a
+fixed `maxVisibleEventCount` and for the native auto-fit layout.
 
 ```tsx
-<Calendar mode="month" /* ... */ />                            // auto-fit (default)
+<Calendar mode="month" /* ... */ />                            // native auto-fit; web 3 lanes
 <Calendar mode="month" maxVisibleEventCount={3} /* ... */ />   // fixed cap
 ```
 
-- `maxVisibleEventCount` — a fixed cap on **lanes per week row** instead of
-  auto-fit. Because a multi-day bar occupies a lane across the whole week, a long
-  bar can push a lightly-booked day's own events into `+N more`. Recommended when
-  you pass a custom `renderEvent`, since auto-fit assumes the built-in chip height.
-- `onPressMore` — tap the overflow label; receives the hidden events and the
+- `maxVisibleEventCount`: a fixed cap on **lanes per week row**, the overflow row
+  included. With a cap of 3, a row shows up to three lanes, or two lanes and the
+  overflow row. Without it, native auto-fits the lanes to the cell height, and
+  React DOM and Solid show 3. Because a multi-day bar occupies a lane across the
+  whole week, a long bar can push a lightly-booked day's own events into `+N more`.
+  Recommended on native when you pass a custom `renderEvent`, since auto-fit
+  assumes the built-in chip height.
+- `onPressMore`: tap the overflow label; receives the hidden events and the
   day. Without it, the built-in popover opens instead, listing the day's events
   (style it via the `morePopover` slot).
-- `moreLabel` — customize the overflow text (e.g. `"+{moreCount}"`).
-- `sortedMonthView` — sort each day's chips by start time (default on); all-day
+- `moreLabel`: customize the overflow text (e.g. `"+{moreCount}"`).
+- `sortedMonthView`: sort each day's chips by start time (default on); all-day
   events lead the day.
 
 ## Grid shape
