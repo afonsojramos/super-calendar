@@ -58,6 +58,18 @@ Facts were checked against React Native 0.86 and `@legendapp/list` 3.7.
 
 - `onViewableItemsChanged` fires only when the set of visible pages changes.
   Settling back onto the page you started from sends nothing.
+- LegendList hardcodes `scrollEventThrottle: 0` on the underlying `ScrollView`
+  and uses `props.scrollEventThrottle` only to wrap `props.onScroll` in a JS
+  throttle with an uncancelled trailing `setTimeout`; it also skips notifying
+  `props.onScroll` when forwarding `onScrollEndDrag` and `onMomentumScrollEnd`.
+  On Android quick swipes in `TimeGrid`, a throttled or lagged `onScroll` offset
+  (e.g. `181.38` pages while the pager settled on `182.00`) caused the idle
+  check to snap back a week after `onMomentumScrollEnd` or fire a redundant snap
+  just before it. `TimeGrid` omits `scrollEventThrottle` on the pager list
+  (matching `MonthPager`), records the settled offset and drops the idle check
+  when `onMomentumScrollEnd` lands on a page, and reads the native-only
+  `nativePagerOffset` shared value (never written by `TimeGrid`) in
+  `realignRestingPager`.
 - A programmatic `scrollToIndex` can fail to land. With **Keep date** and a long
   edge hold on an Android emulator, the grid rested on the page the drag had
   paged to while the page-back to the kept page was the pending target (1 run

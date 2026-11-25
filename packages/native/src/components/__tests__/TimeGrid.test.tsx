@@ -1640,9 +1640,11 @@ describe("TimeGrid pager resting off a page", () => {
   type PagerList = {
     getFixedItemSize: () => number;
     initialScrollIndex: number;
+    sharedValues: { scrollOffset: { value: number } };
     onScroll: (e: unknown) => void;
     onScrollBeginDrag: () => void;
-    onScrollEndDrag: () => void;
+    onScrollEndDrag: (e?: unknown) => void;
+    onMomentumScrollEnd?: (e: unknown) => void;
   };
   const list = () => lastListProps() as unknown as PagerList;
   const scrollTo = (x: number) =>
@@ -1960,6 +1962,204 @@ describe("TimeGrid pager resting off a page", () => {
     await scrollTo((initialScrollIndex + 0.3) * getFixedItemSize());
     await wait(200);
     expect(calls().at(-1)).toEqual({ index: initialScrollIndex, animated: true });
+  });
+
+  it("cancels the idle check when onMomentumScrollEnd settles on a page, even with a lagged scroll offset", async () => {
+    const onChangeDate = vi.fn();
+    await renderPager(onChangeDate);
+    const pager = list();
+    const width = pager.getFixedItemSize();
+    const next = pager.initialScrollIndex + 1;
+    await act(() => pager.onScrollBeginDrag());
+    // Leave both onScroll and the native shared value lagged mid-swipe so this
+    // test specifically proves onMomentumScrollEnd cancels the idle timer.
+    await scrollTo((pager.initialScrollIndex + 0.38) * width);
+    await act(() =>
+      pager.onScrollEndDrag({
+        nativeEvent: { contentOffset: { x: (pager.initialScrollIndex + 0.45) * width } },
+      }),
+    );
+    await act(() =>
+      pager.onMomentumScrollEnd?.({ nativeEvent: { contentOffset: { x: next * width } } }),
+    );
+    await wait(250);
+    expect(onChangeDate).toHaveBeenCalledTimes(1);
+    const [committed] = onChangeDate.mock.calls[0] as [Date];
+    expect([committed.getFullYear(), committed.getMonth(), committed.getDate()]).toEqual([
+      2026, 0, 7,
+    ]);
+    expect(calls().some((call) => call.index === pager.initialScrollIndex)).toBe(false);
+  });
+
+  it("keeps the idle check armed when onMomentumScrollEnd settles off a page", async () => {
+    const onChangeDate = vi.fn();
+    await renderPager(onChangeDate);
+    const pager = list();
+    const width = pager.getFixedItemSize();
+    await act(() => pager.onScrollBeginDrag());
+    await scrollTo((pager.initialScrollIndex + 0.7) * width);
+    await act(() => pager.onScrollEndDrag());
+    await act(() =>
+      pager.onMomentumScrollEnd?.({
+        nativeEvent: { contentOffset: { x: (pager.initialScrollIndex + 0.7) * width } },
+      }),
+    );
+    await wait(250);
+    expect(calls().at(-1)).toEqual({ index: pager.initialScrollIndex + 1, animated: true });
+  });
+
+  it("trusts the live scroll offset when the idle check beats onMomentumScrollEnd", async () => {
+    const onChangeDate = vi.fn();
+    await renderPager(onChangeDate);
+    const pager = list();
+    const width = pager.getFixedItemSize();
+    const next = pager.initialScrollIndex + 1;
+    await act(() => pager.onScrollBeginDrag());
+    await scrollTo((pager.initialScrollIndex + 0.38) * width);
+    await act(() => pager.onScrollEndDrag());
+    // The UI-thread offset has already reached the next page before momentum end arrives on JS.
+    pager.sharedValues.scrollOffset.value = next * width;
+    await wait(250);
+    expect(calls()).toEqual([]);
+    expect(onChangeDate).not.toHaveBeenCalled();
+    await act(() =>
+      pager.onMomentumScrollEnd?.({ nativeEvent: { contentOffset: { x: next * width } } }),
+    );
+    expect(onChangeDate).toHaveBeenCalledTimes(1);
+    const [committed] = onChangeDate.mock.calls[0] as [Date];
+    expect([committed.getFullYear(), committed.getMonth(), committed.getDate()]).toEqual([
+      2026, 0, 7,
+    ]);
+  });
+
+  it("does not snap again when a cancelled swipe returns to its starting page", async () => {
+    await renderPager();
+    const pager = list();
+    const width = pager.getFixedItemSize();
+    await act(() => pager.onScrollBeginDrag());
+    await scrollTo((pager.initialScrollIndex + 0.3) * width);
+    await act(() => pager.onScrollEndDrag());
+    pager.sharedValues.scrollOffset.value = pager.initialScrollIndex * width;
+    await wait(250);
+    expect(calls()).toEqual([]);
+  });
+
+  it("still retries a programmatic scroll that never emitted a scroll event", async () => {
+    const grid = (date: Date) => (
+      <TimeGrid
+        mode="day"
+        date={date}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />
+    );
+    const { rerender } = await render(grid(new Date(2026, 0, 6, 12, 0, 0)));
+    const pager = list();
+    const { getFixedItemSize, initialScrollIndex } = pager;
+    const width = getFixedItemSize();
+    // An earlier scroll armed the idle check while resting on the initial page.
+    await scrollTo(initialScrollIndex * width);
+    // The app moves the date on a day; JS never overwrites the native scroll
+    // offset shared value, so a dropped scroll still sees the native page.
+    await rerender(grid(new Date(2026, 0, 7, 12, 0, 0)));
+    expect(pager.sharedValues.scrollOffset.value).toBe(initialScrollIndex * width);
+    expect(calls()).toHaveLength(1);
+    expect(calls()[0]?.index).toBe(initialScrollIndex + 1);
+    await wait(250);
+    expect(calls()).toHaveLength(2);
+    expect(calls()[1]?.index).toBe(initialScrollIndex + 1);
+  });
+
+  it("retries a kept-date page-back even after onMomentumScrollEnd settled on the swiped page", async () => {
+    await render(
+      <TimeGrid
+        mode="day"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    const pager = list();
+    const width = pager.getFixedItemSize();
+    const next = pager.initialScrollIndex + 1;
+    await act(() => pager.onScrollBeginDrag());
+    await scrollTo((pager.initialScrollIndex + 0.6) * width);
+    await act(() => pager.onScrollEndDrag());
+    pager.sharedValues.scrollOffset.value = next * width;
+    await act(() =>
+      pager.onMomentumScrollEnd?.({ nativeEvent: { contentOffset: { x: next * width } } }),
+    );
+    // The app kept its date, so the grid sends an animated page-back.
+    expect(calls()).toEqual([{ index: pager.initialScrollIndex, animated: true }]);
+    // If that page-back drops silently (native stays on `next`), the idle check retries once.
+    await wait(250);
+    expect(calls()).toEqual([
+      { index: pager.initialScrollIndex, animated: true },
+      { index: pager.initialScrollIndex, animated: true },
+    ]);
+  });
+
+  it("releases a held kept-date page-back when a stolen touch starts right after onMomentumScrollEnd", async () => {
+    await render(
+      <TimeGrid
+        mode="day"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />,
+    );
+    const pager = list();
+    const width = pager.getFixedItemSize();
+    const next = pager.initialScrollIndex + 1;
+    await act(() => pager.onScrollBeginDrag());
+    await scrollTo((pager.initialScrollIndex + 0.6) * width);
+    await act(() => pager.onScrollEndDrag());
+    pager.sharedValues.scrollOffset.value = next * width;
+    // Settle on page `next` (clearing the swipe timer) and start a new drag
+    // before the kept-date transition runs, then abandon the drag with no end.
+    await act(() => {
+      pager.onMomentumScrollEnd?.({ nativeEvent: { contentOffset: { x: next * width } } });
+      pager.onScrollBeginDrag();
+    });
+    expect(calls()).toEqual([]);
+    await wait(1050);
+    expect(calls().at(-1)).toEqual({ index: pager.initialScrollIndex, animated: true });
+  });
+
+  it("trusts a real fling to page 0 even when lagged onScroll is past page 1", async () => {
+    const onChangeDate = vi.fn();
+    await renderPager(onChangeDate);
+    const pager = list();
+    const width = pager.getFixedItemSize();
+    await act(() => pager.onScrollBeginDrag());
+    await scrollTo(1.4 * width);
+    await act(() => pager.onScrollEndDrag());
+    pager.sharedValues.scrollOffset.value = 0;
+    await wait(250);
+    expect(calls()).toEqual([]);
+    expect(onChangeDate).not.toHaveBeenCalled();
+  });
+
+  it("omits scrollEventThrottle on the horizontal pager so LegendList does not queue trailing onScroll timers", async () => {
+    await renderPager();
+    expect(
+      (lastListProps() as { scrollEventThrottle?: number }).scrollEventThrottle,
+    ).toBeUndefined();
   });
 
   it("does not attach the guard off Android", async () => {

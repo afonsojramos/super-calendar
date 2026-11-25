@@ -3404,8 +3404,43 @@ function TimeGridInner<T>(
   // shared value inside that tick still sees the previous batch, so building the
   // next map from `.value` would keep only the last report.
   const laneHeightsRef = useRef<Record<number, number>>({});
-  const pagerOffset = useSharedValue(PAGE_WINDOW * columnsWidth);
-  const pagerSharedValues = useMemo(() => ({ scrollOffset: pagerOffset }), [pagerOffset]);
+  // Live horizontal offset written exclusively by the native scroll view (via
+  // LegendList's `useScrollViewOffset`, plus LegendList's own mount seed).
+  // `TimeGrid` never writes to it, so the Android idle check always reads the
+  // scroll view's actual position even when a programmatic `scrollToIndex` drops.
+  const nativePagerOffset = useSharedValue(-1);
+  const pagerSharedValues = useMemo(
+    () => ({ scrollOffset: nativePagerOffset }),
+    [nativePagerOffset],
+  );
+  // True once the current pager mount has seen user/scroll activity, so a real
+  // scroll to page 0 (`offset === 0`) is distinguished from LegendList's mount
+  // `state.scroll = 0` seed. Mirrored on UI for `laneHeight` and on JS for
+  // synchronous reads in `handleViewableItemsChanged` and `realignRestingPager`.
+  const nativeScrollSeenRef = useRef(false);
+  const nativeScrollSeen = useSharedValue(false);
+  const markNativeScrollSeen = useCallback(() => {
+    if (nativeScrollSeenRef.current) return;
+    nativeScrollSeenRef.current = true;
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+    nativeScrollSeen.value = true;
+  }, [nativeScrollSeen]);
+  // Optimistic offset written by JS for programmatic jumps (`goToPage`, resize,
+  // external `date`, settle) so the all-day band and viewability filter stay in
+  // step before native reports a scroll. Packed into one object (and mirrored
+  // synchronously in `pagerSeedRef` for JS reads) so UI and JS stay atomic.
+  const initialPagerSeed = { offset: PAGE_WINDOW * columnsWidth, nativeAtSeed: -1 };
+  const pagerSeedRef = useRef(initialPagerSeed);
+  const pagerSeed = useSharedValue(initialPagerSeed);
+  const seedPagerOffset = useCallback(
+    (offset: number) => {
+      const next = { offset, nativeAtSeed: nativePagerOffset.value };
+      pagerSeedRef.current = next;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      pagerSeed.value = next;
+    },
+    [pagerSeed, nativePagerOffset],
+  );
   // The committed page, for the worklet below: the list only reports its offset
   // as it scrolls, and seeds it from its own scroll state at mount, which can
   // still be zero. An offset more than a page and a half from the committed
@@ -3414,7 +3449,12 @@ function TimeGridInner<T>(
   const laneHeight = useDerivedValue(() => {
     if (!showAllDayEventCell || columnsWidth <= 0) return 0;
     const heights = laneHeights.value;
-    let progress = pagerOffset.value / columnsWidth;
+    const nativeOffset = nativePagerOffset.value;
+    const seed = pagerSeed.value;
+    const hasLiveNative = nativeOffset > 0 || (nativeOffset === 0 && nativeScrollSeen.value);
+    const currentOffset =
+      hasLiveNative && nativeOffset !== seed.nativeAtSeed ? nativeOffset : seed.offset;
+    let progress = currentOffset / columnsWidth;
     if (Math.abs(progress - activeIndexShared.value) > 1.5) progress = activeIndexShared.value;
     const from = Math.floor(progress);
     const fraction = progress - from;
@@ -3927,12 +3967,16 @@ function TimeGridInner<T>(
       // as a swipe back to a week the grid is no longer on. A tick that reaches
       // this thread after a fast fling has moved on is dropped too; the page the
       // fling rests on is still reported, so only weeks it passed are skipped.
-      if (columnsWidth > 0 && Math.round(pagerOffset.value / columnsWidth) !== settled.index)
-        return;
+      const nativeOffset = nativePagerOffset.value;
+      const seed = pagerSeedRef.current;
+      const hasLiveNative = nativeOffset > 0 || (nativeOffset === 0 && nativeScrollSeenRef.current);
+      const liveOffset =
+        hasLiveNative && nativeOffset !== seed.nativeAtSeed ? nativeOffset : seed.offset;
+      if (columnsWidth > 0 && Math.round(liveOffset / columnsWidth) !== settled.index) return;
       viewedIndexRef.current = settled.index;
       if (settled.item) reportDate(settled.item, "swipe");
     },
-    [reportDate, columnsWidth, pagerOffset],
+    [reportDate, columnsWidth, nativePagerOffset],
   );
 
   // Realign the list when the date changes from outside a swipe (e.g. a "today"
@@ -3944,10 +3988,9 @@ function TimeGridInner<T>(
     resentTargetRef.current = null;
     // Keep the all-day band's interpolation source in step with the jump; the
     // list reports its offset only as it scrolls, not on a programmatic one.
-    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-    pagerOffset.value = activeIndex * columnsWidth;
+    seedPagerOffset(activeIndex * columnsWidth);
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- columnsWidth/pagerOffset are stable per width
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- columnsWidth/seedPagerOffset are stable per width
   }, [activeIndex]);
 
   // The list reports its offset only as it scrolls; seed it whenever the pages are
@@ -3957,11 +4000,13 @@ function TimeGridInner<T>(
   // the resize and the scroll is blank rather than another page.
   const laidOutWidthRef = useRef<number | null>(null);
   useLayoutEffect(() => {
-    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-    pagerOffset.value = activeIndex * columnsWidth;
+    seedPagerOffset(activeIndex * columnsWidth);
     // The list unmounts at width 0 and remounts on the active page at the next width.
     if (!pagerReady) {
       laidOutWidthRef.current = null;
+      nativeScrollSeenRef.current = false;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      nativeScrollSeen.value = false;
       return;
     }
     const previous = laidOutWidthRef.current;
@@ -3970,7 +4015,7 @@ function TimeGridInner<T>(
     if (previous == null || previous === columnsWidth) return;
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reseed on width only; scroll events track index changes
-  }, [columnsWidth, pagerOffset, pagerReady]);
+  }, [columnsWidth, seedPagerOffset, nativeScrollSeen, pagerReady]);
 
   // react-native-web ignores `contentOffset`: retry the seed each frame until the
   // scroll view can hold it (the viewport's `onLayout` also tries).
@@ -4056,12 +4101,11 @@ function TimeGridInner<T>(
       viewedIndexRef.current = index;
       pendingScrollIndexRef.current = index;
       resentTargetRef.current = null;
-      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-      pagerOffset.value = index * columnsWidth;
+      seedPagerOffset(index * columnsWidth);
       void listRef.current?.scrollToIndex({ index, animated: !isWeb && !reduceMotion });
       reportDate(target, reason);
     },
-    [pageDates, reduceMotion, reportDate, columnsWidth, pagerOffset],
+    [pageDates, reduceMotion, reportDate, columnsWidth, seedPagerOffset],
   );
   // Page back to `date` after a cross-page drag that left its event in place (a
   // cancel or a rejected drop). The grid scrolls itself, with an animation: on
@@ -4082,8 +4126,7 @@ function TimeGridInner<T>(
         viewedIndexRef.current = index;
         pendingScrollIndexRef.current = index;
         resentTargetRef.current = null;
-        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-        pagerOffset.value = index * columnsWidth;
+        seedPagerOffset(index * columnsWidth);
         void listRef.current?.scrollToIndex({ index, animated: !isWeb && !reduceMotion });
       }
       reportDate(date, "event-drag");
@@ -4102,25 +4145,6 @@ function TimeGridInner<T>(
     clearLift();
     landDrop(pendingDrop, activeIndex);
   }, [pendingDrop, activeIndex, landDrop, clearLift]);
-
-  // `date` is controlled: when the app keeps the old date after the user paged (a
-  // swipe, an arrow key or an edge drag), page back to the one it still shows
-  // instead of leaving the list on the page the user moved to.
-  useEffect(() => {
-    // Not while a finger holds the pager: it would snap back to the held page on
-    // release. The drag end re-runs this check.
-    if (dateReports === 0 || activeIndex === viewedIndexRef.current) return;
-    if (pagerDraggingRef.current) {
-      pageBackHeldRef.current = true;
-      return;
-    }
-    viewedIndexRef.current = activeIndex;
-    pendingScrollIndexRef.current = activeIndex;
-    resentTargetRef.current = null;
-    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-    pagerOffset.value = activeIndex * columnsWidth;
-    void listRef.current?.scrollToIndex({ index: activeIndex, animated: !isWeb && !reduceMotion });
-  }, [dateReports, activeIndex, columnsWidth, pagerOffset, reduceMotion]);
 
   // Commit the page nearest `offsetX` and return its index. Viewability only
   // reports a page that is nearly all on screen, so a pager that rests between
@@ -4143,6 +4167,129 @@ function TimeGridInner<T>(
   const pagerDraggingRef = useRef(false);
   // Set when the user starts dragging the pager and cleared by the settle it leads to.
   const pagerUserScrollRef = useRef(false);
+  // Android: once the pager has gone a moment without a scroll event, snap an
+  // offset left between pages back onto the nearest page (or onto the target of
+  // an interrupted programmatic scroll). A drag that began and has not reported
+  // its end waits longer, in case a finger is still holding it.
+  const lastPagerScrollRef = useRef({ offsetX: 0, at: 0 });
+  const pagerIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (pagerIdleTimerRef.current) clearTimeout(pagerIdleTimerRef.current);
+      pagerIdleTimerRef.current = null;
+    },
+    [],
+  );
+
+  const realignRestingPager = useCallback(
+    (offsetX: number) => {
+      pagerDraggingRef.current = false;
+      // A page-back held for a drag that never reported its end (a parent view took
+      // the touch, or the finger is still): run it now instead of snapping to the
+      // page the app refused. If the app has since accepted the page, snap as usual.
+      if (pageBackHeldRef.current) {
+        pageBackHeldRef.current = false;
+        if (activeIndexRef.current !== viewedIndexRef.current) {
+          startTransition(() => setDateReports((count) => count + 1));
+          return;
+        }
+      }
+      if (columnsWidth <= 0) return;
+      // LegendList skips notifying `onScroll` on drag/momentum end, so `offsetX`
+      // can lag behind the scroll view. Prefer the native-only UI-thread
+      // `nativePagerOffset` once it holds a real scroll position (ignoring
+      // LegendList's mount `0` seed until the pager has seen scroll activity).
+      const nativeOffset = nativePagerOffset.value;
+      const settledX =
+        nativeOffset > 0 || (nativeOffset === 0 && nativeScrollSeenRef.current)
+          ? nativeOffset
+          : offsetX;
+      const pages = settledX / columnsWidth;
+      const offPagePx = Math.abs(pages - Math.round(pages)) * columnsWidth * PixelRatio.get();
+      const target = pendingScrollIndexRef.current;
+      // Resting on a page is fine unless it is not the page the last programmatic
+      // scroll was sent to. Such a list (seen when an app keeps its date during a
+      // long edge drag; the cause is not traced) rests on a whole page that
+      // nothing else corrects, as its viewability ticks are ignored while the
+      // target is pending. Send it once more, and only once per target, so a
+      // scroll that keeps falling short cannot loop.
+      if (offPagePx < 0.5) {
+        if (target == null || target === Math.round(pages)) return;
+        if (resentTargetRef.current === target) return;
+        resentTargetRef.current = target;
+      }
+      const index = target ?? commitNearestPage(settledX);
+      seedPagerOffset(index * columnsWidth);
+      void listRef.current?.scrollToIndex({ index, animated: !reduceMotion });
+    },
+    [columnsWidth, commitNearestPage, nativePagerOffset, seedPagerOffset, reduceMotion],
+  );
+  const realignRestingPagerRef = useRef(realignRestingPager);
+  realignRestingPagerRef.current = realignRestingPager;
+  // One timer per burst of scroll events: when it fires early it re-arms for
+  // the rest of the wait measured from the latest event.
+  const armPagerIdleTimer = useCallback((delay: number) => {
+    pagerIdleTimerRef.current = setTimeout(() => {
+      const wait = pagerDraggingRef.current ? PAGER_HELD_DRAG_MS : PAGER_IDLE_MS;
+      const remaining = lastPagerScrollRef.current.at + wait - Date.now();
+      if (remaining > 0) {
+        armPagerIdleTimer(remaining);
+        return;
+      }
+      pagerIdleTimerRef.current = null;
+      realignRestingPagerRef.current(lastPagerScrollRef.current.offsetX);
+    }, delay);
+  }, []);
+
+  // `date` is controlled: when the app keeps the old date after the user paged (a
+  // swipe, an arrow key or an edge drag), page back to the one it still shows
+  // instead of leaving the list on the page the user moved to.
+  useEffect(() => {
+    // Not while a finger holds the pager: it would snap back to the held page on
+    // release. The drag end re-runs this check.
+    if (dateReports === 0 || activeIndex === viewedIndexRef.current) return;
+    if (pagerDraggingRef.current) {
+      pageBackHeldRef.current = true;
+      // Match MonthPager: if a parent view steals this drag (`ACTION_CANCEL`
+      // sends no drag end), the held timer still releases the page-back even
+      // when `handlePagerSettled` cleared the previous swipe's timer.
+      if (Platform.OS === "android") {
+        lastPagerScrollRef.current = {
+          offsetX: lastPagerScrollRef.current.offsetX,
+          at: Date.now(),
+        };
+        if (!pagerIdleTimerRef.current) armPagerIdleTimer(PAGER_HELD_DRAG_MS);
+      }
+      return;
+    }
+    viewedIndexRef.current = activeIndex;
+    pendingScrollIndexRef.current = activeIndex;
+    resentTargetRef.current = null;
+    seedPagerOffset(activeIndex * columnsWidth);
+    void listRef.current?.scrollToIndex({ index: activeIndex, animated: !isWeb && !reduceMotion });
+    // Keep the Android idle retry alive if `handlePagerSettled` cleared the
+    // swipe's timer right before this page-back ran and the scroll drops silently.
+    // Ignore LegendList's mount `0` seed (`nativePagerOffset.value > 0` or an
+    // observed scroll timestamp).
+    if (
+      Platform.OS === "android" &&
+      (lastPagerScrollRef.current.at > 0 || nativePagerOffset.value > 0)
+    ) {
+      lastPagerScrollRef.current = {
+        offsetX: lastPagerScrollRef.current.offsetX,
+        at: Date.now(),
+      };
+      if (!pagerIdleTimerRef.current) armPagerIdleTimer(PAGER_IDLE_MS);
+    }
+  }, [
+    dateReports,
+    activeIndex,
+    columnsWidth,
+    seedPagerOffset,
+    reduceMotion,
+    nativePagerOffset,
+    armPagerIdleTimer,
+  ]);
 
   // A fast fling can outrun the list's on-demand mounting and leave the pager
   // blank until something nudges it. When momentum ends, re-anchor the list on
@@ -4164,99 +4311,60 @@ function TimeGridInner<T>(
       // (goToPage, realign) sets `pendingScrollIndexRef` and repaints itself, so
       // skip those to avoid a redundant re-anchor during held edge paging.
       if (pendingScrollIndexRef.current != null) return;
-      const index = commitNearestPage(event.nativeEvent.contentOffset.x);
-      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-      pagerOffset.value = index * columnsWidth;
+      markNativeScrollSeen();
+      const settledX = event.nativeEvent.contentOffset.x;
+      lastPagerScrollRef.current = { offsetX: settledX, at: Date.now() };
+      const pages = settledX / columnsWidth;
+      const offPagePx = Math.abs(pages - Math.round(pages)) * columnsWidth * PixelRatio.get();
+      // LegendList skips notifying `onScroll` on momentum end: once the pager
+      // rests on a page, drop the swipe's idle check; if it somehow settled
+      // off-page on Android, keep an idle check armed in case the re-anchor drops.
+      if (offPagePx < 0.5) {
+        if (pagerIdleTimerRef.current) {
+          clearTimeout(pagerIdleTimerRef.current);
+          pagerIdleTimerRef.current = null;
+        }
+      } else if (Platform.OS === "android" && !pagerIdleTimerRef.current) {
+        armPagerIdleTimer(PAGER_IDLE_MS);
+      }
+      const index = commitNearestPage(settledX);
+      seedPagerOffset(index * columnsWidth);
       requestAnimationFrame(() => {
         // The app kept its date and the grid is already paging back to it.
         if (viewedIndexRef.current !== index) return;
         void listRef.current?.scrollToIndex({ index, animated: false });
       });
     },
-    [columnsWidth, commitNearestPage, pagerOffset],
+    [columnsWidth, commitNearestPage, seedPagerOffset, armPagerIdleTimer, markNativeScrollSeen],
   );
 
-  // Android: once the pager has gone a moment without a scroll event, snap an
-  // offset left between pages back onto the nearest page (or onto the target of
-  // an interrupted programmatic scroll). A drag that began and has not reported
-  // its end waits longer, in case a finger is still holding it.
-  const lastPagerScrollRef = useRef({ offsetX: 0, at: 0 });
-  const pagerIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (pagerIdleTimerRef.current) clearTimeout(pagerIdleTimerRef.current);
-      pagerIdleTimerRef.current = null;
-    },
-    [],
-  );
-  const realignRestingPager = useCallback(
-    (offsetX: number) => {
-      pagerDraggingRef.current = false;
-      // A page-back held for a drag that never reported its end (a parent view took
-      // the touch, or the finger is still): run it now instead of snapping to the
-      // page the app refused. If the app has since accepted the page, snap as usual.
-      if (pageBackHeldRef.current) {
-        pageBackHeldRef.current = false;
-        if (activeIndexRef.current !== viewedIndexRef.current) {
-          startTransition(() => setDateReports((count) => count + 1));
-          return;
-        }
-      }
-      if (columnsWidth <= 0) return;
-      const pages = offsetX / columnsWidth;
-      const offPagePx = Math.abs(pages - Math.round(pages)) * columnsWidth * PixelRatio.get();
-      const target = pendingScrollIndexRef.current;
-      // Resting on a page is fine unless it is not the page the last programmatic
-      // scroll was sent to. Such a list (seen when an app keeps its date during a
-      // long edge drag; the cause is not traced) rests on a whole page that
-      // nothing else corrects, as its viewability ticks are ignored while the
-      // target is pending. Send it once more, and only once per target, so a
-      // scroll that keeps falling short cannot loop.
-      if (offPagePx < 0.5) {
-        if (target == null || target === Math.round(pages)) return;
-        if (resentTargetRef.current === target) return;
-        resentTargetRef.current = target;
-      }
-      const index = target ?? commitNearestPage(offsetX);
-      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
-      pagerOffset.value = index * columnsWidth;
-      void listRef.current?.scrollToIndex({ index, animated: !reduceMotion });
-    },
-    [columnsWidth, commitNearestPage, pagerOffset, reduceMotion],
-  );
-  const realignRestingPagerRef = useRef(realignRestingPager);
-  realignRestingPagerRef.current = realignRestingPager;
-  // One timer per burst of scroll events: when it fires early it re-arms for
-  // the rest of the wait measured from the latest event.
-  const armPagerIdleTimer = useCallback((delay: number) => {
-    pagerIdleTimerRef.current = setTimeout(() => {
-      const wait = pagerDraggingRef.current ? PAGER_HELD_DRAG_MS : PAGER_IDLE_MS;
-      const remaining = lastPagerScrollRef.current.at + wait - Date.now();
-      if (remaining > 0) {
-        armPagerIdleTimer(remaining);
-        return;
-      }
-      pagerIdleTimerRef.current = null;
-      realignRestingPagerRef.current(lastPagerScrollRef.current.offsetX);
-    }, delay);
-  }, []);
   const handlePagerScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      markNativeScrollSeen();
       lastPagerScrollRef.current = { offsetX: event.nativeEvent.contentOffset.x, at: Date.now() };
       if (!pagerIdleTimerRef.current) armPagerIdleTimer(PAGER_IDLE_MS);
     },
-    [armPagerIdleTimer],
+    [armPagerIdleTimer, markNativeScrollSeen],
   );
   const handlePagerDragStart = useCallback(() => {
     pagerDraggingRef.current = true;
     pagerUserScrollRef.current = true;
+    markNativeScrollSeen();
+    const cleared = { ...pagerSeedRef.current, nativeAtSeed: -1 };
+    pagerSeedRef.current = cleared;
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+    pagerSeed.value = cleared;
     // The user takes the pager over from any programmatic scroll still settling (a
     // page-back, an edge-drag page, a jump to an outside date), so the pages they
     // land on are reported.
     pendingScrollIndexRef.current = null;
-  }, []);
-  const handlePagerDragEnd = useCallback(() => {
+  }, [pagerSeed, markNativeScrollSeen]);
+  const handlePagerDragEnd = useCallback((event?: NativeSyntheticEvent<NativeScrollEvent>) => {
     pagerDraggingRef.current = false;
+    const offsetX = event?.nativeEvent?.contentOffset?.x;
+    if (typeof offsetX === "number") {
+      lastPagerScrollRef.current = { offsetX, at: Date.now() };
+    }
     if (!pageBackHeldRef.current) return;
     pageBackHeldRef.current = false;
     startTransition(() => setDateReports((count) => count + 1));
@@ -4570,7 +4678,6 @@ function TimeGridInner<T>(
                                   ? ("normal" as const)
                                   : ("fast" as const),
                                 disableIntervalMomentum: !freeSwipe,
-                                scrollEventThrottle: 16,
                                 onMomentumScrollEnd: handlePagerSettled,
                                 onScrollBeginDrag: handlePagerDragStart,
                                 onScrollEndDrag: handlePagerDragEnd,
