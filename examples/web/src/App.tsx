@@ -342,17 +342,22 @@ export function App() {
           </p>
         </header>
 
-        <nav style={styles.tabs}>
-          {TABS.map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              style={{ ...styles.tab, ...(mode === m ? styles.tabActive : null) }}
+        <nav aria-label="Calendar controls" style={styles.controls}>
+          <label style={styles.viewLabel}>
+            View
+            <select
+              aria-label="View"
+              value={mode}
+              onChange={(event) => setMode(event.currentTarget.value as DemoTab)}
+              style={styles.viewSelect}
             >
-              {m}
-            </button>
-          ))}
+              {TABS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
         </nav>
 
         {isCalendarTab(mode) ? (
@@ -659,20 +664,18 @@ const styles: Record<string, CSSProperties> = {
   header: { marginBottom: 4 },
   title: { fontSize: 20, lineHeight: 1.2, margin: 0 },
   subtitle: { margin: 0, color: "#6B7280", fontSize: 14 },
-  tabs: { display: "flex", flexWrap: "wrap", gap: 8, padding: "8px 0" },
-  tab: {
-    padding: "6px 18px",
+  // The view menu, styled like the Solid example's.
+  controls: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, padding: "8px 0" },
+  viewLabel: { display: "flex", alignItems: "center", gap: 8, fontSize: 14 },
+  viewSelect: {
+    font: "inherit",
+    border: "1px solid #dedfe3",
     borderRadius: 8,
-    border: "none",
-    background: "#eef0f3",
-    color: "#1A1B1E",
-    fontWeight: 600,
-    fontSize: 14,
+    background: "transparent",
+    color: "inherit",
+    padding: "8px 12px",
     cursor: "pointer",
-    textTransform: "capitalize",
-    fontFamily: "inherit",
   },
-  tabActive: { background: "#1F6FEB", color: "#fff" },
   navRow: {
     display: "flex",
     alignItems: "center",

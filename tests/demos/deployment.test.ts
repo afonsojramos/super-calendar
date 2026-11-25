@@ -50,8 +50,20 @@ async function checkPage(
   }
 }
 
+// Every example picks its view from a "View" menu: a select on the web, a button
+// that opens a menu of the same names on native.
+async function chooseView(page: Page, view: string) {
+  const select = page.locator('select[aria-label="View"]');
+  if (await select.count()) {
+    await select.selectOption(view);
+    return;
+  }
+  await page.getByRole("button", { name: "View", exact: true }).click();
+  await page.getByRole("menuitem", { name: new RegExp(`^${view}(\\s*✓)?$`) }).click();
+}
+
 async function nativeMultiWeekGrid(page: Page) {
-  await page.getByText("multiweek", { exact: true }).click();
+  await chooseView(page, "multiweek");
   await page.getByRole("button", { name: "4 weeks", exact: true }).click();
   const grids = page.getByTestId("multiweek-grid");
   const currentIndex = () =>
@@ -91,7 +103,7 @@ describe("published demos", () => {
       await checkPage(
         "/",
         async (page) => {
-          await page.getByText("week", { exact: true }).click();
+          await chooseView(page, "week");
           const trip = page.getByRole("button", { name: /Company offsite/ });
           await expect.poll(() => trip.count()).toBe(1);
           await trip.scrollIntoViewIfNeeded();
@@ -135,7 +147,7 @@ describe("published demos", () => {
               await page.getByRole("button", { name: "Previous period" }).click();
             await page.getByLabel("View", { exact: true }).selectOption("month");
             await page.getByRole("button", { name: "Next period" }).click();
-          } else await page.getByRole("button", { name: /^month$/i }).click();
+          } else await chooseView(page, "month");
           expect(await page.evaluate(() => new Date(2011, 11, 30).getDate())).toBe(31);
           const day = page.locator('[data-day="2011-12-29"]');
           await day.scrollIntoViewIfNeeded();
@@ -167,7 +179,7 @@ describe("published demos", () => {
             // The Solid example starts in November 2026; navigate to April.
             for (let month = 0; month < 7; month++)
               await page.getByRole("button", { name: "Previous period" }).click();
-          } else await page.getByRole("button", { name: /^month$/i }).click();
+          } else await chooseView(page, "month");
           expect(await page.evaluate(() => new Date(2026, 3, 24).getHours())).toBe(1);
           const day = page.locator(`[data-day="2026-04-${dayNumber}"]`);
           await day.scrollIntoViewIfNeeded();
@@ -197,7 +209,7 @@ describe("published demos", () => {
     await checkPage(
       "/",
       async (page) => {
-        await page.getByText("multiweek", { exact: true }).click();
+        await chooseView(page, "multiweek");
         const fourWeeks = page.getByRole("button", { name: "4 weeks", exact: true });
         await fourWeeks.click();
         const firstDay = page.getByLabel(/^Monday, 21 December 2026,/);
@@ -259,7 +271,7 @@ describe("published demos", () => {
         await controls[0].click();
         await expect.poll(() => title.textContent()).toBe("Dec 21, 2026 - Jan 17, 2027");
 
-        await page.getByText("month", { exact: true }).click();
+        await chooseView(page, "month");
         await expect.poll(() => title.textContent()).toBe("December 2026");
         expect(await page.getByText("December 2026", { exact: true }).count()).toBe(1);
       },
@@ -319,7 +331,7 @@ describe("published demos", () => {
       await checkPage(
         "/",
         async (page) => {
-          await page.getByText(mode, { exact: true }).click();
+          await chooseView(page, mode);
           if (mode === "multiweek")
             await page.getByRole("button", { name: "2 weeks", exact: true }).click();
           const grids = page.getByTestId(mode === "month" ? "month-grid" : "multiweek-grid");
@@ -399,8 +411,7 @@ describe("published demos", () => {
     await checkPage(
       path,
       async (page) => {
-        if (path === "/solid/") await page.getByLabel("View", { exact: true }).selectOption(mode);
-        else await page.getByRole("button", { name: new RegExp(`^${mode}$`, "i") }).click();
+        await chooseView(page, mode);
         const first = page.locator('[data-day="2026-11-06"]');
         const last = page.locator('[data-day="2026-11-11"]');
         await first.scrollIntoViewIfNeeded();
@@ -564,7 +575,7 @@ describe("published demos", () => {
             .first()
             .click();
         } else {
-          await page.getByRole("button", { name: "field", exact: true }).click();
+          await chooseView(page, "field");
           await page.getByRole("button", { name: "Select dates", exact: true }).click();
         }
         const dialog = page.getByRole("dialog");
@@ -599,10 +610,10 @@ describe("published demos", () => {
   ])("loads %s and changes calendar modes", async (path, title, month, week) => {
     await checkPage(path, async (page) => {
       await page.getByText(title, { exact: true }).waitFor();
-      await page.getByText("month", { exact: true }).click();
+      await chooseView(page, "month");
       await page.locator(month).first().waitFor();
       await expect.poll(() => page.locator(week).count()).toBe(0);
-      await page.getByText("week", { exact: true }).click();
+      await chooseView(page, "week");
       await page.locator(week).first().waitFor();
       await expect.poll(() => page.locator(month).count()).toBe(0);
     });
@@ -614,7 +625,7 @@ describe("published demos", () => {
       await checkPage(path, async (page) => {
         if (path === "/solid/")
           await page.getByLabel("View", { exact: true }).selectOption("multiweek");
-        else await page.getByText("multiweek", { exact: true }).click();
+        else await chooseView(page, "multiweek");
         const grid = page.locator(
           path === "/" ? '[data-testid="multiweek-grid"]' : '[role="grid"]',
         );

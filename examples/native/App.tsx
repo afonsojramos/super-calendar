@@ -50,6 +50,7 @@ import { type DateRange, MonthList, useDateRange } from "@super-calendar/native/
 import { EventMenuProvider, type EventMenuActions } from "@super-calendar/example-shared";
 import { buildEvents, type EventMeta } from "@super-calendar/example-shared/events";
 import { EventContextMenu } from "./components/EventContextMenu";
+import { ViewMenu } from "./components/ViewMenu";
 
 function MonthDraft({ start, end }: CreateGhostArgs) {
   const theme = useCalendarTheme();
@@ -358,22 +359,7 @@ export default function App() {
                 </Text>
               </View>
             ) : null}
-            <View style={styles.tabs}>
-              {TABS.map((m) => (
-                <Pressable
-                  key={m}
-                  style={[styles.tab, activeMode === m && styles.tabActive]}
-                  onPress={() => setMode(m)}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.tabText, activeMode === m && styles.tabTextActive]}
-                  >
-                    {m}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            <ViewMenu value={activeMode} options={TABS} onChange={setMode} />
             {DEMO_MODE == null && isGridMode(activeMode) ? (
               <View style={styles.navigation}>
                 <Text testID="visible-period" accessibilityRole="header" style={styles.periodLabel}>
@@ -740,18 +726,6 @@ const styles = StyleSheet.create({
   },
   // A width that is not a whole number of dp on most screens.
   narrowCard: { width: "73%", alignSelf: "center" },
-  // Pill buttons that wrap onto extra rows, matching the dom example's bar.
-  tabs: { flexDirection: "row", flexWrap: "wrap", paddingVertical: 8, gap: 8 },
-  tab: {
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: 8,
-    backgroundColor: "#eef0f3",
-    alignItems: "center",
-  },
-  tabActive: { backgroundColor: "#1F6FEB" },
-  tabText: { fontWeight: "600", color: "#1A1B1E", textTransform: "capitalize" },
-  tabTextActive: { color: "#fff" },
   // Prev / Today / next navigation, mirroring the dom example's toolbar.
   navigation: { gap: 8, paddingBottom: 12 },
   navRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12 },
