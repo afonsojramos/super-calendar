@@ -54,7 +54,8 @@ in-view dragging without edge paging. Other navigation remains available.
 - `"keyboard"`: arrow-key paging on native web, or **PageUp** and **PageDown**
   in the DOM and Solid renderers.
 - `"event-drag"`: the user held a dragged event at the grid's edge. On native,
-  a rejected cross-week drop also pages back to the event's week with this reason.
+  a rejected or cancelled cross-week drop also pages back to the event's week
+  with this reason.
 
 Your own controls (previous, next, today) set `date` directly, so they never
 call `onChangeDate`. The calendar always passes `details`, but the type marks it

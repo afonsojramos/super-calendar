@@ -64,9 +64,13 @@ describe("onChangeDate reason on native", () => {
     const list = lastListProps() as {
       data: Date[];
       initialScrollIndex: number;
+      getFixedItemSize: () => number;
+      sharedValues: { scrollOffset: { value: number } };
       onViewableItemsChanged: (info: unknown) => void;
     };
     const index = list.initialScrollIndex + 1;
+    // The swipe moves the list onto the next page, which then reports as viewable.
+    list.sharedValues.scrollOffset.value = index * list.getFixedItemSize();
     await act(() =>
       list.onViewableItemsChanged({
         viewableItems: [{ isViewable: true, index, item: list.data[index] }],

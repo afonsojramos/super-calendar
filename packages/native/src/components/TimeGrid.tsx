@@ -223,14 +223,27 @@ type EdgePaging = {
   ghostW: SharedValue<number>;
   ghostH: SharedValue<number>;
   ghostVisible: SharedValue<number>;
-  // Show the ghost for `event` (returning false if placement rejected the
-  // lift), check whether the active lift is still valid on repeat ticks, and
-  // drop it at its pager-local top-left (clearing the ghost either way).
-  beginLift: (event: CalendarEvent<unknown>) => boolean;
+  // Show the ghost for `event`, dragged from the page at `pageIndex` (returning
+  // false if placement rejected the lift), check whether the active lift is
+  // still valid on repeat ticks, drop it at its pager-local top-left (clearing
+  // the ghost either way), clear it without a drop, or clear it without a drop
+  // and page back to the event (a cancelled drag).
+  beginLift: (event: CalendarEvent<unknown>, pageIndex: number) => boolean;
   isLiftActive: () => boolean;
   commitLiftedDrop: (ghostLocalX: number, minuteDelta: number) => void;
+  cancelLift: () => void;
+  cancelLiftedDrag: () => void;
+  // Run `callback` once the floating copy is gone (at once if it already is).
+  afterLiftCleared: (callback: () => void) => void;
 };
 const EdgePagingContext = createContext<EdgePaging | null>(null);
+
+/** A cross-page drop, resolved to a day column and a start time on its page. */
+type PendingDrop<T> = {
+  event: CalendarEvent<T>;
+  column: number;
+  minutes: number;
+};
 
 const noop = () => {};
 
@@ -474,9 +487,29 @@ type AnimatedEventBoxProps<T> = {
   // Page the view one period (dir -1/+1) when the event is dragged past the
   // visible columns and held there. Absent disables edge auto-advance.
   onEdgeAdvance?: (dir: number) => void;
+  // The pager index of the page this box is on, kept mounted while it carries a
+  // lifted drag (see EdgePaging).
+  pageIndex: number;
 };
 
-function AnimatedEventBoxInner<T>({
+/**
+ * Mounts the box afresh once a cross-page drag that it carried has ended. The
+ * box hides while its floating copy stands in, through its animated style. On
+ * Android, a drag the system cancels as the app goes to the background ends
+ * while the app is in the background, and there the animated style that shows
+ * the box again, though worked out correctly on the UI thread, did not reach
+ * the view, nor did later animated updates with the same values. A React mount
+ * reaches the view, so the box comes back however and whenever the drag ended
+ * (see PAGERS.md).
+ */
+function AnimatedEventBoxInner<T>(props: AnimatedEventBoxProps<T>) {
+  const [mount, setMount] = useState(0);
+  const remount = useCallback(() => setMount((count) => count + 1), []);
+  return <AnimatedEventBoxBody key={mount} {...props} onLiftEnded={remount} />;
+}
+
+function AnimatedEventBoxBody<T>({
+  onLiftEnded,
   positioned,
   eventIndex,
   movingEvent,
@@ -503,10 +536,11 @@ function AnimatedEventBoxInner<T>({
   onDragEvent,
   onDragStart,
   onEdgeAdvance,
+  pageIndex,
   showDragHandle,
   eventStartEditable,
   eventDurationEditable,
-}: AnimatedEventBoxProps<T>) {
+}: AnimatedEventBoxProps<T> & { onLiftEnded: () => void }) {
   const RenderEventComponent = renderEvent;
   const theme = useCalendarTheme();
   const labels = useCalendarLabels();
@@ -521,7 +555,6 @@ function AnimatedEventBoxInner<T>({
   const pagerWidthSV = edgePaging?.pagerWidth;
   const ghostXSV = edgePaging?.ghostX;
   const ghostYSV = edgePaging?.ghostY;
-  const commitLiftedDrop = edgePaging?.commitLiftedDrop;
   // Drag-to-move/resize. Native picks the event up on long-press (so a tap or
   // scroll isn't hijacked); web activates after a small drag threshold, so a
   // plain click still selects and a right-click still opens a context menu.
@@ -566,6 +599,11 @@ function AnimatedEventBoxInner<T>({
   // plus where in the box it was grabbed and the live finger position, so the
   // ghost can be seeded from the JS dwell timer and track the finger after.
   const lifted = useSharedValue(0);
+  // The same lift, as the JavaScript thread knows it. The dwell timer lifts the
+  // event here, and its write to `lifted` reaches the UI thread a frame later, so
+  // a release in that frame sees no lift there. What a release does is decided
+  // from this ref instead (see `finishLift`).
+  const liftedHereRef = useRef(false);
   const grabX = useSharedValue(0);
   const grabY = useSharedValue(0);
   const liveAbsX = useSharedValue(0);
@@ -894,7 +932,9 @@ function AnimatedEventBoxInner<T>({
   const commitDrag = useCallback(
     (deltaStartMin: number, deltaEndMin: number) => {
       const { event, onDragEvent: handler } = latest.current;
-      if (!handler) return;
+      // A lift the UI thread had not seen yet when the finger lifted: the
+      // release drops the floating copy instead (see `finishLift`).
+      if (!handler || liftedHereRef.current) return;
       // Returns null when a resize would collapse below one step — snap back.
       const next = resolveDraggedBounds(
         event.start,
@@ -973,6 +1013,48 @@ function AnimatedEventBoxInner<T>({
       disarmEdge();
     };
   }, [disarmEdge]);
+  // The grid keeps this box's page mounted while it carries a lift, but anything
+  // else that unmounts the box (the app removing the event mid-drag) takes its
+  // gesture detector with it, and Gesture Handler then sends no end or finalize.
+  // Clear the floating copy, which would otherwise outlive the drag, and the
+  // page's preview of a segmented move, which hides only while `lifted` is set.
+  // Read through a ref, so only the unmount runs this, never a changed callback.
+  const abandonLiftRef = useRef(() => {});
+  abandonLiftRef.current = () => {
+    edgePaging?.cancelLift();
+    onMovePreview(null);
+  };
+  useLayoutEffect(
+    () => () => {
+      if (!liftedHereRef.current) return;
+      liftedHereRef.current = false;
+      lifted.value = 0;
+      abandonLiftRef.current();
+    },
+    [lifted],
+  );
+  // Every end of the move gesture lands here, after the dwell timer has either
+  // lifted the event or seen the release and stopped. A release drops the
+  // floating copy where it is drawn; a cancel (the system taking the touch)
+  // leaves the event where it was.
+  // `ghostX`/`ghostY` are where the copy was drawn, worked out on the UI thread,
+  // because a JavaScript read of the copy's position can predate its seed.
+  const finishLift = useCallback(
+    (success: boolean, ghostX: number, ghostY: number) => {
+      if (!liftedHereRef.current || !edgePaging) return;
+      liftedHereRef.current = false;
+      // No edge page may start after the drag's own outcome, a page-back included.
+      disarmEdge();
+      onMovePreview(null);
+      if (success) edgePaging.commitLiftedDrop(ghostX, ghostY);
+      else edgePaging.cancelLiftedDrag();
+      // The fresh mount resets `lifted` and the offsets. It waits for the
+      // floating copy to go, which a drop waiting on the app's answer keeps up,
+      // so the event never shows twice.
+      edgePaging.afterLiftCleared(onLiftEnded);
+    },
+    [edgePaging, onMovePreview, onLiftEnded, disarmEdge],
+  );
   // Cancel a pending dwell. Runs on every gesture end.
   const releaseEdge = disarmEdge;
   const armEdge = useCallback(
@@ -982,14 +1064,21 @@ function AnimatedEventBoxInner<T>({
       const fire = () => {
         dwellTimer.current = null;
         if (!mountedRef.current || !edgePaging) return;
+        // The finger lifts on the UI thread, which clears `moving` at once, while
+        // the release reaches this thread later. A page change that has not
+        // started by then would slide the view away from where the drop lands.
+        if (!moving.value) return;
         // First edge fire: lift the event into the floating ghost. It must NOT
         // commit here — committing relocates the event off this page, which
         // unmounts the dragging box and kills the gesture. Instead the ghost
         // (seeded at the current finger position) carries the event across the
         // page, and the drop commits on release. The source box stays mounted, so
         // the same gesture keeps tracking after the page changes.
-        if (!lifted.value) {
-          if (!edgePaging.beginLift(latest.current.event as CalendarEvent<unknown>)) return;
+        if (!liftedHereRef.current) {
+          if (!edgePaging.beginLift(latest.current.event as CalendarEvent<unknown>, pageIndex)) {
+            return;
+          }
+          liftedHereRef.current = true;
           lifted.value = 1;
           edgePaging.ghostW.value = dayWidth;
           edgePaging.ghostH.value = boxHeight.value;
@@ -1007,6 +1096,8 @@ function AnimatedEventBoxInner<T>({
     [
       disarmEdge,
       edgePaging,
+      pageIndex,
+      moving,
       lifted,
       dayWidth,
       boxHeight,
@@ -1112,9 +1203,7 @@ function AnimatedEventBoxInner<T>({
         }
       })
       .onEnd((event) => {
-        // A cross-week drag is committed in onFinalize (which fires whether the
-        // gesture ends cleanly or is cancelled as the page moves under it), so the
-        // drop lands even when onEnd doesn't fire on device. Nothing to do here.
+        // A cross-week drag finishes in onFinalize, which also sees a cancel.
         if (lifted.value) return;
         const { minuteDelta, dayDelta, totalDelta } = snapMove(
           event.translationX,
@@ -1137,27 +1226,28 @@ function AnimatedEventBoxInner<T>({
       })
       .onFinalize((_event, success) => {
         dragZ.value = 0;
+        // First, so a dwell timer that fires before the release reaches the
+        // JavaScript thread starts no page (see `armEdge`).
+        moving.value = 0;
         // A cancelled or paged drag returns the renderer to the stored times; a
         // committed one keeps the dropped times until the parent's update lands.
         if (liveOwner.value === 1) {
           liveOwner.value = 0;
           if (!liveCommitted.value) showLiveDelta(0, 0, !multiDay);
         }
-        // Commit the cross-week drop here: onFinalize fires on every gesture end,
-        // including the cancel RNGH reports when the source page moves under the
-        // touch, so committing from the last finger position (ghost column + the
-        // vertical drag) guarantees the drop lands instead of silently vanishing.
-        if (lifted.value && ghostXSV && ghostYSV && commitLiftedDrop) {
-          runOnJS(commitLiftedDrop)(ghostXSV.value, ghostYSV.value);
-          moveOffset.value = 0;
-          moveOffsetX.value = 0;
-          lifted.value = 0;
-          runOnJS(endMovePreview)();
+        // A cross-week drag finishes on the JavaScript thread, which owns the lift.
+        // Hand it the copy's position from here: until the lift's own writes
+        // arrive, place the copy from the finger, as the dwell timer seeds it.
+        if (pagerLeftSV && pagerTopSV && ghostXSV && ghostYSV) {
+          const x = lifted.value
+            ? ghostXSV.value
+            : liveAbsX.value - grabX.value - pagerLeftSV.value;
+          const y = lifted.value ? ghostYSV.value : liveAbsY.value - grabY.value - pagerTopSV.value;
+          runOnJS(finishLift)(success, x, y);
         }
         // The preview unmounts from the `spillHeight` reaction once the commit
-        // lands and clears `moveOffset`; this is the safety net for a cancel,
-        // where `onEnd` never runs.
-        moving.value = 0;
+        // lands and clears `moveOffset`; this is the safety net for a gesture
+        // that ends without a commit.
         if (multiDay && !success) {
           moveOffset.value = 0;
           moveOffsetX.value = 0;
@@ -1195,7 +1285,7 @@ function AnimatedEventBoxInner<T>({
     pagerWidthSV,
     ghostXSV,
     ghostYSV,
-    commitLiftedDrop,
+    finishLift,
     dayWidth,
     dayIndex,
     dayCount,
@@ -2516,6 +2606,12 @@ function TimetablePageInner<T>({
     <View
       testID="time-grid-page"
       style={[styles.page, { width, height }]}
+      // Hiding the page from accessibility makes Fabric keep it as the parent of
+      // its children, which it otherwise mounts into the list's item container.
+      // Keep that parent the same while active, or a page change moves every
+      // event into a new parent, and iOS cancels a drag whose view leaves the
+      // window.
+      collapsable={false}
       // Only the active page is on screen; keep the pre-mounted neighbours out of
       // the screen-reader traversal so their events and headers aren't announced.
       accessibilityElementsHidden={!isActive}
@@ -2745,6 +2841,7 @@ function TimetablePageInner<T>({
                   onDragEvent={onDragEvent}
                   onDragStart={onDragStart}
                   onEdgeAdvance={onEdgeAdvance}
+                  pageIndex={pageIndex}
                 />
               );
             }),
@@ -3191,9 +3288,14 @@ function TimeGridInner<T>(
   // scrolls with the content, so a finger's window position maps into the grid
   // through it.
   const scrollY = useSharedValue(seedDefaultY);
+  // 1 once the scroll view has reported an offset. Until then `scrollY` holds the
+  // seed, which the scroll view may not be able to reach (see `clampSeed`).
+  const scrollReported = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler(
     {
       onScroll: (event) => {
+        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+        scrollReported.value = 1;
         // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
         scrollY.value = event.contentOffset.y;
         if (onVerticalScroll) {
@@ -3215,6 +3317,29 @@ function TimeGridInner<T>(
   // The scroll view's `contentOffset` holds the mount offset; a later
   // `scrollOffsetMinutes` is scrolled to by the effect further down.
   const [mountOffsetY] = useState(seedDefaultY);
+  // A seed past the end of the hours (a viewport taller than the grid, as on a
+  // low-density screen) cannot be reached. Android and the browser clamp it and,
+  // resting at 0, send no scroll event, so the pinned header and all-day band
+  // would stay at the seed, over the hours. Until a scroll event reports the real
+  // offset, hold the seed and the scroll view at the furthest offset the content
+  // allows. iOS keeps an out-of-range offset as overscroll, where the seed stays
+  // right, and its content grows once the all-day band measures, so clamping
+  // there could land short of a seed the content then reaches.
+  const scrollSizesRef = useRef({ viewport: 0, content: 0 });
+  const clampSeed = useCallback(
+    (sizes: Partial<{ viewport: number; content: number }>) => {
+      const next = { ...scrollSizesRef.current, ...sizes };
+      scrollSizesRef.current = next;
+      if (Platform.OS === "ios" || scrollReported.value) return;
+      if (next.viewport <= 0 || next.content <= 0) return;
+      const max = Math.max(0, next.content - next.viewport);
+      if (scrollY.value <= max) return;
+      // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+      scrollY.value = max;
+      scrollRef.current?.scrollTo({ y: max, animated: false });
+    },
+    [scrollReported, scrollY, scrollRef],
+  );
   // react-native-web ignores `contentOffset`; apply the initial offset once the
   // viewport and the content have laid out instead.
   const webSeededRef = useRef(!isWeb);
@@ -3298,12 +3423,24 @@ function TimeGridInner<T>(
   const ghostVisible = useSharedValue(0);
   const [liftedEvent, setLiftedEvent] = useState<CalendarEvent<T> | null>(null);
   const liftedEventRef = useRef<CalendarEvent<T> | null>(null);
+  // The page the lifted drag started on. Its event box owns the gesture, so the
+  // pager keeps it mounted however far the drag pages away; otherwise the list
+  // unmounts it past its draw distance and the drag dies under the finger.
+  const [liftedPageIndex, setLiftedPageIndex] = useState<number | null>(null);
+  const pagerAlwaysRender = useMemo(
+    () => (liftedPageIndex == null ? undefined : { indices: [liftedPageIndex] }),
+    [liftedPageIndex],
+  );
   // The drop commit needs the live page's columns and handler; keep them in a ref
   // refreshed each render so the callbacks below stay identity-stable. A changing
   // context value would re-memo every event's gesture and tear down an in-progress
   // drag (the gesture must outlive the page change to finish a cross-week drop).
   const dropRef = useRef({
-    headerDays: [] as Date[],
+    daysAt: (_index: number): Date[] => [],
+    viewedIndex: (): number => PAGE_WINDOW,
+    activeIndex: (): number => PAGE_WINDOW,
+    events,
+    getEventId,
     columnsWidth,
     headerOffset,
     minHour: clampedMinHour,
@@ -3313,9 +3450,20 @@ function TimeGridInner<T>(
     onDragEvent,
     onChangeDate,
   });
+  const resolveLiftedEvent = useCallback(
+    (ev: CalendarEvent<T>) =>
+      findCurrentEvent(dropRef.current.events, ev, dropRef.current.getEventId) ?? ev,
+    [],
+  );
+  // A drop waiting for the app's answer (see `pendingDrop`). No new lift starts
+  // until it lands, because landing it clears the lift.
+  const pendingDropRef = useRef<PendingDrop<T> | null>(null);
+  // Pages back to a drag's event when it stays put; set once `goToPage` exists.
+  const pageBackRef = useRef<(date: Date) => void>(() => {});
   const beginLift = useCallback(
-    (event: CalendarEvent<unknown>) => {
-      const ev = event as CalendarEvent<T>;
+    (event: CalendarEvent<unknown>, pageIndex: number) => {
+      const ev = resolveLiftedEvent(event as CalendarEvent<T>);
+      if (pendingDropRef.current) return false;
       if (isAllDayLaneEvent(ev, dropRef.current.multiDayTimedEventPlacement)) {
         // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
         ghostVisible.value = 0;
@@ -3323,34 +3471,76 @@ function TimeGridInner<T>(
       }
       liftedEventRef.current = ev;
       setLiftedEvent(ev);
+      setLiftedPageIndex(pageIndex);
       return true;
     },
-    [ghostVisible],
+    [ghostVisible, resolveLiftedEvent],
   );
-  const isLiftActive = useCallback(
-    () =>
-      liftedEventRef.current != null &&
-      !isAllDayLaneEvent(liftedEventRef.current, dropRef.current.multiDayTimedEventPlacement),
-    [],
-  );
+  const isLiftActive = useCallback(() => {
+    const ev = liftedEventRef.current;
+    if (!ev) return false;
+    return !isAllDayLaneEvent(resolveLiftedEvent(ev), dropRef.current.multiDayTimedEventPlacement);
+  }, [resolveLiftedEvent]);
+  // Callbacks waiting for the floating copy to go (see `afterLiftCleared`).
+  const liftClearedRef = useRef<(() => void)[]>([]);
   const clearLift = useCallback(() => {
     // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
     ghostVisible.value = 0;
     liftedEventRef.current = null;
     setLiftedEvent(null);
+    setLiftedPageIndex(null);
+    const waiting = liftClearedRef.current;
+    liftClearedRef.current = [];
+    for (const callback of waiting) callback();
   }, [ghostVisible]);
+  const afterLiftCleared = useCallback((callback: () => void) => {
+    if (liftedEventRef.current == null) callback();
+    else liftClearedRef.current.push(callback);
+  }, []);
+  const currentLiftedEvent = liftedEvent
+    ? (findCurrentEvent(events, liftedEvent, getEventId) ?? liftedEvent)
+    : null;
+  // Place a drop on the page at `index`: `column` of its days, `minutes` into it.
+  const landDrop = useCallback(
+    (drop: PendingDrop<T>, index: number) => {
+      const {
+        daysAt,
+        multiDayTimedEventPlacement: placement,
+        onDragEvent: onDrag,
+      } = dropRef.current;
+      const ev = resolveLiftedEvent(drop.event);
+      const days = daysAt(index);
+      if (!onDrag || days.length === 0 || isAllDayLaneEvent(ev, placement)) return;
+      const start = new Date(days[Math.min(drop.column, days.length - 1)]);
+      start.setHours(0, 0, 0, 0);
+      start.setMinutes(drop.minutes);
+      const duration = ev.end.getTime() - ev.start.getTime();
+      const end = new Date(start.getTime() + duration);
+      // A rejected drop (handler returned false) leaves the event on its original
+      // week, which the drag has paged away from. Page back to it so the reject
+      // reads as a visible snap-back instead of the event seeming to vanish.
+      if (onDrag(ev, start, end) === false) pageBackRef.current(ev.start);
+    },
+    [resolveLiftedEvent],
+  );
+  // A drop made while the app has not yet answered a page change the drag
+  // reported. It lands once the render carrying that answer commits, on the page
+  // the app then shows: the new one if it took the date, the one it kept if not.
+  const [pendingDrop, setPendingDrop] = useState<PendingDrop<T> | null>(null);
   useEffect(() => {
-    if (
-      liftedEventRef.current &&
-      isAllDayLaneEvent(liftedEventRef.current, multiDayTimedEventPlacement)
-    ) {
+    const ev = liftedEventRef.current ? resolveLiftedEvent(liftedEventRef.current) : null;
+    if (ev && isAllDayLaneEvent(ev, multiDayTimedEventPlacement)) {
+      pendingDropRef.current = null;
+      setPendingDrop(null);
       clearLift();
     }
-  }, [multiDayTimedEventPlacement, clearLift]);
+  }, [multiDayTimedEventPlacement, events, getEventId, resolveLiftedEvent, clearLift]);
   const commitLiftedDrop = useCallback(
     (ghostLocalX: number, ghostLocalY: number) => {
       const {
-        headerDays: days,
+        daysAt,
+        viewedIndex,
+        activeIndex: committedIndex,
         columnsWidth: cw,
         headerOffset: headerH,
         minHour: min,
@@ -3358,21 +3548,26 @@ function TimeGridInner<T>(
         snapMinutes: snap,
         multiDayTimedEventPlacement: placement,
         onDragEvent: onDrag,
-        onChangeDate: onDate,
       } = dropRef.current;
-      const ev = liftedEventRef.current;
+      const ev = liftedEventRef.current ? resolveLiftedEvent(liftedEventRef.current) : null;
       const duration = ev ? ev.end.getTime() - ev.start.getTime() : 0;
-      clearLift();
-      if (!ev || !onDrag || days.length === 0 || isAllDayLaneEvent(ev, placement)) return;
+      // Every page shows the same number of columns.
+      const columnCount = daysAt(committedIndex()).length;
+      if (!ev || !onDrag || columnCount === 0 || isAllDayLaneEvent(ev, placement)) {
+        clearLift();
+        return;
+      }
       // Map the ghost's drawn position on the page it landed on back to a cell:
       // its centre picks the day column, its top edge picks the time. Both are
       // pager-local, and the pager is the scrolling content itself, so the top
       // edge only needs the page's all-day band and label inset taken off before
       // the live row height (pinch) converts it to hours.
-      const dayWidth = cw / days.length;
-      const col = Math.min(
-        Math.max(Math.floor((ghostLocalX + ghostW.value / 2) / dayWidth), 0),
-        days.length - 1,
+      const dayWidth = cw / columnCount;
+      // The ghost spans one day column; using `dayWidth` avoids reading `ghostW`
+      // from JavaScript before the UI thread has received the lift's seed.
+      const column = Math.min(
+        Math.max(Math.floor((ghostLocalX + dayWidth / 2) / dayWidth), 0),
+        columnCount - 1,
       );
       const hoursFromMin =
         (ghostLocalY - headerH - laneHeight.value - HOUR_LABEL_TOP_INSET) / cellHeight.value;
@@ -3387,17 +3582,29 @@ function TimeGridInner<T>(
         snap,
         duration / 60_000,
       );
-      const start = new Date(days[col]);
-      start.setHours(0, 0, 0, 0);
-      start.setMinutes(minutes);
-      const end = new Date(start.getTime() + duration);
-      // A rejected drop (handler returned false) leaves the event on its original
-      // week, which the drag has paged away from. Page back to it so the reject
-      // reads as a visible snap-back instead of the event seeming to vanish.
-      if (onDrag(ev, start, end) === false) onDate(ev.start, { reason: "event-drag" });
+      const drop = { event: ev, column, minutes };
+      if (viewedIndex() === committedIndex()) {
+        clearLift();
+        landDrop(drop, committedIndex());
+        return;
+      }
+      // The pager has moved to a page whose date the app has not rendered yet.
+      // A transition, like the date report itself, so the render that lands the
+      // drop also carries the app's answer, whether the app updates `date`
+      // directly or in a transition of its own. The floating copy stays where it
+      // was dropped until then, so the event never disappears in between.
+      pendingDropRef.current = drop;
+      startTransition(() => setPendingDrop(drop));
     },
-    [clearLift, cellHeight, laneHeight, ghostW],
+    [clearLift, landDrop, cellHeight, laneHeight, resolveLiftedEvent],
   );
+  // A cancelled drag leaves the event where it was; page back to it, as a
+  // rejected drop does, so the event does not seem to vanish.
+  const cancelLiftedDrag = useCallback(() => {
+    const ev = liftedEventRef.current ? resolveLiftedEvent(liftedEventRef.current) : null;
+    clearLift();
+    if (ev) pageBackRef.current(ev.start);
+  }, [clearLift, resolveLiftedEvent]);
   const edgePaging = useMemo<EdgePaging>(
     () => ({
       pagerLeft,
@@ -3411,6 +3618,9 @@ function TimeGridInner<T>(
       beginLift,
       isLiftActive,
       commitLiftedDrop,
+      cancelLift: clearLift,
+      cancelLiftedDrag,
+      afterLiftCleared,
     }),
     [
       pagerLeft,
@@ -3424,6 +3634,9 @@ function TimeGridInner<T>(
       beginLift,
       isLiftActive,
       commitLiftedDrop,
+      clearLift,
+      cancelLiftedDrag,
+      afterLiftCleared,
     ],
   );
   // Zoom committed at the end of the last pinch; off-screen pages animate off
@@ -3552,6 +3765,9 @@ function TimeGridInner<T>(
   // intermediate pages it crosses are ignored until it lands, so they can't report
   // a page in between back as the new date — which made jumps land one page short.
   const pendingScrollIndexRef = useRef<number | null>(null);
+  // The target `realignRestingPager` last sent again, cleared by every new
+  // programmatic target.
+  const resentTargetRef = useRef<number | null>(null);
   // Bumped after each date the user pages to, so the grid re-renders with the `date`
   // the app chose even when the app kept the old one (no prop changes then).
   const [dateReports, setDateReports] = useState(0);
@@ -3614,7 +3830,23 @@ function TimeGridInner<T>(
   // Keep the cross-week drop's page columns + handler current without changing the
   // identity-stable EdgePaging callbacks (see dropRef).
   dropRef.current = {
-    headerDays,
+    daysAt: (index: number) =>
+      getViewDays(
+        mode,
+        pageDates[index] ?? activePageDate,
+        weekStartsOn,
+        numberOfDays,
+        isRTL,
+        weekEndsOn,
+        hiddenDays,
+      ),
+    // The page the pager shows or is already paging to, and the page `date`
+    // names. An edge page moves the pager at once; `date` follows only once the
+    // app has answered the page change it reported.
+    viewedIndex: () => viewedIndexRef.current,
+    activeIndex: () => activeIndexRef.current,
+    events,
+    getEventId,
     columnsWidth,
     headerOffset,
     minHour: clampedMinHour,
@@ -3644,10 +3876,18 @@ function TimeGridInner<T>(
         return;
       }
       if (settled.index === viewedIndexRef.current) return;
+      // Report only the page nearest the live offset; a page 90% in view is
+      // within a tenth of a page of it. After a programmatic scroll iOS reported
+      // the target and then, late, the page the list had left, which would read
+      // as a swipe back to a week the grid is no longer on. A tick that reaches
+      // this thread after a fast fling has moved on is dropped too; the page the
+      // fling rests on is still reported, so only weeks it passed are skipped.
+      if (columnsWidth > 0 && Math.round(pagerOffset.value / columnsWidth) !== settled.index)
+        return;
       viewedIndexRef.current = settled.index;
       if (settled.item) reportDate(settled.item, "swipe");
     },
-    [reportDate],
+    [reportDate, columnsWidth, pagerOffset],
   );
 
   // Realign the list when the date changes from outside a swipe (e.g. a "today"
@@ -3656,6 +3896,7 @@ function TimeGridInner<T>(
     if (activeIndex === viewedIndexRef.current) return;
     viewedIndexRef.current = activeIndex;
     pendingScrollIndexRef.current = activeIndex;
+    resentTargetRef.current = null;
     // Keep the all-day band's interpolation source in step with the jump; the
     // list reports its offset only as it scrolls, not on a programmatic one.
     // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
@@ -3769,6 +4010,7 @@ function TimeGridInner<T>(
       if (!target) return;
       viewedIndexRef.current = index;
       pendingScrollIndexRef.current = index;
+      resentTargetRef.current = null;
       // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
       pagerOffset.value = index * columnsWidth;
       void listRef.current?.scrollToIndex({ index, animated: !isWeb && !reduceMotion });
@@ -3776,9 +4018,45 @@ function TimeGridInner<T>(
     },
     [pageDates, reduceMotion, reportDate, columnsWidth, pagerOffset],
   );
+  // Page back to `date` after a cross-page drag that left its event in place (a
+  // cancel or a rejected drop). The grid scrolls itself, with an animation: on
+  // Android a scroll without one does not stop an edge page still animating,
+  // which could land after the page-back (see PAGERS.md).
+  // Assigned after commit, so a drop never calls one from a render that was
+  // thrown away.
+  useLayoutEffect(() => {
+    pageBackRef.current = (date: Date) => {
+      const index = indexOfDate(date);
+      if (!pageDates[index]) {
+        onChangeDate(date, { reason: "event-drag" });
+        return;
+      }
+      // Already there (the drag paged back by itself): no scroll, so no target
+      // to wait for, which would otherwise stay pending with no tick to clear it.
+      if (index !== viewedIndexRef.current) {
+        viewedIndexRef.current = index;
+        pendingScrollIndexRef.current = index;
+        resentTargetRef.current = null;
+        // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+        pagerOffset.value = index * columnsWidth;
+        void listRef.current?.scrollToIndex({ index, animated: !isWeb && !reduceMotion });
+      }
+      reportDate(date, "event-drag");
+    };
+  });
   const pageByKey = useCallback((delta: number) => goToPage(delta, "keyboard"), [goToPage]);
   const pageByEdgeDrag = useCallback((delta: number) => goToPage(delta, "event-drag"), [goToPage]);
   useWebPagerKeys(swipeEnabled, pageByKey);
+
+  // Land a drop that waited for the app's answer to a page change, on the page
+  // `date` now names. If the app kept its date, the effect below pages back to it.
+  useEffect(() => {
+    if (!pendingDrop) return;
+    setPendingDrop(null);
+    pendingDropRef.current = null;
+    clearLift();
+    landDrop(pendingDrop, activeIndex);
+  }, [pendingDrop, activeIndex, landDrop, clearLift]);
 
   // `date` is controlled: when the app keeps the old date after the user paged (a
   // swipe, an arrow key or an edge drag), page back to the one it still shows
@@ -3793,6 +4071,7 @@ function TimeGridInner<T>(
     }
     viewedIndexRef.current = activeIndex;
     pendingScrollIndexRef.current = activeIndex;
+    resentTargetRef.current = null;
     // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
     pagerOffset.value = activeIndex * columnsWidth;
     void listRef.current?.scrollToIndex({ index: activeIndex, animated: !isWeb && !reduceMotion });
@@ -3881,8 +4160,19 @@ function TimeGridInner<T>(
       if (columnsWidth <= 0) return;
       const pages = offsetX / columnsWidth;
       const offPagePx = Math.abs(pages - Math.round(pages)) * columnsWidth * PixelRatio.get();
-      if (offPagePx < 0.5) return;
-      const index = pendingScrollIndexRef.current ?? commitNearestPage(offsetX);
+      const target = pendingScrollIndexRef.current;
+      // Resting on a page is fine unless it is not the page the last programmatic
+      // scroll was sent to. Such a list (seen when an app keeps its date during a
+      // long edge drag; the cause is not traced) rests on a whole page that
+      // nothing else corrects, as its viewability ticks are ignored while the
+      // target is pending. Send it once more, and only once per target, so a
+      // scroll that keeps falling short cannot loop.
+      if (offPagePx < 0.5) {
+        if (target == null || target === Math.round(pages)) return;
+        if (resentTargetRef.current === target) return;
+        resentTargetRef.current = target;
+      }
+      const index = target ?? commitNearestPage(offsetX);
       // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
       pagerOffset.value = index * columnsWidth;
       void listRef.current?.scrollToIndex({ index, animated: !reduceMotion });
@@ -4137,6 +4427,8 @@ function TimeGridInner<T>(
                   showsVerticalScrollIndicator={showVerticalScrollIndicator}
                   scrollEnabled={verticalScrollEnabled}
                   onScroll={scrollHandler}
+                  onLayout={(event) => clampSeed({ viewport: event.nativeEvent.layout.height })}
+                  onContentSizeChange={(_width, height) => clampSeed({ content: height })}
                   scrollEventThrottle={16}
                   refreshControl={verticalScrollEnabled ? refreshControl : undefined}
                   contentOffset={{ x: 0, y: mountOffsetY }}
@@ -4201,6 +4493,7 @@ function TimeGridInner<T>(
                           getFixedItemSize={getFixedItemSize}
                           // Mount the next pages either side while idle, not mid-swipe.
                           drawDistance={columnsWidth * 2}
+                          alwaysRender={pagerAlwaysRender}
                           // The live horizontal offset, kept on the UI thread, drives the
                           // all-day band's height.
                           sharedValues={pagerSharedValues}
@@ -4239,15 +4532,15 @@ function TimeGridInner<T>(
                           renderItem={renderItem}
                         />
                       ) : null}
-                      {liftedEvent &&
-                      !isAllDayLaneEvent(liftedEvent, multiDayTimedEventPlacement) ? (
+                      {currentLiftedEvent &&
+                      !isAllDayLaneEvent(currentLiftedEvent, multiDayTimedEventPlacement) ? (
                         <DragGhost
                           x={ghostX}
                           y={ghostY}
                           w={ghostW}
                           h={ghostH}
                           visible={ghostVisible}
-                          event={liftedEvent}
+                          event={currentLiftedEvent}
                           mode={mode}
                           renderEvent={labeledRenderEvent}
                           eventGap={eventGap}

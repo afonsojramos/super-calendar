@@ -230,7 +230,12 @@ need `onChangeDate` set (they already do for paging); the page only advances on 
 deliberate dwell at the very edge, so a normal in-view drag never trips it.
 
 On native the pager's own swipe is frozen for the moment it pages, so the view
-advances under your held finger instead of waiting for you to lift.
+advances under your held finger instead of waiting for you to lift. Lifting
+your finger stops the paging, and no further page starts. The event lands on the
+period the grid settles on: the page the view shows or is moving to, or, when
+your app keeps its `date` instead of taking the new one, the period it kept. If the system cancels the touch
+after the view has paged (for example, an incoming call), the event stays where
+it was, no `onDragEvent` fires, and the view pages back to the event's period.
 
 On native, the floating copy's horizontal centre selects the destination day.
 Its top edge selects the time. The copy spans a full day column, even for an event
