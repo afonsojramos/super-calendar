@@ -1,5 +1,5 @@
 import { addDays, differenceInCalendarDays, startOfDay } from "date-fns";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Animated, {
   runOnJS,
   type SharedValue,
@@ -7,7 +7,12 @@ import Animated, {
   useAnimatedStyle,
   useDerivedValue,
 } from "react-native-reanimated";
-import { clockHoursBetween, shiftMinutes, wallClockHours } from "@super-calendar/core";
+import {
+  clockHoursBetween,
+  resolveDraggedBounds,
+  shiftMinutes,
+  wallClockHours,
+} from "@super-calendar/core";
 import type { CalendarEvent, CalendarMode, RenderEvent } from "../types";
 import { useCalendarTheme } from "../theme";
 import { useSlots } from "../utils/slots";
@@ -21,6 +26,11 @@ export type MultiDayMove<T> = {
   offsetX: SharedValue<number>;
   offsetY: SharedValue<number>;
   lifted: SharedValue<number>;
+  // The snapped start and end deltas a release would commit, and the step they
+  // snap to, so the renderer shows the times the drop will report.
+  liveStartDelta: SharedValue<number>;
+  liveEndDelta: SharedValue<number>;
+  snapMinutes: number;
 };
 
 type PreviewProps<T> = {
@@ -38,17 +48,48 @@ type PreviewProps<T> = {
 const noop = () => {};
 
 // Mount once on grab. Only numbers and shared values cross to the UI thread;
-// moving the pointer does not rerender the page or rebuild its gestures.
+// moving the pointer does not rerender the page or rebuild its gestures. The
+// segments re-render once per snapped step, to show the times a drop reports.
 export function MultiDayMovePreview<T>(props: PreviewProps<T>) {
   const { move, days } = props;
+  const { liveStartDelta, liveEndDelta, snapMinutes } = move;
   const dayOffsets = useMemo(
     () => days.map((day) => differenceInCalendarDays(day, days[move.dayIndex]) * 1440),
     [days, move],
   );
+  const [delta, setDelta] = useState({ start: 0, end: 0 });
+  const syncDelta = useCallback((next: { start: number; end: number }) => {
+    setDelta((current) =>
+      current.start === next.start && current.end === next.end ? current : next,
+    );
+  }, []);
+  // The first run syncs too, since the shared values may hold a delta already.
+  useAnimatedReaction(
+    () => ({ start: liveStartDelta.value, end: liveEndDelta.value }),
+    (next, previous) => {
+      if (!previous || next.start !== previous.start || next.end !== previous.end) {
+        runOnJS(syncDelta)(next);
+      }
+    },
+  );
+  const event = useMemo(() => {
+    const next =
+      delta.start === 0 && delta.end === 0
+        ? null
+        : resolveDraggedBounds(
+            move.event.start,
+            move.event.end,
+            delta.start,
+            delta.end,
+            snapMinutes,
+          );
+    return next ? { ...move.event, start: next.start, end: next.end } : move.event;
+  }, [move.event, delta, snapMinutes]);
   return days.map((day, index) => (
     <PreviewDay
       key={day.toISOString()}
       {...props}
+      liveEvent={event}
       dayOffsets={dayOffsets}
       index={index}
       dayStart={startOfDay(day).getTime()}
@@ -66,11 +107,13 @@ function PreviewDay<T>({
   renderEvent: RenderEventComponent,
   minEventHeight,
   eventGap,
+  liveEvent,
   dayOffsets,
   index,
   dayStart,
   dayEnd,
 }: PreviewProps<T> & {
+  liveEvent: CalendarEvent<T>;
   dayOffsets: number[];
   index: number;
   dayStart: number;
@@ -156,7 +199,7 @@ function PreviewDay<T>({
       ]}
     >
       <RenderEventComponent
-        event={event}
+        event={liveEvent}
         mode={mode}
         boxHeight={boxHeight}
         {...continuation}
