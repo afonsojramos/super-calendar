@@ -1428,6 +1428,8 @@ describe("TimeGrid fast-fling repaint", () => {
     const list = lastListProps() as FlingList & {
       data: Date[];
       initialScrollIndex: number;
+      getFixedItemSize: () => number;
+      sharedValues: { scrollOffset: { value: number } };
       onViewableItemsChanged: (info: unknown) => void;
     };
     const calls = () =>
@@ -1435,6 +1437,7 @@ describe("TimeGrid fast-fling repaint", () => {
     const index = list.initialScrollIndex + 1;
     await act(() => list.onScrollBeginDrag?.());
     // A slow drag shows the next week before the finger lifts.
+    list.sharedValues.scrollOffset.value = index * list.getFixedItemSize();
     await act(() =>
       list.onViewableItemsChanged({
         viewableItems: [{ isViewable: true, index, item: list.data[index] }],
@@ -1700,6 +1703,144 @@ describe("TimeGrid pager resting off a page", () => {
     ]);
   });
 
+  it("scrolls again to a target that a programmatic scroll never reached", async () => {
+    const grid = (date: Date) => (
+      <TimeGrid
+        mode="day"
+        date={date}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />
+    );
+    const { rerender } = await render(grid(new Date(2026, 0, 6, 12, 0, 0)));
+    const { getFixedItemSize, initialScrollIndex } = list();
+    // The app moves the date on a day, and the grid scrolls to it.
+    await rerender(grid(new Date(2026, 0, 7, 12, 0, 0)));
+    expect(calls()).toHaveLength(1);
+    expect(calls()[0]?.index).toBe(initialScrollIndex + 1);
+    // The scroll never lands, and the list comes to rest exactly on the page it
+    // started from.
+    await scrollTo(initialScrollIndex * getFixedItemSize());
+    await wait(250);
+    expect(calls()).toHaveLength(2);
+    expect(calls()[1]?.index).toBe(initialScrollIndex + 1);
+    // If that falls short too, the grid stops there rather than loop.
+    await scrollTo(initialScrollIndex * getFixedItemSize());
+    await wait(250);
+    expect(calls()).toHaveLength(2);
+  });
+
+  it("does not report a page the list has already left as a swipe", async () => {
+    const onChangeDate = vi.fn();
+    const grid = (date: Date) => (
+      <TimeGrid
+        mode="day"
+        date={date}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={onChangeDate}
+        onPressEvent={noop}
+      />
+    );
+    const { rerender } = await render(grid(new Date(2026, 0, 6, 12, 0, 0)));
+    const pager = list() as PagerList & {
+      data: Date[];
+      onViewableItemsChanged: (info: unknown) => void;
+    };
+    const { initialScrollIndex } = pager;
+    const report = (index: number) =>
+      act(() =>
+        pager.onViewableItemsChanged({
+          viewableItems: [{ isViewable: true, index, item: pager.data[index] }],
+        }),
+      );
+    // The app jumps the date three days on, and the list follows without an
+    // animation.
+    await rerender(grid(new Date(2026, 0, 9, 12, 0, 0)));
+    // iOS reports the target, then, late, the page the list jumped from.
+    await report(initialScrollIndex + 3);
+    await report(initialScrollIndex);
+    expect(onChangeDate).not.toHaveBeenCalled();
+  });
+
+  it("reports the page a fast fling rests on after dropping a late tick it passed", async () => {
+    const onChangeDate = vi.fn();
+    await render(
+      <TimeGrid
+        mode="day"
+        date={new Date(2026, 0, 6, 12, 0, 0)}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={onChangeDate}
+        onPressEvent={noop}
+      />,
+    );
+    const pager = list() as PagerList & {
+      data: Date[];
+      onViewableItemsChanged: (info: unknown) => void;
+    };
+    const { getFixedItemSize, initialScrollIndex } = pager;
+    const report = (index: number) =>
+      act(() =>
+        pager.onViewableItemsChanged({
+          viewableItems: [{ isViewable: true, index, item: pager.data[index] }],
+        }),
+      );
+    await act(() => pager.onScrollBeginDrag());
+    await act(() => pager.onScrollEndDrag());
+    // The fling is already past the next page when its tick arrives.
+    await scrollTo((initialScrollIndex + 1.7) * getFixedItemSize());
+    await report(initialScrollIndex + 1);
+    expect(onChangeDate).not.toHaveBeenCalled();
+    await scrollTo((initialScrollIndex + 2) * getFixedItemSize());
+    await report(initialScrollIndex + 2);
+    expect(onChangeDate).toHaveBeenCalledExactlyOnceWith(pager.data[initialScrollIndex + 2], {
+      reason: "swipe",
+    });
+  });
+
+  it.each([
+    { label: "rests on the page it was sent to", start: false, offset: 1 },
+    { label: "is swiped by the user to another page", start: true, offset: 0 },
+  ])("leaves a pager alone that $label", async ({ start, offset }) => {
+    const grid = (date: Date) => (
+      <TimeGrid
+        mode="day"
+        date={date}
+        events={[event]}
+        cellHeight={{ value: 48 } as never}
+        weekStartsOn={1}
+        renderEvent={DefaultEvent}
+        keyExtractor={(item) => item.id}
+        onChangeDate={noop}
+        onPressEvent={noop}
+      />
+    );
+    const { rerender } = await render(grid(new Date(2026, 0, 6, 12, 0, 0)));
+    const { getFixedItemSize, initialScrollIndex } = list();
+    await rerender(grid(new Date(2026, 0, 7, 12, 0, 0)));
+    expect(calls()).toHaveLength(1);
+    // A drag start hands the pager to the user, dropping the pending target.
+    if (start) {
+      await act(() => list().onScrollBeginDrag());
+      await act(() => list().onScrollEndDrag());
+    }
+    await scrollTo((initialScrollIndex + offset) * getFixedItemSize());
+    await wait(250);
+    expect(calls()).toHaveLength(1);
+  });
+
   it("leaves a pager resting on a page alone", async () => {
     await renderPager();
     const { getFixedItemSize, initialScrollIndex } = list();
@@ -1829,13 +1970,17 @@ describe("TimeGrid pager resting off a page", () => {
 });
 
 describe("TimeGrid cross-week drop", () => {
+  // A virtualized pager keeps the page the drag started on mounted, with the
+  // gesture on it, after an edge drag pages away from it.
   beforeEach(() => {
     const gestureHandler = gestureHandlerMock as unknown as { __gestures: unknown[] };
     gestureHandler.__gestures.length = 0;
     animatedReactionHarness().__reactions.length = 0;
+    (globalThis as { __virtualizedPager?: boolean }).__virtualizedPager = true;
     vi.useFakeTimers();
   });
   afterEach(() => {
+    (globalThis as { __virtualizedPager?: boolean }).__virtualizedPager = false;
     vi.useRealTimers();
   });
 

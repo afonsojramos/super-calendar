@@ -312,6 +312,9 @@ describe("TimeGrid live drag times", () => {
   });
 
   it("keeps the stored times in the floating copy once the drag pages", async () => {
+    // A virtualized pager keeps the source page mounted through `alwaysRender`
+    // once the drag lifts, instead of unmounting it and cancelling the lift.
+    (globalThis as { __virtualizedPager?: boolean }).__virtualizedPager = true;
     vi.useFakeTimers();
     try {
       const onChangeDate = vi.fn();
@@ -344,10 +347,12 @@ describe("TimeGrid live drag times", () => {
       });
       expect(onChangeDate).toHaveBeenCalledWith(new Date(2026, 0, 12), { reason: "event-drag" });
       await rerender(week(new Date(2026, 0, 12)));
-      // The drop day is resolved on release, so the copy shows the stored times.
-      expect(getAllByText("09:00-10:00", { includeHiddenElements: true })).toHaveLength(1);
-      expect(queryAllByText("10:00-11:00", { includeHiddenElements: true })).toHaveLength(0);
+      // The drop day is resolved on release, so the visible floating copy shows
+      // the stored times while the source box stays hidden on its pinned page.
+      expect(getAllByText("09:00-10:00")).toHaveLength(1);
+      expect(queryAllByText("10:00-11:00")).toHaveLength(0);
     } finally {
+      (globalThis as { __virtualizedPager?: boolean }).__virtualizedPager = false;
       vi.useRealTimers();
     }
   });
