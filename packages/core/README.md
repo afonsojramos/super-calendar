@@ -125,7 +125,9 @@ dates, invalid counts, and spans outside JavaScript's date range throw
 `RangeError` before allocating rows. The builder materializes O(7 × N) days.
 `period` covers full weeks; `visibleRange` gives the chronological visible
 endpoints after hidden weekdays. Both use `{ start, endExclusive }`. RTL reverses
-row display only. `MultiWeekGridDay` has the month builder's day state without
+row display only. For a renderer that keeps chronological columns and mirrors
+them on screen, `arrowKeyDayStep`, `columnAtX`, and `screenContinues` map arrow
+keys, pointer x, and a bar's cut-off edges under RTL. `MultiWeekGridDay` has the month builder's day state without
 `isCurrentMonth`; `MultiWeekGridWeek.id` uses the unfiltered week start.
 `getViewDays` and `viewDayCount` reject `multiweek`, so use this builder for it.
 

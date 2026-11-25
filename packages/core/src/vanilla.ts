@@ -4,6 +4,7 @@ export * from "./tokens";
 export * from "./presentation";
 export * from "./utils/dateRange";
 export * from "./utils/dates";
+export * from "./utils/direction";
 export * from "./utils/drag";
 export * from "./utils/eventDisplay";
 export * from "./utils/eventIdentity";

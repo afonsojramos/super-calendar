@@ -81,6 +81,8 @@ export interface MonthListProps<T = unknown>
   activeDate?: Date;
   /** date-fns locale for the month titles and weekday labels. */
   locale?: Locale;
+  /** Lay each month's days out right to left (see `MonthView`). Default false. */
+  isRTL?: boolean;
   /** Theme overrides; falls back to the default light theme. */
   theme?: Partial<DomCalendarTheme>;
   /** Height of the scroll viewport, in px (default 480). */
@@ -127,6 +129,7 @@ export function MonthList<T = unknown>({
   fillCellOnSelection = false,
   activeDate,
   locale,
+  isRTL = false,
   theme: themeOverrides,
   height = 480,
   minDate,
@@ -197,6 +200,7 @@ export function MonthList<T = unknown>({
         showAdjacentMonths={false}
         showWeekdays={false}
         locale={locale}
+        isRTL={isRTL}
         theme={themeOverrides}
         minDate={minDate}
         maxDate={maxDate}
@@ -227,6 +231,7 @@ export function MonthList<T = unknown>({
       fillCellOnSelection,
       activeDate,
       locale,
+      isRTL,
       themeOverrides,
       minDate,
       maxDate,
@@ -241,6 +246,7 @@ export function MonthList<T = unknown>({
   return (
     <div
       className={className}
+      dir={isRTL ? "rtl" : "ltr"}
       style={{ fontFamily: theme.fontFamily, color: theme.text, ...style }}
     >
       <div

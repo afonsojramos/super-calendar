@@ -239,7 +239,10 @@ export type MonthViewProps<T> = SlotStyleProps<MonthViewSlot> & {
   highlightWeekends?: boolean;
   /** Ignore taps on month-cell events (day-cell taps still fire). Default false. */
   disableMonthEventCellPress?: boolean;
-  /** Reverse the day order within each week (right-to-left). Default false. */
+  /**
+   * Lay the days out right to left: each week and the weekday header run from the
+   * right edge, and drags follow the screen. Default false.
+   */
   isRTL?: boolean;
   /** Always render six week rows, for a fixed-height grid. Default false. */
   showSixWeeks?: boolean;
@@ -1436,40 +1439,47 @@ function DateRowsInner<T>({
         {...(isWeb && showGrid ? { focusable: false } : null)}
         accessibilityLabel={accessibilityLabel}
       >
-        {hasBand ? (
-          <View
-            testID="month-range-band"
-            {...slot("rangeBand", {
-              base: [
-                styles.rangeBand,
-                { pointerEvents: "none" },
-                fillCellOnSelection
-                  ? { top: 0, bottom: 0 }
-                  : {
-                      top: BAND_CENTER_Y - theme.rangeBandHeight / 2,
-                      height: theme.rangeBandHeight,
-                    },
-                // Cap the pill at the endpoint circle (half a badge in from centre)
-                // instead of spilling to the cell edge, so no band shows beside it.
-                !fillCellOnSelection &&
-                  isRangeStart && {
-                    left: "50%",
-                    marginLeft: -DATE_BADGE_HEIGHT / 2,
-                    borderTopLeftRadius: theme.rangeBandHeight / 2,
-                    borderBottomLeftRadius: theme.rangeBandHeight / 2,
-                  },
-                !fillCellOnSelection &&
-                  isRangeEnd && {
-                    right: "50%",
-                    marginRight: -DATE_BADGE_HEIGHT / 2,
-                    borderTopRightRadius: theme.rangeBandHeight / 2,
-                    borderBottomRightRadius: theme.rangeBandHeight / 2,
-                  },
-              ],
-              themed: { backgroundColor: theme.colors.rangeBackground },
-            })}
-          />
-        ) : null}
+        {hasBand
+          ? (() => {
+              // Cap the pill at the endpoint circle (half a badge in from centre)
+              // instead of spilling to the cell edge, so no band shows beside it.
+              // Under RTL the range runs right to left, so start caps the right side.
+              const capLeft = isRTL ? isRangeEnd : isRangeStart;
+              const capRight = isRTL ? isRangeStart : isRangeEnd;
+              return (
+                <View
+                  testID="month-range-band"
+                  {...slot("rangeBand", {
+                    base: [
+                      styles.rangeBand,
+                      { pointerEvents: "none" },
+                      fillCellOnSelection
+                        ? { top: 0, bottom: 0 }
+                        : {
+                            top: BAND_CENTER_Y - theme.rangeBandHeight / 2,
+                            height: theme.rangeBandHeight,
+                          },
+                      !fillCellOnSelection &&
+                        capLeft && {
+                          left: "50%",
+                          marginLeft: -DATE_BADGE_HEIGHT / 2,
+                          borderTopLeftRadius: theme.rangeBandHeight / 2,
+                          borderBottomLeftRadius: theme.rangeBandHeight / 2,
+                        },
+                      !fillCellOnSelection &&
+                        capRight && {
+                          right: "50%",
+                          marginRight: -DATE_BADGE_HEIGHT / 2,
+                          borderTopRightRadius: theme.rangeBandHeight / 2,
+                          borderBottomRightRadius: theme.rangeBandHeight / 2,
+                        },
+                    ],
+                    themed: { backgroundColor: theme.colors.rangeBackground },
+                  })}
+                />
+              );
+            })()
+          : null}
         {multiWeek ? (
           <View
             style={[

@@ -31,6 +31,8 @@ interface PickerBaseProps
   placeholder?: string;
   /** Disable the field and close its popover. Re-enabling leaves the popover closed. */
   disabled?: boolean;
+  /** Lay the field and its calendar out right to left (see `MonthView`). Default false. */
+  isRTL?: boolean;
   /** Theme overrides for the calendar. */
   theme?: Partial<DomCalendarTheme>;
   /** Class applied to the root element. */
@@ -49,7 +51,7 @@ const triggerDefault: CSSProperties = {
   borderRadius: 8,
   cursor: "pointer",
   font: "inherit",
-  textAlign: "left",
+  textAlign: "start",
 };
 
 const popoverDefault: CSSProperties = {
@@ -120,6 +122,7 @@ interface ShellProps {
   hasValue: boolean;
   placeholder: string;
   disabled?: boolean;
+  isRTL: boolean;
   className?: string;
   style?: CSSProperties;
   ariaLabel: string;
@@ -139,6 +142,7 @@ function PickerShell({
   hasValue,
   placeholder,
   disabled,
+  isRTL,
   className,
   style,
   ariaLabel,
@@ -179,6 +183,7 @@ function PickerShell({
     <div
       ref={rootRef}
       className={className}
+      dir={isRTL ? "rtl" : "ltr"}
       style={{
         position: "relative",
         display: "inline-block",
@@ -255,6 +260,7 @@ export function DatePicker({
   height = 320,
   placeholder = "Select a date",
   disabled,
+  isRTL = false,
   theme: themeOverrides,
   className,
   style,
@@ -280,6 +286,7 @@ export function DatePicker({
       hasValue={!!value}
       placeholder={placeholder}
       disabled={disabled}
+      isRTL={isRTL}
       className={className}
       style={style}
       ariaLabel="Choose a date"
@@ -287,6 +294,7 @@ export function DatePicker({
     >
       <MonthList
         theme={themeOverrides}
+        isRTL={isRTL}
         date={value ?? new Date()}
         weekStartsOn={weekStartsOn}
         selectedDates={value ? [value] : []}
@@ -340,6 +348,7 @@ export function DateRangePicker({
   height = 320,
   placeholder = "Select dates",
   disabled,
+  isRTL = false,
   theme: themeOverrides,
   className,
   style,
@@ -366,6 +375,7 @@ export function DateRangePicker({
       hasValue={!!value}
       placeholder={placeholder}
       disabled={disabled}
+      isRTL={isRTL}
       className={className}
       style={style}
       ariaLabel="Choose a date range"
@@ -373,6 +383,7 @@ export function DateRangePicker({
     >
       <MonthList
         theme={themeOverrides}
+        isRTL={isRTL}
         date={value?.start ?? new Date()}
         weekStartsOn={weekStartsOn}
         selectedRange={value ?? undefined}

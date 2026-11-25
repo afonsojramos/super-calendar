@@ -32,7 +32,9 @@ const isTextEntry = (element: FocusedElement): boolean => {
 /**
  * Web-only: page the calendar with the ← / → arrow keys, standing in for the
  * horizontal swipe that the grid disables on web. No-op off web or when
- * `enabled` is false. `onPage(delta)` receives -1 (previous) or +1 (next).
+ * `enabled` is false. `onPage(delta)` receives the page-index step on screen: -1
+ * for the page to the left, +1 for the page to the right. Under `isRTL` the pages
+ * run newest first, so +1 is the previous period.
  */
 export function useWebPagerKeys(enabled: boolean, onPage: (delta: number) => void): void {
   useEffect(() => {

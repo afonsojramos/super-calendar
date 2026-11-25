@@ -537,7 +537,8 @@ describe("native multiweek pager", () => {
         onChangeDateRange={range}
       />,
     );
-    await settle(list.props, 61);
+    // Pages run backwards in time under RTL, so the next period is the page before.
+    await settle(list.props, list.props.initialScrollIndex - 1);
     expect(change).toHaveBeenCalledExactlyOnceWith(new Date(2031, 0, 6), { reason: "swipe" });
     expect(range).toHaveBeenCalledExactlyOnceWith([
       new Date(2031, 0, 6),

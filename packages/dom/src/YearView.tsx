@@ -106,6 +106,8 @@ export interface YearViewProps<T = unknown>
    * fires `onPressDay`, not this. Days being sketched carry `data-creating`.
    */
   onCreateEvent?: (start: Date, end: Date) => void;
+  /** Lay the months and their days out right to left. Default false. */
+  isRTL?: boolean;
   /** Theme overrides; falls back to the default light theme. */
   theme?: Partial<DomCalendarTheme>;
   /** Class applied to the root element. */
@@ -139,6 +141,7 @@ export function YearView<T = unknown>({
   onPressMonth,
   onSelectDrag,
   onCreateEvent,
+  isRTL = false,
   theme: themeOverrides,
   className,
   style,
@@ -218,6 +221,7 @@ export function YearView<T = unknown>({
   return (
     <div
       className={className}
+      dir={isRTL ? "rtl" : "ltr"}
       style={{ fontFamily: theme.fontFamily, color: theme.text, overflowY: "auto", ...style }}
     >
       <div
@@ -247,7 +251,7 @@ export function YearView<T = unknown>({
                       padding: "0 0 4px",
                       cursor: "pointer",
                       font: "inherit",
-                      textAlign: "left",
+                      textAlign: "start",
                     },
                     themed: {
                       fontSize: 13,
@@ -382,6 +386,9 @@ export function YearView<T = unknown>({
                       // continuous strip; only the endpoints round their outer edge.
                       const bandKind = rangeBandKind(state, true);
                       const rounding = bandRounding(rangeBandKind(state, false));
+                      // The range's first day rounds the side it starts from: the right under RTL.
+                      const roundLeft = isRTL ? rounding.end : rounding.start;
+                      const roundRight = isRTL ? rounding.start : rounding.end;
                       const band =
                         bandKind === "none" ? null : (
                           <span
@@ -392,10 +399,10 @@ export function YearView<T = unknown>({
                                 position: "absolute",
                                 inset: 0,
                                 zIndex: 0,
-                                borderTopLeftRadius: rounding.start ? "50%" : 0,
-                                borderBottomLeftRadius: rounding.start ? "50%" : 0,
-                                borderTopRightRadius: rounding.end ? "50%" : 0,
-                                borderBottomRightRadius: rounding.end ? "50%" : 0,
+                                borderTopLeftRadius: roundLeft ? "50%" : 0,
+                                borderBottomLeftRadius: roundLeft ? "50%" : 0,
+                                borderTopRightRadius: roundRight ? "50%" : 0,
+                                borderBottomRightRadius: roundRight ? "50%" : 0,
                               },
                               themed: { background: theme.rangeBackground },
                             })}

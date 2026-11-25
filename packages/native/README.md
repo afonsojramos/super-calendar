@@ -18,7 +18,7 @@ In the time grid, an all-day event renders once as a bar across the visible
 dates it covers. Overlapping events stack on separate rows. The end is
 exclusive, and hidden days take no width. `renderEvent` and press callbacks
 receive the original event; `continuesBefore` and `continuesAfter` indicate
-clipping at the visible range edges. The default bar squares its corners on a
+clipping at the bar's left and right edges. The default bar squares its corners on a
 continuing side. The `allDayColumn` slot styles one
 spanning cell. Timed events that cross midnight keep their per-day segments by
 default (`multiDayTimedEventPlacement="grid"`); set
@@ -81,6 +81,18 @@ export function MyCalendar() {
 
 `date` is controlled: update it from `onChangeDate`. If you leave it unchanged, a
 swipe pages back to the date you kept.
+
+## Right-to-left layout
+
+Pass `isRTL` to `Calendar` or any view to lay it out right to left. Days and
+weekday headers run right to left, the time grid's hour gutter sits on the
+right, and drags and edge paging follow the screen. A right swipe pages to the
+next period without `I18nManager`. Under `isRTL`, a lane bar's
+`continuesAfter` marks the edge where it started before the view.
+
+`isRTL` mirrors the calendar by itself. When `I18nManager.isRTL` is also true,
+React Native flips rows and horizontal lists too, so the two can cancel out.
+Check the layout on a device before combining them.
 
 ## Multi-week grids
 

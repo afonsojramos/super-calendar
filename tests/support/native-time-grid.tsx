@@ -4,12 +4,15 @@ import { Dimensions, StyleSheet } from "react-native";
 // The time grid mounts its pager list only after the pager has laid out, and
 // The test renderer lays nothing out. Fire that layout at the width the grid estimates
 // before measuring (the window minus the hour column, read from the wrapper's
-// own `left`), so the list mounts and geometry assertions keep their numbers.
+// own `left` and `right`), so the list mounts and geometry assertions keep their numbers.
 export const firePagerLayout = async (result: RenderResult) => {
   const pager = result.queryByTestId("time-grid-pager");
   if (!pager) return;
-  const left = (StyleSheet.flatten(pager.props.style) as { left?: number }).left ?? 0;
-  const width = Dimensions.get("window").width - left;
+  const { left = 0, right = 0 } = StyleSheet.flatten(pager.props.style) as {
+    left?: number;
+    right?: number;
+  };
+  const width = Dimensions.get("window").width - left - right;
   await fireEvent(pager, "layout", {
     nativeEvent: { layout: { x: left, y: 0, width, height: 0 } },
   });

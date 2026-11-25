@@ -130,3 +130,51 @@ treat a swipe differently from keyboard paging or an event drag:
 
 `details.reason` is `"swipe"`, `"keyboard"`, or `"event-drag"`. See
 [Navigation](/reference/api#navigation) for when each one fires.
+
+## Right-to-left layout
+
+Set `isRTL` to lay the calendar out right to left, for example for Arabic or
+Hebrew. It works the same on React Native, React DOM, and Solid.
+
+```tsx
+import { ar } from "date-fns/locale";
+
+<Calendar mode="week" date={date} events={events} onChangeDate={setDate} isRTL locale={ar} />;
+```
+
+With `isRTL`:
+
+- Days run right to left in the month, multi-week, year, and time-grid views,
+  and the weekday headers match. Year mode also places January top right.
+- The time grid's hour gutter, week number, and current-time label sit on the
+  right.
+- Multi-day bars, move previews, and create previews grow leftward. A bar that
+  continues past the view squares its cut-off edge.
+- Drags follow the screen: dragging an event one column left moves it a day
+  later. Holding a dragged event at the left edge pages to the next period.
+- On React Native, a right swipe pages to the next period. You don't need to
+  enable `I18nManager`. When `I18nManager.isRTL` is also true, React Native
+  flips rows and horizontal lists too, so check the layout on a device before
+  combining them.
+- On the web, **ArrowLeft** moves to the next day and **ArrowRight** to the
+  previous one. **PageDown** still pages to the next period. On
+  react-native-web, **ArrowLeft** pages to the next period.
+
+`MonthView`, `MultiWeekView`, `MonthList`, `TimeGrid`, and `YearView` take the
+same prop. Native `MonthPager` and the web `DatePicker` and `DateRangePicker`
+take it too.
+
+On the web, each view root gets `dir="rtl"`, so text and logical CSS mirror.
+Without `isRTL` it gets `dir="ltr"`, so the calendar doesn't read the page's
+`dir`. Pass `isRTL` from your app's locale. This keeps the server-rendered and
+client layouts the same, and keeps the drag math in step with the CSS. The day
+cells stay in date order in the DOM, so a screen reader reads them in date
+order.
+
+In the all-day lane, `continuesBefore` and `continuesAfter` (and the web
+`data-continues-before` and `data-continues-after` attributes) name the bar's
+left and right edges. Under `isRTL`, `continuesAfter` marks a bar that started
+before the view. Use `startsBeforeVisible` to ask whether the event started
+earlier. In a custom `renderEvent`, square the physical corners
+(`borderTopLeftRadius` for `continuesBefore`), not logical ones, or the corners
+mirror twice.

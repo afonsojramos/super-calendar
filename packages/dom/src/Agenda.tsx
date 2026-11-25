@@ -200,7 +200,7 @@ export function Agenda<T = unknown>({
                     background: "transparent",
                     cursor: "pointer",
                     font: "inherit",
-                    textAlign: "left",
+                    textAlign: "start",
                   }
                 : { display: "block", width: "100%" },
               themed: { padding: "12px 12px 4px", fontSize: 13, fontWeight: 600, color },
@@ -230,7 +230,7 @@ export function Agenda<T = unknown>({
                 base: {
                   display: "block",
                   width: "100%",
-                  textAlign: "left",
+                  textAlign: "start",
                   border: "none",
                   background: "transparent",
                   cursor: "pointer",

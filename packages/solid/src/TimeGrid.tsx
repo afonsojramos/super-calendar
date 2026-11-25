@@ -9,7 +9,10 @@ import {
   type CalendarMode,
   type DateChangeDetails,
   type CreateGhostArgs,
+  arrowKeyDayStep,
   cellRangeFromDrag,
+  columnAtX,
+  screenContinues,
   clampMoveStartMinutes,
   closedHourBands,
   eventAccessibilityLabel as defaultEventAccessibilityLabel,
@@ -176,11 +179,16 @@ const ALL_DAY_PREVIEW_OPACITY = 0.85;
 
 // An all-day cell spanning its visible columns, matching the timed columns' grid
 // line and horizontal inset.
-const allDayColumnBase = (startCol: number, endCol: number, lane: number): CSSProperties => ({
+const allDayColumnBase = (
+  startCol: number,
+  endCol: number,
+  lane: number,
+  isRTL: boolean,
+): CSSProperties => ({
   gridColumn: `${startCol + 1} / span ${endCol - startCol + 1}`,
   gridRow: lane + 1,
   minWidth: 0,
-  borderLeft: "1px solid transparent",
+  [isRTL ? "borderRight" : "borderLeft"]: "1px solid transparent",
   padding: "0 1px",
   display: "flex",
   flexDirection: "column",
@@ -189,7 +197,7 @@ const ALL_DAY_CHIP_BASE: CSSProperties = {
   border: "none",
   padding: 0,
   background: "transparent",
-  textAlign: "left",
+  textAlign: "start",
   height: 22,
 };
 
@@ -260,9 +268,16 @@ export interface SolidRenderEventArgs<T = unknown> {
   inAllDayLane?: boolean;
   /** Pixel height of the event box (timed events only). */
   boxHeight?: number;
-  /** Starts before the visible day (timed) or visible date range (all-day). */
+  /**
+   * Starts before the visible day (timed) or visible date range (all-day). On a
+   * lane bar it names the cut-off left edge, so under `isRTL` it means the event
+   * runs on after the range; use `startsBeforeVisible` for the start.
+   */
   continuesBefore?: boolean;
-  /** Ends after the visible day (timed) or visible date range (all-day). */
+  /**
+   * Ends after the visible day (timed) or visible date range (all-day). On a lane
+   * bar it names the cut-off right edge, which is the start under `isRTL`.
+   */
   continuesAfter?: boolean;
   /**
    * True for a lane bar whose event started chronologically before its first
@@ -327,8 +342,15 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
   minHour?: number;
   /** Last hour shown, exclusive (1–24). Default 24. */
   maxHour?: number;
-  /** Hide the left hour-axis column (lines stay, labels/gutter go). Default false. */
+  /** Hide the hour-axis column (lines stay, labels/gutter go). Default false. */
   hideHours?: boolean;
+  /**
+   * Lay the day columns out right to left: the root gets `dir="rtl"`, the hour
+   * gutter and week number move to the right, events, drags and edge paging
+   * mirror, and ArrowLeft moves to the next day. Without it the root gets
+   * `dir="ltr"`. Default false.
+   */
+  isRTL?: boolean;
   /** Show the ISO week number in the header gutter. Default false. */
   showWeekNumber?: boolean;
   /** Prefix for the week number, e.g. "W" → "W28". Default "W". */
@@ -753,6 +775,7 @@ export function TimeGrid<T = unknown>(
       minHour: 0,
       maxHour: 24,
       hideHours: false,
+      isRTL: false,
       showWeekNumber: false,
       weekNumberPrefix: "W",
       keyboardEventNavigation: false,
@@ -803,6 +826,11 @@ export function TimeGrid<T = unknown>(
   const windowEnd = createMemo(() => Math.max(windowStart() + 1, Math.min(props.maxHour, 24)));
   const windowHours = createMemo(() => windowEnd() - windowStart());
   const gutterWidth = createMemo(() => (props.hideHours ? 0 : GUTTER_WIDTH));
+  // The days stay in chronological DOM order and `dir` runs them right to left;
+  // absolute offsets and pointer x mirror here. `xSign` is the screen-x sign of
+  // the next day, and `startSide` the side a column's content starts from.
+  const xSign = () => (props.isRTL ? -1 : 1);
+  const startSide = () => (props.isRTL ? "right" : "left");
   const RenderBackground = createMemo(() => props.renderBackgroundEvent);
   const visibleHours = createMemo(() =>
     Array.from(
@@ -1218,7 +1246,7 @@ export function TimeGrid<T = unknown>(
     const columnWidth = rect && count > 0 ? rect.width / count : 0;
     if (!rect || columnWidth <= 0) return;
     const fromCol = clamp(
-      Math.floor((grab.clientX - rect.left) / columnWidth),
+      columnAtX(grab.clientX - rect.left, columnWidth, count, props.isRTL),
       segment.startCol,
       segment.endCol,
     );
@@ -1248,7 +1276,7 @@ export function TimeGrid<T = unknown>(
       const travelled = Math.hypot(e.clientX - grab.clientX, e.clientY - grab.clientY);
       if (!current.armed && travelled <= ALL_DAY_DRAG_SLOP_PX) return;
       const toCol = clamp(
-        fromCol + Math.round((e.clientX - grab.clientX) / columnWidth),
+        fromCol + xSign() * Math.round((e.clientX - grab.clientX) / columnWidth),
         0,
         daysRef.current.length - 1,
       );
@@ -1617,7 +1645,8 @@ export function TimeGrid<T = unknown>(
       // Map the horizontal drag to whole day columns, clamped so the in-view box
       // can't leave the visible range (mirrors the native renderer). Once paged,
       // the drop day comes from the hit-test instead.
-      const rawDayDelta = o.dayWidth > 0 ? Math.round((e.clientX - o.pointerX) / o.dayWidth) : 0;
+      const rawDayDelta =
+        o.dayWidth > 0 ? xSign() * Math.round((e.clientX - o.pointerX) / o.dayWidth) : 0;
       const targetDay = clamp(o.dayIndex + rawDayDelta, 0, daysRef.current.length - 1);
       const dayDelta = targetDay - o.dayIndex;
       // Draw the box where the drop commits it: a start in the hour a
@@ -1664,7 +1693,7 @@ export function TimeGrid<T = unknown>(
         requestedStartHours: requestedHours,
         durationHours,
         dayDelta,
-        dayOffsetPx: dayDelta * o.dayWidth,
+        dayOffsetPx: xSign() * dayDelta * o.dayWidth,
         spillHours,
         spillDayIndex,
         spillBefore,
@@ -1681,9 +1710,13 @@ export function TimeGrid<T = unknown>(
       if (edgeAdvanceEnabled() && o.pointerType === "mouse") {
         const rect = columnsRef.current?.getBoundingClientRect();
         if (rect && rect.right > rect.left) {
-          const left = rect.left + gutterWidth();
-          const side: -1 | 0 | 1 =
-            e.clientX <= left + EDGE_ZONE ? -1 : e.clientX >= rect.right - EDGE_ZONE ? 1 : 0;
+          // The day columns' screen edges, beside the gutter on either side.
+          const left = rect.left + (props.isRTL ? 0 : gutterWidth());
+          const right = rect.right - (props.isRTL ? gutterWidth() : 0);
+          const screenSide =
+            e.clientX <= left + EDGE_ZONE ? -1 : e.clientX >= right - EDGE_ZONE ? 1 : 0;
+          // Toward the later period: the right edge, or the left one under RTL.
+          const side = (screenSide * xSign()) as -1 | 0 | 1;
           if (side !== edgeSide.current) {
             clearEdgeTimer();
             edgeSide.current = side;
@@ -2353,23 +2386,19 @@ export function TimeGrid<T = unknown>(
       }
       return best;
     };
+    const step = arrowKeyDayStep(arrowKey, props.isRTL);
+    if (step !== 0) {
+      for (let d = day + step; d >= 0 && d < navByDay().length; d += step) {
+        const k = nearestInDay(d);
+        if (k) return k;
+      }
+      return null;
+    }
     switch (arrowKey) {
       case "ArrowDown":
         return navByDay()[day][Math.min(pos + 1, navByDay()[day].length - 1)].key;
       case "ArrowUp":
         return navByDay()[day][Math.max(pos - 1, 0)].key;
-      case "ArrowRight":
-        for (let d = day + 1; d < navByDay().length; d++) {
-          const k = nearestInDay(d);
-          if (k) return k;
-        }
-        return null;
-      case "ArrowLeft":
-        for (let d = day - 1; d >= 0; d--) {
-          const k = nearestInDay(d);
-          if (k) return k;
-        }
-        return null;
       case "Home":
         return navByDay()[day][0].key;
       case "End":
@@ -2421,6 +2450,7 @@ export function TimeGrid<T = unknown>(
       ref={(el) => (eventActions.rootRef.current = el)}
       tabindex={-1}
       class={props.className}
+      dir={props.isRTL ? "rtl" : "ltr"}
       style={css({
         fontFamily: theme().fontFamily,
         color: theme().text,
@@ -2611,12 +2641,12 @@ export function TimeGrid<T = unknown>(
                 boxSizing: "border-box",
                 minWidth: 0,
                 overflow: "hidden",
-                textAlign: "right",
+                textAlign: "end",
               },
               themed: {
                 fontSize: 10,
                 color: theme().textMuted,
-                padding: props.hideHours ? 0 : "4px 6px 0 0",
+                padding: props.hideHours ? 0 : props.isRTL ? "4px 0 0 6px" : "4px 6px 0 0",
               },
             })}
           >
@@ -2641,8 +2671,8 @@ export function TimeGrid<T = unknown>(
                   mode: props.mode,
                   isAllDay: allDay(),
                   inAllDayLane: true,
-                  continuesBefore: segment().continuesBefore,
-                  continuesAfter: segment().continuesAfter,
+                  continuesBefore: screenContinues(segment(), props.isRTL).continuesBefore,
+                  continuesAfter: screenContinues(segment(), props.isRTL).continuesAfter,
                   startsBeforeVisible: segmentStartsBeforeVisible(
                     segment().event,
                     days(),
@@ -2657,7 +2687,12 @@ export function TimeGrid<T = unknown>(
                 return (
                   <div
                     {...slot("allDayColumn", {
-                      base: allDayColumnBase(segment().startCol, segment().endCol, segment().lane),
+                      base: allDayColumnBase(
+                        segment().startCol,
+                        segment().endCol,
+                        segment().lane,
+                        props.isRTL,
+                      ),
                     })}
                   >
                     <button
@@ -2689,8 +2724,10 @@ export function TimeGrid<T = unknown>(
                             })
                       }
                       {...dataState({
-                        "data-continues-before": segment().continuesBefore,
-                        "data-continues-after": segment().continuesAfter,
+                        "data-continues-before": screenContinues(segment(), props.isRTL)
+                          .continuesBefore,
+                        "data-continues-after": screenContinues(segment(), props.isRTL)
+                          .continuesAfter,
                         "data-dragging": carried(),
                       })}
                       {...slot("allDayEvent", {
@@ -2725,8 +2762,8 @@ export function TimeGrid<T = unknown>(
                   mode: props.mode,
                   isAllDay: isAllDayEvent(preview().event),
                   inAllDayLane: true,
-                  continuesBefore: preview().continuesBefore,
-                  continuesAfter: preview().continuesAfter,
+                  continuesBefore: screenContinues(preview(), props.isRTL).continuesBefore,
+                  continuesAfter: screenContinues(preview(), props.isRTL).continuesAfter,
                   startsBeforeVisible: segmentStartsBeforeVisible(
                     preview().event,
                     days(),
@@ -2741,7 +2778,12 @@ export function TimeGrid<T = unknown>(
                     aria-hidden="true"
                     {...slot("allDayColumn", {
                       base: {
-                        ...allDayColumnBase(preview().startCol, preview().endCol, preview().lane),
+                        ...allDayColumnBase(
+                          preview().startCol,
+                          preview().endCol,
+                          preview().lane,
+                          props.isRTL,
+                        ),
                         pointerEvents: "none",
                         zIndex: 1,
                         opacity: ALL_DAY_PREVIEW_OPACITY,
@@ -2750,8 +2792,10 @@ export function TimeGrid<T = unknown>(
                   >
                     <div
                       {...dataState({
-                        "data-continues-before": preview().continuesBefore,
-                        "data-continues-after": preview().continuesAfter,
+                        "data-continues-before": screenContinues(preview(), props.isRTL)
+                          .continuesBefore,
+                        "data-continues-after": screenContinues(preview(), props.isRTL)
+                          .continuesAfter,
                       })}
                       {...slot("allDayEvent", { base: ALL_DAY_CHIP_BASE })}
                     >
@@ -2813,7 +2857,7 @@ export function TimeGrid<T = unknown>(
                           // Clamp so the top-of-grid label (`h === windowStart`) sits at
                           // the edge instead of clipping 6px above it.
                           top: Math.max(0, (h() - windowStart()) * hourHeight() - 6),
-                          right: 6,
+                          [props.isRTL ? "left" : "right"]: 6,
                         },
                         themed: {
                           fontSize: 10,
@@ -2939,7 +2983,8 @@ export function TimeGrid<T = unknown>(
                       // Weekend columns are tinted (matching the native renderer); the
                       // tint sits behind the grid lines, business-hours shade and events.
                       themed: {
-                        borderLeft: `1px solid ${theme().gridLine}`,
+                        [props.isRTL ? "borderRight" : "borderLeft"]:
+                          `1px solid ${theme().gridLine}`,
                         ...(props.highlightWeekends && isWeekend(day())
                           ? {
                               background: theme().weekendBackground,
@@ -3206,7 +3251,7 @@ export function TimeGrid<T = unknown>(
                                         // is the renderer's concern: the built-in one clamps, and a
                                         // custom renderer should adapt to the `boxHeight` it's given.
                                         height: boxHeight(),
-                                        left: floating()
+                                        [startSide()]: floating()
                                           ? props.eventGap
                                           : `calc(${pe().column * widthPct()}% + ${props.eventGap}px)`,
                                         width: floating()
@@ -3421,7 +3466,7 @@ export function TimeGrid<T = unknown>(
                         <div
                           style={css({
                             position: "absolute",
-                            left: -3,
+                            [startSide()]: -3,
                             top: -3,
                             width: 8,
                             height: 8,

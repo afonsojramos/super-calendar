@@ -19,6 +19,7 @@ import {
   layoutMonthWeek,
   monthDropBounds,
   type MonthEventSegment,
+  screenContinues,
 } from "@super-calendar/core";
 
 const isWeb = Platform.OS === "web";
@@ -52,6 +53,8 @@ type AllDayLaneProps<T> = {
   multiDayTimedEventPlacement?: MultiDayTimedEventPlacement;
   /** Format promoted timed events' start times in 12-hour AM/PM. Default false. */
   ampm?: boolean;
+  /** Lay bars out right to left. Default false. */
+  isRTL?: boolean;
   /** Reports the lane's natural height, which the grid's all-day band follows. */
   onLayout?: (event: LayoutChangeEvent) => void;
 };
@@ -100,6 +103,7 @@ export function AllDayLane<T>({
   eventStartEditable = true,
   multiDayTimedEventPlacement = "grid",
   ampm = false,
+  isRTL = false,
   onLayout,
 }: AllDayLaneProps<T>) {
   const theme = useCalendarTheme();
@@ -176,6 +180,11 @@ export function AllDayLane<T>({
     return layoutMonthWeek<T>(days, [moved]).segments[0] ?? null;
   }, [drag, days]);
 
+  // `layoutMonthWeek` infers RTL from a reversed multi-day array, so a single
+  // visible day still reports chronological continuation and needs mirroring here.
+  const screenEdges = (segment: MonthEventSegment<T>) =>
+    days.length === 1 ? screenContinues(segment, isRTL) : segment;
+
   return (
     <View
       {...slot("allDayLane", {
@@ -185,7 +194,9 @@ export function AllDayLane<T>({
       onLayout={onLayout}
     >
       {spans.map((segment, index) => {
-        const { event, startCol, endCol, lane, continuesBefore, continuesAfter } = segment;
+        const { event, startCol, endCol, lane } = segment;
+        const { continuesBefore, continuesAfter } = screenEdges(segment);
+        const previewEdges = preview ? screenEdges(preview) : null;
         const previous = spans[index - 1];
         const previousEnd = previous?.lane === lane ? previous.endCol : -1;
         const lastInLane = spans[index + 1]?.lane !== lane;
@@ -262,8 +273,8 @@ export function AllDayLane<T>({
                     isAllDay={isAllDayEvent(preview.event)}
                     inAllDayLane
                     ampm={ampm}
-                    continuesBefore={preview.continuesBefore}
-                    continuesAfter={preview.continuesAfter}
+                    continuesBefore={previewEdges?.continuesBefore}
+                    continuesAfter={previewEdges?.continuesAfter}
                     startsBeforeVisible={segmentStartsBeforeVisible(
                       preview.event,
                       days,
