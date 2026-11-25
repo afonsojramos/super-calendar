@@ -4,7 +4,6 @@ import {
   type LayoutChangeEvent,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   type TextStyle,
@@ -12,6 +11,12 @@ import {
   type ScrollViewProps,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+  runOnJS,
+  type SharedValue,
+  useAnimatedScrollHandler,
+  useSharedValue,
+} from "react-native-reanimated";
 import { useCalendarTheme } from "../theme";
 import type { CalendarEvent, WeekStartsOn } from "../types";
 import { createSlots, type SlotStyleProps } from "../utils/slots";
@@ -107,8 +112,8 @@ export type YearViewProps<T = unknown> = SlotStyleProps<YearViewSlot> & {
    * `useDateRange`'s `selectRange` to drive `selectedRange`. Fires on every day the
    * drag crosses, so the highlight follows it; `onCreateEvent` (when also set)
    * fires once on release. Either handler enables the same sweep: hold a day and
-   * drag on a device, press and drag on the web. On a device a sweep stays inside
-   * the mini month it started in; on the web it can run across months.
+   * drag on a device, press and drag on the web. A sweep can run across mini
+   * months.
    */
   onSelectDrag?: (start: Date, end: Date) => void;
   /**
@@ -124,6 +129,41 @@ export type YearViewProps<T = unknown> = SlotStyleProps<YearViewSlot> & {
 // Seed before the first layout pass so the grid renders immediately (and in
 // tests, where onLayout never fires).
 const FALLBACK_COLUMNS = 3;
+
+// A mini month's week rows, in the year grid's coordinates.
+type GridBox = { x: number; y: number; width: number; height: number };
+// Per mini month, its cells row by row: the day's midnight timestamp, or -1 for
+// a blank adjacent-month cell or an unselectable day, which a sweep skips.
+type DayTable = { cols: number; days: number[] }[];
+
+// The scroll view's visible band, in the year grid's coordinates. A height of 0
+// means not yet measured, and leaves the point unclipped.
+type Viewport = { top: number; height: number };
+
+// The day under a year-grid point, or -1 over a gap, a title, a skipped cell, a
+// month not yet measured, or a point scrolled out of view. Declared before the
+// components whose worklets capture it.
+function sweepDayAt(
+  boxes: (GridBox | null)[],
+  table: DayTable,
+  viewport: Viewport,
+  x: number,
+  y: number,
+): number {
+  "worklet";
+  if (viewport.height > 0 && (y < viewport.top || y >= viewport.top + viewport.height)) return -1;
+  for (let month = 0; month < table.length; month++) {
+    const box = boxes[month];
+    const { cols, days } = table[month];
+    if (!box || box.width <= 0 || box.height <= 0 || cols === 0) continue;
+    if (x < box.x || x >= box.x + box.width || y < box.y || y >= box.y + box.height) continue;
+    const rows = days.length / cols;
+    const row = Math.min(rows - 1, Math.floor((y - box.y) / (box.height / rows)));
+    const col = Math.min(cols - 1, Math.floor((x - box.x) / (box.width / cols)));
+    return days[row * cols + col];
+  }
+  return -1;
+}
 
 function YearViewInner<T>({
   date,
@@ -154,8 +194,18 @@ function YearViewInner<T>({
   const slot = createSlots<YearViewSlot>({ classNames, styles: styleOverrides });
 
   const [columns, setColumns] = useState(FALLBACK_COLUMNS);
+  // Native: the year grid's visible band (scroll offset and viewport height), so
+  // a sweep dragged over a header or tab bar can't reach months scrolled out of view.
+  const viewTop = useSharedValue(0);
+  const viewHeight = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      viewTop.value = event.contentOffset.y;
+    },
+  });
   const handleLayout = (event: LayoutChangeEvent) => {
-    const width = event.nativeEvent.layout.width;
+    const { width, height } = event.nativeEvent.layout;
+    if (!isWeb) viewHeight.value = height;
     if (width <= 0) return;
     setColumns(Math.max(2, Math.min(4, Math.floor(width / minMonthWidth))));
   };
@@ -189,9 +239,9 @@ function YearViewInner<T>({
 
   // ---- drag-to-select / create ---------------------------------------------
   // One sweep gesture, reported live through `onSelectDrag` and committed to
-  // `onCreateEvent`. Native runs a pan over each mini month's grid (so a hold and
-  // drag sweeps its days); the web drives it from the cells' own pointer events,
-  // which lets a sweep run across mini months.
+  // `onCreateEvent`, which can run across mini months. Native holds a day through
+  // a pan over its mini month's grid, then hit-tests the finger against every
+  // mini month's measured box; the web drives it from the cells' own pointer events.
   const sweepEnabled = onSelectDrag != null || onCreateEvent != null;
   const [sweep, setSweep] = useState<{ anchor: number; hover: number } | null>(null);
   const sweepRef = useRef(sweep);
@@ -207,11 +257,15 @@ function YearViewInner<T>({
     (day: Date) => isDateSelectable(day, { minDate, maxDate, isDateDisabled }),
     [minDate, maxDate, isDateDisabled],
   );
+  // The ref moves with each step, not on the next render: native can deliver
+  // several hovered days before React renders, and the worklet does not resend
+  // a day it already sent.
   const beginSweep = useCallback((day: Date) => {
     const time = startOfDay(day).getTime();
     suppressPressRef.current = false;
     movedRef.current = false;
-    setSweep({ anchor: time, hover: time });
+    sweepRef.current = { anchor: time, hover: time };
+    setSweep(sweepRef.current);
   }, []);
   const extendSweep = useCallback(
     (day: Date) => {
@@ -220,7 +274,8 @@ function YearViewInner<T>({
       const time = startOfDay(day).getTime();
       if (time === current.hover) return;
       movedRef.current = true;
-      setSweep((c) => (c ? { ...c, hover: time } : c));
+      sweepRef.current = { ...current, hover: time };
+      setSweep(sweepRef.current);
       const [lo, hi] = current.anchor <= time ? [current.anchor, time] : [time, current.anchor];
       onSelectDrag?.(new Date(lo), new Date(hi));
     },
@@ -228,12 +283,87 @@ function YearViewInner<T>({
   );
   const finishSweep = useCallback(() => {
     const current = sweepRef.current;
+    sweepRef.current = null;
     setSweep(null);
     if (!current || !movedRef.current) return;
     if (isWeb) suppressPressRef.current = true;
     const range = monthCreateRange(new Date(current.anchor), new Date(current.hover));
     onCreateEvent?.(range.start, range.end);
   }, [onCreateEvent]);
+
+  // Native: what the sweep worklets hit-test against, kept on the UI thread so a
+  // drag only crosses to JavaScript when the day under the finger changes.
+  const nativeSweep = sweepEnabled && !isWeb;
+  const sweepTable = useSharedValue<DayTable>([]);
+  const sweepBoxes = useSharedValue<(GridBox | null)[]>([]);
+  const dayTable = useMemo<DayTable>(
+    () =>
+      nativeSweep
+        ? months.map((month, i) => {
+            const weeks = monthWeeks[i];
+            return {
+              cols: weeks[0]?.length ?? 0,
+              days: weeks
+                .flat()
+                .map((day) =>
+                  day.getMonth() === month.getMonth() && isSelectable(day)
+                    ? startOfDay(day).getTime()
+                    : -1,
+                ),
+            };
+          })
+        : [],
+    [nativeSweep, months, monthWeeks, isSelectable],
+  );
+  useEffect(() => {
+    sweepTable.value = dayTable;
+  }, [sweepTable, dayTable]);
+  // Each mini month's box inside the year grid, and its week rows' box inside
+  // that; their sum places the rows in the year grid's coordinates. Measured on
+  // native even before a sweep handler arrives, since a view that has already
+  // laid out reports no layout to a newly attached `onLayout`.
+  const monthBoxes = useRef<(GridBox | null)[]>([]);
+  const rowBoxes = useRef<(GridBox | null)[]>([]);
+  const measure = useCallback(
+    (store: "month" | "rows", index: number, layout: GridBox) => {
+      (store === "month" ? monthBoxes : rowBoxes).current[index] = layout;
+      sweepBoxes.value = months.map((_, i) => {
+        const outer = monthBoxes.current[i];
+        const inner = rowBoxes.current[i];
+        return outer && inner
+          ? { x: outer.x + inner.x, y: outer.y + inner.y, width: inner.width, height: inner.height }
+          : null;
+      });
+    },
+    [sweepBoxes, months],
+  );
+  const measureMonth = isWeb ? undefined : measure;
+  // The worklets call JavaScript through these stable functions, so a re-render
+  // (one per swept day) never rebuilds a pan and cancels the drag running in it.
+  const sweepHandlers = useRef({ beginSweep, extendSweep, finishSweep });
+  sweepHandlers.current = { beginSweep, extendSweep, finishSweep };
+  const sweepCallbacks = useMemo(
+    () => ({
+      begin: (time: number) => sweepHandlers.current.beginSweep(new Date(time)),
+      extend: (time: number) => sweepHandlers.current.extendSweep(new Date(time)),
+      finish: () => sweepHandlers.current.finishSweep(),
+      // Drops the sweep without committing, for a pan removed mid-drag.
+      cancel: () => {
+        sweepRef.current = null;
+        setSweep(null);
+      },
+    }),
+    [],
+  );
+  // The month whose pan owns the running sweep, plus one (0 while none does).
+  const sweepActive = useSharedValue(0);
+  const sweepHover = useSharedValue(-1);
+  // Where the grid sits in the scroll content, to place the visible band.
+  const gridTop = useSharedValue(0);
+  const sweepView = useMemo(
+    () => ({ scrollTop: viewTop, height: viewHeight, gridTop }),
+    [viewTop, viewHeight, gridTop],
+  );
 
   // Web: a released pointer ends the sweep wherever it lands.
   useEffect(() => {
@@ -259,8 +389,10 @@ function YearViewInner<T>({
   );
 
   return (
-    <ScrollView
+    <Animated.ScrollView
       onLayout={handleLayout}
+      onScroll={isWeb ? undefined : onScroll}
+      scrollEventThrottle={isWeb ? undefined : 16}
       showsVerticalScrollIndicator
       // Native only: once the hold has armed a sweep, stop the list scrolling
       // under the finger. On the web a press arms it immediately, so freezing
@@ -268,7 +400,16 @@ function YearViewInner<T>({
       scrollEnabled={isWeb || sweep == null}
       refreshControl={refreshControl}
     >
-      <View {...slot("grid", { base: styles.grid })}>
+      <View
+        onLayout={
+          isWeb
+            ? undefined
+            : (event) => {
+                gridTop.value = event.nativeEvent.layout.y;
+              }
+        }
+        {...slot("grid", { base: styles.grid })}
+      >
         {months.map((month, monthIndex) => {
           const weeks = monthWeeks[monthIndex];
           const title = format(month, "MMMM", { locale });
@@ -287,6 +428,11 @@ function YearViewInner<T>({
           return (
             <View
               key={month.toISOString()}
+              onLayout={
+                measureMonth
+                  ? (event) => measureMonth("month", monthIndex, event.nativeEvent.layout)
+                  : undefined
+              }
               {...slot("month", { base: [styles.month, { width: `${100 / columns}%` }] })}
             >
               {onPressMonth ? (
@@ -325,13 +471,15 @@ function YearViewInner<T>({
               </View>
               <MiniMonthGrid
                 testID={`year-month-grid-${month.getMonth()}`}
-                month={month}
-                weeks={weeks}
-                sweepEnabled={sweepEnabled && !isWeb}
-                isSelectable={isSelectable}
-                onBeginSweep={beginSweep}
-                onExtendSweep={extendSweep}
-                onFinishSweep={finishSweep}
+                monthIndex={monthIndex}
+                sweepEnabled={nativeSweep}
+                table={sweepTable}
+                boxes={sweepBoxes}
+                active={sweepActive}
+                hover={sweepHover}
+                view={sweepView}
+                callbacks={sweepCallbacks}
+                onMeasure={measureMonth}
               >
                 {weeks.map((week) => (
                   <View key={week[0].toISOString()} {...slot("week", { base: styles.week })}>
@@ -477,77 +625,106 @@ function YearViewInner<T>({
           );
         })}
       </View>
-    </ScrollView>
+    </Animated.ScrollView>
   );
 }
 
 // One mini month's week rows, wrapped in a pan when drag-to-select is on. The
-// gesture is bound per month (rather than to the whole year) because that keeps
-// the hit-test to a single measured box, so a sweep runs across the days of the
-// month it started in.
+// pan arms on a hold over this month's days, then hit-tests the finger against
+// every mini month, so the sweep carries across them. Each month keeps its own
+// pan so a hold off the day cells (a title, a gap) never arms one.
 function MiniMonthGrid({
   testID,
-  month,
-  weeks,
+  monthIndex,
   sweepEnabled,
-  isSelectable,
-  onBeginSweep,
-  onExtendSweep,
-  onFinishSweep,
+  table,
+  boxes,
+  active,
+  hover,
+  view,
+  callbacks,
+  onMeasure,
   children,
 }: {
   testID: string;
-  month: Date;
-  weeks: Date[][];
+  monthIndex: number;
   sweepEnabled: boolean;
-  isSelectable: (day: Date) => boolean;
-  onBeginSweep: (day: Date) => void;
-  onExtendSweep: (day: Date) => void;
-  onFinishSweep: () => void;
+  table: SharedValue<DayTable>;
+  boxes: SharedValue<(GridBox | null)[]>;
+  active: SharedValue<number>;
+  hover: SharedValue<number>;
+  view: {
+    scrollTop: SharedValue<number>;
+    height: SharedValue<number>;
+    gridTop: SharedValue<number>;
+  };
+  callbacks: {
+    begin: (time: number) => void;
+    extend: (time: number) => void;
+    finish: () => void;
+    cancel: () => void;
+  };
+  onMeasure: ((store: "month" | "rows", index: number, layout: GridBox) => void) | undefined;
   children: React.ReactNode;
 }) {
-  const sizeRef = useRef({ width: 0, height: 0 });
-  const onLayout = useCallback((event: LayoutChangeEvent) => {
-    const { width, height } = event.nativeEvent.layout;
-    sizeRef.current = { width, height };
-  }, []);
-  // The gesture reads its inputs from here rather than closing over them, so a
-  // consumer's inline handler (or the re-render each swept day causes) can't
-  // rebuild the pan and cancel the drag that is running through it.
-  const latest = useRef({ month, weeks, isSelectable, onBeginSweep, onExtendSweep, onFinishSweep });
-  latest.current = { month, weeks, isSelectable, onBeginSweep, onExtendSweep, onFinishSweep };
-  // The day under a grid-relative point, or null for a point on a blanked
-  // adjacent-month cell or an unselectable day: neither can anchor a sweep or
-  // be swept onto. Mirrors MonthView's `hitTest`.
-  const dayAt = useCallback((x: number, y: number): Date | null => {
-    const { width, height } = sizeRef.current;
-    const { month: current, weeks: rows, isSelectable: selectable } = latest.current;
-    if (width <= 0 || height <= 0 || rows.length === 0) return null;
-    const row = Math.min(rows.length - 1, Math.max(0, Math.floor(y / (height / rows.length))));
-    const cols = rows[row].length;
-    const col = Math.min(cols - 1, Math.max(0, Math.floor(x / (width / cols))));
-    const day = rows[row][col];
-    if (!day) return null;
-    if (day.getMonth() !== current.getMonth()) return null;
-    return selectable(day) ? day : null;
-  }, []);
+  const onLayout = useCallback(
+    (event: LayoutChangeEvent) => onMeasure?.("rows", monthIndex, event.nativeEvent.layout),
+    [onMeasure, monthIndex],
+  );
   const gesture = useMemo(() => {
     if (!sweepEnabled) return undefined;
+    const { begin, extend, finish } = callbacks;
+    const { scrollTop, height, gridTop } = view;
+    const owner = monthIndex + 1;
+    // The pan reports points relative to this month's rows; the hit-test takes
+    // the year grid's coordinates.
+    const dayAt = (x: number, y: number) => {
+      "worklet";
+      const own = boxes.value[monthIndex];
+      if (!own) return -1;
+      const viewport = { top: scrollTop.value - gridTop.value, height: height.value };
+      return sweepDayAt(boxes.value, table.value, viewport, own.x + x, own.y + y);
+    };
     return Gesture.Pan()
       .activateAfterLongPress(DRAG_HOLD_MS)
-      .runOnJS(true)
       .onStart((event) => {
+        // A second finger held in another month leaves the running sweep alone.
+        if (active.value) return;
         const day = dayAt(event.x, event.y);
-        if (day) latest.current.onBeginSweep(day);
+        if (day < 0) return;
+        active.value = owner;
+        hover.value = day;
+        runOnJS(begin)(day);
       })
       .onUpdate((event) => {
+        if (active.value !== owner) return;
+        // Over a gap, a blank cell or a disabled day the sweep keeps its last day.
         const day = dayAt(event.x, event.y);
-        if (day) latest.current.onExtendSweep(day);
+        if (day < 0 || day === hover.value) return;
+        hover.value = day;
+        runOnJS(extend)(day);
       })
-      .onFinalize(() => latest.current.onFinishSweep());
-  }, [sweepEnabled, dayAt]);
+      .onFinalize(() => {
+        if (active.value !== owner) return;
+        active.value = 0;
+        hover.value = -1;
+        runOnJS(finish)();
+      });
+  }, [sweepEnabled, monthIndex, table, boxes, active, hover, view, callbacks]);
+  // A pan removed mid-drag (a new year re-keys the months, or the sweep
+  // handlers go away) may never finalize, which would leave its sweep owning
+  // every other month's pan and the scroll view frozen.
+  useEffect(() => {
+    if (!gesture) return;
+    return () => {
+      if (active.value !== monthIndex + 1) return;
+      active.value = 0;
+      hover.value = -1;
+      callbacks.cancel();
+    };
+  }, [gesture, active, hover, monthIndex, callbacks]);
   const grid = (
-    <View testID={testID} onLayout={onLayout}>
+    <View testID={testID} onLayout={onMeasure ? onLayout : undefined}>
       {children}
     </View>
   );
