@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.23.0](https://github.com/afonsojramos/super-calendar/compare/v2.22.0...v2.23.0) (2026-11-25)
+
+
+### Features
+
+* accept getEventId on every renderer and keep held drags on refreshed events ([d2a8b9c](https://github.com/afonsojramos/super-calendar/commit/d2a8b9c79ab63bc69e3cf17ca7bf763704a19473))
+* lay out every renderer right to left with isRTL ([b00a334](https://github.com/afonsojramos/super-calendar/commit/b00a334ec4c713d373ce5f0b0d83d935895f95a7))
+* **native:** show live times while dragging a time-grid event ([b0c01aa](https://github.com/afonsojramos/super-calendar/commit/b0c01aae6b802cfd511c7cf335ae0f3bde73c4bc))
+
+
+### Bug Fixes
+
+* align the web time-grid header and all-day lane with the columns when a scrollbar shows ([#205](https://github.com/afonsojramos/super-calendar/issues/205)) ([4acab31](https://github.com/afonsojramos/super-calendar/commit/4acab3182ef165763986c64d780e52cf45dfd50c))
+* highlight today or activeDate in the web schedule instead of the date prop, and accept activeDate on every web view ([dd911f5](https://github.com/afonsojramos/super-calendar/commit/dd911f5043d333252c1fac6f369551f970738fca))
+* **month:** count the overflow row in maxVisibleEventCount on native ([fe8ae1d](https://github.com/afonsojramos/super-calendar/commit/fe8ae1d071010051c4f81258524c4686470ac9bc))
+* **native:** carry a year-view sweep across mini months ([bbec124](https://github.com/afonsojramos/super-calendar/commit/bbec124fa6c235cdc821c44c2181f8dd40318d2c))
+* **native:** keep a time-grid edge drag alive past the second page ([c172910](https://github.com/afonsojramos/super-calendar/commit/c172910aeecba6655da5bb66d20f5aedda6c796f))
+* **native:** stop Android quick swipes from snapping back on stale scroll offsets ([#211](https://github.com/afonsojramos/super-calendar/issues/211)) ([ff2b29a](https://github.com/afonsojramos/super-calendar/commit/ff2b29a9f94f622528308c9fc165b54faac66b55))
+* **web:** fire onPressCell on touch taps in ResourceTimeline ([#212](https://github.com/afonsojramos/super-calendar/issues/212)) ([ce8045c](https://github.com/afonsojramos/super-calendar/commit/ce8045cbdc41e0a2a3aedaa9aad6f11d669c8c05))
+
 ## [2.22.0](https://github.com/afonsojramos/super-calendar/compare/v2.21.0...v2.22.0) (2026-11-23)
 
 
