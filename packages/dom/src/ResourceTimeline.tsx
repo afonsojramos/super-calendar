@@ -1,6 +1,7 @@
 import {
   type ComponentType,
   type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
   type ReactNode,
@@ -214,6 +215,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 
 // Hour-gutter width in the vertical orientation, matching the time grid's axis.
 const GUTTER_WIDTH = 56;
+const CELL_TOUCH_SLOP_PX = 8;
 
 type DragState<T> = {
   pointerId: number;
@@ -420,6 +422,7 @@ export function ResourceTimeline<T = unknown>({
     pe: PositionedEvent<T>,
   ) => {
     const { startHours, durationHours } = pe;
+    cellTouchRef.current = null;
     if (e.button === 0 && e.isPrimary !== false && !dragRef.current) handledClick.current = null;
     if (
       !onDragEvent ||
@@ -559,7 +562,8 @@ export function ResourceTimeline<T = unknown>({
 
   // Create-by-drag / tap on empty lane space, mirroring the time grid: mouse and
   // pen sweep out a new event, and a tap without movement fires onPressCell. Touch
-  // is left free to scroll the board, so cell taps are pointer (mouse/pen) only.
+  // stays free to scroll the board (no sweep); a tap fires onPressCell on click,
+  // which the browser skips when the finger scrolled instead.
   const [createBox, setCreateBox] = useState<{
     resourceKey: string;
     startPx: number;
@@ -574,6 +578,13 @@ export function ResourceTimeline<T = unknown>({
     startPx: number;
     dayKey: string;
     creating: boolean;
+  } | null>(null);
+  const cellTouchRef = useRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    resourceId: string;
+    dayKey: string;
   } | null>(null);
   const createActive = createBox !== null;
   useEffect(() => {
@@ -611,20 +622,30 @@ export function ResourceTimeline<T = unknown>({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [clearCreate]);
   const cellEnabled = !!onPressCell || !!onCreateEvent;
-  const pxAlongAxis = (el: HTMLElement, e: ReactPointerEvent) => {
+  const pxAlongAxis = (el: HTMLElement, e: Pick<MouseEvent, "clientX" | "clientY">) => {
     const rect = el.getBoundingClientRect();
     return vertical ? e.clientY - rect.top : e.clientX - rect.left;
   };
   const beginCreate = (e: ReactPointerEvent, resource: Resource) => {
-    // Only from the lane background, primary button, never on an event bar.
-    if (
-      !cellEnabled ||
-      e.pointerType === "touch" ||
-      e.isPrimary === false ||
-      createOrigin.current ||
-      dragRef.current
-    )
+    if (e.isPrimary === false) {
+      cellTouchRef.current = null;
       return;
+    }
+    if (createOrigin.current || dragRef.current) return;
+    // Mouse / pen only for sweep-to-create: on touch the lane must stay free to
+    // scroll the board, and a tap without movement commits on the trailing click.
+    cellTouchRef.current =
+      e.pointerType === "touch" && !!onPressCell && e.target === e.currentTarget
+        ? {
+            pointerId: e.pointerId,
+            x: e.clientX,
+            y: e.clientY,
+            resourceId: resource.id,
+            dayKey: date.toDateString(),
+          }
+        : null;
+    // Only from the lane background, primary button, never on an event bar.
+    if (!cellEnabled || e.pointerType === "touch") return;
     if (e.target !== e.currentTarget || e.button > 0) return;
     const el = e.currentTarget as HTMLElement;
     const startPx = pxAlongAxis(el, e);
@@ -648,6 +669,14 @@ export function ResourceTimeline<T = unknown>({
     if (onCreateEvent) setCreateBox({ resourceKey: resource.id, startPx, curPx: startPx });
   };
   const moveCreate = (e: ReactPointerEvent) => {
+    const touch = cellTouchRef.current;
+    if (
+      touch &&
+      e.pointerId === touch.pointerId &&
+      Math.hypot(e.clientX - touch.x, e.clientY - touch.y) > CELL_TOUCH_SLOP_PX
+    ) {
+      cellTouchRef.current = null;
+    }
     const o = createOrigin.current;
     if (!o || o.pointerId !== e.pointerId || !onCreateEvent) return;
     o.clientX = e.clientX;
@@ -677,8 +706,33 @@ export function ResourceTimeline<T = unknown>({
       if (at) onPressCell(at.start, resource);
     }
   };
+  const tapCell = (e: ReactMouseEvent<HTMLDivElement>, resource: Resource) => {
+    const touch = cellTouchRef.current;
+    cellTouchRef.current = null;
+    if (
+      !touch ||
+      !onPressCell ||
+      e.target !== e.currentTarget ||
+      touch.resourceId !== resource.id ||
+      touch.dayKey !== date.toDateString()
+    ) {
+      return;
+    }
+    const currentResource = resources.find((candidate) => candidate.id === resource.id);
+    if (!currentResource) return;
+    const px = pxAlongAxis(e.currentTarget, e);
+    const at = cellRangeFromDrag(date, px, px, hourSize, startHour, dragStepMinutes);
+    if (at) onPressCell(at.start, currentResource);
+  };
   // A gesture the browser cancels (scroll takeover, etc.) must not commit.
   const cancelCreate = (e: ReactPointerEvent) => {
+    if (cellTouchRef.current?.pointerId === e.pointerId) cellTouchRef.current = null;
+    if (createOrigin.current?.pointerId !== e.pointerId) return;
+    clearCreate();
+  };
+  // Touch has implicit pointer capture whose `lostpointercapture` fires after
+  // `pointerup` and before `click`, so capture loss cancels only a sweep, not a tap.
+  const loseCreateCapture = (e: ReactPointerEvent) => {
     if (createOrigin.current?.pointerId !== e.pointerId) return;
     clearCreate();
   };
@@ -706,13 +760,19 @@ export function ResourceTimeline<T = unknown>({
         : { start: new Date(liveStart), end: new Date(liveEnd) },
     [liveStart, liveEnd],
   );
-  const trackInteractionProps = (resource: Resource) => ({
-    onPointerDown: (e: ReactPointerEvent) => beginCreate(e, resource),
-    onPointerMove: moveCreate,
-    onPointerUp: endCreate,
-    onPointerCancel: cancelCreate,
-    onLostPointerCapture: cancelCreate,
-  });
+  const trackInteractionProps = (resource: Resource) =>
+    cellEnabled
+      ? {
+          onPointerDown: (e: ReactPointerEvent) => beginCreate(e, resource),
+          onPointerMove: moveCreate,
+          onPointerUp: endCreate,
+          onPointerCancel: cancelCreate,
+          onLostPointerCapture: loseCreateCapture,
+          ...(onPressCell
+            ? { onClick: (e: ReactMouseEvent<HTMLDivElement>) => tapCell(e, resource) }
+            : null),
+        }
+      : {};
   useEffect(() => {
     if (
       dragRef.current &&
@@ -729,6 +789,10 @@ export function ResourceTimeline<T = unknown>({
         creating.dayKey !== date.toDateString())
     )
       clearCreate();
+    const touch = cellTouchRef.current;
+    if (touch && (!onPressCell || touch.dayKey !== date.toDateString())) {
+      cellTouchRef.current = null;
+    }
   });
   useEffect(
     () => () => {
@@ -738,6 +802,7 @@ export function ResourceTimeline<T = unknown>({
       origin.current = null;
       dragRef.current = null;
       createOrigin.current = null;
+      cellTouchRef.current = null;
       try {
         if (currentDrag) captured?.element.releasePointerCapture?.(currentDrag.pointerId);
         currentCreate?.el.releasePointerCapture?.(currentCreate.pointerId);

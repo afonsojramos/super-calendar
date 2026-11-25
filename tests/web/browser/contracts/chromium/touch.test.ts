@@ -73,4 +73,77 @@ describe(rendererName, () => {
       await cdp.detach();
     }
   });
+
+  it.each([
+    { orientation: "horizontal", view: "resources-touch", axis: "x" as const },
+    { orientation: "vertical", view: "resources-touch-vertical", axis: "y" as const },
+  ])(
+    "fires onPressCell on a touch tap and scrolls on a touch swipe in $orientation ResourceTimeline",
+    async ({ view, axis }) => {
+      await open(view);
+      const trackSelector = '[data-resource-id="b"][data-slot="track"]';
+      await page.locator(trackSelector).waitFor();
+      const scroller = await page.locator(trackSelector).evaluateHandle((track, scrollAxis) => {
+        let parent: HTMLElement | null = track.parentElement;
+        const prop = scrollAxis === "x" ? "overflowX" : "overflowY";
+        while (parent && getComputedStyle(parent)[prop] !== "auto") parent = parent.parentElement;
+        if (!parent) throw new Error(`Missing resource timeline ${scrollAxis} scroller`);
+        return parent;
+      }, axis);
+      const bounds = await box(trackSelector);
+      const tapPoint =
+        axis === "x"
+          ? { x: bounds.x + 80, y: bounds.y + bounds.height / 2, id: 1 }
+          : { x: bounds.x + bounds.width / 2, y: bounds.y + 96, id: 1 };
+      const cdp = await page.context().newCDPSession(page);
+      try {
+        // Real touch tap fires onPressCell at the tapped slot and resource.
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [tapPoint],
+        });
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await expect.poll(calls).toBe(axis === "x" ? '["cell:15:9:0@b"]' : '["cell:15:10:0@b"]');
+
+        // Touch swipe scrolls the timeline without firing onPressCell again.
+        const before = await scroller.evaluate(
+          (element, scrollAxis) => (scrollAxis === "x" ? element.scrollLeft : element.scrollTop),
+          axis,
+        );
+        const swipeStart =
+          axis === "x"
+            ? { x: bounds.x + 140, y: bounds.y + bounds.height / 2, id: 2 }
+            : { x: bounds.x + bounds.width / 2, y: bounds.y + 140, id: 2 };
+        await cdp.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [swipeStart],
+        });
+        for (const offset of [25, 50, 75, 100]) {
+          await cdp.send("Input.dispatchTouchEvent", {
+            type: "touchMove",
+            touchPoints: [
+              axis === "x"
+                ? { ...swipeStart, x: swipeStart.x - offset }
+                : { ...swipeStart, y: swipeStart.y - offset },
+            ],
+          });
+          await page.waitForTimeout(20);
+        }
+        await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+        await expect
+          .poll(() =>
+            scroller.evaluate(
+              (element, scrollAxis) =>
+                scrollAxis === "x" ? element.scrollLeft : element.scrollTop,
+              axis,
+            ),
+          )
+          .toBeGreaterThan(before + 20);
+        expect(await calls()).toBe(axis === "x" ? '["cell:15:9:0@b"]' : '["cell:15:10:0@b"]');
+      } finally {
+        await cdp.detach();
+        await scroller.dispose();
+      }
+    },
+  );
 });

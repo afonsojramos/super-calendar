@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import { flush } from "solid-js";
+import { createSignal, flush } from "solid-js";
 import type { CalendarEvent } from "@super-calendar/core/vanilla";
 import { Calendar, MonthView, ResourceTimeline, TimeGrid } from "../index";
 import { click, key, mount, mountProps, pointer } from "../../../../tests/support/solid-render";
@@ -320,6 +320,49 @@ describe("Solid resource interactions", () => {
       pointer(handle, "move", end);
       pointer(handle, "up", end);
       expect(onDragEvent).toHaveBeenCalledWith(event, at(9), at(12), resources[0]);
+    },
+  );
+
+  it.each(["horizontal", "vertical"] as const)(
+    "binds a direct click listener on %s resource tracks only while onPressCell is set",
+    (orientation) => {
+      const [press, setPress] = createSignal<
+        ((time: Date, resource: { id: string; title?: string }) => void) | undefined
+      >(undefined);
+      const resources = [{ id: "a", title: "Room A" }];
+      const view = mount(() => (
+        <ResourceTimeline
+          date={date}
+          events={[]}
+          resources={resources}
+          orientation={orientation}
+          startHour={8}
+          hourWidth={80}
+          hourHeight={48}
+          onPressCell={press()}
+        />
+      ));
+      const track = view.container.querySelector<HTMLElement>('[data-slot="track"]')!;
+      const addSpy = vi.spyOn(track, "addEventListener");
+      const removeSpy = vi.spyOn(track, "removeEventListener");
+
+      const onPressCell = vi.fn();
+      setPress(() => onPressCell);
+      flush();
+      expect(addSpy).toHaveBeenCalledWith("click", expect.any(Function));
+
+      const coords =
+        orientation === "vertical" ? { clientX: 40, clientY: 96 } : { clientX: 160, clientY: 20 };
+      pointer(track, "down", { ...coords, pointerId: 1, pointerType: "touch" });
+      pointer(track, "up", { ...coords, pointerId: 1, pointerType: "touch" });
+      // Non-bubbling click reaches only a listener attached directly to the track element.
+      track.dispatchEvent(new MouseEvent("click", { bubbles: false, ...coords, detail: 1 }));
+      flush();
+      expect(onPressCell).toHaveBeenCalledExactlyOnceWith(at(10), resources[0]);
+
+      setPress(undefined);
+      flush();
+      expect(removeSpy).toHaveBeenCalledWith("click", expect.any(Function));
     },
   );
 });
