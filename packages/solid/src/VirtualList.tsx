@@ -6,6 +6,7 @@ interface VirtualListProps<T> {
   keyExtractor: (item: T) => string;
   estimatedItemSize: number;
   initialScrollIndex?: number;
+  viewportRef?: (element: HTMLDivElement) => void;
   style?: JSX.CSSProperties;
   renderItem: (props: { item: T }) => JSX.Element;
 }
@@ -106,6 +107,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): JSX.Element {
     <div
       ref={(value) => {
         viewport = value;
+        props.viewportRef?.(value);
       }}
       data-virtual-list
       style={{ ...props.style, position: "relative", "overflow-anchor": "none" }}

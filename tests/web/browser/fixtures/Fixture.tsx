@@ -304,7 +304,7 @@ export function Fixture() {
   const record = (call: string) => setCalls((previous) => [...previous, call]);
 
   return (
-    <main>
+    <main data-classic-scrollbars={view.startsWith("scrollbar-") ? "" : undefined}>
       <nav>
         <button onClick={() => setUpdated(true)}>Update props</button>
         <button onClick={() => setRestricted(true)}>Restrict dates</button>
@@ -381,7 +381,44 @@ export function Fixture() {
           </button>
         ) : null}
       </nav>
-      {view.startsWith("month-draft") || view.startsWith("multiweek-draft") ? (
+      {view === "scrollbar-week" ? (
+        // Tall enough to scroll while "Toggle disabled" is off; on, it narrows the visible hours.
+        <TimeGrid<{ id: number }>
+          date={anchor}
+          now={anchor}
+          mode="week"
+          weekStartsOn={1}
+          events={allDayEvents}
+          height={300}
+          hourHeight={48}
+          minHour={disabled() ? 8 : undefined}
+          maxHour={disabled() ? 10 : undefined}
+          showWeekNumber
+          showAllDayLabel
+        />
+      ) : view === "scrollbar-multiweek" ? (
+        <Calendar
+          mode="multiweek"
+          date={anchor}
+          numberOfWeeks={updated() ? 1 : 8}
+          weekStartsOn={1}
+          height={260}
+          events={allDayEvents}
+        />
+      ) : view === "scrollbar-resources" ? (
+        <ResourceTimeline<{ id: number; resourceId: string }>
+          date={anchor}
+          now={anchor}
+          orientation="vertical"
+          resources={resources}
+          events={resourceEvents}
+          style={{ height: 240 }}
+          startHour={8}
+          endHour={24}
+        />
+      ) : view === "scrollbar-months" ? (
+        <MonthList date={anchor} pastMonths={0} futureMonths={12} height={400} weekStartsOn={1} />
+      ) : view.startsWith("month-draft") || view.startsWith("multiweek-draft") ? (
         <Calendar
           mode={view.startsWith("month-draft") ? "month" : "multiweek"}
           date={anchor}
