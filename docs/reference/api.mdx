@@ -30,6 +30,7 @@ your editor lists the full set with inline docs.
 | `weekStartsOn`  | `0–6`                     | 0 = Sunday, 1 = Monday.                                              |
 | `weekdayFormat` | `narrow \| short \| long` | Weekday header width (default `short`).                              |
 | `timeZone`      | `string`                  | Display events, the now indicator and today in this IANA zone.       |
+| `activeDate`    | `Date`                    | Highlight this day instead of today, in every mode.                  |
 
 Anchor dates are read in the device's local time zone: construct `date` as a
 local date (`new Date(2026, 7, 24)`), not a UTC instant. See

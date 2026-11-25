@@ -17,6 +17,7 @@ import {
   groupEventsByDay,
   isAllDayEvent,
   isBackgroundEvent,
+  isSameCalendarDay,
   keepMonthDraftVisible,
   layoutMonthWeek,
   monthCreateRange,
@@ -216,6 +217,8 @@ export interface MonthViewProps<T = unknown>
   now?: Date;
   /** Highlight today as it is in this IANA time zone (default: the device's). */
   timeZone?: string;
+  /** Highlight this date instead of the real "today". */
+  activeDate?: Date;
   /** Theme overrides; falls back to the default light theme. */
   theme?: Partial<SolidCalendarTheme>;
   /** Fired when a selectable day is clicked. */
@@ -369,8 +372,13 @@ function rangeBandDefault(
     },
   };
 }
-function badgeDefault(day: RowDay, theme: SolidCalendarTheme, hovered: boolean): SlotDefault {
-  const badge = dayBadgeKind(day, day.isToday);
+function badgeDefault(
+  day: RowDay,
+  highlighted: boolean,
+  theme: SolidCalendarTheme,
+  hovered: boolean,
+): SlotDefault {
+  const badge = dayBadgeKind(day, highlighted);
   const filled = badge !== "none";
   const background = filled
     ? badge === "today"
@@ -392,7 +400,7 @@ function badgeDefault(day: RowDay, theme: SolidCalendarTheme, hovered: boolean):
     },
     themed: {
       background,
-      color: filled ? (day.isToday ? theme.todayText : theme.selectedText) : "inherit",
+      color: filled ? (highlighted ? theme.todayText : theme.selectedText) : "inherit",
     },
   };
 }
@@ -435,8 +443,12 @@ function eventCellDefault(
     },
   };
 }
-function compactBadgeDefault(day: RowDay, theme: SolidCalendarTheme): SlotDefault {
-  const badge = dayBadgeKind(day, day.isToday);
+function compactBadgeDefault(
+  day: RowDay,
+  highlighted: boolean,
+  theme: SolidCalendarTheme,
+): SlotDefault {
+  const badge = dayBadgeKind(day, highlighted);
   const filled = badge !== "none";
   return {
     base: {
@@ -457,7 +469,7 @@ function compactBadgeDefault(day: RowDay, theme: SolidCalendarTheme): SlotDefaul
           ? theme.todayBackground
           : theme.selectedBackground
         : "transparent",
-      color: filled ? (day.isToday ? theme.todayText : theme.selectedText) : "inherit",
+      color: filled ? (highlighted ? theme.todayText : theme.selectedText) : "inherit",
     },
   };
 }
@@ -718,6 +730,12 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
         };
       }),
   );
+  // The badge fills for `activeDate` when set, else today. `data-today` and the
+  // accessible name keep stating the real today.
+  const isHighlighted = (day: RowDay) => {
+    const active = props.activeDate;
+    return active ? isSameCalendarDay(day.date, active) : day.isToday;
+  };
   // Reserve `maxVisibleEventCount` rows below the date so every cell is uniform;
   // when a day overflows, the last row becomes the "+N more" affordance.
   const eventRowHeight = createMemo(
@@ -1728,7 +1746,11 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                             {...dayData()}
                                             {...slot(
                                               "dayBadge",
-                                              compactBadgeDefault(day(), theme()),
+                                              compactBadgeDefault(
+                                                day(),
+                                                isHighlighted(day()),
+                                                theme(),
+                                              ),
                                             )}
                                           >
                                             {day().label}
@@ -2228,7 +2250,12 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                           {...dayData()}
                                           {...slot(
                                             "dayBadge",
-                                            badgeDefault(day(), theme(), hoveredKey() === day().id),
+                                            badgeDefault(
+                                              day(),
+                                              isHighlighted(day()),
+                                              theme(),
+                                              hoveredKey() === day().id,
+                                            ),
                                           )}
                                         >
                                           {day().label}

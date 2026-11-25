@@ -90,6 +90,7 @@ export function Agenda<T>({
   const keyExtractorRow = useCallback((row: Row<T>) => row.key, []);
   // The day, not the instant, so the rows re-render once a day.
   const todayKey = startOfDay(nowInTimeZone(now, timeZone)).getTime();
+  const activeKey = activeDate ? startOfDay(activeDate).getTime() : null;
   const renderItem = useCallback(
     ({ item }: LegendListRenderItemProps<Row<T>>) => {
       if (item.kind === "header") {
@@ -157,8 +158,8 @@ export function Agenda<T>({
       keyExtractor={keyExtractorRow}
       renderItem={renderItem}
       // LegendList keeps rendered rows until `data` or `extraData` changes, so
-      // the day that is today has to invalidate them.
-      extraData={todayKey}
+      // the highlighted day (today or `activeDate`) has to invalidate them.
+      extraData={`${todayKey}:${activeKey ?? ""}`}
       // The public prop is data-agnostic; LegendList types the separator by row.
       ItemSeparatorComponent={
         (itemSeparatorComponent ?? undefined) as ComponentType<{ leadingItem: Row<T> }> | undefined

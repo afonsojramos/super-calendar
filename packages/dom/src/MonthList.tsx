@@ -71,6 +71,8 @@ export interface MonthListProps<T = unknown>
   selectedDates?: Date[];
   /** Fill the whole cell on selection instead of the default rounded pill band. */
   fillCellOnSelection?: boolean;
+  /** Highlight this date instead of the real "today". */
+  activeDate?: Date;
   /** date-fns locale for the month titles and weekday labels. */
   locale?: Locale;
   /** Theme overrides; falls back to the default light theme. */
@@ -116,6 +118,7 @@ export function MonthList<T = unknown>({
   selectedRange,
   selectedDates,
   fillCellOnSelection = false,
+  activeDate,
   locale,
   theme: themeOverrides,
   height = 480,
@@ -182,6 +185,7 @@ export function MonthList<T = unknown>({
         selectedRange={selectedRange}
         selectedDates={selectedDates}
         fillCellOnSelection={fillCellOnSelection}
+        activeDate={activeDate}
         showAdjacentMonths={false}
         showWeekdays={false}
         locale={locale}
@@ -212,6 +216,7 @@ export function MonthList<T = unknown>({
       selectedRange,
       selectedDates,
       fillCellOnSelection,
+      activeDate,
       locale,
       themeOverrides,
       minDate,

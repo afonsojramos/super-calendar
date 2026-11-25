@@ -24,7 +24,9 @@ event fills the agenda without you materialising occurrences.
 ## Rows and headers
 
 - Date headers announce the day; today's header is highlighted (or the
-  `activeDate` you pass). `onPressDay` makes headers tappable.
+  `activeDate` you pass). Today follows `now` and `timeZone`, as in the other
+  modes, and the `date` prop doesn't move the highlight. `onPressDay` makes
+  headers tappable.
 - `onPressEvent` / `onLongPressEvent` fire for rows; `renderEvent` (or
   `renderScheduleEvent` on the dom `Calendar`) replaces the row's card.
 - `allDayLabel` sets the text shown instead of a time range for all-day events.

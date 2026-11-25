@@ -74,6 +74,8 @@ export interface MonthListProps<T = unknown>
   selectedDates?: Date[];
   /** Fill the whole cell on selection instead of the default rounded pill band. */
   fillCellOnSelection?: boolean;
+  /** Highlight this date instead of the real "today". */
+  activeDate?: Date;
   /** date-fns locale for the month titles and weekday labels. */
   locale?: Locale;
   /** Theme overrides; falls back to the default light theme. */
@@ -220,6 +222,7 @@ export function MonthList<T = unknown>(incoming: MonthListProps<T>): JSX.Element
             selectedRange={props.selectedRange}
             selectedDates={props.selectedDates}
             fillCellOnSelection={props.fillCellOnSelection}
+            activeDate={props.activeDate}
             showAdjacentMonths={false}
             showWeekdays={false}
             locale={props.locale}

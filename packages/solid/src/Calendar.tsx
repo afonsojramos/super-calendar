@@ -108,6 +108,8 @@ export interface CalendarProps<T = unknown>
    * `eventsInTimeZone`.
    */
   timeZone?: string;
+  /** Highlight this date (header/cell/agenda) instead of the real "today". */
+  activeDate?: Date;
   /** Theme overrides; falls back to the default light theme. */
   theme?: Partial<SolidCalendarTheme>;
   /** Height of the scroll viewport, in px. */
@@ -522,6 +524,7 @@ export function Calendar<T = unknown>(
           locale={props.locale}
           now={props.now}
           timeZone={props.timeZone}
+          activeDate={props.activeDate}
           labels={props.labels}
           theme={props.theme}
           className={props.className}
@@ -553,10 +556,10 @@ export function Calendar<T = unknown>(
           locale={props.locale}
           now={props.now}
           timeZone={props.timeZone}
+          activeDate={props.activeDate}
           ampm={props.ampm}
           theme={props.theme}
           height={props.height}
-          activeDate={props.date}
           className={props.className}
           style={props.style}
           classNames={props.classNames}
@@ -579,6 +582,7 @@ export function Calendar<T = unknown>(
           locale={props.locale}
           now={props.now}
           timeZone={props.timeZone}
+          activeDate={props.activeDate}
           labels={props.labels}
           theme={props.theme}
           className={props.className}
@@ -626,6 +630,7 @@ export function Calendar<T = unknown>(
           locale={props.locale}
           now={props.now}
           timeZone={props.timeZone}
+          activeDate={props.activeDate}
           labels={props.labels}
           theme={props.theme}
           className={props.className}
@@ -670,6 +675,7 @@ export function Calendar<T = unknown>(
           hiddenDays={props.hiddenDays}
           now={props.now}
           timeZone={props.timeZone}
+          activeDate={props.activeDate}
           weekdayFormat={props.weekdayFormat}
           numberOfDays={props.numberOfDays}
           locale={props.locale}
