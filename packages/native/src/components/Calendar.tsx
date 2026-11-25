@@ -387,10 +387,10 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   /** Highlight this date (header/cell/agenda) instead of the real "today". */
   activeDate?: Date;
   /**
-   * Lay the day columns out right-to-left (month, week/day grid and all-day lane).
-   * Cosmetic only: the hour gutter stays on the left and paging still advances
-   * with the system scroll direction. Default false. For full RTL (including
-   * scroll direction), also enable React Native's `I18nManager`.
+   * Lay every view out right to left: days, weekday headers, the all-day lane and
+   * the year's months run from the right, the hour column sits on the right, and
+   * swipes page in the reading direction (the next period is to the left). Needs
+   * no `I18nManager` setting. Default false.
    */
   isRTL?: boolean;
   /**
@@ -911,6 +911,7 @@ function CalendarInner<T>(
           <YearView
             date={date}
             events={displayEvents}
+            isRTL={isRTL}
             refreshControl={refreshControl}
             weekStartsOn={weekStartsOn}
             hiddenDays={hiddenDays}

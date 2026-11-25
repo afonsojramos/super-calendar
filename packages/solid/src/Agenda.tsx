@@ -217,7 +217,7 @@ export function Agenda<T = unknown>(incoming: AgendaProps<T>): JSX.Element {
               background: "transparent",
               cursor: "pointer",
               font: "inherit",
-              textAlign: "left",
+              textAlign: "start",
             }
           : { display: "block", width: "100%" },
         themed: {
@@ -257,7 +257,7 @@ export function Agenda<T = unknown>(incoming: AgendaProps<T>): JSX.Element {
           base: {
             display: "block",
             width: "100%",
-            textAlign: "left",
+            textAlign: "start",
             border: "none",
             background: "transparent",
             cursor: "pointer",

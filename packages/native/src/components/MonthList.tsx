@@ -131,6 +131,7 @@ export type MonthListProps<T> = {
   /** Tint weekend day cells with the theme's weekend background. Default true. */
   highlightWeekends?: boolean;
   disableMonthEventCellPress?: boolean;
+  /** Lay each month's days out right to left. Default false. */
   isRTL?: boolean;
   activeDate?: Date;
   selectedDates?: Date[];
@@ -249,13 +250,23 @@ function MonthListInner<T>({
     () => ({
       events,
       activeDate,
+      isRTL,
       firstViewableIndex,
       chipHeight,
       chipGap,
       weekRowHeight,
       monthHeaderHeight,
     }),
-    [events, activeDate, firstViewableIndex, chipHeight, chipGap, weekRowHeight, monthHeaderHeight],
+    [
+      events,
+      activeDate,
+      isRTL,
+      firstViewableIndex,
+      chipHeight,
+      chipGap,
+      weekRowHeight,
+      monthHeaderHeight,
+    ],
   );
 
   // A fixed window of months anchored once, aligned to the month start.

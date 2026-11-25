@@ -1998,7 +1998,18 @@ describe("TimeGrid cross-week drop", () => {
     { label: "full-width box still mostly over Tuesday", overlaps: 1, left: 1.4, day: 13 },
     { label: "box beyond the first column", overlaps: 1, left: -1, day: 12 },
     { label: "box beyond the last column", overlaps: 1, left: 7, day: 18 },
-    { label: "right-to-left columns", overlaps: 2, left: 1.9, day: 16, isRTL: true },
+    // Under RTL the first box of a pair sits in the right half of its day column,
+    // so its ghost sits half a column further left (matching `second box of a pair`
+    // in LTR), while the second box sits in the left half with zero inset.
+    { label: "right-to-left columns", overlaps: 2, left: 1.9, day: 17, isRTL: true },
+    {
+      label: "right-to-left columns, left half",
+      overlaps: 2,
+      grab: 1,
+      left: 1.9,
+      day: 16,
+      isRTL: true,
+    },
     { label: "hidden Wednesday", overlaps: 2, left: 1.9, day: 15, hideWednesday: true },
     { label: "rejected placement", overlaps: 2, left: 1.9, day: 14, reject: true },
   ])(

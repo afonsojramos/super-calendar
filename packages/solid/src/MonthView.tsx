@@ -1,5 +1,6 @@
 import { Dynamic, type JSX } from "@solidjs/web";
 import {
+  arrowKeyDayStep,
   bandRounding,
   buildMonthGrid,
   buildMultiWeekGrid,
@@ -32,6 +33,7 @@ import {
   type MultiWeekGridDay,
   overlapsOtherEvents,
   rangeBandKind,
+  screenContinues,
   resolveCalendarLabels,
   type WeekdayFormat,
   type WeekStartsOn,
@@ -209,6 +211,12 @@ export interface MonthViewProps<T = unknown>
    * centered rounded "pill" strip. Default false.
    */
   fillCellOnSelection?: boolean;
+  /**
+   * Lay the days out right to left: the root gets `dir="rtl"`, days and weekday
+   * labels run right to left, bars and drags mirror, and ArrowLeft moves to the
+   * next day. Without it the root gets `dir="ltr"`. Default false.
+   */
+  isRTL?: boolean;
   /** Render the "Month yyyy" title above the grid (default true). */
   showTitle?: boolean;
   /** Render the weekday header row (default true). */
@@ -337,6 +345,7 @@ function rangeBandDefault(
   theme: SolidCalendarTheme,
   fillCell: boolean,
   eventsMode: boolean,
+  isRTL: boolean,
 ): SlotDefault | null {
   const kind = rangeBandKind(day, fillCell);
   if (kind === "none") return null;
@@ -345,7 +354,10 @@ function rangeBandDefault(
   const bandHeight = eventsMode ? badgeSize : theme.rangeBandHeight;
   const inset = fill ? 0 : eventsMode ? CELL_PAD : Math.max(0, (theme.cellHeight - bandHeight) / 2);
   const radius = fill ? 0 : bandHeight / 2;
+  // The range's first day rounds the side it starts from: the right one under RTL.
   const rounding = bandRounding(kind);
+  const roundLeft = isRTL ? rounding.end : rounding.start;
+  const roundRight = isRTL ? rounding.start : rounding.end;
   // Cap the pill at the endpoint circles: a start/end band stops at the circle's
   // outer edge (half a badge in from the cell centre) rather than spilling to the
   // cell edge, so no band shows in the empty space beside the day circles. Events
@@ -354,8 +366,8 @@ function rangeBandDefault(
   const cap = eventsMode ? 0 : `calc(50% - ${badgeSize / 2}px)`;
   const base: CSSProperties = {
     position: "absolute",
-    left: rounding.start ? cap : 0,
-    right: rounding.end ? cap : 0,
+    left: roundLeft ? cap : 0,
+    right: roundRight ? cap : 0,
     top: inset,
     // An events cell is far taller than its date row, so the strip is sized from
     // the badge rather than stretched to the cell's bottom.
@@ -368,11 +380,11 @@ function rangeBandDefault(
         }),
     zIndex: 0,
   };
-  if (rounding.start) {
+  if (roundLeft) {
     base.borderTopLeftRadius = radius;
     base.borderBottomLeftRadius = radius;
   }
-  if (rounding.end) {
+  if (roundRight) {
     base.borderTopRightRadius = radius;
     base.borderBottomRightRadius = radius;
   }
@@ -440,7 +452,7 @@ function eventCellDefault(
       gap: chipGap,
       padding: CELL_PAD,
       boxSizing: "border-box",
-      textAlign: "left",
+      textAlign: "start",
       WebkitTapHighlightColor: "transparent",
     },
     themed: {
@@ -493,7 +505,7 @@ const chipButtonDefault: SlotDefault = {
     margin: 0,
     background: "transparent",
     cursor: "pointer",
-    textAlign: "left",
+    textAlign: "start",
     fontFamily: "inherit",
   },
 };
@@ -529,7 +541,7 @@ function moreButtonDefault(
       border: "none",
       background: "transparent",
       cursor: "pointer",
-      textAlign: "left",
+      textAlign: "start",
       height: chipHeight,
       lineHeight: `${chipHeight}px`,
       fontFamily: "inherit",
@@ -645,6 +657,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
       moreLabel: "{moreCount} More",
       highlightWeekends: true,
       fillCellOnSelection: false,
+      isRTL: false,
       showTitle: true,
       showWeekdays: true,
       eventStartEditable: true,
@@ -1322,15 +1335,15 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
     if (!days || !keys || !period) return null;
     const index = days.findIndex((d) => format(d, "yyyy-MM-dd") === focusKey());
     if (index === -1) return null;
-    if (key === "ArrowLeft") return days[index - 1] ?? null;
-    if (key === "ArrowRight") return days[index + 1] ?? null;
+    const step = arrowKeyDayStep(key, props.isRTL);
+    if (step !== 0) return days[index + step] ?? null;
     if (key === "Home") return days[0];
     if (key === "End") return days[days.length - 1];
-    const step = key === "ArrowUp" ? -7 : 7;
+    const week = key === "ArrowUp" ? -7 : 7;
     for (
-      let cursor = addDays(days[index], step);
+      let cursor = addDays(days[index], week);
       cursor >= period.start && cursor < period.endExclusive;
-      cursor = addDays(cursor, step)
+      cursor = addDays(cursor, week)
     ) {
       if (keys.has(format(cursor, "yyyy-MM-dd"))) return cursor;
     }
@@ -1352,8 +1365,8 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
     const focused = focusedDate();
     if (!focused) return;
     let next: Date | null = null;
-    if (e.key === "ArrowLeft") next = addDays(focused, -1);
-    else if (e.key === "ArrowRight") next = addDays(focused, 1);
+    const step = arrowKeyDayStep(e.key, props.isRTL);
+    if (step !== 0) next = addDays(focused, step);
     else if (e.key === "ArrowUp") next = addDays(focused, -7);
     else if (e.key === "ArrowDown") next = addDays(focused, 7);
     else if (e.key === "Home") next = startOfMonth(props.source.date);
@@ -1368,6 +1381,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
   return (
     <div
       class={props.className}
+      dir={props.isRTL ? "rtl" : "ltr"}
       style={css({
         fontFamily: theme().fontFamily,
         color: theme().text,
@@ -1442,7 +1456,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
               // Spanning bars for this row (laid out once in `weekLayouts`). A multi-day
               // event is one bar across its columns, stacked into lanes; each bar renders
               // inside its start-column cell (valid grid content that reads with that day)
-              // and overflows right across the days it spans. The cells reserve the lane
+              // and overflows across the days it spans (leftward under RTL). The cells reserve the lane
               // rows so "+more" sits below the bars.
               const rowLayout = createMemo(() => rowLayouts()[weekIndex] ?? EMPTY_LAYOUT);
               // When lanes overflow, keep the last row for "+more" but always show at
@@ -1488,8 +1502,13 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                       start,
                       end,
                       lane: segment.lane,
-                      continuesBefore: segment.continuesBefore || start > segment.startCol,
-                      continuesAfter: segment.continuesAfter || end < segment.endCol,
+                      ...screenContinues(
+                        {
+                          continuesBefore: segment.continuesBefore || start > segment.startCol,
+                          continuesAfter: segment.continuesAfter || end < segment.endCol,
+                        },
+                        props.isRTL,
+                      ),
                     }
                   : null;
               });
@@ -1516,8 +1535,13 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                             seg: s,
                             startCol,
                             endCol,
-                            continuesBefore: s.continuesBefore || startCol > s.startCol,
-                            continuesAfter: s.continuesAfter || endCol < s.endCol,
+                            ...screenContinues(
+                              {
+                                continuesBefore: s.continuesBefore || startCol > s.startCol,
+                                continuesAfter: s.continuesAfter || endCol < s.endCol,
+                              },
+                              props.isRTL,
+                            ),
                           };
                         })
                         .filter((b) => b.startCol <= b.endCol),
@@ -1570,6 +1594,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                         theme(),
                                         props.fillCellOnSelection,
                                         eventsMode(),
+                                        props.isRTL,
                                       ),
                                     );
                                     const dateLabel = createMemo(() =>
@@ -1784,7 +1809,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                             {day().label}
                                           </span>
                                           {/* Spanning bars that start in this column: absolutely placed,
-                                           overflowing right across the days they span. Rendered here
+                                           overflowing across the days they span. Rendered here
                                            (not a row overlay) so each bar is valid content of its
                                            start day's gridcell and reads with that day. Made
                                            non-interactive mid drag so a sweep (or a move) reaches the
@@ -1801,7 +1826,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                               {...slot("createGhost", {
                                                 base: {
                                                   position: "absolute",
-                                                  left: 2,
+                                                  [props.isRTL ? "right" : "left"]: 2,
                                                   width: `calc(${(draftSpan()!.end - dayCol + 1) * 100}% - 4px)`,
                                                   top: draftTop(),
                                                   height: draftHeight(),
@@ -1843,7 +1868,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                               aria-hidden="true"
                                               style={css({
                                                 position: "absolute",
-                                                left: 2,
+                                                [props.isRTL ? "right" : "left"]: 2,
                                                 width: `calc(${(draftSpan()!.end - dayCol + 1) * 100}% - 4px)`,
                                                 top: draftTop(),
                                                 height: draftHeight(),
@@ -1963,7 +1988,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                     style={css({
                                                       ...barChipButton().style,
                                                       position: "absolute",
-                                                      left: 2,
+                                                      [props.isRTL ? "right" : "left"]: 2,
                                                       width: `calc(${span() * 100}% - 4px)`,
                                                       top:
                                                         CELL_PAD +
@@ -2189,7 +2214,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                             background: "transparent",
                                                             padding: 0,
                                                             font: "inherit",
-                                                            textAlign: "left",
+                                                            textAlign: "start",
                                                             cursor: "pointer",
                                                           })}
                                                         >

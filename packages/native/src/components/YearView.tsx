@@ -87,6 +87,8 @@ export type YearViewProps<T = unknown> = SlotStyleProps<YearViewSlot> & {
   labels?: Partial<CalendarLabels>;
   /** Highlight this date instead of the real "today". */
   activeDate?: Date;
+  /** Lay days and months out right to left. Default false. */
+  isRTL?: boolean;
   /** A selected span: endpoints get a filled badge, the days between get the range band. */
   selectedRange?: DateRange;
   /** Discrete selected days, drawn with a filled badge. */
@@ -175,6 +177,7 @@ function YearViewInner<T>({
   timeZone,
   labels: labelsProp,
   activeDate,
+  isRTL = false,
   selectedRange,
   selectedDates,
   minDate,
@@ -215,17 +218,16 @@ function YearViewInner<T>({
   // Each mini month's week rows, built once per year rather than per render, so
   // the drag hit-test (and the pan it is built into) keeps a stable identity.
   const monthWeeks = useMemo(
-    () => months.map((month) => buildMonthWeeks(month, weekStartsOn, { hiddenDays })),
-    [months, weekStartsOn, hiddenDays],
+    () => months.map((month) => buildMonthWeeks(month, weekStartsOn, { hiddenDays, isRTL })),
+    [months, weekStartsOn, hiddenDays, isRTL],
   );
   // Weekday initials for one shared header per mini month.
-  const weekdayLabels = useMemo(
-    () =>
-      filterHiddenDays(getWeekDays(date, weekStartsOn), hiddenDays).map((d) =>
-        format(d, weekdayFormatToken("narrow"), { locale }),
-      ),
-    [date, weekStartsOn, locale, hiddenDays],
-  );
+  const weekdayLabels = useMemo(() => {
+    const days = filterHiddenDays(getWeekDays(date, weekStartsOn), hiddenDays);
+    return (isRTL ? days.reverse() : days).map((d) =>
+      format(d, weekdayFormatToken("narrow"), { locale }),
+    );
+  }, [date, weekStartsOn, locale, hiddenDays, isRTL]);
   // Days that hold at least one event, keyed like `groupEventsByDay`.
   const eventDays = useMemo(
     () =>
@@ -408,7 +410,7 @@ function YearViewInner<T>({
                 gridTop.value = event.nativeEvent.layout.y;
               }
         }
-        {...slot("grid", { base: styles.grid })}
+        {...slot("grid", { base: [styles.grid, isRTL && styles.gridRTL] })}
       >
         {months.map((month, monthIndex) => {
           const weeks = monthWeeks[monthIndex];
@@ -529,8 +531,12 @@ function YearViewInner<T>({
                               {...slot("rangeBand", {
                                 base: [
                                   styles.rangeBand,
-                                  rounding.start && styles.rangeBandStart,
-                                  rounding.end && styles.rangeBandEnd,
+                                  // The range runs right to left under RTL, so its
+                                  // start rounds the right edge.
+                                  rounding.start &&
+                                    (isRTL ? styles.rangeBandEnd : styles.rangeBandStart),
+                                  rounding.end &&
+                                    (isRTL ? styles.rangeBandStart : styles.rangeBandEnd),
                                 ],
                                 themed: { backgroundColor: theme.colors.rangeBackground },
                               })}
@@ -753,6 +759,7 @@ export const YearView = memo(YearViewInner) as typeof YearViewInner;
 
 const styles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap" },
+  gridRTL: { flexDirection: "row-reverse" },
   month: { padding: 8 },
   // Structural layout / themed typography split per slot, so a slot class can
   // replace the look without breaking the layout.

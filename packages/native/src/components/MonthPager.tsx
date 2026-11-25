@@ -105,6 +105,11 @@ export type MonthPagerProps<T> = {
   showAdjacentMonths?: boolean;
   highlightWeekends?: boolean;
   disableMonthEventCellPress?: boolean;
+  /**
+   * Lay the days out right to left and page in the reading direction: the next
+   * period is to the left, so a swipe to the right moves forward in time. Needs
+   * no `I18nManager` setting. Default false.
+   */
   isRTL?: boolean;
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
   renderEvent: RenderEvent<T>;
@@ -305,7 +310,7 @@ function DateRowsPagerInner<T>({
         : startOfWeek(anchorDate, { weekStartsOn }),
     [anchorDate, numberOfWeeks, weekStartsOn],
   );
-  const monthDates = useMemo(() => {
+  const chronologicalDates = useMemo(() => {
     const dates = Array.from({ length: PAGE_WINDOW * 2 + 1 }, (_, i) =>
       numberOfWeeks === undefined
         ? addMonths(anchor, i - PAGE_WINDOW)
@@ -321,12 +326,23 @@ function DateRowsPagerInner<T>({
             Number.isFinite(addWeeks(page, numberOfWeeks).getTime()),
         );
   }, [anchor, numberOfWeeks]);
+  // Under RTL the list runs backwards in time, so the next period sits to the left
+  // and a swipe pages in the reading direction without `I18nManager`. Index-based
+  // paging (arrow keys) then follows the screen.
+  const monthDates = useMemo(
+    () => (isRTL ? [...chronologicalDates].reverse() : chronologicalDates),
+    [chronologicalDates, isRTL],
+  );
   const indexOfMonth = useCallback(
-    (target: Date) =>
-      numberOfWeeks === undefined
-        ? differenceInCalendarMonths(startOfMonth(target), anchor) + PAGE_WINDOW
-        : differenceInCalendarWeeks(target, monthDates[0], { weekStartsOn }) / numberOfWeeks,
-    [anchor, monthDates, numberOfWeeks, weekStartsOn],
+    (target: Date) => {
+      const chronological =
+        numberOfWeeks === undefined
+          ? differenceInCalendarMonths(startOfMonth(target), anchor) + PAGE_WINDOW
+          : differenceInCalendarWeeks(target, chronologicalDates[0], { weekStartsOn }) /
+            numberOfWeeks;
+      return isRTL ? chronologicalDates.length - 1 - chronological : chronological;
+    },
+    [anchor, chronologicalDates, numberOfWeeks, weekStartsOn, isRTL],
   );
 
   // The committed month's page is the centred/active one. Derived (not stored)
@@ -501,6 +517,7 @@ function DateRowsPagerInner<T>({
       pageMeasured,
       events,
       activeDate,
+      isRTL,
       nowTime,
       timeZone,
       fillCellOnSelection,
@@ -518,6 +535,7 @@ function DateRowsPagerInner<T>({
       pageMeasured,
       events,
       activeDate,
+      isRTL,
       nowTime,
       timeZone,
       fillCellOnSelection,

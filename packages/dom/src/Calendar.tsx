@@ -116,6 +116,13 @@ export interface CalendarProps<T = unknown>
   /** date-fns locale for titles, headers, and time labels. */
   locale?: Locale;
   /**
+   * Lay every view out right to left: days, weekday headers and months run right
+   * to left, the hour gutter moves to the right, drags and edge paging follow the
+   * screen, and ArrowLeft moves to the next day. PageDown still goes to the next
+   * period. Sets `dir="rtl"` on each view root (`dir="ltr"` without it). Default false.
+   */
+  isRTL?: boolean;
+  /**
    * Display events in this IANA time zone (e.g. `"America/New_York"`), DST-correct
    * and independent of the device zone. Display-only: it shifts the wall-clock the
    * grid lays out from, it doesn't change your `Date`s, and callbacks report your
@@ -167,7 +174,7 @@ export interface CalendarProps<T = unknown>
   minHour?: number;
   /** Last hour shown, exclusive (1–24). Default 24. */
   maxHour?: number;
-  /** Hide the left hour-axis column (lines stay, labels/gutter go). Default false. */
+  /** Hide the hour-axis column (lines stay, labels/gutter go). Default false. */
   hideHours?: boolean;
   /** Show the ISO week number in the header gutter. Default false. */
   showWeekNumber?: boolean;
@@ -394,6 +401,7 @@ function CalendarInner<T = unknown>(
     numberOfDays,
     numberOfWeeks = 2,
     locale,
+    isRTL = false,
     timeZone,
     activeDate,
     theme,
@@ -580,6 +588,7 @@ function CalendarInner<T = unknown>(
         events={displayEvents}
         weekStartsOn={weekStartsOn}
         hiddenDays={hiddenDays}
+        isRTL={isRTL}
         locale={locale}
         now={now}
         timeZone={timeZone}
@@ -630,6 +639,7 @@ function CalendarInner<T = unknown>(
         events={displayEvents}
         weekStartsOn={weekStartsOn}
         hiddenDays={hiddenDays}
+        isRTL={isRTL}
         weekdayFormat={weekdayFormat}
         highlightWeekends={highlightWeekends}
         locale={locale}
@@ -679,6 +689,7 @@ function CalendarInner<T = unknown>(
         events={displayEvents}
         weekStartsOn={weekStartsOn}
         hiddenDays={hiddenDays}
+        isRTL={isRTL}
         weekdayFormat={weekdayFormat}
         highlightWeekends={highlightWeekends}
         locale={locale}
@@ -728,6 +739,7 @@ function CalendarInner<T = unknown>(
         events={displayEvents}
         weekStartsOn={weekStartsOn}
         hiddenDays={hiddenDays}
+        isRTL={isRTL}
         now={now}
         timeZone={timeZone}
         activeDate={activeDate}
@@ -788,7 +800,7 @@ function CalendarInner<T = unknown>(
   // no-op when `onChangeDate` is unset). Rendered unconditionally so toggling the
   // handler never remounts the view subtree.
   return (
-    <div style={{ display: "contents" }} onKeyDown={handlePageKeys}>
+    <div dir={isRTL ? "rtl" : "ltr"} style={{ display: "contents" }} onKeyDown={handlePageKeys}>
       {view}
     </div>
   );

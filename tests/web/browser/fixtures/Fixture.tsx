@@ -242,7 +242,9 @@ const missingEventId = (): string | number => {
 };
 
 export function Fixture() {
-  const view = new URLSearchParams(location.search).get("view") ?? "months";
+  const params = new URLSearchParams(location.search);
+  const view = params.get("view") ?? "months";
+  const isRTL = params.get("rtl") === "1";
   const unavailable = view.endsWith("-unavailable");
   const constrained = unavailable || view.endsWith("-constrained");
   const minDate = unavailable
@@ -444,6 +446,7 @@ export function Fixture() {
           mode="week"
           weekStartsOn={1}
           height={260}
+          isRTL={isRTL}
           hiddenDays={view.endsWith("hidden") ? [0, 3, 6] : undefined}
           events={
             view.endsWith("long")
@@ -491,6 +494,7 @@ export function Fixture() {
         <Calendar
           mode={view.startsWith("month-drag") ? "month" : "multiweek"}
           date={date() ?? anchor}
+          isRTL={isRTL}
           numberOfWeeks={updated() ? 3 : view.includes("eight") ? 8 : 2}
           weekStartsOn={1}
           hiddenDays={restricted() ? [0, 6] : undefined}
@@ -552,6 +556,7 @@ export function Fixture() {
         <EditableGrid<{ id: number }>
           date={anchor}
           onChangeDate={(next) => record(`page:${clock(next)}`)}
+          isRTL={isRTL}
           now={anchor}
           mode="week"
           weekStartsOn={1}

@@ -101,6 +101,8 @@ export interface YearViewProps<T = unknown>
    * fires `onPressDay`, not this. Days being sketched carry `data-creating`.
    */
   onCreateEvent?: (start: Date, end: Date) => void;
+  /** Lay the months and their days out right to left. Default false. */
+  isRTL?: boolean;
   /** Theme overrides; falls back to the default light theme. */
   theme?: Partial<SolidCalendarTheme>;
   /** Class applied to the root element. */
@@ -119,10 +121,13 @@ export function YearView<T = unknown>(incoming: YearViewProps<T>): JSX.Element {
     {
       weekStartsOn: 0,
       minMonthWidth: 150,
+      isRTL: false,
     } satisfies Partial<YearViewProps<T>>,
     incoming,
   );
   const theme = createMemo(() => mergeSolidTheme(props.theme));
+  // Read once here: the day cells read this memo rather than the props object.
+  const isRTL = createMemo(() => props.isRTL);
   const labels = createMemo(() => resolveCalendarLabels(props.labels));
   // One memo for every day cell, yielding the day (not the instant) so the cells
   // re-run only when it changes. Tracking `date` re-reads the clock on navigation.
@@ -229,6 +234,7 @@ export function YearView<T = unknown>(incoming: YearViewProps<T>): JSX.Element {
   return (
     <div
       class={props.className}
+      dir={props.isRTL ? "rtl" : "ltr"}
       style={css({
         fontFamily: theme().fontFamily,
         color: theme().text,
@@ -283,7 +289,7 @@ export function YearView<T = unknown>(incoming: YearViewProps<T>): JSX.Element {
                           padding: "0 0 4px",
                           cursor: "pointer",
                           font: "inherit",
-                          textAlign: "left",
+                          textAlign: "start",
                         },
                         themed: {
                           fontSize: 13,
@@ -494,9 +500,16 @@ export function YearView<T = unknown>(incoming: YearViewProps<T>): JSX.Element {
                                         const bandKind = createMemo(() =>
                                           rangeBandKind(state(), true),
                                         );
-                                        const rounding = createMemo(() =>
-                                          bandRounding(rangeBandKind(state(), false)),
-                                        );
+                                        // The range's first day rounds the side it starts
+                                        // from: the right one under RTL.
+                                        const rounding = createMemo(() => {
+                                          const chrono = bandRounding(
+                                            rangeBandKind(state(), false),
+                                          );
+                                          return isRTL()
+                                            ? { left: chrono.end, right: chrono.start }
+                                            : { left: chrono.start, right: chrono.end };
+                                        });
                                         const band = createMemo(() =>
                                           bandKind() === "none" ? null : (
                                             <span
@@ -507,12 +520,14 @@ export function YearView<T = unknown>(incoming: YearViewProps<T>): JSX.Element {
                                                   position: "absolute",
                                                   inset: 0,
                                                   zIndex: 0,
-                                                  borderTopLeftRadius: rounding().start ? "50%" : 0,
-                                                  borderBottomLeftRadius: rounding().start
+                                                  borderTopLeftRadius: rounding().left ? "50%" : 0,
+                                                  borderBottomLeftRadius: rounding().left
                                                     ? "50%"
                                                     : 0,
-                                                  borderTopRightRadius: rounding().end ? "50%" : 0,
-                                                  borderBottomRightRadius: rounding().end
+                                                  borderTopRightRadius: rounding().right
+                                                    ? "50%"
+                                                    : 0,
+                                                  borderBottomRightRadius: rounding().right
                                                     ? "50%"
                                                     : 0,
                                                 },

@@ -1618,10 +1618,12 @@ type HourLabelProps = {
   hourComponent?: HourRenderer;
   /** Leave the label out, because the now label sits on top of it. */
   hidden?: boolean;
+  /** The column sits right of the days, so the label aligns to its left edge. */
+  isRTL: boolean;
 };
 
 // The hour-axis label: the consumer's `hourComponent`, or the themed text.
-const HourLabel = ({ hour, width, label, ampm, hourComponent, hidden }: HourLabelProps) => {
+const HourLabel = ({ hour, width, label, ampm, hourComponent, hidden, isRTL }: HourLabelProps) => {
   const theme = useCalendarTheme();
   const slot = useSlots<TimeGridSlot>();
   if (hidden) return null;
@@ -1630,7 +1632,7 @@ const HourLabel = ({ hour, width, label, ampm, hourComponent, hidden }: HourLabe
   ) : (
     <Text
       {...slot<TextStyle>("hourLabel", {
-        base: [styles.hourLabel, { width }],
+        base: [isRTL ? styles.hourLabelRTL : styles.hourLabel, { width }],
         themed: [theme.text.hourLabel, { color: theme.colors.textMuted }],
       })}
       allowFontScaling={false}
@@ -1706,6 +1708,8 @@ type HourGutterProps = {
   /** Draws the current time in the hour column, level with the now line. */
   renderNowLabel?: (now: Date) => React.ReactNode;
   nowPosition: ReturnType<typeof getNowPosition>;
+  /** Sit right of the day columns, with the labels aligned toward them. */
+  isRTL: boolean;
 };
 
 // How close, in hours, an hour label may sit to the now label before it is left out.
@@ -1732,6 +1736,7 @@ const HourGutterInner = ({
   hourComponent,
   renderNowLabel,
   nowPosition,
+  isRTL,
 }: HourGutterProps) => {
   const theme = useCalendarTheme();
   const slot = useSlots<TimeGridSlot>();
@@ -1756,7 +1761,12 @@ const HourGutterInner = ({
     [minHour, maxHour, headerHeight],
   );
   return (
-    <View testID="hour-gutter" {...slot("hourGutter", { base: [styles.hourGutter, { width }] })}>
+    <View
+      testID="hour-gutter"
+      {...slot("hourGutter", {
+        base: [isRTL ? styles.hourGutterRTL : styles.hourGutter, { width }],
+      })}
+    >
       {headerHeight > 0 ? (
         <Animated.View
           style={[
@@ -1794,7 +1804,7 @@ const HourGutterInner = ({
           {showAllDayLabel ? (
             <Text
               {...slot<TextStyle>("allDayLabel", {
-                base: styles.allDayLabel,
+                base: isRTL ? styles.allDayLabelRTL : styles.allDayLabel,
                 themed: { color: theme.colors.textMuted },
               })}
               allowFontScaling={false}
@@ -1814,6 +1824,7 @@ const HourGutterInner = ({
                 label={formatHour(hour, { ampm })}
                 ampm={ampm}
                 hourComponent={hourComponent}
+                isRTL={isRTL}
                 hidden={
                   labelHours != null && Math.abs(hour - labelHours) < NOW_LABEL_CLEARANCE_HOURS
                 }
@@ -2667,6 +2678,7 @@ function TimetablePageInner<T>({
             eventStartEditable={eventStartEditable}
             multiDayTimedEventPlacement={multiDayTimedEventPlacement}
             ampm={ampm}
+            isRTL={isRTL}
             onLayout={reportLaneLayout}
           />
         </Animated.View>
@@ -2785,8 +2797,14 @@ function TimetablePageInner<T>({
         })}
 
         {days.map((day, dayIndex) => {
+          // Each line sits on the column's edge nearest the hour column: its right
+          // edge under RTL, where the hour column is on the right.
           const separatorSlot = slot("daySeparator", {
-            base: [styles.daySeparator, styles.nonInteractive, { left: dayLeft(dayIndex) }],
+            base: [
+              styles.daySeparator,
+              styles.nonInteractive,
+              isRTL ? { right: (dayCount - 1 - dayIndex) * dayWidth } : { left: dayLeft(dayIndex) },
+            ],
             themed: { backgroundColor: theme.colors.gridLine },
           });
           return (
@@ -2806,6 +2824,9 @@ function TimetablePageInner<T>({
             .filter((p) => p.startHours < maxHour && p.startHours + p.durationHours > minHour)
             .map((positioned, eventIndex) => {
               const columnWidth = dayWidth / positioned.columns;
+              const visualColumn = isRTL
+                ? positioned.columns - 1 - positioned.column
+                : positioned.column;
               return (
                 <AnimatedEventBox
                   // Prefix with the day so a multi-day event's per-day segments
@@ -2819,7 +2840,7 @@ function TimetablePageInner<T>({
                   cellHeight={heightSource}
                   minHour={minHour}
                   maxHour={maxHour}
-                  left={dayLeft(dayIndex) + positioned.column * columnWidth}
+                  left={dayLeft(dayIndex) + visualColumn * columnWidth}
                   width={columnWidth}
                   dayLeftPx={dayLeft(dayIndex)}
                   nextDayDirection={isRTL ? -1 : 1}
@@ -3023,7 +3044,12 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
   maxHour?: number;
   /** Show hour labels in 12-hour AM/PM form. Default false (24h). */
   ampm?: boolean;
-  /** Reverse day-column order (right-to-left). Default false. */
+  /**
+   * Lay the grid out right to left: the day columns and header run from the right,
+   * the hour column sits on the right, and swipes, edge drags and arrow keys page
+   * in the reading direction (the next period is to the left). Needs no
+   * `I18nManager` setting. Default false.
+   */
   isRTL?: boolean;
   minHourHeight?: number;
   maxHourHeight?: number;
@@ -3253,9 +3279,9 @@ function TimeGridInner<T>(
   // The scroll viewport; measured in the window so a lifted drag can map the
   // finger into the scrolling content.
   const viewportRef = useRef<ComponentRef<typeof View>>(null);
-  // Width the pager last laid out at, so the zoom (which changes its height every
-  // frame) doesn't re-measure it.
-  const pagerLayoutWidthRef = useRef(-1);
+  // Offset and width the pager last laid out at, so the zoom (which changes its
+  // height every frame) doesn't re-measure it.
+  const pagerLayoutFrameRef = useRef({ x: Number.NaN, width: -1 });
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   // The grid sizes to its container width, not the window, so it fits a
   // constrained layout on the web (e.g. a max-width card). On native the grid
@@ -3733,21 +3759,40 @@ function TimeGridInner<T>(
     () => (weekAnchored ? startOfWeek(anchorDate, { weekStartsOn }) : startOfDay(anchorDate)),
     [weekAnchored, anchorDate, weekStartsOn],
   );
+  // Under RTL the list runs backwards in time, so the next period sits to the left
+  // and a swipe pages in the reading direction without `I18nManager`. Index-based
+  // paging (edge drags, arrow keys) then follows the screen.
+  const pageDirection = isRTL ? -1 : 1;
+  // Flipping `isRTL` mirrors `pageDates` around `PAGE_WINDOW` while keeping
+  // mounted pages alive by date key, so remap recorded lane heights to match.
+  const prevPageDirectionRef = useRef(pageDirection);
+  useEffect(() => {
+    if (prevPageDirectionRef.current === pageDirection) return;
+    prevPageDirectionRef.current = pageDirection;
+    const mirrored: Record<number, number> = {};
+    for (const [key, height] of Object.entries(laneHeightsRef.current)) {
+      mirrored[PAGE_WINDOW * 2 - Number(key)] = height;
+    }
+    laneHeightsRef.current = mirrored;
+    // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
+    laneHeights.value = mirrored;
+  }, [pageDirection, laneHeights]);
   const pageDates = useMemo(
     () =>
       Array.from({ length: PAGE_WINDOW * 2 + 1 }, (_, i) =>
-        addDays(anchor, (i - PAGE_WINDOW) * step),
+        addDays(anchor, (i - PAGE_WINDOW) * pageDirection * step),
       ),
-    [anchor, step],
+    [anchor, step, pageDirection],
   );
   const indexOfDate = useCallback(
     (target: Date) => {
       const aligned = weekAnchored ? startOfWeek(target, { weekStartsOn }) : startOfDay(target);
       // Floor so an arbitrary date lands on the page whose range contains it
       // (exact for day/week, where dates are already page-aligned).
-      return Math.floor(differenceInCalendarDays(aligned, anchor) / step) + PAGE_WINDOW;
+      const pages = Math.floor(differenceInCalendarDays(aligned, anchor) / step);
+      return pages * pageDirection + PAGE_WINDOW;
     },
-    [anchor, weekAnchored, step, weekStartsOn],
+    [anchor, weekAnchored, step, weekStartsOn, pageDirection],
   );
 
   // The committed date's page is the centred/active one. `viewedIndexRef` tracks
@@ -4456,20 +4501,28 @@ function TimeGridInner<T>(
                         hourComponent={hourComponent}
                         renderNowLabel={renderNowLabel}
                         nowPosition={gutterNow}
+                        isRTL={isRTL}
                       />
                     ) : null}
                     <View
                       ref={pagerRef}
                       testID="time-grid-pager"
-                      style={[styles.pager, { left: hourColumnWidth, height: pagerHeight }]}
+                      style={[
+                        styles.pager,
+                        isRTL
+                          ? { left: 0, right: hourColumnWidth, height: pagerHeight }
+                          : { left: hourColumnWidth, height: pagerHeight },
+                      ]}
                       onLayout={(event) => {
                         // Window-space frame of the pager for the drag worklets' edge
-                        // detection and ghost placement. Only a width change matters
-                        // (the grid's or the hour column's); the zoom changes the
-                        // height every frame, so those layouts are skipped.
-                        const laidOutWidth = event.nativeEvent.layout.width;
-                        if (laidOutWidth === pagerLayoutWidthRef.current) return;
-                        pagerLayoutWidthRef.current = laidOutWidth;
+                        // detection and ghost placement. Only a width or offset change
+                        // matters (the grid's, the hour column's, or the column moving
+                        // sides under `isRTL`); the zoom changes the height every frame,
+                        // so those layouts are skipped.
+                        const { x: laidOutX, width: laidOutWidth } = event.nativeEvent.layout;
+                        const frame = pagerLayoutFrameRef.current;
+                        if (laidOutWidth === frame.width && laidOutX === frame.x) return;
+                        pagerLayoutFrameRef.current = { x: laidOutX, width: laidOutWidth };
                         setPagerLayoutWidth(laidOutWidth);
                         pagerRef.current?.measureInWindow((x, _y, measuredWidth) => {
                           // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
@@ -4754,6 +4807,12 @@ const styles = StyleSheet.create({
     left: 0,
     bottom: 0,
   },
+  hourGutterRTL: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+  },
   fill: {
     position: "absolute",
     top: 0,
@@ -4846,6 +4905,11 @@ const styles = StyleSheet.create({
     textAlign: "right",
     paddingRight: 6,
   },
+  allDayLabelRTL: {
+    fontSize: 10,
+    textAlign: "left",
+    paddingLeft: 6,
+  },
   nowLabel: {
     position: "absolute",
     left: 0,
@@ -4895,6 +4959,11 @@ const styles = StyleSheet.create({
     marginTop: -HOUR_LABEL_NUDGE,
     textAlign: "right",
     paddingRight: 6,
+  },
+  hourLabelRTL: {
+    marginTop: -HOUR_LABEL_NUDGE,
+    textAlign: "left",
+    paddingLeft: 6,
   },
   // A line sits at the top of its hour or sub-hour cell.
   hourLine: {

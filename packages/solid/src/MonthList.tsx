@@ -84,6 +84,8 @@ export interface MonthListProps<T = unknown>
   activeDate?: Date;
   /** date-fns locale for the month titles and weekday labels. */
   locale?: Locale;
+  /** Lay each month's days out right to left (see `MonthView`). Default false. */
+  isRTL?: boolean;
   /** Theme overrides; falls back to the default light theme. */
   theme?: Partial<SolidCalendarTheme>;
   /** Height of the scroll viewport, in px (default 480). */
@@ -116,6 +118,7 @@ export function MonthList<T = unknown>(incoming: MonthListProps<T>): JSX.Element
       highlightWeekends: true,
       weekStartsOn: 0,
       fillCellOnSelection: false,
+      isRTL: false,
       height: 480,
     } satisfies Partial<MonthListProps<T>>,
     incoming,
@@ -160,6 +163,7 @@ export function MonthList<T = unknown>(incoming: MonthListProps<T>): JSX.Element
   return (
     <div
       class={props.className}
+      dir={props.isRTL ? "rtl" : "ltr"}
       style={css({
         fontFamily: theme().fontFamily,
         color: theme().text,
@@ -233,6 +237,7 @@ export function MonthList<T = unknown>(incoming: MonthListProps<T>): JSX.Element
             showAdjacentMonths={false}
             showWeekdays={false}
             locale={props.locale}
+            isRTL={props.isRTL}
             theme={props.theme}
             minDate={props.minDate}
             maxDate={props.maxDate}

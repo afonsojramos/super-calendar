@@ -121,9 +121,6 @@ side-by-side columns automatically.
 - It's **opinionated about peers**: Reanimated, Gesture Handler and
   `@legendapp/list` are required. `react-native-big-calendar` is more
   self-contained (no Reanimated/Gesture Handler).
-- **RTL** is cosmetic (`isRTL` reverses the day-column order, like
-  big-calendar's): the hour gutter stays on the left and paging follows the
-  system scroll direction. Enable React Native's `I18nManager` for full RTL.
 
 ## Relationship to flash-calendar
 
@@ -728,10 +725,12 @@ const labels = {
 lists every key. Define the object outside the render, or memoize it, so the
 views do not re-render on every pass.
 
-Pass `isRTL` to reverse the day-column order in every view (month grid, week/day
-grid and the all-day lane). It's cosmetic — the hour gutter stays on the left and
-paging follows the system scroll direction — so enable React Native's
-`I18nManager` alongside it for full right-to-left behaviour.
+Pass `isRTL` to lay every view out right to left on all three renderers. Days,
+weekday headers and year months run right to left, the hour gutter and week
+number sit on the right, and drags, edge paging and arrow keys follow the screen.
+On native, a right swipe pages to the next period without `I18nManager`. On the
+web, each view root gets `dir="rtl"`. See
+[right-to-left layout](https://super-calendar.afonsojramos.me/guides/views#right-to-left-layout).
 
 ```tsx
 <Calendar /* ... */ isRTL locale={ar} weekStartsOn={6} />

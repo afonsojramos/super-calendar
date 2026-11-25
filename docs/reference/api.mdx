@@ -216,6 +216,7 @@ the [Date selection](/guides/selection) guide.
 | `highlightWeekends`            | `boolean`                                  | Tint weekend cells/columns (month + time grid, default on).                     |
 | `maxVisibleEventCount`         | `number`                                   | Month: cap on event lanes per week row, "+N more" row included (min. one lane). |
 | `showTitle`                    | `boolean`                                  | Month: the built-in "MMMM yyyy" label above the grid (default on).              |
+| `isRTL`                        | `boolean`                                  | Lay every view out right to left (default off); see below.                      |
 | `theme`                        | `PartialCalendarTheme`                     | Color/text/metric overrides.                                                    |
 | `classNames`                   | `Partial<Record<CalendarSlot, string>>`    | Per-slot Tailwind classes (uniwind/NativeWind); see [Styling](/guides/styling). |
 | `styles`                       | `Partial<Record<CalendarSlot, StyleProp>>` | Per-slot style overrides, merged last.                                          |
@@ -230,7 +231,8 @@ midnight. Overlapping lane events occupy separate rows. This
 applies to native, React DOM, and Solid. The end is exclusive; hidden days take
 no width. `renderEvent` receives the original event, `inAllDayLane: true`,
 `isAllDay` reflecting whether the event itself is all-day, `continuesBefore`
-and `continuesAfter` hints indicating clipping at the visible range edges, and
+and `continuesAfter` hints indicating clipping at the bar's left and right
+edges (under `isRTL`, `continuesAfter` marks the start), and
 `startsBeforeVisible` indicating whether the event started chronologically
 before its first visible day (including across interior hidden days or RTL).
 The default bar squares its corners on a continuing side and omits the start
@@ -247,6 +249,16 @@ refresh replaces event objects. Return a stable, unique string or number for
 each event or occurrence. Without a valid, unique ID, a held bar is found by its
 dates and title, and a replaced event can remount its content. See
 [Identify events across refreshes](/guides/events#identify-events-across-refreshes).
+
+`isRTL` is accepted by `Calendar`, `MonthView`, `MultiWeekView`, `MonthList`,
+`TimeGrid`, and `YearView` on every renderer, by native `MonthPager`, and by the
+web `DatePicker` and `DateRangePicker`. Days, weekday headers, and year months
+run right to left, the time grid's hour gutter, week number, and current-time
+label move to the right, and drags, edge paging, and Left/Right arrow keys follow
+the screen. PageUp and PageDown keep their meaning. On native, swipes page in the
+reading direction without `I18nManager`. On the web, each view root gets
+`dir="rtl"`, or `dir="ltr"` without the prop, and the day cells stay in date order
+in the DOM. See [right-to-left layout](/guides/views#right-to-left-layout).
 
 Month `Calendar`, `MonthView`, and `MonthList` accept `chipHeight` and `chipGap`.
 Both are numbers in pixels. DOM height defaults to 18; native height follows the
@@ -358,6 +370,13 @@ shortening an event that continues past midnight. Pass the event's duration in
 minutes as the optional fifth argument to let the start run before midnight, into
 the previous day, when the window opens at midnight. The end then stays at least
 one snap step after midnight.
+
+For a custom renderer that lays chronological day columns out right to left,
+`arrowKeyDayStep(key, isRTL)` returns the day step for an arrow key (`1`, `-1`,
+or `0`), `columnAtX(x, columnWidth, count, isRTL)` returns the chronological
+column under a point measured from the row's left edge, and
+`screenContinues(segment, isRTL)` turns a `layoutMonthWeek` segment's
+`continuesBefore` and `continuesAfter` into its left and right screen edges.
 
 For a custom renderer that should read like the built-in ones, `resolveCalendarLabels`
 fills a partial `labels` object with the English defaults and

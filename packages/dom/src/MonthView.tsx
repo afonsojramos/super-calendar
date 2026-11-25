@@ -20,6 +20,7 @@ import {
   useState,
 } from "react";
 import {
+  arrowKeyDayStep,
   bandRounding,
   buildMonthGrid,
   buildMultiWeekGrid,
@@ -47,6 +48,7 @@ import {
   type MultiWeekGridDay,
   overlapsOtherEvents,
   rangeBandKind,
+  screenContinues,
   type WeekdayFormat,
   type WeekStartsOn,
   type CalendarLabels,
@@ -197,6 +199,12 @@ export interface MonthViewProps<T = unknown>
    * centered rounded "pill" strip. Default false.
    */
   fillCellOnSelection?: boolean;
+  /**
+   * Lay the days out right to left: the root gets `dir="rtl"`, days and weekday
+   * labels run right to left, bars and drags mirror, and ArrowLeft moves to the
+   * next day. Without it the root gets `dir="ltr"`. Default false.
+   */
+  isRTL?: boolean;
   /** Render the "Month yyyy" title above the grid (default true). */
   showTitle?: boolean;
   /** Render the weekday header row (default true). */
@@ -325,6 +333,7 @@ function rangeBandDefault(
   theme: DomCalendarTheme,
   fillCell: boolean,
   eventsMode: boolean,
+  isRTL: boolean,
 ): SlotDefault | null {
   const kind = rangeBandKind(day, fillCell);
   if (kind === "none") return null;
@@ -333,7 +342,10 @@ function rangeBandDefault(
   const bandHeight = eventsMode ? badgeSize : theme.rangeBandHeight;
   const inset = fill ? 0 : eventsMode ? CELL_PAD : Math.max(0, (theme.cellHeight - bandHeight) / 2);
   const radius = fill ? 0 : bandHeight / 2;
+  // The range's first day rounds the side it starts from: the right one under RTL.
   const rounding = bandRounding(kind);
+  const roundLeft = isRTL ? rounding.end : rounding.start;
+  const roundRight = isRTL ? rounding.start : rounding.end;
   // Cap the pill at the endpoint circles: a start/end band stops at the circle's
   // outer edge (half a badge in from the cell centre) rather than spilling to the
   // cell edge, so no band shows in the empty space beside the day circles. Events
@@ -342,19 +354,19 @@ function rangeBandDefault(
   const cap = eventsMode ? 0 : `calc(50% - ${badgeSize / 2}px)`;
   const base: CSSProperties = {
     position: "absolute",
-    left: rounding.start ? cap : 0,
-    right: rounding.end ? cap : 0,
+    left: roundLeft ? cap : 0,
+    right: roundRight ? cap : 0,
     top: inset,
     // An events cell is far taller than its date row, so the strip is sized from
     // the badge rather than stretched to the cell's bottom.
     ...(fill || !eventsMode ? { bottom: inset } : { height: bandHeight }),
     zIndex: 0,
   };
-  if (rounding.start) {
+  if (roundLeft) {
     base.borderTopLeftRadius = radius;
     base.borderBottomLeftRadius = radius;
   }
-  if (rounding.end) {
+  if (roundRight) {
     base.borderTopRightRadius = radius;
     base.borderBottomRightRadius = radius;
   }
@@ -418,7 +430,7 @@ function eventCellDefault(
       gap: chipGap,
       padding: CELL_PAD,
       boxSizing: "border-box",
-      textAlign: "left",
+      textAlign: "start",
       WebkitTapHighlightColor: "transparent",
     },
     themed: {
@@ -473,7 +485,7 @@ const chipButtonDefault: SlotDefault = {
     margin: 0,
     background: "transparent",
     cursor: "pointer",
-    textAlign: "left",
+    textAlign: "start",
     fontFamily: "inherit",
   },
 };
@@ -511,7 +523,7 @@ function moreButtonDefault(
       border: "none",
       background: "transparent",
       cursor: "pointer",
-      textAlign: "left",
+      textAlign: "start",
       height: chipHeight,
       lineHeight: `${chipHeight}px`,
       fontFamily: "inherit",
@@ -651,6 +663,7 @@ export function DateRows<T = unknown>({
   selectedDates,
   highlightWeekends = true,
   fillCellOnSelection = false,
+  isRTL = false,
   showTitle = true,
   showWeekdays = true,
   locale,
@@ -1252,15 +1265,15 @@ export function DateRows<T = unknown>({
     if (!focusableDays || !focusableKeys || !period) return undefined;
     const index = focusableDays.findIndex((d) => format(d, "yyyy-MM-dd") === focusKey);
     if (index === -1) return null;
-    if (key === "ArrowLeft") return focusableDays[index - 1] ?? null;
-    if (key === "ArrowRight") return focusableDays[index + 1] ?? null;
+    const step = arrowKeyDayStep(key, isRTL);
+    if (step !== 0) return focusableDays[index + step] ?? null;
     if (key === "Home") return focusableDays[0];
     if (key === "End") return focusableDays[focusableDays.length - 1];
-    const step = key === "ArrowUp" ? -7 : 7;
+    const week = key === "ArrowUp" ? -7 : 7;
     for (
-      let cursor = addDays(focusableDays[index], step);
+      let cursor = addDays(focusableDays[index], week);
       cursor >= period.start && cursor < period.endExclusive;
-      cursor = addDays(cursor, step)
+      cursor = addDays(cursor, week)
     ) {
       if (focusableKeys.has(format(cursor, "yyyy-MM-dd"))) return cursor;
     }
@@ -1281,8 +1294,8 @@ export function DateRows<T = unknown>({
     }
     if (!focusedDate) return;
     let next: Date | null = null;
-    if (e.key === "ArrowLeft") next = addDays(focusedDate, -1);
-    else if (e.key === "ArrowRight") next = addDays(focusedDate, 1);
+    const step = arrowKeyDayStep(e.key, isRTL);
+    if (step !== 0) next = addDays(focusedDate, step);
     else if (e.key === "ArrowUp") next = addDays(focusedDate, -7);
     else if (e.key === "ArrowDown") next = addDays(focusedDate, 7);
     else if (e.key === "Home") next = startOfMonth(date);
@@ -1298,6 +1311,7 @@ export function DateRows<T = unknown>({
   return (
     <div
       className={className}
+      dir={isRTL ? "rtl" : "ltr"}
       style={{
         fontFamily: theme.fontFamily,
         color: theme.text,
@@ -1360,7 +1374,7 @@ export function DateRows<T = unknown>({
           // Spanning bars for this row (laid out once in `weekLayouts`). A multi-day
           // event is one bar across its columns, stacked into lanes; each bar renders
           // inside its start-column cell (valid grid content that reads with that day)
-          // and overflows right across the days it spans. The cells reserve the lane
+          // and overflows across the days it spans (leftward under RTL). The cells reserve the lane
           // rows so "+more" sits below the bars.
           const rowLayout = rowLayouts[weekIndex] ?? EMPTY_LAYOUT;
           // When lanes overflow, keep the last row for "+more" but always show at
@@ -1394,8 +1408,13 @@ export function DateRows<T = unknown>({
                 seg: s,
                 startCol,
                 endCol,
-                continuesBefore: s.continuesBefore || startCol > s.startCol,
-                continuesAfter: s.continuesAfter || endCol < s.endCol,
+                ...screenContinues(
+                  {
+                    continuesBefore: s.continuesBefore || startCol > s.startCol,
+                    continuesAfter: s.continuesAfter || endCol < s.endCol,
+                  },
+                  isRTL,
+                ),
               };
             })
             .filter((b) => b.startCol <= b.endCol);
@@ -1409,19 +1428,31 @@ export function DateRows<T = unknown>({
           const draftHeight = Math.min(chipHeight, Math.max(0, eventRowHeight - draftTop));
           // The preview's squared corners where it continues past this row's
           // visible columns, like a bar's.
-          const previewSegment =
+          const previewEdges =
             movePreview && draftSegment && draftStart <= draftEnd
-              ? {
-                  corners: {
-                    ...(draftSegment.continuesBefore || draftStart > draftSegment.startCol
-                      ? { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }
-                      : null),
-                    ...(draftSegment.continuesAfter || draftEnd < draftSegment.endCol
-                      ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 }
-                      : null),
+              ? screenContinues(
+                  {
+                    continuesBefore:
+                      draftSegment.continuesBefore || draftStart > draftSegment.startCol,
+                    continuesAfter: draftSegment.continuesAfter || draftEnd < draftSegment.endCol,
                   },
-                }
+                  isRTL,
+                )
               : null;
+          const previewSegment = previewEdges
+            ? {
+                corners: {
+                  ...(previewEdges.continuesBefore
+                    ? { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }
+                    : null),
+                  ...(previewEdges.continuesAfter
+                    ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 }
+                    : null),
+                },
+              }
+            : null;
+          // Bars start at their first day's leading edge: the right one under RTL.
+          const barStart = isRTL ? "right" : "left";
           const barChipButton = slot("chipButton", chipButtonDefault);
           const barChip = slot("chip", chipDefault(theme, chipHeight));
           return (
@@ -1446,7 +1477,7 @@ export function DateRows<T = unknown>({
                     <div key={day.id} role="gridcell" aria-hidden style={{ height: cellHeight }} />
                   );
                 }
-                const band = rangeBandDefault(day, theme, fillCellOnSelection, eventsMode);
+                const band = rangeBandDefault(day, theme, fillCellOnSelection, eventsMode, isRTL);
                 const dateLabel = format(
                   day.date,
                   "EEEE, d MMMM yyyy",
@@ -1585,7 +1616,7 @@ export function DateRows<T = unknown>({
                         {day.label}
                       </span>
                       {/* Spanning bars that start in this column: absolutely placed,
-                          overflowing right across the days they span. Rendered here
+                          overflowing across the days they span. Rendered here
                           (not a row overlay) so each bar is valid content of its
                           start day's gridcell and reads with that day. Made
                           non-interactive mid drag so a sweep (or a move) reaches the
@@ -1628,7 +1659,7 @@ export function DateRows<T = unknown>({
                               style={{
                                 ...barChipButton.style,
                                 position: "absolute",
-                                left: 2,
+                                [barStart]: 2,
                                 width: `calc(${span * 100}% - 4px)`,
                                 top:
                                   CELL_PAD +
@@ -1679,7 +1710,7 @@ export function DateRows<T = unknown>({
                           {...slot("createGhost", {
                             base: {
                               position: "absolute",
-                              left: 2,
+                              [barStart]: 2,
                               width: `calc(${(draftEnd - draftStart + 1) * 100}% - 4px)`,
                               top: draftTop,
                               height: draftHeight,
@@ -1711,7 +1742,7 @@ export function DateRows<T = unknown>({
                           aria-hidden="true"
                           style={{
                             position: "absolute",
-                            left: 2,
+                            [barStart]: 2,
                             width: `calc(${(draftEnd - draftStart + 1) * 100}% - 4px)`,
                             top: draftTop,
                             height: draftHeight,
@@ -1843,7 +1874,7 @@ export function DateRows<T = unknown>({
                                   background: "transparent",
                                   padding: 0,
                                   font: "inherit",
-                                  textAlign: "left",
+                                  textAlign: "start",
                                   cursor: "pointer",
                                 }}
                               >

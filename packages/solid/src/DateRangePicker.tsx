@@ -25,6 +25,8 @@ interface PickerBaseProps
   placeholder?: string;
   /** Disable the field and close its popover. Re-enabling leaves the popover closed. */
   disabled?: boolean;
+  /** Lay the field and its calendar out right to left (see `MonthView`). Default false. */
+  isRTL?: boolean;
   /** Theme overrides for the calendar. */
   theme?: Partial<SolidCalendarTheme>;
   /** Class applied to the root element. */
@@ -42,7 +44,7 @@ const triggerDefault: CSSProperties = {
   borderRadius: 8,
   cursor: "pointer",
   font: "inherit",
-  textAlign: "left",
+  textAlign: "start",
 };
 const popoverDefault: CSSProperties = {
   position: "absolute",
@@ -122,6 +124,7 @@ interface ShellProps {
   hasValue: boolean;
   placeholder: string;
   disabled?: boolean;
+  isRTL?: boolean;
   className?: string;
   style?: CSSProperties;
   ariaLabel: string;
@@ -167,6 +170,7 @@ function PickerShell(props: ShellProps): JSX.Element {
     <div
       ref={(el) => (props.rootRef.current = el)}
       class={props.className}
+      dir={props.isRTL ? "rtl" : "ltr"}
       style={css({
         position: "relative",
         display: "inline-block",
@@ -263,6 +267,7 @@ export function DatePicker(incoming: DatePickerProps): JSX.Element {
       hasValue={!!props.value}
       placeholder={props.placeholder}
       disabled={props.disabled}
+      isRTL={props.isRTL}
       className={props.className}
       style={props.style}
       ariaLabel="Choose a date"
@@ -270,6 +275,7 @@ export function DatePicker(incoming: DatePickerProps): JSX.Element {
     >
       <MonthList
         theme={props.theme}
+        isRTL={props.isRTL}
         date={props.value ?? new Date()}
         weekStartsOn={props.weekStartsOn}
         selectedDates={props.value ? [props.value] : []}
@@ -344,6 +350,7 @@ export function DateRangePicker(incoming: DateRangePickerProps): JSX.Element {
       hasValue={!!props.value}
       placeholder={props.placeholder}
       disabled={props.disabled}
+      isRTL={props.isRTL}
       className={props.className}
       style={props.style}
       ariaLabel="Choose a date range"
@@ -351,6 +358,7 @@ export function DateRangePicker(incoming: DateRangePickerProps): JSX.Element {
     >
       <MonthList
         theme={props.theme}
+        isRTL={props.isRTL}
         date={props.value?.start ?? new Date()}
         weekStartsOn={props.weekStartsOn}
         selectedRange={props.value ?? undefined}

@@ -102,6 +102,13 @@ export interface CalendarProps<T = unknown>
   /** date-fns locale for titles, headers, and time labels. */
   locale?: Locale;
   /**
+   * Lay every view out right to left: days, weekday headers and months run right
+   * to left, the hour gutter moves to the right, drags and edge paging follow the
+   * screen, and ArrowLeft moves to the next day. PageDown still goes to the next
+   * period. Sets `dir="rtl"` on each view root (`dir="ltr"` without it). Default false.
+   */
+  isRTL?: boolean;
+  /**
    * Display events in this IANA time zone (e.g. `"America/New_York"`), DST-correct
    * and independent of the device zone. Display-only: it shifts the wall-clock the
    * grid lays out from, it doesn't change your `Date`s, and callbacks report your
@@ -153,7 +160,7 @@ export interface CalendarProps<T = unknown>
   minHour?: number;
   /** Last hour shown, exclusive (1–24). Default 24. */
   maxHour?: number;
-  /** Hide the left hour-axis column (lines stay, labels/gutter go). Default false. */
+  /** Hide the hour-axis column (lines stay, labels/gutter go). Default false. */
   hideHours?: boolean;
   /** Show the ISO week number in the header gutter. Default false. */
   showWeekNumber?: boolean;
@@ -526,6 +533,7 @@ export function Calendar<T = unknown>(
           events={displayEvents()}
           weekStartsOn={props.weekStartsOn}
           hiddenDays={props.hiddenDays}
+          isRTL={props.isRTL}
           locale={props.locale}
           now={props.now}
           timeZone={props.timeZone}
@@ -583,6 +591,7 @@ export function Calendar<T = unknown>(
           events={displayEvents()}
           weekStartsOn={props.weekStartsOn}
           hiddenDays={props.hiddenDays}
+          isRTL={props.isRTL}
           weekdayFormat={props.weekdayFormat}
           highlightWeekends={props.highlightWeekends}
           locale={props.locale}
@@ -632,6 +641,7 @@ export function Calendar<T = unknown>(
           events={displayEvents()}
           weekStartsOn={props.weekStartsOn}
           hiddenDays={props.hiddenDays}
+          isRTL={props.isRTL}
           weekdayFormat={props.weekdayFormat}
           highlightWeekends={props.highlightWeekends}
           locale={props.locale}
@@ -681,6 +691,7 @@ export function Calendar<T = unknown>(
           events={displayEvents()}
           weekStartsOn={props.weekStartsOn}
           hiddenDays={props.hiddenDays}
+          isRTL={props.isRTL}
           now={props.now}
           timeZone={props.timeZone}
           activeDate={props.activeDate}
@@ -743,6 +754,7 @@ export function Calendar<T = unknown>(
   };
   return (
     <div
+      dir={props.isRTL ? "rtl" : "ltr"}
       style={css({
         display: "contents",
       })}

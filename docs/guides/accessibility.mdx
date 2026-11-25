@@ -208,6 +208,10 @@ export function EditableWeek() {
   events by time, Left/Right jump to the nearest event in the adjacent day,
   Home/End reach the first/last, Enter/Space activate. Navigation is additive:
   every event stays in the Tab order.
+- **Right to left**: with `isRTL`, Left and Right follow the screen, so
+  **ArrowLeft** moves to the next day (or, on react-native-web, the next page).
+  Up, Down, Home, End, PageUp, and PageDown keep their meaning. See
+  [right-to-left layout](/guides/views#right-to-left-layout).
 - **Date pickers**: opening a `DatePicker` or `DateRangePicker` moves focus to
   the selected day (or today, or the first available day in that month). If that
   month has no available days, focus moves to the popover panel. Arrow keys move

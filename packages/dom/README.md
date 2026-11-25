@@ -12,7 +12,7 @@ In the time grid, an all-day event renders once as a bar across the visible
 dates it covers. Overlapping events stack on separate rows. The end is
 exclusive, and hidden days take no width. `renderEvent` and press callbacks
 receive the original event; `continuesBefore` and `continuesAfter` indicate
-clipping at the visible range edges. The default bar squares its corners on a
+clipping at the bar's left and right edges. The default bar squares its corners on a
 continuing side, and the `allDayEvent` button carries `data-continues-before` /
 `data-continues-after` there. The `allDayColumn` slot styles one
 spanning cell. Timed events that cross midnight keep their per-day segments by
@@ -84,6 +84,15 @@ Additional contacts cancel pending holds and cannot take over an active drag.
 Set `touchDragDelay` and `touchDragThreshold` on `TimeGrid` or `Calendar` to adjust
 the hold. Mouse drag and resize retain their existing behavior. See the
 [dragging guide](https://super-calendar.afonsojramos.me/guides/dragging).
+
+## Right-to-left layout
+
+Pass `isRTL` to `Calendar`, the views, or the date pickers to lay them out right
+to left. Each view root gets `dir="rtl"` (`dir="ltr"` without it), days and
+weekday headers run right to left, the time grid's hour gutter sits on the
+right, drags and edge paging follow the screen, and ArrowLeft moves to the next
+day. PageUp and PageDown keep their meaning. Under `isRTL`, a lane bar's
+`continuesAfter` marks the edge where it started before the view.
 
 ## Multi-week grids
 
