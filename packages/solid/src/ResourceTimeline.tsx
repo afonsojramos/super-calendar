@@ -703,6 +703,7 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
     },
   );
   const cellEnabled = createMemo(() => !!props.onPressCell || !!props.onCreateEvent);
+  const hasPressCell = createMemo(() => !!props.onPressCell);
   createEffect(
     () => ({
       dayKey: props.date.toDateString(),
@@ -858,7 +859,7 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
   const bindTrackTap = (resource: () => Resource) => {
     const [trackEl, setTrackEl] = createSignal<HTMLDivElement | null>(null);
     createEffect(
-      () => (props.onPressCell ? trackEl() : null),
+      () => (hasPressCell() ? trackEl() : null),
       (track) => {
         if (!track) return;
         const onClick = (event: MouseEvent) => tapCell(event, track, resource());

@@ -583,6 +583,7 @@ export function ResourceTimeline<T = unknown>({
     pointerId: number;
     x: number;
     y: number;
+    el: HTMLElement;
     resourceId: string;
     dayKey: string;
   } | null>(null);
@@ -640,6 +641,7 @@ export function ResourceTimeline<T = unknown>({
             pointerId: e.pointerId,
             x: e.clientX,
             y: e.clientY,
+            el: e.currentTarget as HTMLElement,
             resourceId: resource.id,
             dayKey: date.toDateString(),
           }
@@ -713,6 +715,7 @@ export function ResourceTimeline<T = unknown>({
       !touch ||
       !onPressCell ||
       e.target !== e.currentTarget ||
+      touch.el !== e.currentTarget ||
       touch.resourceId !== resource.id ||
       touch.dayKey !== date.toDateString()
     ) {
@@ -790,7 +793,7 @@ export function ResourceTimeline<T = unknown>({
     )
       clearCreate();
     const touch = cellTouchRef.current;
-    if (touch && (!onPressCell || touch.dayKey !== date.toDateString())) {
+    if (touch && (!touch.el.isConnected || !onPressCell || touch.dayKey !== date.toDateString())) {
       cellTouchRef.current = null;
     }
   });

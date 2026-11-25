@@ -346,10 +346,20 @@ describe("Solid resource interactions", () => {
       const addSpy = vi.spyOn(track, "addEventListener");
       const removeSpy = vi.spyOn(track, "removeEventListener");
 
+      const clickCalls = (spy: typeof addSpy) =>
+        spy.mock.calls.filter(([eventName]) => eventName === "click");
+
       const onPressCell = vi.fn();
       setPress(() => onPressCell);
       flush();
-      expect(addSpy).toHaveBeenCalledWith("click", expect.any(Function));
+      expect(clickCalls(addSpy)).toHaveLength(1);
+
+      // Replacing onPressCell with a new closure keeps the listener attached without churn.
+      const nextPressCell = vi.fn();
+      setPress(() => nextPressCell);
+      flush();
+      expect(clickCalls(addSpy)).toHaveLength(1);
+      expect(clickCalls(removeSpy)).toHaveLength(0);
 
       const coords =
         orientation === "vertical" ? { clientX: 40, clientY: 96 } : { clientX: 160, clientY: 20 };
@@ -358,11 +368,12 @@ describe("Solid resource interactions", () => {
       // Non-bubbling click reaches only a listener attached directly to the track element.
       track.dispatchEvent(new MouseEvent("click", { bubbles: false, ...coords, detail: 1 }));
       flush();
-      expect(onPressCell).toHaveBeenCalledExactlyOnceWith(at(10), resources[0]);
+      expect(onPressCell).not.toHaveBeenCalled();
+      expect(nextPressCell).toHaveBeenCalledExactlyOnceWith(at(10), resources[0]);
 
       setPress(undefined);
       flush();
-      expect(removeSpy).toHaveBeenCalledWith("click", expect.any(Function));
+      expect(clickCalls(removeSpy)).toHaveLength(1);
     },
   );
 });
