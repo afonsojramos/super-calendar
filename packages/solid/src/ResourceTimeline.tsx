@@ -221,6 +221,7 @@ const sameRange = (a: CreateGhostArgs | null, b: CreateGhostArgs | null) =>
 
 // Hour-gutter width in the vertical orientation, matching the time grid's axis.
 const GUTTER_WIDTH = 56;
+const CELL_TOUCH_SLOP_PX = 8;
 type DragState<T> = {
   pointerId: number;
   event: CalendarEvent<T>;
@@ -480,6 +481,7 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
     pe: PositionedEvent<T>,
   ) => {
     const { startHours, durationHours } = pe;
+    cellTouchRef.current = null;
     if (e.button === 0 && e.isPrimary !== false && !dragRef.current) handledClick = null;
     if (
       !props.onDragEvent ||
@@ -632,7 +634,8 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
 
   // Create-by-drag / tap on empty lane space, mirroring the time grid: mouse and
   // pen sweep out a new event, and a tap without movement fires onPressCell. Touch
-  // is left free to scroll the board, so cell taps are pointer (mouse/pen) only.
+  // stays free to scroll the board (no sweep); a tap fires onPressCell on click,
+  // which the browser skips when the finger scrolled instead.
   const [createBox, setCreateBox] = createSignal<{
     resourceKey: string;
     startPx: number;
@@ -647,6 +650,15 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
     startPx: number;
     dayKey: string;
     creating: boolean;
+  } | null> = {
+    current: null,
+  };
+  const cellTouchRef: ElementRef<{
+    pointerId: number;
+    x: number;
+    y: number;
+    resourceId: string;
+    dayKey: string;
   } | null> = {
     current: null,
   };
@@ -691,10 +703,12 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
     },
   );
   const cellEnabled = createMemo(() => !!props.onPressCell || !!props.onCreateEvent);
+  const hasPressCell = createMemo(() => !!props.onPressCell);
   createEffect(
     () => ({
       dayKey: props.date.toDateString(),
       creating: !!props.onCreateEvent,
+      pressing: !!props.onPressCell,
       enabled: cellEnabled(),
     }),
     (state) => {
@@ -704,22 +718,39 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
         (!state.enabled || (origin.creating && !state.creating) || origin.dayKey !== state.dayKey)
       )
         clearCreate();
+      const touch = cellTouchRef.current;
+      if (touch && (!state.pressing || touch.dayKey !== state.dayKey)) {
+        cellTouchRef.current = null;
+      }
     },
   );
-  const pxAlongAxis = (el: HTMLElement, e: DomPointerEvent) => {
+  onCleanup(() => {
+    cellTouchRef.current = null;
+  });
+  const pxAlongAxis = (el: HTMLElement, e: Pick<MouseEvent, "clientX" | "clientY">) => {
     const rect = el.getBoundingClientRect();
     return vertical() ? e.clientY - rect.top : e.clientX - rect.left;
   };
   const beginCreate = (e: DomPointerEvent, resource: Resource) => {
-    // Only from the lane background, primary button, never on an event bar.
-    if (
-      !cellEnabled() ||
-      e.pointerType === "touch" ||
-      e.isPrimary === false ||
-      createOrigin.current ||
-      dragRef.current
-    )
+    if (e.isPrimary === false) {
+      cellTouchRef.current = null;
       return;
+    }
+    if (createOrigin.current || dragRef.current) return;
+    // Mouse / pen only for sweep-to-create: on touch the lane must stay free to
+    // scroll the board, and a tap without movement commits on the trailing click.
+    cellTouchRef.current =
+      e.pointerType === "touch" && !!props.onPressCell && e.target === e.currentTarget
+        ? {
+            pointerId: e.pointerId,
+            x: e.clientX,
+            y: e.clientY,
+            resourceId: resource.id,
+            dayKey: props.date.toDateString(),
+          }
+        : null;
+    // Only from the lane background, primary button, never on an event bar.
+    if (!cellEnabled() || e.pointerType === "touch") return;
     if (e.target !== e.currentTarget || e.button > 0) return;
     const el = e.currentTarget as HTMLElement;
     const startPx = pxAlongAxis(el, e);
@@ -748,6 +779,14 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
       });
   };
   const moveCreate = (e: DomPointerEvent) => {
+    const touch = cellTouchRef.current;
+    if (
+      touch &&
+      e.pointerId === touch.pointerId &&
+      Math.hypot(e.clientX - touch.x, e.clientY - touch.y) > CELL_TOUCH_SLOP_PX
+    ) {
+      cellTouchRef.current = null;
+    }
     const o = createOrigin.current;
     if (!o || o.pointerId !== e.pointerId || !props.onCreateEvent) return;
     o.clientX = e.clientX;
@@ -788,8 +827,57 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
       if (at) props.onPressCell(at.start, resource);
     }
   };
+  const tapCell = (e: MouseEvent, track: HTMLDivElement, resource: Resource) => {
+    const touch = cellTouchRef.current;
+    cellTouchRef.current = null;
+    if (
+      !touch ||
+      !props.onPressCell ||
+      e.target !== track ||
+      touch.resourceId !== resource.id ||
+      touch.dayKey !== props.date.toDateString()
+    ) {
+      return;
+    }
+    const currentResource = resources().find((candidate) => candidate.id === resource.id);
+    if (!currentResource) return;
+    const px = pxAlongAxis(track, e);
+    const at = cellRangeFromDrag(
+      props.date,
+      px,
+      px,
+      hourSize(),
+      props.startHour,
+      props.dragStepMinutes,
+    );
+    if (at) props.onPressCell(at.start, currentResource);
+  };
+  // Attach a direct click listener on each track while `onPressCell` is set.
+  // Solid delegates `onClick` to the mount container without stamping `onclick`
+  // on the element, which causes iOS Safari to suppress synthetic `click` on a
+  // plain `<div>` when mounted on `document`, `document.body`, or a portal.
+  const bindTrackTap = (resource: () => Resource) => {
+    const [trackEl, setTrackEl] = createSignal<HTMLDivElement | null>(null);
+    createEffect(
+      () => (hasPressCell() ? trackEl() : null),
+      (track) => {
+        if (!track) return;
+        const onClick = (event: MouseEvent) => tapCell(event, track, resource());
+        track.addEventListener("click", onClick);
+        return () => track.removeEventListener("click", onClick);
+      },
+    );
+    return setTrackEl;
+  };
   // A gesture the browser cancels (scroll takeover, etc.) must not commit.
   const cancelCreate = (e: DomPointerEvent) => {
+    if (cellTouchRef.current?.pointerId === e.pointerId) cellTouchRef.current = null;
+    if (createOrigin.current?.pointerId !== e.pointerId) return;
+    clearCreate();
+  };
+  // Touch has implicit pointer capture whose `lostpointercapture` fires after
+  // `pointerup` and before `click`, so capture loss cancels only a sweep, not a tap.
+  const loseCreateCapture = (e: DomPointerEvent) => {
     if (createOrigin.current?.pointerId !== e.pointerId) return;
     clearCreate();
   };
@@ -811,13 +899,16 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
     },
     { equals: sameRange },
   );
-  const trackInteractionProps = (resource: Resource) => ({
-    onPointerDown: (e: DomPointerEvent) => beginCreate(e, resource),
-    onPointerMove: moveCreate,
-    onPointerUp: endCreate,
-    onPointerCancel: cancelCreate,
-    onLostPointerCapture: cancelCreate,
-  });
+  const trackInteractionProps = (resource: Resource) =>
+    cellEnabled()
+      ? {
+          onPointerDown: (e: DomPointerEvent) => beginCreate(e, resource),
+          onPointerMove: moveCreate,
+          onPointerUp: endCreate,
+          onPointerCancel: cancelCreate,
+          onLostPointerCapture: loseCreateCapture,
+        }
+      : {};
   // The closed-hours bands to shade in a lane, resolved per resource.
   const bandsFor = (resource: Resource) => {
     const businessHours = props.businessHours;
@@ -1076,8 +1167,12 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
                   <For each={resources()} keyed={(resource) => resource.id}>
                     {(resource) => {
                       const resourceKey = untrack(() => resource().id);
+                      const trackRef = bindTrackTap(resource);
                       onCleanup(() => {
                         if (createOrigin.current?.resource.id === resourceKey) clearCreate();
+                        if (cellTouchRef.current?.resourceId === resourceKey) {
+                          cellTouchRef.current = null;
+                        }
                       });
                       const ghost = createMemo(() => {
                         const box = createBox();
@@ -1103,6 +1198,7 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
                           })}
                         >
                           <div
+                            ref={trackRef}
                             data-resource-id={resource().id}
                             {...trackInteractionProps(resource())}
                             {...slot("track", {
@@ -1460,8 +1556,12 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
                 <For each={resources()} keyed={(resource) => resource.id}>
                   {(resource, index) => {
                     const resourceKey = untrack(() => resource().id);
+                    const trackRef = bindTrackTap(resource);
                     onCleanup(() => {
                       if (createOrigin.current?.resource.id === resourceKey) clearCreate();
+                      if (cellTouchRef.current?.resourceId === resourceKey) {
+                        cellTouchRef.current = null;
+                      }
                     });
                     const ghost = createMemo(() => {
                       const box = createBox();
@@ -1508,6 +1608,7 @@ export function ResourceTimeline<T = unknown>(incoming: ResourceTimelineProps<T>
                             : (resource().title ?? resource().id)}
                         </div>
                         <div
+                          ref={trackRef}
                           data-resource-id={resource().id}
                           {...trackInteractionProps(resource())}
                           {...slot("track", {

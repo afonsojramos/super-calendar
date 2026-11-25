@@ -603,7 +603,13 @@ export function Fixture() {
                 : undefined
           }
           startHour={8}
-          endHour={14}
+          endHour={view.includes("-touch") ? 20 : 14}
+          style={view.includes("-touch") ? { height: 240, width: 320 } : undefined}
+          onPressCell={
+            view.includes("-touch")
+              ? (at, resource) => record(`cell:${clock(at)}@${resource.id}`)
+              : undefined
+          }
           onPressEvent={(event) => record(`press:${event.title}`)}
           onDragEvent={
             editing()
