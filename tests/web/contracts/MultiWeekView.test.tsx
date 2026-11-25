@@ -467,6 +467,27 @@ describe(rendererName, () => {
       },
     );
 
+    it("counts the overflow row as one of a fixed cap's rows, as the month does", () => {
+      // A, B and Span cover 31 December and 1 January on lanes 0-2; Solo adds a
+      // fourth event on the 31st. A cap of three rows shows two lanes and a label
+      // row, where 1 January draws Span, its one hidden event, instead of "+1".
+      const allDay = (title: string, days: number): CalendarEvent => ({
+        title,
+        start: new Date(2030, 11, 31),
+        end: addDays(new Date(2030, 11, 31), days),
+        allDay: true,
+      });
+      const view = render(MultiWeekView, {
+        ...base,
+        events: [allDay("A", 2), allDay("B", 2), allDay("Span", 2), allDay("Solo", 1)],
+        maxVisibleEventCount: 3,
+      });
+      expect(view.getByLabelText("2 more events, 31 December")).toBeTruthy();
+      expect(view.queryByText("Solo")).toBeNull();
+      expect(view.getAllByText("Span")).toHaveLength(1);
+      expect(view.queryByLabelText(/more events?, 1 January/)).toBeNull();
+    });
+
     it("dismisses overflow when the displayed window changes", () => {
       const events = Array.from({ length: 4 }, (_, i) => ({ ...meeting, title: `Meeting ${i}` }));
       const props = { ...base, events, maxVisibleEventCount: 1 };

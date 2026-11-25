@@ -161,10 +161,12 @@ export interface MonthViewProps<T = unknown>
    */
   eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
   /**
-   * Max event lanes (stacked rows) shown per week before the rest of a day's
-   * events collapse into a "+N more" row (default 3). Because multi-day events draw
-   * as one bar spanning a lane across the week, this caps lanes per row, not chips
-   * per day, so a long bar can push a lightly-booked day's own events into "+N more".
+   * Max event lanes (stacked rows) shown per week (default 3). When a row has more,
+   * the last of these rows holds each day's "+N more" label, or the day's one hidden
+   * event when it sits on that lane; a row always keeps one lane. Because multi-day
+   * events draw as one bar spanning a lane across the week, this caps lanes per row,
+   * not chips per day, so a long bar can push a lightly-booked day's own events into
+   * "+N more".
    */
   maxVisibleEventCount?: number;
   /** Height of an event chip and of the "+N more" row, in px (default 18). */

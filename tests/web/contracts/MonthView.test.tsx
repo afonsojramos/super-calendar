@@ -300,6 +300,68 @@ describe(rendererName, () => {
         expect(getByLabelText("Span, 16 July")).toBe(getByText("Span").closest("button"));
       });
 
+      describe("with a fixed maxVisibleEventCount", () => {
+        const allDay = (title: string, first: number, last: number): CalendarEvent => ({
+          title,
+          start: new Date(2026, 6, first),
+          end: new Date(2026, 6, last + 1),
+          allDay: true,
+        });
+        const mount = (events: CalendarEvent[], cap = 3) =>
+          render(MonthView, {
+            date: new Date(2026, 6, 1),
+            weekStartsOn: 1,
+            events,
+            chipHeight: 20,
+            maxVisibleEventCount: cap,
+          });
+        // The lane rows a day cell reserves above its overflow label.
+        const lanesAbove = (label: HTMLElement) =>
+          [...label.parentElement!.children].filter(
+            (child) => child !== label && child.getAttribute("aria-hidden") === "true",
+          ).length;
+
+        it("draws every lane, with no overflow row, when the row fits the cap", () => {
+          const { getByText, queryByText } = mount([
+            allDay("A", 15, 16),
+            allDay("B", 15, 16),
+            allDay("C", 15, 16),
+          ]);
+          for (const title of ["A", "B", "C"]) expect(getByText(title)).toBeTruthy();
+          expect(queryByText(/More/)).toBeNull();
+        });
+
+        it.each([2, 3])(
+          "makes the overflow label the last of %i rows when two events hide",
+          (cap) => {
+            // Cap + 1 events on Wednesday: the row shows cap - 1 lanes, then the label.
+            const titles = ["A", "B", "C", "D"].slice(0, cap + 1);
+            const { getByLabelText, getByText, queryByText } = mount(
+              titles.map((title) => allDay(title, 15, 15)),
+              cap,
+            );
+            expect(lanesAbove(getByLabelText("2 more events, 15 July"))).toBe(cap - 1);
+            for (const title of titles.slice(0, cap - 1)) expect(getByText(title)).toBeTruthy();
+            for (const title of titles.slice(cap - 1)) expect(queryByText(title)).toBeNull();
+          },
+        );
+
+        it("keeps the label for a day whose one hidden event sits on a lower lane", () => {
+          // P and Q cover Tuesday to Thursday on lanes 0-1, R covers Tuesday and
+          // Wednesday on lane 2, S fills lane 3 on Tuesday, and U takes lane 3 from
+          // Wednesday. Thursday's only hidden event, U, sits below its empty lane 2.
+          const { getByLabelText } = mount([
+            allDay("P", 14, 16),
+            allDay("Q", 14, 16),
+            allDay("R", 14, 15),
+            allDay("S", 14, 14),
+            allDay("U", 15, 16),
+          ]);
+          // Thursday keeps the label on the cap's last row; lane 2 stays a gap.
+          expect(lanesAbove(getByLabelText("1 more events, 16 July"))).toBe(2);
+        });
+      });
+
       it("renders chips from a prebuilt eventsByDay map (the internal MonthList path)", () => {
         // MonthList builds the index once and passes it; the lookup key must match.
         const map = groupEventsByDay(events);

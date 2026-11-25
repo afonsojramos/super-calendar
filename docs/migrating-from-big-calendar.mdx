@@ -83,6 +83,9 @@ swap. Make the smallest changes that compile and preserve the current behaviour.
    `verticalScrollEnabled`, `showVerticalScrollIndicator`,
    `itemSeparatorComponent`, `renderEvent`, `renderHeaderForMonthView`,
    `showAllDayEventCell`, `isRTL`.
+   - `maxVisibleEventCount` counts the `+N more` row as one of its lanes, so a day
+     that overflows shows one event fewer above the label than in big-calendar. Add
+     one to keep the same number.
    - `date` is controlled: keep it in state and update it from `onChangeDate`
      (`onChangeDate={setDate}`). A fixed `date` keeps the calendar on that date,
      and a swipe pages back to it.

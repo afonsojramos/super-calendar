@@ -185,9 +185,10 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   /** Tap a day's column header on the week/day grid (default header only). */
   onPressDateHeader?: (date: Date) => void;
   /**
-   * Max event chips per month cell before they collapse into "+N more". Omit to
-   * auto-fit as many as the cell height allows (default); set a number for a
-   * fixed cap. Pass an explicit value when using a custom `renderEvent`.
+   * Max event lanes per month week row, the "+N more" row included, keeping at
+   * least one lane. Omit to auto-fit as many as the cell height allows (default);
+   * set a number for a fixed cap. Pass an explicit value when using a custom
+   * `renderEvent`.
    */
   maxVisibleEventCount?: number;
   /** Month chip height in pixels; omit to keep the renderer default. */

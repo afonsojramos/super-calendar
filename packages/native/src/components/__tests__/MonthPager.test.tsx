@@ -1,7 +1,7 @@
 import { startTransition, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { vi } from "vitest";
 import { act, fireEvent, render } from "@testing-library/react-native";
-import { Platform, Text } from "react-native";
+import { Dimensions, Platform, Text } from "react-native";
 import * as gestureHandlerMock from "react-native-gesture-handler";
 import type { CreateGhostArgs } from "@super-calendar/core";
 import type { CalendarEvent } from "../../types";
@@ -103,6 +103,63 @@ describe("MonthPager event updates", () => {
 
     await rerender(<Calendar {...props} chipHeight={44} chipGap={6} />);
     expect(getByLabelText(/6 January 2026, 2 events$/)).toHaveStyle({ gap: 6 });
+  });
+});
+
+describe("MonthPager first frames", () => {
+  // Monday 15 June holds four events.
+  const events: CalendarEvent[] = ["A", "B", "C", "D"].map((title, i) => ({
+    title: `Mon ${title}`,
+    start: new Date(2026, 5, 15, 9 + i),
+    end: new Date(2026, 5, 15, 10 + i),
+  }));
+  const props = {
+    mode: "month" as const,
+    date: new Date(2026, 5, 15),
+    events,
+    weekStartsOn: 0 as const,
+    chipHeight: 20,
+    onChangeDate: noop,
+    onPressEvent: noop,
+  };
+  const page = (view: Awaited<ReturnType<typeof render>>) =>
+    view.getByTestId("month-pager-page", { includeHiddenElements: true });
+
+  it("hides its pages until it has measured their height", async () => {
+    const view = await render(<Calendar {...props} />);
+    expect(page(view)).toHaveStyle({ opacity: 0 });
+    await fireEvent(view.getByTestId("month-pager"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 700, height: 350 } },
+    });
+    expect(page(view)).toHaveStyle({ opacity: 1 });
+  });
+
+  it("fits auto-fit lanes to a resized page before the grid measures again", async () => {
+    const view = await render(<Calendar {...props} />);
+    // The grid first lays out at the pager's seed (window) height, then the pager
+    // measures its real 350pt area: five 70pt rows fit one 22pt lane and the label.
+    const seed = Dimensions.get("window").height;
+    await fireEvent(view.getByTestId("month-grid"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 700, height: seed } },
+    });
+    await fireEvent(view.getByTestId("month-pager"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 700, height: 350 } },
+    });
+    expect(view.getByLabelText("3 more events, 15 June")).toBeTruthy();
+    expect(view.queryByText("Mon B")).toBeNull();
+  });
+
+  it("keeps the measured height of a grid that does not fill its page", async () => {
+    // A 600pt grid keeps five 120pt rows, room for all four lanes, whatever the page.
+    const view = await render(<Calendar {...props} styles={{ grid: { height: 600 } }} />);
+    await fireEvent(view.getByTestId("month-grid"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 700, height: 600 } },
+    });
+    await fireEvent(view.getByTestId("month-pager"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 700, height: 350 } },
+    });
+    expect(view.getByText("Mon D")).toBeTruthy();
+    expect(view.queryByText(/More/)).toBeNull();
   });
 });
 

@@ -376,10 +376,118 @@ describe("MonthView per-day overflow", () => {
     expect(queryByLabelText(/more events?, 16 June/)).toBeNull();
   });
 
-  it("keeps the label under a fixed maxVisibleEventCount", async () => {
-    const { getByLabelText, queryByText } = await mount({ maxVisibleEventCount: 2 });
-    expect(getByLabelText("1 more events, 16 June")).toBeTruthy();
-    expect(queryByText("Tue C")).toBeNull();
+  it("gives the label the last of three rows before the grid is measured", async () => {
+    const { getByLabelText, getByText, queryByText } = await render(
+      <MonthView {...baseProps} events={events} chipHeight={20} />,
+    );
+    expect(getByLabelText("2 more events, 15 June")).toBeTruthy();
+    expect(queryByText("Mon C")).toBeNull();
+    expect(getByText("Tue C")).toBeTruthy();
+  });
+
+  it("draws every lane when the auto-fit row holds them all", async () => {
+    const { getByText, queryByText } = await mount({ events: events.slice(0, 3) });
+    expect(getByText("Mon C")).toBeTruthy();
+    expect(queryByText(/More/)).toBeNull();
+  });
+});
+
+describe("MonthView fixed maxVisibleEventCount", () => {
+  // All-day bars from Wednesday 17 June to `last`, stacked into lanes in order.
+  const allDay = (title: string, first: number, last: number): CalendarEvent => ({
+    title,
+    start: new Date(2026, 5, first),
+    end: new Date(2026, 5, last + 1),
+    allDay: true,
+  });
+  const mount = (events: CalendarEvent[], cap = 3) =>
+    render(<MonthView {...baseProps} events={events} chipHeight={20} maxVisibleEventCount={cap} />);
+  // The lane spacers a day cell reserves above its overflow label.
+  const lanesAbove = (label: { parent: unknown }) => {
+    let cell = label.parent as { parent: unknown; children: unknown[] } | null;
+    while (cell && !cell.children.includes(label)) cell = cell.parent as typeof cell;
+    if (!cell) throw new Error("overflow label has no cell");
+    return cell.children.filter((child) => {
+      const style = StyleSheet.flatten(
+        (child as { props?: { style?: unknown } }).props?.style as ViewStyle,
+      );
+      return style?.pointerEvents === "none" && style.height === 20;
+    }).length;
+  };
+
+  it("keeps every capped row tall enough for its lanes and scrolls when they overflow", async () => {
+    const view = await mount([allDay("A", 17, 17), allDay("B", 17, 17), allDay("C", 17, 17)]);
+    // Three 22pt rows (the label row included) below the 30pt date area.
+    const grid = view.getByTestId("month-grid");
+    expect(StyleSheet.flatten(grid.props.style as ViewStyle).minHeight).toBe(96 * 5);
+    for (const row of grid.children) {
+      const style = StyleSheet.flatten(
+        (row as { props: { style?: unknown } }).props.style as ViewStyle,
+      );
+      expect(style.minHeight).toBe(96);
+    }
+    // A short parent scrolls the rows rather than clipping them.
+    expect(view.getByTestId("month-viewport")).toBeTruthy();
+  });
+
+  it("draws every lane, with no overflow row, when the row fits the cap", async () => {
+    const { getByText, queryByText } = await mount([
+      allDay("A", 17, 18),
+      allDay("B", 17, 18),
+      allDay("C", 17, 18),
+    ]);
+    for (const title of ["A", "B", "C"]) expect(getByText(title)).toBeTruthy();
+    expect(queryByText(/More/)).toBeNull();
+  });
+
+  it.each([2, 3])(
+    "makes the overflow label the last of %i rows when two events hide",
+    async (cap) => {
+      // Cap + 1 events on Wednesday: the row shows cap - 1 lanes, then the label.
+      const titles = ["A", "B", "C", "D"].slice(0, cap + 1);
+      const { getByLabelText, getByText, queryByText } = await mount(
+        titles.map((title) => allDay(title, 17, 17)),
+        cap,
+      );
+      const label = getByLabelText("2 more events, 17 June");
+      expect(lanesAbove(label)).toBe(cap - 1);
+      for (const title of titles.slice(0, cap - 1)) expect(getByText(title)).toBeTruthy();
+      for (const title of titles.slice(cap - 1)) expect(queryByText(title)).toBeNull();
+    },
+  );
+
+  it("draws a day's one hidden event in the label's row instead of +1", async () => {
+    // A, B and Span cover Wednesday and Thursday on lanes 0-2; Solo adds a fourth
+    // Wednesday event. Wednesday hides two events, Thursday only Span.
+    const { getByLabelText, getAllByText, queryByText, queryByLabelText } = await mount([
+      allDay("A", 17, 18),
+      allDay("B", 17, 18),
+      allDay("Span", 17, 18),
+      allDay("Solo", 17, 17),
+    ]);
+    expect(getByLabelText("2 more events, 17 June")).toBeTruthy();
+    expect(queryByText("Solo")).toBeNull();
+    expect(getAllByText("Span")).toHaveLength(1);
+    expect(queryByLabelText(/more events?, 18 June/)).toBeNull();
+    // Span is cut to Thursday, on the third lane below the 30pt date area.
+    const bar = barWrapperOf(getAllByText("Span")[0]);
+    expect(bar.top).toBe(30 + 2 * 22);
+    expect(bar.left).toBe(`${(4 / 7) * 100}%`);
+  });
+
+  it("keeps the label for a day whose one hidden event sits on a lower lane", async () => {
+    // P and Q cover Tuesday to Thursday on lanes 0-1, R covers Tuesday and
+    // Wednesday on lane 2, S fills lane 3 on Tuesday, and U takes lane 3 from
+    // Wednesday. Thursday's only hidden event, U, sits below its empty lane 2.
+    const { getByLabelText } = await mount([
+      allDay("P", 16, 18),
+      allDay("Q", 16, 18),
+      allDay("R", 16, 17),
+      allDay("S", 16, 16),
+      allDay("U", 17, 18),
+    ]);
+    // Thursday keeps the label on the cap's last row; lane 2 stays a gap.
+    expect(lanesAbove(getByLabelText("1 more events, 18 June"))).toBe(2);
   });
 });
 
@@ -406,7 +514,7 @@ describe("MonthView labels", () => {
       />,
     );
     expect(getByLabelText("Monday, 15 June 2026, selected, 6 events")).toBeTruthy();
-    expect(getByLabelText("4 more events, 15 June")).toBeTruthy();
+    expect(getByLabelText("5 more events, 15 June")).toBeTruthy();
     await fireEvent.press(getByText(/More/));
     expect(getByLabelText("Close")).toBeTruthy();
   });
@@ -422,7 +530,7 @@ describe("MonthView labels", () => {
       />,
     );
     expect(getByLabelText("Monday, 15 June 2026, wybrany, wydarzenia: 6")).toBeTruthy();
-    expect(getByLabelText("jeszcze 4, 15 June")).toBeTruthy();
+    expect(getByLabelText("jeszcze 5, 15 June")).toBeTruthy();
     await fireEvent.press(getByText(/More/));
     expect(getByLabelText("Zamknij")).toBeTruthy();
   });
