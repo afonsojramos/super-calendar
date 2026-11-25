@@ -78,6 +78,7 @@ import type {
   DateChangeReason,
   EventDragHandler,
   EventDragStartHandler,
+  EventIdGetter,
   EventKeyExtractor,
   MultiDayTimedEventPlacement,
   RenderEvent,
@@ -112,6 +113,7 @@ import {
   resolveCalendarLabels,
   type WeekdayFormat,
   weekdayFormatToken,
+  findCurrentEvent,
 } from "@super-calendar/core";
 import {
   type ResolvedSlot,
@@ -122,6 +124,7 @@ import {
 import { useWebGridZoom } from "../utils/useWebGridZoom";
 import { PAGER_HELD_DRAG_MS } from "../utils/pagerTiming";
 import { useWebPagerKeys } from "../utils/useWebPagerKeys";
+import { useEventKeyExtractor } from "../utils/eventKeys";
 import { withEventAccessibilityLabel } from "../utils/withEventAccessibilityLabel";
 import { CalendarLabelsContext, useCalendarLabels } from "../utils/labels";
 import { AllDayLane } from "./AllDayLane";
@@ -785,7 +788,7 @@ function AnimatedEventBoxInner<T>({
   // Clear the drag preview once the committed change re-renders this box at its
   // new geometry. The gesture holds the snapped offset through the commit (so the
   // box never flashes back to the original spot); this drops it the moment the
-  // new start/duration lands, for consumers whose keyExtractor keeps it mounted.
+  // new start/duration lands, for consumers whose event key keeps it mounted.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/immutability -- Reanimated shared value: assigning .value is the intended mutation API
     moveOffset.value = 0;
@@ -1931,7 +1934,8 @@ type TimetablePageProps<T> = {
   renderBackgroundEvent?: RenderEvent<T>;
   showNowIndicator: boolean;
   renderEvent: RenderEvent<T>;
-  keyExtractor: EventKeyExtractor<T>;
+  keyExtractor?: EventKeyExtractor<T>;
+  getEventId?: EventIdGetter<T>;
   snapMinutes: number;
   minEventHeight: number;
   eventGap: number;
@@ -2002,7 +2006,8 @@ function TimetablePageInner<T>({
   renderBusinessHours,
   renderBackgroundEvent,
   renderEvent,
-  keyExtractor,
+  keyExtractor: keyExtractorProp,
+  getEventId,
   snapMinutes,
   minEventHeight,
   eventGap,
@@ -2033,6 +2038,9 @@ function TimetablePageInner<T>({
   activeDate,
   onPressDateHeader,
 }: TimetablePageProps<T>) {
+  // Event boxes and lane bars keep their element, and so a held gesture, for as
+  // long as this key stays the same.
+  const keyExtractor = useEventKeyExtractor(events, getEventId, keyExtractorProp);
   const theme = useCalendarTheme();
   const slot = useSlots<TimeGridSlot>();
 
@@ -2069,11 +2077,15 @@ function TimetablePageInner<T>({
     [days, events, multiDayTimedEventPlacement],
   );
   const [multiDayMove, setMultiDayMove] = useState<MultiDayMove<T> | null>(null);
+  // The held object loses its ID key once a refresh replaces it, so match by
+  // `getEventId` before the key.
   const movingEvent = multiDayMove
-    ? (events.find(
+    ? (findCurrentEvent(events, multiDayMove.event, getEventId) ??
+      events.find(
         (event, index) =>
           keyExtractor(event, index) === keyExtractor(multiDayMove.event, multiDayMove.eventIndex),
-      ) ?? null)
+      ) ??
+      null)
     : null;
   useEffect(() => {
     if (!multiDayMove) return;
@@ -2859,7 +2871,17 @@ export type TimeGridProps<T> = SlotStyleProps<TimeGridSlot> & {
    * to the built-in title-and-time label.
    */
   eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
-  keyExtractor: EventKeyExtractor<T>;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its rendered state and any
+   * held move, resize, or all-day drag. Takes precedence over `keyExtractor`.
+   */
+  getEventId?: EventIdGetter<T>;
+  /**
+   * Stable key per event. Defaults to start, end, and title.
+   * @deprecated Use `getEventId`, which also keeps a held drag on its event.
+   */
+  keyExtractor?: EventKeyExtractor<T>;
   scrollOffsetMinutes?: number;
   hourColumnWidth?: number;
   /** Hide the left hour-axis column (lines stay, labels/gutter go). Default false. */
@@ -3026,6 +3048,7 @@ function TimeGridInner<T>(
     labels: labelsProp,
     renderEvent,
     eventAccessibilityLabel,
+    getEventId,
     keyExtractor,
     scrollOffsetMinutes = 0,
     hourColumnWidth: hourColumnWidthProp = DEFAULT_HOUR_COLUMN_WIDTH,
@@ -3946,6 +3969,7 @@ function TimeGridInner<T>(
         showNowIndicator={showNowIndicator}
         renderEvent={labeledRenderEvent}
         keyExtractor={keyExtractor}
+        getEventId={getEventId}
         snapMinutes={Math.max(1, dragStepMinutes)}
         minEventHeight={minEventHeight}
         eventGap={eventGap}
@@ -4012,6 +4036,7 @@ function TimeGridInner<T>(
       showNowIndicator,
       labeledRenderEvent,
       keyExtractor,
+      getEventId,
       dragStepMinutes,
       minEventHeight,
       eventGap,

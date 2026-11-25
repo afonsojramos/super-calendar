@@ -33,6 +33,7 @@ import type {
   CalendarMode,
   CreateGhostArgs,
   DateChangeDetails,
+  EventIdGetter,
   EventKeyExtractor,
   MonthDateInfo,
   MultiDayTimedEventPlacement,
@@ -265,7 +266,17 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
    * stays a shaded, non-interactive range. The resource timeline keeps the shade.
    */
   renderBackgroundEvent?: RenderEvent<T>;
-  /** Stable key per event. Defaults to start-time + index. */
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its rendered state and any
+   * held move, resize, or all-day drag, in every mode. Takes precedence over
+   * `keyExtractor`.
+   */
+  getEventId?: EventIdGetter<T>;
+  /**
+   * Stable key per event. Defaults to start, end, and title.
+   * @deprecated Use `getEventId`, which also keeps a held drag on its event.
+   */
   keyExtractor?: EventKeyExtractor<T>;
   /** Partial theme merged over the defaults. */
   theme?: PartialCalendarTheme;
@@ -409,12 +420,6 @@ export type CalendarProps<T> = SlotStyleProps<CalendarSlot> & {
   /** Drawn between rows of the `schedule` (agenda) list. */
   itemSeparatorComponent?: React.ComponentType<unknown> | null;
 };
-
-// Derive a key purely from event data so identity is stable across reorders and
-// list mutations. Supply your own `keyExtractor` returning a real id when events
-// can share an identical start/end/title.
-const defaultKeyExtractor: EventKeyExtractor<unknown> = (event) =>
-  `${event.start.toISOString()}|${event.end.toISOString()}|${event.title ?? ""}`;
 
 // The [start, end] of the dates a given mode shows around `date`. Month spans the
 // padded grid (whole weeks); time-grid modes span their day columns.
@@ -573,7 +578,8 @@ function CalendarInner<T>(
     businessHours,
     renderBusinessHours,
     renderBackgroundEvent,
-    keyExtractor = defaultKeyExtractor as EventKeyExtractor<T>,
+    getEventId,
+    keyExtractor,
     theme,
     cellHeight: cellHeightProp,
     hourHeight = DEFAULT_HOUR_HEIGHT,
@@ -874,6 +880,7 @@ function CalendarInner<T>(
             renderCustomDateForMonth={renderCustomDateForMonth}
             calendarCellStyle={calendarCellStyle}
             renderEvent={resolvedRenderEvent}
+            getEventId={getEventId}
             keyExtractor={keyExtractor}
             onPressDay={onPressDay}
             onLongPressDay={onLongPressDay}
@@ -931,6 +938,7 @@ function CalendarInner<T>(
             now={now}
             timeZone={timeZone}
             renderEvent={resolvedRenderEvent}
+            getEventId={getEventId}
             keyExtractor={keyExtractor}
             onPressEvent={handlePressEvent}
             onLongPressEvent={handleLongPressEvent}
@@ -957,6 +965,7 @@ function CalendarInner<T>(
             now={now}
             timeZone={timeZone}
             renderEvent={resolvedRenderEvent}
+            getEventId={getEventId}
             keyExtractor={keyExtractor}
             scrollOffsetMinutes={scrollOffsetMinutes}
             hourColumnWidth={hourColumnWidth}

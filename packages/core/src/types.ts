@@ -152,8 +152,18 @@ export interface RecurrenceRule {
  */
 export type CalendarEvent<T = unknown> = ICalendarEvent & Omit<T, keyof ICalendarEvent>;
 
-/** Build a stable key for an event. Defaults to start-time + index. */
+/**
+ * Build a stable key for an event. Defaults to start-time + index.
+ * @deprecated Use {@link EventIdGetter} through the `getEventId` prop.
+ */
 export type EventKeyExtractor<T = unknown> = (event: CalendarEvent<T>, index: number) => string;
+
+/**
+ * Returns an event's stable ID: a string or number, unique per displayed event or
+ * occurrence. A refresh that replaces event objects keeps focus, rendered state,
+ * and a held drag attached to the event with the same ID.
+ */
+export type EventIdGetter<T = unknown> = (event: CalendarEvent<T>) => string | number;
 
 /** Sunday = 0 … Saturday = 6, matching `Date.prototype.getDay()`. */
 export type WeekStartsOn = 0 | 1 | 2 | 3 | 4 | 5 | 6;

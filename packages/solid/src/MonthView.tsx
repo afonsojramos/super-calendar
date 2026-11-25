@@ -14,6 +14,9 @@ import {
   dayBadgeKind,
   eventDayKeys,
   type EventAccessibilityLabeler,
+  eventIdKeys,
+  type EventIdGetter,
+  findCurrentEvent,
   groupEventsByDay,
   isAllDayEvent,
   isBackgroundEvent,
@@ -263,6 +266,12 @@ export interface MonthViewProps<T = unknown>
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
   /** Fired the instant an event is picked up for a drag, before anything is committed. */
   onDragStart?: (event: CalendarEvent<T>) => void;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its focus, rendered state,
+   * and any held move.
+   */
+  getEventId?: EventIdGetter<T>;
   /** Allow moving events by default (per-event `startEditable` overrides). Default true. */
   eventStartEditable?: boolean;
   /** Reject a drop that would overlap another event (default true = allowed). */
@@ -965,11 +974,21 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
   // A move over another day previews the event at its destination the same way:
   // a copy with the shifted bounds the drop would commit, laid out beside the
   // faded original.
+  const eventIds = createMemo(() => eventIdKeys(props.events ?? [], props.getEventId));
+  // The carried event as rendered now: a refresh can replace it with the event
+  // that has the same `getEventId`.
+  const movingEvent = createMemo(() => {
+    const current = drag();
+    return current?.kind === "move"
+      ? (findCurrentEvent(props.events ?? [], current.event, props.getEventId) ?? current.event)
+      : undefined;
+  });
   const moveSpan = createMemo(
     () => {
       const current = drag();
-      return current?.kind === "move"
-        ? { event: current.event, from: current.from, to: current.to }
+      const event = movingEvent();
+      return current?.kind === "move" && event
+        ? { event, from: current.from, to: current.to }
         : null;
     },
     {
@@ -1169,6 +1188,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
     () => ({
       days: dayLookup(),
       events: props.events,
+      getEventId: props.getEventId,
       canCreate: !!(props.onCreateEvent || props.onSelectDrag),
       canMove: !!props.onDragEvent,
       eventStartEditable: props.eventStartEditable,
@@ -1176,6 +1196,9 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
     (state) => {
       const origin = heldOrigin;
       if (!origin) return;
+      const originEvent = origin.event
+        ? findCurrentEvent(state.events ?? [], origin.event, state.getEventId)
+        : undefined;
       const current = dragRef.current;
       const destination = current
         ? new Date(current.kind === "create" ? current.hover : current.to)
@@ -1189,10 +1212,10 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
         !enabled(destination) ||
         (origin.event
           ? !state.canMove ||
-            !state.events?.includes(origin.event) ||
-            origin.event.disabled ||
-            origin.event.draggable === false ||
-            !(origin.event.startEditable ?? state.eventStartEditable)
+            !originEvent ||
+            originEvent.disabled ||
+            originEvent.draggable === false ||
+            !(originEvent.startEditable ?? state.eventStartEditable)
           : !state.canCreate)
       ) {
         heldTouch?.();
@@ -1230,17 +1253,20 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
             props.onCreateEvent?.(range.start, range.end);
             return;
           }
-          const next = monthDropBounds(current.event, new Date(current.from), new Date(current.to));
+          // A refresh may have replaced the carried event; report the current object.
+          const moved =
+            findCurrentEvent(props.events ?? [], current.event, props.getEventId) ?? current.event;
+          const next = monthDropBounds(moved, new Date(current.from), new Date(current.to));
           if (!next) return;
           // Reject a drop that would land the event on top of another when
           // `eventOverlap` is off, before the consumer's handler ever sees it.
           if (
             props.eventOverlap === false &&
-            overlapsOtherEvents(props.events ?? [], current.event, next.start, next.end)
+            overlapsOtherEvents(props.events ?? [], moved, next.start, next.end)
           ) {
             return;
           }
-          props.onDragEvent?.(current.event, next.start, next.end);
+          props.onDragEvent?.(moved, next.start, next.end);
         };
         const clear = () => {
           heldTouch?.();
@@ -1883,21 +1909,23 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                           </Show>
                                           {
                                             <For
-                                              each={barSegs().filter((b) => b.startCol === dayCol)}
-                                              keyed={false}
+                                              each={barSegs()
+                                                .filter((b) => b.startCol === dayCol)
+                                                // Bars keep their element by event ID, or else by position.
+                                                .map((b, index) => ({
+                                                  ...b,
+                                                  key: eventIds().get(b.seg.event) ?? index,
+                                                }))}
+                                              keyed={(b) => b.key}
                                             >
                                               {(b) => {
                                                 const span = createMemo(
                                                   () => b().endCol - b().startCol + 1,
                                                 );
-                                                const isDragged = createMemo(() => {
-                                                  const currentDrag = drag();
-                                                  return (
-                                                    currentDrag?.armed === true &&
-                                                    currentDrag.kind === "move" &&
-                                                    currentDrag.event === b().seg.event
-                                                  );
-                                                });
+                                                const isDragged = createMemo(
+                                                  () =>
+                                                    dragArmed() && movingEvent() === b().seg.event,
+                                                );
                                                 return (
                                                   <button
                                                     type="button"
@@ -2138,8 +2166,15 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                                   {dayLabel()}
                                                 </div>
                                                 {
-                                                  <For each={dayEvents()} keyed={false}>
-                                                    {(event) => {
+                                                  <For
+                                                    each={dayEvents().map((event, index) => ({
+                                                      event,
+                                                      key: eventIds().get(event) ?? index,
+                                                    }))}
+                                                    keyed={(entry) => entry.key}
+                                                  >
+                                                    {(entry) => {
+                                                      const event = () => entry().event;
                                                       return (
                                                         <button
                                                           type="button"

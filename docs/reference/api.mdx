@@ -87,7 +87,8 @@ waits for it to finish.
 | `renderNowLabel`           | `(now: Date) => ReactNode`         | React Native: label beside the visible current-time line. |
 | `renderHeaderForMonthView` | `(weekDays) => ReactNode`          | Replace the month weekday header.                         |
 | `headerComponent`          | `ReactNode`                        | Extra element between header and grid.                    |
-| `keyExtractor`             | `(event, index) => string`         | Stable event keys.                                        |
+| `getEventId`               | `(event) => string \| number`      | Stable event ID that survives data refreshes.             |
+| `keyExtractor`             | `(event, index) => string`         | Deprecated rendering key; use `getEventId`.               |
 
 While you move or resize a time-grid event, `renderEvent` receives a copy of it
 whose `start` and `end` are the times the drop would report. Compare events by a
@@ -240,10 +241,11 @@ measure custom event content to determine the band height. With `onDragEvent`,
 a bar moves by whole days within the visible range and keeps its duration and
 clock times.
 
-In React DOM and Solid, `getEventId` preserves all-day focus and renderer state
-when a data refresh replaces event objects. Return a stable, unique string or
-number for each event or occurrence. Without a valid, unique ID, bars use object
-identity, so replacing an event remounts its content. Native uses `keyExtractor`.
+`getEventId` keeps a bar's focus, rendered content, and held drag when a data
+refresh replaces event objects. Return a stable, unique string or number for
+each event or occurrence. Without a valid, unique ID, a held bar is found by its
+dates and title, and a replaced event can remount its content. See
+[Identify events across refreshes](/guides/events#identify-events-across-refreshes).
 
 Month `Calendar`, `MonthView`, and `MonthList` accept `chipHeight` and `chipGap`.
 Both are numbers in pixels. DOM height defaults to 18; native height follows the
@@ -275,10 +277,11 @@ Changing either dimension updates already mounted list and pager months.
   </Card>
   <Card title="Types">
     `CalendarEvent`, `CalendarMode`, `RenderEventArgs`, `RecurrenceRule`, `BusinessHours`,
-    `EventDragHandler`, `CalendarTheme`, `PositionedEvent`, `DateRange`, `MonthGrid`,
-    `MonthEventSegment`, `MonthWeekEvents`, `MonthListProps`, `CalendarSlot`, `SlotStyleProps`,
-    `CalendarLabels`, `CalendarHandle`, `ScrollToTimeOptions`, `CreateGhostArgs`, `MonthDateInfo`,
-    `DateChangeDetails`, `DateChangeReason`, `MultiDayTimedEventPlacement`, `LayoutDayEventsOptions`
+    `EventDragHandler`, `EventIdGetter`, `CalendarTheme`, `PositionedEvent`, `DateRange`,
+    `MonthGrid`, `MonthEventSegment`, `MonthWeekEvents`, `MonthListProps`, `CalendarSlot`,
+    `SlotStyleProps`, `CalendarLabels`, `CalendarHandle`, `ScrollToTimeOptions`, `CreateGhostArgs`,
+    `MonthDateInfo`, `DateChangeDetails`, `DateChangeReason`, `MultiDayTimedEventPlacement`,
+    `LayoutDayEventsOptions`
   </Card>
 </CardGroup>
 
@@ -296,10 +299,11 @@ On native, all week rows share a height. Dates align at the top of their cells,
 and event bars start below the tallest date. Rows scroll when the dates, event
 lanes and overflow labels need more space than the viewport provides.
 
-Held web moves track event object identity. With `Calendar` recurrence or
-`timeZone`, replacing the `events` array rebuilds displayed events and cancels
-the move. The native `keyExtractor` does not preserve gesture identity across replacements.
-See [keep event data stable](/guides/events#keep-event-data-stable).
+A held move follows the event with the same `getEventId` through a refresh that
+replaces the `events` array, including the rebuilt occurrences of `Calendar`
+recurrence or `timeZone`. Without a valid ID, a held web multi-week move tracks
+the event object, so replacing it cancels the move. See
+[Identify events across refreshes](/guides/events#identify-events-across-refreshes).
 
 Web `Calendar` uses `height` to constrain the rows; standalone web views accept
 `style`. Native fills its parent. Rows scroll rather than shrink below their
@@ -405,9 +409,7 @@ event actions. `eventChangeRejected` supplies the polite status message for
 rejected edits (default "This change is not allowed."). Both web
 `ResourceTimeline` components accept `labels`.
 
-Web `Calendar`, `TimeGrid`, and `ResourceTimeline` accept the optional
-`getEventId: (event) => string | number` prop to keep editing through full
-event-array refreshes. IDs must be stable and unique per occurrence.
+With `getEventId`, the dialog stays open through full event-array refreshes.
 Missing, invalid, or duplicate IDs close the dialog. Without this prop, full
 refreshes close it. The chooser and dialog include both
 dates for multi-day events. PageUp and PageDown inside the dialog do not change

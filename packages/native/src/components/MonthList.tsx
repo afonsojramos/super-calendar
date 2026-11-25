@@ -36,7 +36,13 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useCalendarTheme } from "../theme";
-import type { CalendarEvent, EventKeyExtractor, RenderEvent, WeekStartsOn } from "../types";
+import type {
+  CalendarEvent,
+  EventIdGetter,
+  EventKeyExtractor,
+  RenderEvent,
+  WeekStartsOn,
+} from "../types";
 import {
   type CalendarSelection,
   CalendarSelectionProvider,
@@ -85,8 +91,6 @@ const AUTOSCROLL_INTERVAL_MS = 16;
 // Stable empty events array, so a picker (no events) doesn't churn memoised props.
 const NO_EVENTS: CalendarEvent<unknown>[] = [];
 const noop = () => {};
-const defaultKeyExtractor: EventKeyExtractor<unknown> = (event) =>
-  `${event.start.toISOString()}|${event.end.toISOString()}|${event.title ?? ""}`;
 
 /** Props for {@link MonthList}, the vertically scrolling list of months. */
 export type MonthListProps<T> = {
@@ -145,7 +149,16 @@ export type MonthListProps<T> = {
    * announce. Defaults to the built-in title-and-time label.
    */
   eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
-  /** Stable key per event. Defaults to start-time + index. */
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its rendered state. Takes
+   * precedence over `keyExtractor`.
+   */
+  getEventId?: EventIdGetter<T>;
+  /**
+   * Stable key per event. Defaults to start, end, and title.
+   * @deprecated Use `getEventId`.
+   */
   keyExtractor?: EventKeyExtractor<T>;
   onPressDay?: (date: Date) => void;
   onLongPressDay?: (date: Date) => void;
@@ -192,7 +205,8 @@ function MonthListInner<T>({
   calendarCellStyle,
   renderEvent = DefaultMonthEvent,
   eventAccessibilityLabel,
-  keyExtractor = defaultKeyExtractor as EventKeyExtractor<T>,
+  getEventId,
+  keyExtractor,
   onPressDay,
   onLongPressDay,
   onPressEvent = noop,
@@ -515,6 +529,7 @@ function MonthListInner<T>({
               renderEvent={renderEvent}
               eventAccessibilityLabel={eventAccessibilityLabel}
               keyExtractor={keyExtractor}
+              getEventId={getEventId}
               onPressDay={dragEnabled ? handlePressDay : onPressDay}
               onLongPressDay={onLongPressDay}
               onPressEvent={onPressEvent}
@@ -551,6 +566,7 @@ function MonthListInner<T>({
       fillCellOnSelection,
       calendarCellStyle,
       renderEvent,
+      getEventId,
       keyExtractor,
       dragEnabled,
       handlePressDay,

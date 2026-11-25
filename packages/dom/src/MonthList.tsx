@@ -8,6 +8,7 @@ import {
   type DateRange,
   type DateSelectionConstraints,
   type EventAccessibilityLabeler,
+  type EventIdGetter,
   groupEventsByDay,
   isBackgroundEvent,
   type WeekdayFormat,
@@ -51,6 +52,11 @@ export interface MonthListProps<T = unknown>
    * announce. Defaults to the event title and day (e.g. "Standup, 15 July").
    */
   eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its focus and rendered state.
+   */
+  getEventId?: EventIdGetter<T>;
   /** Max event lanes per month week row, the "+N more" row included, keeping at least one lane (default 3). */
   maxVisibleEventCount?: number;
   /** Month chip height in pixels; omit to keep the renderer default. */
@@ -108,6 +114,7 @@ export function MonthList<T = unknown>({
   events,
   renderEvent,
   eventAccessibilityLabel,
+  getEventId,
   maxVisibleEventCount,
   chipHeight,
   chipGap,
@@ -175,6 +182,7 @@ export function MonthList<T = unknown>({
         eventsByDay={eventsByDay}
         renderEvent={renderEvent}
         eventAccessibilityLabel={eventAccessibilityLabel}
+        getEventId={getEventId}
         maxVisibleEventCount={maxVisibleEventCount}
         chipHeight={chipHeight}
         chipGap={chipGap}
@@ -206,6 +214,7 @@ export function MonthList<T = unknown>({
       eventsByDay,
       renderEvent,
       eventAccessibilityLabel,
+      getEventId,
       maxVisibleEventCount,
       chipHeight,
       chipGap,

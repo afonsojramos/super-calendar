@@ -69,6 +69,9 @@ import {
   weekdayFormatToken,
   type WeekStartsOn,
   type DateChangeDetails,
+  eventIdKeys,
+  type EventIdGetter,
+  findCurrentEvent,
 } from "@super-calendar/core";
 import {
   EventActionsDialog,
@@ -435,8 +438,12 @@ export interface TimeGridProps<T = unknown> extends SlotStyleProps<TimeGridSlot>
    * Return `false` to reject the drop (the event snaps back).
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
-  /** Stable, unique identity for the editing dialog and all-day bars across data refreshes. */
-  getEventId?: (event: CalendarEvent<T>) => string | number;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its focus, rendered state,
+   * open actions dialog, and any held move or resize.
+   */
+  getEventId?: EventIdGetter<T>;
   /**
    * Page the grid to a new anchor date. Supplying it alongside `onDragEvent`
    * turns on edge auto-advance: dragging an event to the left/right edge and
@@ -1023,26 +1030,12 @@ function TimeGridInner<T = unknown>(
     [days, events, multiDayTimedEventPlacement],
   );
   const hasAllDay = allDayLayout.segments.length > 0;
-  const allDayIds = useMemo(() => {
-    const keys = new Map<CalendarEvent<T>, string>();
-    const seen = new Map<string, CalendarEvent<T>>();
-    for (const { event } of allDayLayout.segments) {
-      const id = getEventId?.(event);
-      if (typeof id !== "string" && typeof id !== "number") continue;
-      const key = `${typeof id}:${id}`;
-      const previous = seen.get(key);
-      if (previous) keys.delete(previous);
-      else {
-        seen.set(key, event);
-        keys.set(event, key);
-      }
-    }
-    return keys;
-  }, [allDayLayout, getEventId]);
+  // React keys for events with a valid, unique `getEventId`.
+  const eventIds = useMemo(() => eventIdKeys(events, getEventId), [events, getEventId]);
   const allDayKeys = useRef(new WeakMap<CalendarEvent<T>, number>());
   const nextAllDayKey = useRef(0);
   const allDayKey = (event: CalendarEvent<T>) => {
-    const id = allDayIds.get(event);
+    const id = eventIds.get(event);
     if (id !== undefined) return id;
     let key = allDayKeys.current.get(event);
     if (key === undefined) {
@@ -1989,7 +1982,23 @@ function TimeGridInner<T = unknown>(
   // Keep the original boxes mounted for pointer capture, but replace every
   // segment of a moving multi-day event with the same shifted range.
   const moveOrigin = dragOrigin.current;
+  // A refresh can replace the held event. With `getEventId`, the drag follows the
+  // event with its ID, so the drop and the renderers get the current object.
+  const heldReplacement =
+    draggedRef.current && getEventId
+      ? findCurrentEvent(events, draggedRef.current.event, getEventId)
+      : undefined;
+  if (draggedRef.current && heldReplacement && heldReplacement !== draggedRef.current.event) {
+    draggedRef.current = {
+      ...draggedRef.current,
+      event: heldReplacement,
+      onPress: () => onPressEvent?.(heldReplacement),
+    };
+  }
   const heldEvent = draggedRef.current?.event;
+  // A held event with an ID marks its box by identity on the day it was grabbed,
+  // since the refresh can give its `day:index` key to another event.
+  const heldById = !!heldEvent && eventIds.has(heldEvent);
   const movingEvent =
     heldEvent &&
     (events.includes(heldEvent)
@@ -2684,8 +2693,9 @@ function TimeGridInner<T = unknown>(
                   const active =
                     !paged &&
                     !draggedPromoted &&
-                    drag?.key === key &&
-                    (!multiDayHeld || pe.event === movingEvent)
+                    (heldById
+                      ? dayIndex === moveOrigin?.dayIndex && pe.event === heldEvent
+                      : drag?.key === key && (!multiDayHeld || pe.event === movingEvent))
                       ? drag
                       : null;
                   const hiddenForMove = !!multiDayMove && pe.event === movingEvent;
@@ -2732,7 +2742,7 @@ function TimeGridInner<T = unknown>(
                   const { canMove, canResize } = editability(pe.event);
                   return (
                     <div
-                      key={idx}
+                      key={eventIds.get(pe.event) ?? idx}
                       role="button"
                       // Always a tab stop: keyboard nav is additive, arrows only add a
                       // faster path between events without removing any from Tab order.

@@ -52,6 +52,9 @@ import {
   type CalendarLabels,
   dayAccessibilityLabel,
   resolveCalendarLabels,
+  eventIdKeys,
+  type EventIdGetter,
+  findCurrentEvent,
 } from "@super-calendar/core";
 import { holdDateDrag } from "./touch";
 import { InertDiv } from "./InertDiv";
@@ -251,6 +254,12 @@ export interface MonthViewProps<T = unknown>
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
   /** Fired the instant an event is picked up for a drag, before anything is committed. */
   onDragStart?: (event: CalendarEvent<T>) => void;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its focus, rendered state,
+   * and any held move.
+   */
+  getEventId?: EventIdGetter<T>;
   /** Allow moving events by default (per-event `startEditable` overrides). Default true. */
   eventStartEditable?: boolean;
   /** Reject a drop that would overlap another event (default true = allowed). */
@@ -546,15 +555,24 @@ function collectRowEvents<T>(
   return out;
 }
 
-// React keys for a row's bars, in order. A key comes from the event's content
-// and its start column, never its lane or object identity: a move preview can
-// push the carried bar to another lane, and a refetch can replace events with
-// equal copies, and a remount in either case would drop a focused chip's focus
-// and a held touch drag. Identical events count up in row order.
-function monthBarKeys<T>(bars: { seg: { event: CalendarEvent<T> }; startCol: number }[]) {
+// React keys for a row's bars, in order. A key comes from the event's
+// `getEventId` key, or else its content, and its start column, never its lane or
+// object identity: a move preview can push the carried bar to another lane, and a
+// refetch can replace events with equal copies, and a remount in either case
+// would drop a focused chip's focus and a held touch drag. Identical events count
+// up in row order.
+function monthBarKeys<T>(
+  bars: { seg: { event: CalendarEvent<T> }; startCol: number }[],
+  ids: ReadonlyMap<CalendarEvent<T>, string>,
+) {
   const seen = new Map<string, number>();
   return bars.map(({ seg: { event }, startCol }) => {
-    const base = `${event.start.toISOString()}|${event.end.toISOString()}|${event.title}|${startCol}`;
+    const id = ids.get(event);
+    const identity =
+      id === undefined
+        ? `${event.start.toISOString()}|${event.end.toISOString()}|${event.title}`
+        : `id:${id}`;
+    const base = `${identity}|${startCol}`;
     const occurrence = seen.get(base) ?? 0;
     seen.set(base, occurrence + 1);
     return `${base}#${occurrence}`;
@@ -650,6 +668,7 @@ export function DateRows<T = unknown>({
   onSelectDrag,
   onDragEvent,
   onDragStart,
+  getEventId,
   eventStartEditable = true,
   eventOverlap = true,
   keyboardDayNavigation = false,
@@ -696,6 +715,7 @@ export function DateRows<T = unknown>({
     return map;
   }, [eventsByDayProp, events]);
   const Chip = renderEvent;
+  const eventIds = useMemo(() => eventIdKeys(events ?? [], getEventId), [events, getEventId]);
   // Built-in "+N more" popover: opens when the consumer doesn't handle
   // `onPressMore` themselves. Keyed by the day id; closes on outside click,
   // Escape, or picking an event.
@@ -954,7 +974,11 @@ export function DateRows<T = unknown>({
   // a copy with the shifted bounds the drop would commit, laid out beside the
   // faded original.
   const moving = drag?.kind === "move" ? drag : null;
-  const movingEvent = moving?.event;
+  // The carried event as rendered now: a refresh can replace it with the event
+  // that has the same `getEventId`.
+  const movingEvent = moving
+    ? (findCurrentEvent(events ?? [], moving.event, getEventId) ?? moving.event)
+    : undefined;
   const moveFrom = moving?.from;
   const moveTo = moving?.to;
   const movePreview = useMemo(() => {
@@ -1120,12 +1144,13 @@ export function DateRows<T = unknown>({
       const cell = dayLookup.get(format(day, "yyyy-MM-dd"));
       return cell != null && !cell.isDisabled;
     };
+    const originEvent = origin.event
+      ? findCurrentEvent(events ?? [], origin.event, getEventId)
+      : undefined;
     if (
       !enabled(origin.day) ||
       !enabled(destination) ||
-      (origin.event
-        ? !events?.includes(origin.event) || !canMove(origin.event)
-        : !onCreateEvent && !onSelectDrag)
+      (origin.event ? !originEvent || !canMove(originEvent) : !onCreateEvent && !onSelectDrag)
     ) {
       heldTouch.current?.();
     }
@@ -1156,17 +1181,19 @@ export function DateRows<T = unknown>({
         onCreateEvent?.(range.start, range.end);
         return;
       }
-      const next = monthDropBounds(current.event, new Date(current.from), new Date(current.to));
+      // A refresh may have replaced the carried event; report the current object.
+      const moved = findCurrentEvent(events ?? [], current.event, getEventId) ?? current.event;
+      const next = monthDropBounds(moved, new Date(current.from), new Date(current.to));
       if (!next) return;
       // Reject a drop that would land the event on top of another when
       // `eventOverlap` is off, before the consumer's handler ever sees it.
       if (
         eventOverlap === false &&
-        overlapsOtherEvents(events ?? [], current.event, next.start, next.end)
+        overlapsOtherEvents(events ?? [], moved, next.start, next.end)
       ) {
         return;
       }
-      onDragEvent?.(current.event, next.start, next.end);
+      onDragEvent?.(moved, next.start, next.end);
     };
     const clear = () => {
       heldTouch.current?.();
@@ -1199,7 +1226,16 @@ export function DateRows<T = unknown>({
       window.removeEventListener("pointercancel", cancel);
       window.removeEventListener("keydown", keyDown);
     };
-  }, [isDragging, multiWeek, onCreateEvent, onDragEvent, eventOverlap, events, applyDrag]);
+  }, [
+    isDragging,
+    multiWeek,
+    onCreateEvent,
+    onDragEvent,
+    eventOverlap,
+    events,
+    getEventId,
+    applyDrag,
+  ]);
   // Replacing the multi-week window cancels a drag and closes the overflow
   // popover, so neither acts on days that are no longer shown.
   const transientWindow = useRef(windowKey);
@@ -1363,7 +1399,7 @@ export function DateRows<T = unknown>({
               };
             })
             .filter((b) => b.startCol <= b.endCol);
-          const barKeys = monthBarKeys(barSegs);
+          const barKeys = monthBarKeys(barSegs, eventIds);
           // The draft's own lane and columns, clamped like the bars.
           const draftSegment = rowLayout.segments.find((s) => s.event === draftEvent);
           const draftStart = draftSegment ? Math.max(draftSegment.startCol, firstVisCol) : -1;
@@ -1559,8 +1595,7 @@ export function DateRows<T = unknown>({
                         .filter((b) => b.startCol === dayCol)
                         .map((b) => {
                           const span = b.endCol - b.startCol + 1;
-                          const isDragged =
-                            dragArmed && drag?.kind === "move" && drag.event === b.seg.event;
+                          const isDragged = dragArmed && movingEvent === b.seg.event;
                           return (
                             <button
                               key={b.key}
@@ -1795,7 +1830,7 @@ export function DateRows<T = unknown>({
                             </div>
                             {dayEvents.map((event, i) => (
                               <button
-                                key={i}
+                                key={eventIds.get(event) ?? i}
                                 type="button"
                                 onClick={() => {
                                   setMoreOpenFor(null);

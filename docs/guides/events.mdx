@@ -77,17 +77,31 @@ If you filter or map it, memoize the result with React's `useMemo` or Solid's
 when it changes.
 
 With `Calendar` recurrence or `timeZone`, a new array rebuilds the displayed
-occurrences, even if the array contains the same source objects. In the
-multi-week web grid, replacing the held event cancels the move. Keep unrelated
+occurrences, even if the array contains the same source objects. Keep unrelated
 state updates from rebuilding `events`, including inline copies such as
-`events={[...events]}`. A data refresh can still cancel an active move safely.
-The native `keyExtractor` controls rendering keys; it does not reconnect a held gesture
-to a replacement event.
+`events={[...events]}`.
 
-In React DOM and Solid time grids, pass `getEventId` to preserve all-day focus
-and renderer state across refreshed objects. IDs must be stable, unique strings
-or numbers. Without a valid, unique ID, bars use object identity. Native uses
-`keyExtractor` for this purpose.
+### Identify events across refreshes
+
+Pass `getEventId` when a refresh replaces event objects, for example after a
+fetch. It returns a stable string or number for each event, such as
+`getEventId={(event) => event.id}`. Every renderer accepts it on `Calendar`,
+`TimeGrid`, `MonthView`, `MultiWeekView`, `MonthList`, `Agenda`, and
+`ResourceTimeline`. React Native `MonthPager` accepts it too.
+
+When a refresh replaces an event with one that has the same ID, the calendar
+keeps that event's rendered content and keyboard focus. A held move, resize, or
+all-day drag stays on the event, and `onDragEvent` receives the current object.
+On React DOM and Solid, an open actions dialog also stays open.
+
+IDs must be unique within `events`. For recurring data, identify each
+occurrence, not its series. Numeric `0` and string `"0"` are different IDs. An
+event with a missing, invalid, or duplicate ID falls back to the renderer's own
+matching, so a refresh can remount its content or cancel a held move.
+
+On React Native, the deprecated `keyExtractor` still sets rendering keys for
+events without a valid ID. When you pass both props, `getEventId` takes
+precedence.
 
 ## Render your own event
 
@@ -143,7 +157,6 @@ If you only want to tweak the built-in event box, you don't need a full
 
 - `eventCellStyle` — a style (or a function of the event) merged onto the
   built-in box.
-- `keyExtractor` — a stable key per event; defaults to start-time + index.
 - `showTime` shows the time range under the title (default true). The title comes
   first: on the day/week grid it fills the box with as many whole lines as fit
   (never a half-cut line), and the time only appears once a full line is free

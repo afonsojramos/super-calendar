@@ -31,6 +31,9 @@ import {
   movedClockSpan,
   type PositionedEvent,
   resolveDraggedBounds,
+  eventIdKeys,
+  type EventIdGetter,
+  findCurrentEvent,
 } from "@super-calendar/core";
 import {
   EventActionsDialog,
@@ -146,8 +149,12 @@ export interface ResourceTimelineProps<T = unknown> extends SlotStyleProps<Resou
     end: Date,
     resource: Resource,
   ) => void | boolean;
-  /** Stable, unique event identity for the web editing dialog across data refreshes. */
-  getEventId?: (event: CalendarEvent<T>) => string | number;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its focus, rendered state,
+   * open actions dialog, and any held move or resize.
+   */
+  getEventId?: EventIdGetter<T>;
   /** Tap empty lane space; called with the snapped time and the lane's resource. */
   onPressCell?: (at: Date, resource: Resource) => void;
   /** Drag empty lane space to create; called with the swept start/end and the lane's resource. */
@@ -513,9 +520,11 @@ export function ResourceTimeline<T = unknown>({
     const d = dragRef.current;
     if (!d || d.pointerId !== e.pointerId) return;
     handledClick.current = origin.current?.element ?? null;
+    // Report the held event as rendered now, after any refresh.
+    const event = findCurrentEvent(events, d.event, getEventId) ?? d.event;
     if (!d.moved) {
       clearDrag();
-      onPressEvent?.(d.event);
+      onPressEvent?.(event);
       return;
     }
     const resource = resources.find((resource) => resource.id === d.resource.id);
@@ -533,14 +542,14 @@ export function ResourceTimeline<T = unknown>({
     const endDelta =
       d.kind === "move" ? startDelta : o ? Math.round((d.durationHours - o.durationHours) * 60) : 0;
     const next = resolveDraggedBounds(
-      d.event.start,
-      d.event.end,
+      event.start,
+      event.end,
       startDelta,
       endDelta,
       dragStepMinutes,
     );
     clearDrag();
-    if (next) onDragEvent?.(d.event, next.start, next.end, target);
+    if (next) onDragEvent?.(event, next.start, next.end, target);
   };
   const cancelDrag = (e: ReactPointerEvent) => {
     if (dragRef.current?.pointerId !== e.pointerId) return;
@@ -707,7 +716,8 @@ export function ResourceTimeline<T = unknown>({
   useEffect(() => {
     if (
       dragRef.current &&
-      (!origin.current?.element.isConnected || !events.includes(dragRef.current.event))
+      (!origin.current?.element.isConnected ||
+        !findCurrentEvent(events, dragRef.current.event, getEventId))
     )
       clearDrag();
     const creating = createOrigin.current;
@@ -737,6 +747,10 @@ export function ResourceTimeline<T = unknown>({
     },
     [],
   );
+  // The held event as rendered now: a refresh can replace it with the event that
+  // has the same `getEventId`. Keyed by that ID, the held bar keeps its element.
+  const heldEvent = drag ? findCurrentEvent(events, drag.event, getEventId) : undefined;
+  const eventIds = useMemo(() => eventIdKeys(events, getEventId), [events, getEventId]);
   const eventKeys = useRef(new WeakMap<CalendarEvent<T>, number>());
   const nextEventKey = useRef(0);
   const eventKey = (event: CalendarEvent<T>) => {
@@ -1035,9 +1049,9 @@ export function ResourceTimeline<T = unknown>({
                     })}
                   />
                   {positioned.map((pe) => {
-                    const key = eventKey(pe.event);
+                    const key = eventIds.get(pe.event) ?? eventKey(pe.event);
                     const active =
-                      drag?.event === pe.event && drag.resource.id === resource.id ? drag : null;
+                      heldEvent === pe.event && drag?.resource.id === resource.id ? drag : null;
                     const startH = active ? active.startHours : pe.startHours;
                     const durH = active ? active.durationHours : pe.durationHours;
                     const top = clamp(startH - startHour, 0, endHour - startHour) * hourHeight;
@@ -1305,9 +1319,9 @@ export function ResourceTimeline<T = unknown>({
                   })}
                 />
                 {positioned.map((pe) => {
-                  const key = eventKey(pe.event);
+                  const key = eventIds.get(pe.event) ?? eventKey(pe.event);
                   const active =
-                    drag?.event === pe.event && drag.resource.id === resource.id ? drag : null;
+                    heldEvent === pe.event && drag?.resource.id === resource.id ? drag : null;
                   const startH = active ? active.startHours : pe.startHours;
                   const durH = active ? active.durationHours : pe.durationHours;
                   const left = clamp(startH - startHour, 0, endHour - startHour) * hourWidth;

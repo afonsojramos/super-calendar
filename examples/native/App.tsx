@@ -605,7 +605,7 @@ export default function App() {
                     events={events}
                     weekStartsOn={1}
                     renderEvent={EventContextMenu}
-                    keyExtractor={(event) => event.id}
+                    getEventId={(event) => event.id}
                     onChangeVisibleMonth={setDate}
                     onPressEvent={(event) => console.log("press event:", event.title)}
                     onPressDay={(day) => console.log("press day:", day.toDateString())}
@@ -629,6 +629,7 @@ export default function App() {
                     }
                     date={date}
                     events={events}
+                    getEventId={(event) => event.id}
                     refreshControl={
                       <RefreshControl refreshing={refreshing} onRefresh={reloadEvents} />
                     }

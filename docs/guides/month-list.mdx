@@ -51,22 +51,23 @@ date constraints, themes, or slots change. You do not need to replace `date` or
 
 ## Props
 
-| Prop                   | Type                       | Notes                                                           |
-| ---------------------- | -------------------------- | --------------------------------------------------------------- |
-| `date`                 | `Date`                     | The month scrolled to on mount.                                 |
-| `weekStartsOn`         | `0–6`                      | First day of the week.                                          |
-| `events`               | `CalendarEvent<T>[]`       | Optional; omit for an events-free picker.                       |
-| `weekRowHeight`        | `number`                   | Row height (px): 56, or 96 with events. Raise it for a big cap. |
-| `monthHeaderHeight`    | `number`                   | Title-row height (px). Default 44. A custom header must fit it. |
-| `renderEvent`          | `RenderEvent<T>`           | Optional; defaults to `DefaultEvent`.                           |
-| `keyExtractor`         | `(event, index) => string` | Optional; defaults to start-time + index.                       |
-| `selectedDates`        | `Date[]`                   | Selected days (see [Selection](/guides/selection)).             |
-| `selectedRange`        | `DateRange`                | Selected span.                                                  |
-| `minDate` / `maxDate`  | `Date`                     | Bound the selectable range.                                     |
-| `isDateDisabled`       | `(date) => boolean`        | Disable specific days.                                          |
-| `onSelectDrag`         | `(start, end) => void`     | Drag-to-select; pair with `useDateRange().selectRange`.         |
-| `showAdjacentMonths`   | `boolean`                  | Show dimmed adjacent-month days. Default `false`.               |
-| `highlightWeekends`    | `boolean`                  | Tint weekend day cells. Default `true`.                         |
-| `onPressDay`           | `(date) => void`           | Tap a day cell.                                                 |
-| `onChangeVisibleMonth` | `(month) => void`          | Fires with the topmost month once it's ~60% visible.            |
-| `renderMonthHeader`    | `(month) => ReactNode`     | Replace the default `LLLL yyyy` title.                          |
+| Prop                   | Type                          | Notes                                                           |
+| ---------------------- | ----------------------------- | --------------------------------------------------------------- |
+| `date`                 | `Date`                        | The month scrolled to on mount.                                 |
+| `weekStartsOn`         | `0–6`                         | First day of the week.                                          |
+| `events`               | `CalendarEvent<T>[]`          | Optional; omit for an events-free picker.                       |
+| `weekRowHeight`        | `number`                      | Row height (px): 56, or 96 with events. Raise it for a big cap. |
+| `monthHeaderHeight`    | `number`                      | Title-row height (px). Default 44. A custom header must fit it. |
+| `renderEvent`          | `RenderEvent<T>`              | Optional; defaults to `DefaultEvent`.                           |
+| `getEventId`           | `(event) => string \| number` | Optional; a stable ID that survives data refreshes.             |
+| `keyExtractor`         | `(event, index) => string`    | Deprecated; use `getEventId`.                                   |
+| `selectedDates`        | `Date[]`                      | Selected days (see [Selection](/guides/selection)).             |
+| `selectedRange`        | `DateRange`                   | Selected span.                                                  |
+| `minDate` / `maxDate`  | `Date`                        | Bound the selectable range.                                     |
+| `isDateDisabled`       | `(date) => boolean`           | Disable specific days.                                          |
+| `onSelectDrag`         | `(start, end) => void`        | Drag-to-select; pair with `useDateRange().selectRange`.         |
+| `showAdjacentMonths`   | `boolean`                     | Show dimmed adjacent-month days. Default `false`.               |
+| `highlightWeekends`    | `boolean`                     | Tint weekend day cells. Default `true`.                         |
+| `onPressDay`           | `(date) => void`              | Tap a day cell.                                                 |
+| `onChangeVisibleMonth` | `(month) => void`             | Fires with the topmost month once it's ~60% visible.            |
+| `renderMonthHeader`    | `(month) => ReactNode`        | Replace the default `LLLL yyyy` title.                          |

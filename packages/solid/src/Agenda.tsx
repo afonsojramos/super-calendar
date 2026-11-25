@@ -2,6 +2,8 @@ import { Dynamic, type JSX } from "@solidjs/web";
 import {
   type CalendarEvent,
   type EventAccessibilityLabeler,
+  eventIdKeys,
+  type EventIdGetter,
   eventTimeLabel,
   getIsToday,
   nowInTimeZone,
@@ -68,6 +70,11 @@ export interface AgendaProps<T = unknown> extends SlotStyleProps<AgendaSlot> {
    * announce. Defaults to the row's own text content.
    */
   eventAccessibilityLabel?: EventAccessibilityLabeler<T>;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the row with the same ID keeps its focus and rendered state.
+   */
+  getEventId?: EventIdGetter<T>;
   /** Tap an event row. */
   onPressEvent?: (event: CalendarEvent<T>) => void;
   /** Tap a day's header. */
@@ -166,6 +173,7 @@ export function Agenda<T = unknown>(incoming: AgendaProps<T>): JSX.Element {
     const sorted = props.events // Background events shade the grids; they have no agenda row.
       .filter((event) => !isBackgroundEvent(event))
       .sort((a, b) => a.start.getTime() - b.start.getTime());
+    const ids = eventIdKeys(sorted, props.getEventId);
     const out: Row<T>[] = [];
     let currentDay: Date | null = null;
     sorted.forEach((event, index) => {
@@ -177,10 +185,11 @@ export function Agenda<T = unknown>(incoming: AgendaProps<T>): JSX.Element {
           key: `h-${currentDay.toISOString()}`,
         });
       }
+      const id = ids.get(event);
       out.push({
         kind: "event",
         event,
-        key: `e-${event.start.toISOString()}-${index}`,
+        key: id === undefined ? `e-${event.start.toISOString()}-${index}` : `id-${id}`,
       });
     });
     return out;

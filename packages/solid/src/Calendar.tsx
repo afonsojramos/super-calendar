@@ -22,6 +22,7 @@ import {
   isAllDayLaneEvent,
   type MultiDayTimedEventPlacement,
   type WeekdayFormat,
+  type EventIdGetter,
   type WeekStartsOn,
 } from "@super-calendar/core/vanilla";
 import {
@@ -223,8 +224,12 @@ export interface CalendarProps<T = unknown>
    * days dragged so the time of day and duration are kept.
    */
   onDragEvent?: (event: CalendarEvent<T>, start: Date, end: Date) => void | boolean;
-  /** Stable, unique identity for the editing dialog and time-grid all-day bars across data refreshes. */
-  getEventId?: (event: CalendarEvent<T>) => string | number;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its focus, rendered state,
+   * open actions dialog, and any held move or resize, in every mode.
+   */
+  getEventId?: EventIdGetter<T>;
   /** Tap a day's column header. */
   onPressDateHeader?: (day: Date) => void;
   /** Custom time-grid event renderer. */
@@ -566,6 +571,7 @@ export function Calendar<T = unknown>(
           styles={props.styles}
           renderEvent={props.renderScheduleEvent}
           eventAccessibilityLabel={props.eventAccessibilityLabel}
+          getEventId={props.getEventId}
           onPressEvent={zoned.onPressEvent()}
           onPressDay={props.onPressDay}
         />
@@ -615,6 +621,7 @@ export function Calendar<T = unknown>(
           onPressMore={zoned.onPressMore()}
           renderEvent={props.renderMonthEvent}
           eventAccessibilityLabel={props.eventAccessibilityLabel}
+          getEventId={props.getEventId}
         />
       );
     } else if (mode === "multiweek") {
@@ -662,6 +669,7 @@ export function Calendar<T = unknown>(
           onPressMore={zoned.onPressMore()}
           renderEvent={props.renderMonthEvent}
           eventAccessibilityLabel={props.eventAccessibilityLabel}
+          getEventId={props.getEventId}
         />
       );
     } else {

@@ -268,9 +268,10 @@ drop onto another event. `onDragStart` fires when the bar is picked up. On nativ
 movable bar does not call `onLongPressEvent`, because the long press picks it up.
 
 A drag continues when `onDragStart` or another update rebuilds `events` with new
-objects. The lane finds the carried bar by `getEventId` on the web and by
-`keyExtractor` on native, or else by its dates and title. `onDragEvent` receives
-the current object.
+objects. The lane finds the carried bar by `getEventId`. Without one, it uses
+the bar's dates and title, or the deprecated `keyExtractor` on native.
+`onDragEvent` receives the current object. See
+[Identify events across refreshes](/guides/events#identify-events-across-refreshes).
 
 ### Rescheduling without dragging
 

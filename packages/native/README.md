@@ -157,6 +157,13 @@ stored times until release.
 After edge paging, the floating event's horizontal centre selects the destination
 day, and its top edge selects the time.
 
+Pass `getEventId={(event) => event.id}` when a refresh replaces event objects.
+The event with the same ID keeps its rendered content and any held move,
+resize, or all-day drag, and `onDragEvent` receives the current object. Return a
+stable, unique string or number per event or recurring occurrence. The
+deprecated `keyExtractor` still sets rendering keys; `getEventId` takes
+precedence when you pass both.
+
 Set an event's `dragHandleColor` to colour its resize grips in `TimeGrid` and
 `ResourceTimeline` (both orientations). It defaults to `theme.colors.eventText`.
 `showDragHandle={false}` still hides the time-grid grips.

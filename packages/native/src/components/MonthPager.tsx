@@ -43,6 +43,7 @@ import type {
   CalendarEvent,
   EventDragHandler,
   EventDragStartHandler,
+  EventIdGetter,
   EventKeyExtractor,
   MonthDateInfo,
   RenderEvent,
@@ -107,7 +108,17 @@ export type MonthPagerProps<T> = {
   isRTL?: boolean;
   calendarCellStyle?: (date: Date) => StyleProp<ViewStyle>;
   renderEvent: RenderEvent<T>;
-  keyExtractor: EventKeyExtractor<T>;
+  /**
+   * A stable ID for each event, unique per occurrence. When a refresh replaces
+   * event objects, the event with the same ID keeps its rendered state and any
+   * held move. Takes precedence over `keyExtractor`.
+   */
+  getEventId?: EventIdGetter<T>;
+  /**
+   * Stable key per event. Defaults to start, end, and title.
+   * @deprecated Use `getEventId`, which also keeps a held move on its event.
+   */
+  keyExtractor?: EventKeyExtractor<T>;
   onPressDay?: (date: Date) => void;
   onLongPressDay?: (date: Date) => void;
   /** Tap an empty day cell; receives the day at midnight. */
@@ -209,6 +220,7 @@ function DateRowsPagerInner<T>({
   isRTL,
   calendarCellStyle,
   renderEvent,
+  getEventId,
   keyExtractor,
   onPressDay,
   onLongPressDay,
@@ -578,6 +590,7 @@ function DateRowsPagerInner<T>({
           calendarCellStyle={calendarCellStyle}
           renderEvent={renderEvent}
           keyExtractor={keyExtractor}
+          getEventId={getEventId}
           onPressDay={onPressDay}
           onLongPressDay={onLongPressDay}
           onPressCell={onPressCell}
@@ -622,6 +635,7 @@ function DateRowsPagerInner<T>({
       activeDate,
       calendarCellStyle,
       renderEvent,
+      getEventId,
       keyExtractor,
       onPressDay,
       onLongPressDay,
