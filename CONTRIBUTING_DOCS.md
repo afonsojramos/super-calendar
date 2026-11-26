@@ -9,7 +9,7 @@ When public API or behavior changes, update the relevant guides, [the API refere
 - Use "the calendar" or "the library" for the package.
 - Use "consumer" for a developer who uses the library in their app.
 - Use "event" for a `CalendarEvent` and "occurrence" for an expanded recurring event.
-- Use the public mode names `month`, `week`, `day`, `3days`, `custom`, `schedule`, and `year`.
+- Use the public mode names `month`, `multiweek`, `week`, `day`, `3days`, `custom`, `schedule`, and `year`.
 
 ## Style
 
@@ -20,4 +20,6 @@ When public API or behavior changes, update the relevant guides, [the API refere
 
 ## Publishable pages
 
-[The package docs builder](scripts/build-package-docs.mjs) selects pages from the Mintlify navigation and converts MDX to Markdown for publication with each package. Check the builder when adding an MDX component to a bundled page. Run `pnpm exec vitest run tests/tooling/package-docs.test.ts` to verify all four bundles. Run `npx --yes mint@4.3.81 broken-links` from `docs/` to match the CI link check.
+For a page that should ship on npm, add it to the Mintlify navigation in `docs/docs.json` and to the relevant package page lists in `scripts/build-package-docs.mjs`. The builder checks each listed page against the navigation and converts its MDX to Markdown. Check the builder when adding an MDX component to a bundled page.
+
+Run `pnpm exec vitest run tests/tooling/package-docs.test.ts` to verify all four bundles. Run `npx --yes mint@4.3.81 broken-links` from `docs/` to match the CI link check.

@@ -3,14 +3,14 @@
 ## Packages
 
 - `packages/core` provides render-agnostic logic through `@super-calendar/core/vanilla` and React hooks through the root export. Keep renderer dependencies in their packages.
-- `packages/dom`, `packages/native`, and `packages/solid` provide the React DOM, React Native, and Solid 2 renderers. All three use the shared core via `workspace:*`.
+- `packages/dom`, `packages/native`, and `packages/solid` provide the React DOM, React Native, and Solid 2 renderers. All three depend on the workspace's `@super-calendar/core` package.
 
 ## Implementation
 
 - Give the calendar good defaults and expose customization through props, theme tokens, and render overrides.
-- Match prop names across DOM and native for `MonthView`, `MonthList`, and `TimeGrid`. Record web-only props in `tests/architecture/renderer-parity.test.ts`. Mirror shared additions to the `Calendar` wrappers by hand.
+- Match prop names across DOM and native for the `SHARED_COMPONENTS` in `tests/architecture/renderer-parity.test.ts`. Allowlist web-only props in that test. Mirror shared additions to the `Calendar` wrappers by hand.
 - Use pnpm or Nub with the shared `pnpm-lock.yaml`. Keep the default isolated layout and Metro's hierarchical lookup. Leave `nodeLinker: hoisted` and `disableHierarchicalLookup` unset.
-- Metro reads core and native TypeScript source through the `react-native` export condition. Run `pnpm build` to refresh the built packages for the web example and docs demo.
+- Metro reads core and native TypeScript source through the `react-native` export condition. The React web example resolves DOM and core directly to TypeScript source. Run `pnpm build:demos` to rebuild the demos published for the docs.
 
 ## Tests
 

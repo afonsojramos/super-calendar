@@ -29,7 +29,9 @@ After each rebase onto `main`, check the touched files against each row. Exercis
 
 ## Browser event order
 
-Require real Chromium contracts in [the Chromium contract directory](tests/web/browser/contracts/chromium/) for touch or pointer-capture changes. Under the W3C Pointer Events rules, implicit release after `pointerup` can fire `lostpointercapture` before `click`. jsdom does not reproduce that sequence. Check that ordinary capture loss preserves the pending tap and that `pointercancel` clears it. Verify the callback count and that a subsequent gesture still works.
+Test touch and pointer capture in real browsers. Keep portable cases in `tests/web/browser/contracts/` so they run in Chromium, Firefox, and WebKit. Use `tests/web/browser/contracts/chromium/` only for cases that need Chromium's DevTools Protocol, such as cases that dispatch real touch input.
+
+Under the W3C Pointer Events rules, implicit release after `pointerup` can fire `lostpointercapture` before `click`. jsdom does not reproduce that sequence. Check that ordinary capture loss preserves the pending tap and that `pointercancel` clears it. Verify the callback count and that a subsequent gesture still works.
 
 ## Library contracts
 
