@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.23.1](https://github.com/afonsojramos/super-calendar/compare/v2.23.0...v2.23.1) (2026-11-26)
+
+
+### Bug Fixes
+
+* **solid:** deliver TimeGrid touch taps on iOS Safari ([#214](https://github.com/afonsojramos/super-calendar/issues/214)) ([f540be6](https://github.com/afonsojramos/super-calendar/commit/f540be637f79021aa3798be1be7aa6721e295781))
+
 ## [2.23.0](https://github.com/afonsojramos/super-calendar/compare/v2.22.0...v2.23.0) (2026-11-25)
 
 
