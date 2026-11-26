@@ -56,7 +56,7 @@ import {
   Show,
   untrack,
 } from "solid-js";
-import { holdDateDrag } from "./touch";
+import { bindBubblingClick, holdDateDrag } from "./touch";
 import { withDefaults } from "./props";
 import { createScrollbarWidth } from "./scrollbar";
 import { createSlots, dataState, type SlotDefault, type SlotStyleProps } from "./slots";
@@ -1694,6 +1694,12 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                           ),
                                         ),
                                       );
+                                      const cellRef = bindBubblingClick<HTMLDivElement>((e) => {
+                                        if (day().isDisabled || consumeSuppressedClick(e.detail))
+                                          return;
+                                        props.onPressDay?.(day().date);
+                                        props.onPressCell?.(startOfDay(day().date));
+                                      });
                                       return (
                                         // Events mode: by default the cell is not a tab stop, so keyboard
                                         // focus moves through the event chips (real buttons) only, not
@@ -1761,15 +1767,7 @@ export function DateRows<T = unknown>(incoming: DateRowsProps<T>): JSX.Element {
                                               ? (e) => extendDrag(day().date, e.pointerId)
                                               : undefined
                                           }
-                                          onClick={
-                                            day().isDisabled
-                                              ? undefined
-                                              : (e) => {
-                                                  if (consumeSuppressedClick(e.detail)) return;
-                                                  props.onPressDay?.(day().date);
-                                                  props.onPressCell?.(startOfDay(day().date));
-                                                }
-                                          }
+                                          ref={cellRef}
                                           onKeyDown={
                                             props.keyboardDayNavigation && !day().isDisabled
                                               ? (e) => {

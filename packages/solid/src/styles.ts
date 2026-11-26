@@ -13,7 +13,6 @@ export interface ElementRef<T> {
 
 export type DomKeyboardEvent<T = HTMLElement> = KeyboardEvent & { currentTarget: T };
 export type DomPointerEvent<T = HTMLElement> = PointerEvent & { currentTarget: T };
-export type DomMouseEvent<T = HTMLElement> = MouseEvent & { currentTarget: T };
 
 const UNITLESS = new Set([
   "animation-iteration-count",

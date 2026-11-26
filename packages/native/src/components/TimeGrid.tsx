@@ -1,3 +1,10 @@
+// Search TimeGrid by symbol.
+// - AnimatedEventBoxBody handles move and resize gestures, including edge dwell.
+// - TimetablePageInner renders one page's headers, events, and creation surface.
+// - beginLift and commitLiftedDrop handle the drag ghost and cross-page drops.
+// - pageDates and realignRestingPager handle pager state and settling.
+// - renderItem renders virtualized pages before the grid shell.
+
 import {
   type LegendListRef,
   type LegendListRenderItemProps,

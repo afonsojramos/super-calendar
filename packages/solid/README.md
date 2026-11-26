@@ -91,6 +91,9 @@ the `classNames`/`styles` slot contract. Solid render callbacks return
 reactive. `ref` on `Calendar` or `TimeGrid` receives a `CalendarHandle` with
 `scrollToTime(minutes, options?)`.
 
+Set `onPressCell` on `TimeGrid` to handle touch taps on empty time slots, including
+in Safari on iOS.
+
 Only the pointer that starts a drag can move, finish, or cancel it. An additional
 contact cancels a touch hold that has not started dragging yet.
 Cancellation discards pending moves and event creation. `onSelectDrag` reports
