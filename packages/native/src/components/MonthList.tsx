@@ -605,7 +605,6 @@ function MonthListInner<T>({
       getFixedItemSize={getFixedItemSize}
       initialScrollIndex={initialIndex}
       showsVerticalScrollIndicator={false}
-      scrollEventThrottle={16}
       onScroll={handleScroll}
       viewabilityConfig={VIEWABILITY}
       onViewableItemsChanged={handleViewableItemsChanged}

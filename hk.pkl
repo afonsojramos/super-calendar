@@ -9,7 +9,7 @@ steps {
     depends = "format"
   }
   ["typecheck"] {
-    check = "pnpm run typecheck"
+    check = "pnpm typecheck"
     depends = "lint"
   }
   ["test"] {

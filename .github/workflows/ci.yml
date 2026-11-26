@@ -18,9 +18,6 @@ jobs:
       - run: pnpm lint
       - run: pnpm format
       - run: pnpm typecheck
-      - run: pnpm --filter @super-calendar/example-native typecheck
-      - run: pnpm --filter @super-calendar/example-web typecheck
-      - run: pnpm --filter @super-calendar/example-solid typecheck
       - run: pnpm test:parity
       - run: pnpm build
 

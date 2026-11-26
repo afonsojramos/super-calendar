@@ -665,6 +665,9 @@ export function Fixture() {
               : undefined
           }
           onCreateEvent={(start, end) => record(`${clock(start)}-${clock(end)}`)}
+          onPressCell={
+            view === "create-day-touch" ? (at) => record(`cell:${clock(at)}`) : undefined
+          }
         />
       ) : view.startsWith("draft-resources") ? (
         // Create-preview content on the resource timeline, along either axis.

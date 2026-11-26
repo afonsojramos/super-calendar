@@ -21,6 +21,101 @@ const rect = (width: number, height: number, x = 0, y = 0): DOMRect => ({
 });
 
 describe("Solid time-grid interactions", () => {
+  it("delivers a direct touch click to the latest onPressCell without rebinding", () => {
+    const view = mountProps<import("../TimeGrid").TimeGridProps>(TimeGrid, {
+      date,
+      hourHeight: 48,
+    });
+    const column = view.container.querySelector('[data-slot="dayColumn"]')!;
+    const add = vi.spyOn(column, "addEventListener");
+    const remove = vi.spyOn(column, "removeEventListener");
+    const initialPress = vi.fn();
+    const nextPress = vi.fn();
+    const onCreateEvent = vi.fn();
+
+    view.update({ onPressCell: initialPress });
+    const clickAdds = () => add.mock.calls.filter(([event]) => event === "click");
+    const clickRemoves = () => remove.mock.calls.filter(([event]) => event === "click");
+    expect(clickAdds()).toHaveLength(1);
+    view.update({ onPressCell: nextPress });
+    expect(clickAdds()).toHaveLength(1);
+    expect(clickRemoves()).toHaveLength(0);
+
+    const touch = { clientY: 96, pointerType: "touch" };
+    pointer(column, "down", touch);
+    pointer(column, "up", touch);
+    expect(nextPress).not.toHaveBeenCalled();
+    column.dispatchEvent(new MouseEvent("click", { bubbles: false, clientY: 96, detail: 1 }));
+    expect(initialPress).not.toHaveBeenCalled();
+    expect(nextPress).toHaveBeenCalledExactlyOnceWith(at(2));
+
+    view.update({ onPressCell: undefined, onCreateEvent });
+    expect(clickRemoves()).toEqual(clickAdds());
+    pointer(column, "down", touch);
+    pointer(column, "up", touch);
+    view.update({ onPressCell: nextPress });
+    expect(clickAdds()).toHaveLength(2);
+    column.dispatchEvent(new MouseEvent("click", { bubbles: false, clientY: 96, detail: 1 }));
+    expect(nextPress).toHaveBeenCalledTimes(1);
+    view.unmount();
+    expect(clickRemoves()).toEqual(clickAdds());
+  });
+
+  it.each([
+    { control: "checkbox", presses: 0 },
+    { control: "button", presses: 1 },
+  ])("preserves click bubbling from a custom event $control", ({ control, presses }) => {
+    const onPressEvent = vi.fn();
+    const onDetails = vi.fn();
+    const view = mount(() => (
+      <TimeGrid
+        date={date}
+        events={[event]}
+        onPressEvent={onPressEvent}
+        renderEvent={() =>
+          control === "checkbox" ? (
+            <strong
+              role="checkbox"
+              aria-checked={false}
+              tabindex={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDetails();
+              }}
+            >
+              Details
+            </strong>
+          ) : (
+            <button type="button" onClick={onDetails}>
+              Details
+            </button>
+          )
+        }
+      />
+    ));
+    click(view.getByRole(control, { name: "Details" }));
+    expect(onDetails).toHaveBeenCalledOnce();
+    expect(onPressEvent).toHaveBeenCalledTimes(presses);
+  });
+
+  it.each(["read-only", "create-only"] as const)("omits direct cell clicks in %s grids", (mode) => {
+    const add = vi.spyOn(EventTarget.prototype, "addEventListener");
+    try {
+      const view = mount(() => (
+        <TimeGrid date={date} onCreateEvent={mode === "create-only" ? vi.fn() : undefined} />
+      ));
+      const column = view.container.querySelector('[data-slot="dayColumn"]');
+      expect(column).toBeTruthy();
+      expect(
+        add.mock.calls.some(
+          ([event], index) => event === "click" && add.mock.contexts[index] === column,
+        ),
+      ).toBe(false);
+    } finally {
+      add.mockRestore();
+    }
+  });
+
   it.each(["top", "bottom"] as const)("resizes the %s edge without remounting", (edge) => {
     const onDragEvent = vi.fn();
     const view = mount(() => (

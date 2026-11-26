@@ -22,6 +22,7 @@ const SHARED_COMPONENTS = [
   "MultiWeekView",
   "MonthList",
   "TimeGrid",
+  "ResourceTimeline",
   "YearView",
 ] as const;
 
@@ -47,6 +48,8 @@ const DOM_PLATFORM_PROPS: Record<string, Set<string>> = {
     "touchDragThreshold",
     "keyboardEventNavigation",
   ]),
+  // Web exposes CSS slot overrides and a per-board theme. Native uses theme context.
+  ResourceTimeline: new Set(["className", "style", "theme", "classNames", "styles"]),
   // showTitle/showWeekdays toggle dom-only chrome; theme/className/style as above.
   // keyboardDayNavigation is a web keyboard-focus concern (roving tabindex); native
   // is touch/swipe with arrow-key paging, so it has no equivalent.

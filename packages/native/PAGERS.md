@@ -58,6 +58,8 @@ Facts were checked against React Native 0.86 and `@legendapp/list` 3.7.
 
 - `onViewableItemsChanged` fires only when the set of visible pages changes.
   Settling back onto the page you started from sends nothing.
+- Omit `scrollEventThrottle` on `LegendList` and `AnimatedLegendList`.
+  The renderer architecture test enforces this for native JSX.
 - LegendList hardcodes `scrollEventThrottle: 0` on the underlying `ScrollView`
   and uses `props.scrollEventThrottle` only to wrap `props.onScroll` in a JS
   throttle with an uncancelled trailing `setTimeout`; it also skips notifying

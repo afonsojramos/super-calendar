@@ -1,3 +1,26 @@
+import { assign } from "@solidjs/web";
+import { onCleanup } from "solid-js";
+
+const enableSafariClick = () => {};
+
+export function bindBubblingClick<T extends HTMLElement>(
+  onClick: (event: MouseEvent, element: T) => void,
+) {
+  let removeListener: (() => void) | undefined;
+  onCleanup(() => removeListener?.());
+  return (element: T) => {
+    removeListener?.();
+    // A native listener lets iOS Safari deliver the click. Solid still runs the
+    // callback after descendant handlers, which can stop its propagation.
+    element.addEventListener("click", enableSafariClick);
+    assign(element, { onClick: (event: MouseEvent) => onClick(event, element) });
+    removeListener = () => {
+      element.removeEventListener("click", enableSafariClick);
+      assign(element, { onClick: null });
+    };
+  };
+}
+
 export type EventGrab = {
   readonly box: HTMLElement;
   readonly pointerId: number;

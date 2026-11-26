@@ -82,12 +82,11 @@ import {
   css,
   type CSSProperties,
   type DomKeyboardEvent,
-  type DomMouseEvent,
   type DomPointerEvent,
   type ElementRef,
 } from "./styles";
 import { mergeSolidTheme, type SolidCalendarTheme } from "./theme";
-import { type EventGrab, waitForHold } from "./touch";
+import { bindBubblingClick, type EventGrab, waitForHold } from "./touch";
 
 /**
  * Styleable parts of {@link TimeGrid}. Pass a class or inline style per slot via
@@ -944,6 +943,7 @@ export function TimeGrid<T = unknown>(
     current: null,
   };
   const cellEnabled = createMemo(() => !!props.onPressCell || !!props.onCreateEvent);
+  const hasPressCell = createMemo(() => !!props.onPressCell);
   const days = createMemo(() =>
     getViewDays(
       props.mode,
@@ -2009,7 +2009,7 @@ export function TimeGrid<T = unknown>(
     // Mouse / pen only: on touch the column must stay free to scroll the grid.
     // Only from the column background, primary button, never on an event.
     cellTouchRef.current =
-      e.pointerType === "touch" && e.target === e.currentTarget
+      hasPressCell() && e.pointerType === "touch" && e.target === e.currentTarget
         ? {
             pointerId: e.pointerId,
             x: e.clientX,
@@ -2113,18 +2113,32 @@ export function TimeGrid<T = unknown>(
       if (at) props.onPressCell(at.start);
     }
   };
-  const tapCell = (e: DomMouseEvent<HTMLDivElement>, dayIndex: number) => {
+  const tapCell = (e: MouseEvent, column: HTMLDivElement, dayIndex: number) => {
     const touch = cellTouchRef.current;
     cellTouchRef.current = null;
     const day = days()[dayIndex];
-    if (!touch || !props.onPressCell || !day || e.target !== e.currentTarget) {
+    if (!touch || !props.onPressCell || !day || e.target !== column) {
       return;
     }
-    const px = pxFromTop(e.currentTarget, e.clientY);
+    const px = pxFromTop(column, e.clientY);
     const at = cellRangeFromDrag(day, px, px, hourHeightRef.current, windowStart(), snapMinutes());
     if (at) {
       props.onPressCell(at.start);
     }
+  };
+  // iOS Safari needs a direct listener to deliver touch clicks to a plain div.
+  const bindColumnTap = (dayIndex: number) => {
+    const [columnEl, setColumnEl] = createSignal<HTMLDivElement | null>(null);
+    createEffect(
+      () => (hasPressCell() ? columnEl() : null),
+      (column) => {
+        if (!column) return;
+        const onClick = (event: MouseEvent) => tapCell(event, column, dayIndex);
+        column.addEventListener("click", onClick);
+        return () => column.removeEventListener("click", onClick);
+      },
+    );
+    return setColumnEl;
   };
   // A gesture the browser/OS cancels (scroll takeover, etc.) must not commit a
   // create, just drop the in-progress state.
@@ -2142,8 +2156,14 @@ export function TimeGrid<T = unknown>(
     }
   };
   createEffect(
-    () => ({ days: days(), creating: !!props.onCreateEvent, enabled: cellEnabled() }),
+    () => ({
+      days: days(),
+      creating: !!props.onCreateEvent,
+      enabled: cellEnabled(),
+      pressing: hasPressCell(),
+    }),
     (state) => {
+      if (!state.pressing) cellTouchRef.current = null;
       const origin = createOrigin.current;
       if (
         origin &&
@@ -2883,6 +2903,7 @@ export function TimeGrid<T = unknown>(
           {
             <For each={days()} keyed={false}>
               {(day, dayIndex) => {
+                const columnRef = bindColumnTap(dayIndex);
                 const positioned = createMemo(() => positionedByDay()[dayIndex]);
                 // Boxes keep their element by event ID, or else by position.
                 const keyedPositioned = createMemo(() =>
@@ -2960,6 +2981,7 @@ export function TimeGrid<T = unknown>(
                 });
                 return (
                   <div
+                    ref={columnRef}
                     // Identifies the drop day for a cross-page drag hit-test.
                     data-date={day().toISOString()}
                     // Empty columns are a pointer-only create surface: drag to sweep
@@ -2970,7 +2992,6 @@ export function TimeGrid<T = unknown>(
                     onPointerUp={cellEnabled() ? endCreate : undefined}
                     onPointerCancel={cellEnabled() ? cancelCreate : undefined}
                     onLostPointerCapture={cellEnabled() ? loseCreateCapture : undefined}
-                    onClick={cellEnabled() ? (e) => tapCell(e, dayIndex) : undefined}
                     {...dataState({
                       "data-today": getIsToday(day(), new Date(todayKey())),
                       "data-weekend": isWeekend(day()),
@@ -3198,6 +3219,13 @@ export function TimeGrid<T = unknown>(
                                     editable() &&
                                     (pe().event.durationEditable ?? props.eventDurationEditable),
                                 );
+                                const boxRef = bindBubblingClick<HTMLDivElement>((e, box) => {
+                                  if (canMove()) {
+                                    if (e.detail !== 0 && !box.contains(tappedRef.current)) return;
+                                    tappedRef.current = null;
+                                  }
+                                  onPress();
+                                });
                                 return (
                                   <div
                                     role="button"
@@ -3225,20 +3253,7 @@ export function TimeGrid<T = unknown>(
                                             pressEvent(e, pe(), key(), "move", dayIndex, onPress)
                                         : undefined
                                     }
-                                    onClick={
-                                      canMove()
-                                        ? (e) => {
-                                            if (
-                                              e.detail === 0 ||
-                                              (tappedRef.current &&
-                                                e.currentTarget.contains(tappedRef.current))
-                                            ) {
-                                              tappedRef.current = null;
-                                              onPress();
-                                            }
-                                          }
-                                        : onPress
-                                    }
+                                    ref={boxRef}
                                     {...dataState({
                                       "data-dragging": !!active() && !hiddenForMove(),
                                     })}
@@ -3285,7 +3300,7 @@ export function TimeGrid<T = unknown>(
                                     )}
                                     {/* A release without movement on a handle presses the event, like
                                      the box itself. Only when the box can move: otherwise it carries
-                                     its own `onClick`, which would press the event a second time. */}
+                                     a click handler that would press the event a second time. */}
                                     {canResize() && !pe().continuesBefore ? (
                                       <div
                                         onPointerDown={(e) => {
